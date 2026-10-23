@@ -1,13 +1,14 @@
 #[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
 use core::{
-    cell::{RefCell, RefMut},
+    cell::{RefCell, RefMut, UnsafeCell},
     ptr::NonNull,
 };
 
-use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::RawMutex;
+#[cfg(riscv)]
+use esp_sync::RestoreState;
 use macros::ram;
 
 #[cfg(feature = "rtos-trace")]
@@ -262,22 +263,19 @@ impl SchedulerState {
         }
     }
 
-    fn run_scheduler(&mut self, task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext)) {
+    /// Selects the next task, and returns whether `task_switch` was called.
+    ///
+    /// `current_sp` is the stack pointer of the interrupted context.
+    fn run_scheduler(
+        &mut self,
+        current_sp: u32,
+        task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext),
+    ) -> bool {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_begin(TraceEvents::RunSchedule as u32);
 
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
-
-        let current_sp: u32;
-        cfg_select! {
-            xtensa => unsafe {
-                core::arch::asm!("mov {0}, sp", out(reg) current_sp);
-            },
-            _ => unsafe {
-                core::arch::asm!("mv {0}, sp", out(reg) current_sp);
-            },
-        }
 
         if !self.per_cpu[cpu as usize].to_delete.is_empty() {
             self.delete_marked_tasks(cpu, current_sp as usize);
@@ -320,8 +318,12 @@ impl SchedulerState {
         }
 
         let mut arm_next_timeslice_tick = false;
-        let next_task = self.run_queue.pop();
-        if next_task != current_task || deleted_self {
+        let next_task = self.run_queue.pop(
+            #[cfg(multi_core)]
+            self.per_cpu[1 - current_cpu].current_task,
+        );
+        let switched = next_task != current_task || deleted_self;
+        if switched {
             debug!("Switching task {:?} -> {:?}", current_task, next_task);
 
             // If the current task is deleted, we can skip saving its context. We signal this by
@@ -330,9 +332,6 @@ impl SchedulerState {
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::task_exec_end(); // FIXME: rtos-trace should take the task ID for multi-core
 
-                // TODO: the SMP scheduler relies on at least the context saving to happen within
-                // the scheduler's critical section. We can't run the scheduler on the other core
-                // while it might try to restore a partially saved context.
                 #[cfg(multi_core)]
                 let current_ref = unsafe { current.as_ref() };
                 // The other core can only pick up the task we switch away from if it runs the
@@ -408,10 +407,27 @@ impl SchedulerState {
 
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_end(TraceEvents::RunSchedule as u32);
+
+        switched
     }
 
-    pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
-        self.run_scheduler(|current_context, next_context| {
+    /// Runs the scheduler, and returns whether it selected a different context.
+    pub(crate) fn switch_task(
+        &mut self,
+        #[cfg(xtensa)] trap_frame: &mut CpuContext,
+        #[cfg(riscv)] current_sp: u32,
+    ) -> bool {
+        #[cfg(xtensa)]
+        let current_sp = trap_frame.A1;
+
+        // The scheduler saves `current_sp` into the old context. The ISR stack belongs to the CPU,
+        // not to a task.
+        debug_assert!(
+            !on_isr_stack(current_sp),
+            "The context switch interrupted code that runs on the ISR stack"
+        );
+
+        self.run_scheduler(current_sp, |current_context, next_context| {
             trace!(
                 "Task switch: {:x} -> {:x}",
                 current_context as usize, next_context as usize
@@ -422,7 +438,7 @@ impl SchedulerState {
                 #[cfg(xtensa)]
                 trap_frame,
             )
-        });
+        })
     }
 
     /// Returns whether `task` is the main task of any CPU.
@@ -580,6 +596,32 @@ impl SchedulerState {
     }
 }
 
+/// Returns whether `sp` is in the ISR stack of the current CPU.
+fn on_isr_stack(sp: u32) -> bool {
+    unsafe extern "C" {
+        static _isr_stack_bottom_cpu0: u8;
+        static _isr_stack_top_cpu0: u8;
+        #[cfg(multi_core)]
+        static _isr_stack_bottom_cpu1: u8;
+        #[cfg(multi_core)]
+        static _isr_stack_top_cpu1: u8;
+    }
+
+    let (bottom, top) = match Cpu::current() {
+        Cpu::ProCpu => (
+            &raw const _isr_stack_bottom_cpu0,
+            &raw const _isr_stack_top_cpu0,
+        ),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => (
+            &raw const _isr_stack_bottom_cpu1,
+            &raw const _isr_stack_top_cpu1,
+        ),
+    };
+
+    (bottom as u32..top as u32).contains(&sp)
+}
+
 pub(crate) struct GlobalState {
     pub scheduler: RefCell<SchedulerState>,
     #[cfg(feature = "embassy")]
@@ -606,13 +648,18 @@ impl GlobalState {
 }
 
 pub(crate) struct Scheduler {
-    inner: Mutex<RawMutex, GlobalState>,
+    lock: RawMutex,
+    inner: UnsafeCell<GlobalState>,
 }
+
+// `inner` is only accessed while `lock` is held.
+unsafe impl Sync for Scheduler {}
 
 impl Scheduler {
     const fn new() -> Self {
         Self {
-            inner: Mutex::new(GlobalState::new()),
+            lock: RawMutex::new(),
+            inner: UnsafeCell::new(GlobalState::new()),
         }
     }
 
@@ -621,7 +668,41 @@ impl Scheduler {
     }
 
     pub(crate) fn with_shared<R>(&self, cb: impl FnOnce(&GlobalState) -> R) -> R {
-        self.inner.lock(cb)
+        self.lock.lock(|| cb(unsafe { &*self.inner.get() }))
+    }
+
+    /// Runs the scheduler. If the scheduler selects a different context, the lock stays held and
+    /// the function returns the lock token. Otherwise, the function releases the lock. The return
+    /// value does not tell the two cases apart, because a token can be 0.
+    ///
+    /// # Safety
+    ///
+    /// If the lock stays held, the caller must save the old context, leave the old stack, and then
+    /// give the token to [`Self::release_after_switch`].
+    #[cfg(riscv)]
+    #[ram]
+    pub(crate) unsafe fn switch_task_keep_lock(&self, interrupted_sp: u32) -> u32 {
+        let token = unsafe { self.lock.acquire() };
+        let switched = unsafe { &*self.inner.get() }
+            .scheduler()
+            .switch_task(interrupted_sp);
+        if switched {
+            token.inner()
+        } else {
+            unsafe { self.lock.release(token) };
+            0
+        }
+    }
+
+    /// Releases the lock that [`Self::switch_task_keep_lock`] kept.
+    ///
+    /// # Safety
+    ///
+    /// `token` must be the value that [`Self::switch_task_keep_lock`] returned on this CPU.
+    #[cfg(riscv)]
+    #[ram]
+    pub(crate) unsafe fn release_after_switch(&self, token: u32) {
+        unsafe { self.lock.release(RestoreState::new(token)) };
     }
 
     pub(crate) fn current_task(&self) -> TaskPtr {

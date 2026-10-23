@@ -321,6 +321,70 @@ pub(crate) fn enable_main_stack_guard_monitoring() {
     }
 }
 
+/// The data watchpoint that watches the ISR stack guard, if one is free.
+///
+/// Watchpoint 0 watches the stack guard of the current task. On RISC-V,
+/// `write-vec-table-monitoring` uses watchpoint 1.
+#[cfg(all(feature = "rt", riscv))]
+pub(crate) const ISR_STACK_WATCHPOINT: Option<u8> = if property!("soc.cpu_watchpoints") >= 3 {
+    Some(2)
+} else if cfg!(write_vec_table_monitoring) {
+    None
+} else {
+    Some(1)
+};
+
+/// Writes the stack guard of the current CPU's ISR stack, and watches it with a data watchpoint.
+#[cfg(feature = "rt")]
+pub(crate) fn setup_isr_stack_guard() {
+    unsafe extern "C" {
+        static mut _isr_stack_bottom_cpu0: u32;
+        #[cfg(multi_core)]
+        static mut _isr_stack_bottom_cpu1: u32;
+    }
+
+    let bottom = match crate::system::Cpu::current() {
+        crate::system::Cpu::ProCpu => &raw mut _isr_stack_bottom_cpu0,
+        #[cfg(multi_core)]
+        crate::system::Cpu::AppCpu => &raw mut _isr_stack_bottom_cpu1,
+    };
+
+    unsafe {
+        let guard = bottom.byte_add(esp_config::esp_config_int!(
+            usize,
+            "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
+        ));
+        guard.write_volatile(esp_config::esp_config_int!(
+            u32,
+            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+        ));
+
+        #[cfg(stack_guard_monitoring)]
+        if cfg!(stack_guard_monitoring_with_debugger_connected)
+            || !crate::debugger::debugger_connected()
+        {
+            cfg_select! {
+                xtensa => {
+                    let dbreakc = 0b1111100 | (1 << 31); // bit 31 = STORE
+                    core::arch::asm!(
+                        "
+                        wsr {addr}, 145 // 145 = dbreaka1
+                        wsr {dbreakc}, 161 // 161 = dbreakc1
+                        ",
+                        addr = in(reg) guard,
+                        dbreakc = in(reg) dbreakc,
+                    );
+                }
+                _ => {
+                    if let Some(id) = ISR_STACK_WATCHPOINT {
+                        crate::debugger::set_watchpoint(id, guard as usize, 4);
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[cfg(all(riscv, write_vec_table_monitoring))]
 pub(crate) fn trap_section_protected() -> bool {
     cfg!(stack_guard_monitoring_with_debugger_connected) || !crate::debugger::debugger_connected()

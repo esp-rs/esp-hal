@@ -207,89 +207,119 @@ r#"
 "#,
 }
 
+// The vector tables jump to `_start_Trap<N>_trap`. Handlers run on the ISR stack of the current
+// CPU, or below the current stack pointer if the CPU already runs on the ISR stack.
+//
+// Trap frame, in words: ra, t0-t6, a0-a7, then the stack pointer to return to.
+global_asm!(
+    r#"
+.section .trap.start, "ax"
+.balign 4
+.global _esp_riscv_rt_interrupt_trap
+_esp_riscv_rt_interrupt_trap:
+    // `_start_Trap<N>_trap` has stored the interrupted a0 at 0(sp), moved sp down by 16, and
+    // loaded the interrupt number into a0.
+    sw t0, 4(sp)
+
+    csrr t0, mhartid
+    bnez t0, 2f
+
+    la t0, _isr_stack_bottom_cpu0
+    bltu sp, t0, 1f
+    la t0, _isr_stack_top_cpu0
+    bltu sp, t0, 5f
+    j 6f
+1:
+    la t0, _isr_stack_top_cpu0
+    j 6f
+
+2:
+    la t0, _isr_stack_bottom_cpu1
+    bltu sp, t0, 3f
+    la t0, _isr_stack_top_cpu1
+    bltu sp, t0, 5f
+    j 6f
+3:
+    la t0, _isr_stack_top_cpu1
+    j 6f
+
+5:
+    mv t0, sp
+6:
+    addi t0, t0, -80
+    sw sp, 16*4(t0)
+    mv sp, t0
+
+    sw ra, 0*4(sp)
+    sw t1, 2*4(sp)
+    sw t2, 3*4(sp)
+    sw t3, 4*4(sp)
+    sw t4, 5*4(sp)
+    sw t5, 6*4(sp)
+    sw t6, 7*4(sp)
+    sw a1, 9*4(sp)
+    sw a2, 10*4(sp)
+    sw a3, 11*4(sp)
+    sw a4, 12*4(sp)
+    sw a5, 13*4(sp)
+    sw a6, 14*4(sp)
+    sw a7, 15*4(sp)
+
+    lw t1, 16*4(sp)
+    lw t2, 0(t1)
+    sw t2, 8*4(sp)
+    lw t2, 4(t1)
+    sw t2, 1*4(sp)
+
+    call handle_interrupts
+
+    lw ra, 0*4(sp)
+    lw t0, 1*4(sp)
+    lw t1, 2*4(sp)
+    lw t2, 3*4(sp)
+    lw t3, 4*4(sp)
+    lw t4, 5*4(sp)
+    lw t5, 6*4(sp)
+    lw t6, 7*4(sp)
+    lw a0, 8*4(sp)
+    lw a1, 9*4(sp)
+    lw a2, 10*4(sp)
+    lw a3, 11*4(sp)
+    lw a4, 12*4(sp)
+    lw a5, 13*4(sp)
+    lw a6, 14*4(sp)
+    lw a7, 15*4(sp)
+    lw sp, 16*4(sp)
+    addi sp, sp, 16
+    mret
+"#
+);
+
 macro_rules! define_interrupt {
-    ($num:literal, $name:ident, $fname:ident) => {
-        #[derive(Copy, Clone)]
-        struct $name;
-
-        unsafe impl riscv_rt::InterruptNumber for $name {
-            const MAX_INTERRUPT_NUMBER: usize = if cfg!(feature = "clic-48") { 47 } else { 31 };
-
-            fn number(self) -> usize {
-                $num
-            }
-
-            fn from_number(_value: usize) -> riscv_rt::result::Result<Self> {
-                Ok($name)
-            }
-        }
-
-        unsafe impl riscv_rt::CoreInterruptNumber for $name {}
-
-        #[unsafe(naked)]
-        #[unsafe(link_section = ".trap.start")]
-        #[riscv_rt::core_interrupt($name)]
-        extern "C" fn $fname() {
-            core::arch::naked_asm! {
-                concat!(
-                "
-                li a0,",$num,"
-                j handle_interrupts
-                "
-                )
-            }
-        }
+    ($($num:literal),*) => {
+        $(
+            global_asm!(concat!(
+                r#"
+.section .trap.start, "ax"
+.balign 4
+.global _start_Trap"#, $num, r#"_trap
+_start_Trap"#, $num, r#"_trap:
+    addi sp, sp, -16
+    sw a0, 0(sp)
+    li a0, "#, $num, r#"
+    j _esp_riscv_rt_interrupt_trap
+"#
+            ));
+        )*
     };
 }
 
-define_interrupt!(1, Trap1, trap1);
-define_interrupt!(2, Trap2, trap2);
-define_interrupt!(3, Trap3, trap3);
-define_interrupt!(4, Trap4, trap4);
-define_interrupt!(5, Trap5, trap5);
-define_interrupt!(6, Trap6, trap6);
-define_interrupt!(7, Trap7, trap7);
-define_interrupt!(8, Trap8, trap8);
-define_interrupt!(9, Trap9, trap9);
-define_interrupt!(10, Trap10, trap10);
-define_interrupt!(11, Trap11, trap11);
-define_interrupt!(12, Trap12, trap12);
-define_interrupt!(13, Trap13, trap13);
-define_interrupt!(14, Trap14, trap14);
-define_interrupt!(15, Trap15, trap15);
-define_interrupt!(16, Trap16, trap16);
-define_interrupt!(17, Trap17, trap17);
-define_interrupt!(18, Trap18, trap18);
-define_interrupt!(19, Trap19, trap19);
-define_interrupt!(20, Trap20, trap20);
-define_interrupt!(21, Trap21, trap21);
-define_interrupt!(22, Trap22, trap22);
-define_interrupt!(23, Trap23, trap23);
-define_interrupt!(24, Trap24, trap24);
-define_interrupt!(25, Trap25, trap25);
-define_interrupt!(26, Trap26, trap26);
-define_interrupt!(27, Trap27, trap27);
-define_interrupt!(28, Trap28, trap28);
-define_interrupt!(29, Trap29, trap29);
-define_interrupt!(30, Trap30, trap30);
-define_interrupt!(31, Trap31, trap31);
+define_interrupt!(
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31
+);
 
 #[cfg(feature = "clic-48")]
-mod clic {
-    define_interrupt!(32, Trap32, trap32);
-    define_interrupt!(33, Trap33, trap33);
-    define_interrupt!(34, Trap34, trap34);
-    define_interrupt!(35, Trap35, trap35);
-    define_interrupt!(36, Trap36, trap36);
-    define_interrupt!(37, Trap37, trap37);
-    define_interrupt!(38, Trap38, trap38);
-    define_interrupt!(39, Trap39, trap39);
-    define_interrupt!(40, Trap40, trap40);
-    define_interrupt!(41, Trap41, trap41);
-    define_interrupt!(42, Trap42, trap42);
-    define_interrupt!(43, Trap43, trap43);
-    define_interrupt!(44, Trap44, trap44);
-    define_interrupt!(45, Trap45, trap45);
-    define_interrupt!(46, Trap46, trap46);
-    define_interrupt!(47, Trap47, trap47);
-}
+define_interrupt!(
+    32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47
+);

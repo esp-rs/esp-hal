@@ -686,6 +686,265 @@ mod tests {
         }
     }
 
+    /// Counts and yields forever. `context` points to the `AtomicUsize` to increment.
+    #[cfg(multi_core)]
+    extern "C" fn count_and_yield(context: *mut c_void) {
+        let counter = unsafe { &*(context as *const AtomicUsize) };
+        loop {
+            counter.fetch_add(1, Ordering::Relaxed);
+            preempt::yield_task();
+        }
+    }
+
+    #[test]
+    #[timeout(10)]
+    #[cfg(multi_core)]
+    fn unpinned_tasks_survive_migration(ctx: Context) {
+        // Unpinned tasks that yield in a loop move between the cores. A periodic high-priority
+        // interrupt delays core 0 at random points. Thus, core 1 can take a task that core 0
+        // switches away from.
+        use esp_hal::{Blocking, handler, peripherals::TIMG1, timer::PeriodicTimer};
+        use esp_sync::NonReentrantMutex;
+
+        const TASKS: usize = 3;
+        static COUNTERS: [AtomicUsize; TASKS] = [const { AtomicUsize::new(0) }; TASKS];
+        static TIMER: NonReentrantMutex<Option<PeriodicTimer<'static, Blocking>>> =
+            NonReentrantMutex::new(None);
+
+        #[handler(priority = Priority::Priority3)]
+        fn keep_core_busy() {
+            TIMER.with(|timer| {
+                if let Some(timer) = timer {
+                    timer.clear_interrupt();
+                }
+            });
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(100) {}
+        }
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        // The main task must preempt the counting tasks to check the result.
+        CurrentThreadHandle::get().set_priority(5);
+
+        let timg1 = TimerGroup::new(unsafe { TIMG1::steal() });
+        let mut timer = PeriodicTimer::new(timg1.timer0);
+        timer.set_interrupt_handler(keep_core_busy);
+        timer.listen();
+        timer.start(Duration::from_millis(1)).unwrap();
+        TIMER.with(|slot| *slot = Some(timer));
+
+        for counter in &COUNTERS {
+            unsafe {
+                preempt::task_create(
+                    "counter",
+                    count_and_yield,
+                    (&raw const *counter).cast::<c_void>().cast_mut(),
+                    1,
+                    None,
+                    4096,
+                );
+            }
+        }
+
+        let started = COUNTERS
+            .each_ref()
+            .map(|counter| counter.load(Ordering::Relaxed));
+        CurrentThreadHandle::get().delay(Duration::from_secs(3));
+
+        TIMER.with(|slot| {
+            if let Some(timer) = slot {
+                timer.unlisten();
+            }
+        });
+
+        for (index, counter) in COUNTERS.iter().enumerate() {
+            hil_test::assert!(
+                counter.load(Ordering::Relaxed) > started[index],
+                "Counting task {} stopped running",
+                index
+            );
+        }
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
+    /// State that the victim and the waker of `woken_task_runs_on_one_core` share.
+    #[cfg(multi_core)]
+    struct WakeTest {
+        victim: SemaphoreHandle,
+        waker: SemaphoreHandle,
+        victim_blocks_on_core_0: AtomicBool,
+        victim_running: AtomicBool,
+        rounds: AtomicUsize,
+    }
+
+    /// Wakes the waker, then blocks. `context` points to a `WakeTest`.
+    #[cfg(multi_core)]
+    extern "C" fn wake_test_victim(context: *mut c_void) {
+        let test = unsafe { &*(context as *const WakeTest) };
+        loop {
+            test.waker.give();
+            test.victim_blocks_on_core_0
+                .store(Cpu::current() == Cpu::ProCpu, Ordering::Relaxed);
+            test.victim.take(None);
+
+            hil_test::assert!(
+                !test.victim_running.swap(true, Ordering::Relaxed),
+                "Two cores run the same task"
+            );
+            // Must be longer than the busy interrupt, so that two copies of the task overlap here.
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(200) {}
+            test.victim_running.store(false, Ordering::Relaxed);
+
+            test.rounds.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Delays core 0 while the victim blocks, wakes the victim, then blocks. `context` points to a
+    /// `WakeTest`.
+    #[cfg(multi_core)]
+    extern "C" fn wake_test_waker(context: *mut c_void) {
+        let test = unsafe { &*(context as *const WakeTest) };
+        loop {
+            test.waker.take(None);
+
+            let start = Instant::now();
+            while !test.victim_blocks_on_core_0.swap(false, Ordering::Relaxed)
+                && start.elapsed() < Duration::from_millis(10)
+            {}
+            SoftwareInterrupt::<'static, 2>::new(unsafe { FROM_CPU_INTR2::steal() }).raise();
+            test.victim.give();
+        }
+    }
+
+    #[test]
+    #[timeout(10)]
+    #[cfg(multi_core)]
+    fn woken_task_runs_on_one_core(ctx: Context) {
+        // The victim blocks on core 0. The waker on core 1 delays core 0 with a high-priority
+        // interrupt before core 0 switches away from the victim. The waker then wakes the victim
+        // and blocks, so core 1 selects a new task while core 0 still runs the victim.
+        #[esp_hal::handler(priority = Priority::Priority3)]
+        fn keep_core_busy() {
+            SoftwareInterrupt::<'static, 2>::new(unsafe { FROM_CPU_INTR2::steal() }).reset();
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(100) {}
+        }
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        // The main task must preempt the victim to check the result.
+        CurrentThreadHandle::get().set_priority(5);
+
+        let mut sw_int2 = SoftwareInterrupt::new(ctx.sw_int2);
+        sw_int2.set_interrupt_handler(keep_core_busy);
+
+        let test: &'static WakeTest = Box::leak(Box::new(WakeTest {
+            victim: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
+            waker: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
+            victim_blocks_on_core_0: AtomicBool::new(false),
+            victim_running: AtomicBool::new(false),
+            rounds: AtomicUsize::new(0),
+        }));
+        let context = (test as *const WakeTest).cast::<c_void>().cast_mut();
+        unsafe {
+            preempt::task_create("waker", wake_test_waker, context, 2, Some(1), 4096);
+            preempt::task_create("victim", wake_test_victim, context, 1, None, 4096);
+        }
+
+        CurrentThreadHandle::get().delay(Duration::from_secs(3));
+
+        hil_test::assert!(
+            test.rounds.load(Ordering::Relaxed) > 0,
+            "The victim never woke up"
+        );
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
+    #[test]
+    #[timeout(10)]
+    #[cfg(multi_core)]
+    fn deleting_migrating_tasks_keeps_other_tasks_alive(ctx: Context) {
+        // Core 0 deletes unpinned tasks while they move between the cores. The scheduler must not
+        // free a task while core 1 switches away from it, because a new task can then reuse the
+        // stack that core 1 uses.
+        static SURVIVOR: AtomicUsize = AtomicUsize::new(0);
+        static VICTIMS: AtomicUsize = AtomicUsize::new(0);
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        // The spinning tasks must not starve the main task.
+        CurrentThreadHandle::get().set_priority(5);
+
+        unsafe {
+            preempt::task_create(
+                "survivor",
+                count_and_yield,
+                (&raw const SURVIVOR).cast::<c_void>().cast_mut(),
+                1,
+                None,
+                4096,
+            );
+        }
+
+        for _ in 0..200 {
+            let victim = unsafe {
+                preempt::task_create(
+                    "victim",
+                    count_and_yield,
+                    (&raw const VICTIMS).cast::<c_void>().cast_mut(),
+                    1,
+                    None,
+                    4096,
+                )
+            };
+            CurrentThreadHandle::get().delay(Duration::from_millis(1));
+            unsafe { preempt::schedule_task_deletion(Some(victim)) };
+        }
+
+        let before = SURVIVOR.load(Ordering::Relaxed);
+        CurrentThreadHandle::get().delay(Duration::from_millis(10));
+        hil_test::assert!(
+            SURVIVOR.load(Ordering::Relaxed) > before,
+            "The surviving task stopped running"
+        );
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
     #[test]
     #[cfg(multi_core)]
     async fn embassy_cross_core(ctx: Context) {

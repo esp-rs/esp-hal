@@ -320,6 +320,7 @@ pub(super) static PRIORITY_TO_INTERRUPT: [CpuInterrupt; VECTOR_COUNT] = const {
 ///   - Return using the `mret` instruction.
 /// - The handler must be declared as a naked function. The compiler does not insert a function
 ///   prologue or epilogue; a normal Rust `fn` results in an error
+/// - The handler runs on the stack of the code that it interrupts, not on the ISR stack.
 ///
 /// Unless low-level control is required for the lowest possible latency,
 /// [`enable`][crate::interrupt::enable] is usually preferable.

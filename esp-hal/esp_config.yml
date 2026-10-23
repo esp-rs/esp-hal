@@ -81,6 +81,31 @@ options:
     default:
       - value: true
 
+  - name: isr-stack-size-cpu0
+    description: "Size of the stack, in bytes, that interrupt handlers of the first core use.
+      Handlers that `enable_direct` binds on RISC-V chips run on the interrupted stack. On RISC-V,
+      the interrupt entry also stores 16 bytes on the interrupted stack. Make this stack large enough
+      for the deepest chain of nested interrupt handlers, for example with an `InterruptExecutor`.
+      Needs to be a multiple of 16."
+    default:
+      - value: 4096
+    constraints:
+      - type:
+          validator: positive_integer
+
+  - name: isr-stack-size-cpu1
+    description: "Size of the stack, in bytes, that interrupt handlers of the second core use.
+      Handlers that `enable_direct` binds on RISC-V chips run on the interrupted stack. On RISC-V,
+      the interrupt entry also stores 16 bytes on the interrupted stack. Make this stack large enough
+      for the deepest chain of nested interrupt handlers, for example with an `InterruptExecutor`.
+      Needs to be a multiple of 16."
+    default:
+      - value: 4096
+    constraints:
+      - type:
+          validator: positive_integer
+    active: "multi_core"
+
   - name: impl-critical-section
     description: "Provide a `critical-section` implementation. Note that if disabled,
       you will need to provide a `critical-section` implementation which is

@@ -25,6 +25,7 @@ has_crc_le  = true
 has_md5_bsd = true
 
 [device.soc]
+cpu_watchpoints = 2
 memory_map = { ranges = [
     { name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 },
     { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },

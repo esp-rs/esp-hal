@@ -1,5 +1,7 @@
 use esp_hal::system::Cpu;
 
+#[cfg(multi_core)]
+use crate::task::Task;
 use crate::{
     scheduler::{ActiveCores, CpuState},
     task::{TaskExt, TaskPtr, TaskQueue, TaskReadyQueueElement, TaskState},
@@ -243,8 +245,15 @@ impl RunQueue {
         }
     }
 
+    /// Removes the highest priority task that the current CPU can run.
+    ///
+    /// `other_cpu_task` is the current task of the other CPU. The other CPU still runs on its
+    /// stack, even if the task is ready again, so this function does not return it.
     #[esp_hal::ram]
-    pub(crate) fn pop(&mut self) -> Option<TaskPtr> {
+    pub(crate) fn pop(
+        &mut self,
+        #[cfg(multi_core)] other_cpu_task: *const Task,
+    ) -> Option<TaskPtr> {
         let current_prio = self.ready_priority.ready();
         trace!("pop - from level: {}", current_prio);
 
@@ -264,7 +273,9 @@ impl RunQueue {
                 let mut current_prio = current_prio;
                 let mut popped;
                 loop {
-                    popped = self.ready_tasks[current_prio].pop_if(|t| t.pinned_to != Some(other));
+                    popped = self.ready_tasks[current_prio].pop_if(|t| {
+                        t.pinned_to != Some(other) && !core::ptr::eq(t, other_cpu_task)
+                    });
 
                     if popped.is_none() {
                         priority_level.unmark(current_prio);

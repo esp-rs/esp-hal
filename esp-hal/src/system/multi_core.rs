@@ -344,6 +344,9 @@ where
         }
     }
 
+    #[cfg(feature = "rt")]
+    crate::soc::setup_isr_stack_guard();
+
     // The ROM has already handed off to us; clear the AppCpu boot address so a
     // subsequent reset doesn't see a stale entry point. Matches IDF's
     // `call_start_cpu1`.
@@ -429,6 +432,8 @@ where
             ));
             crate::debugger::set_stack_watchpoint(guard as usize);
         }
+        #[cfg(feature = "rt")]
+        crate::soc::setup_isr_stack_guard();
         crate::interrupt::init_vectoring();
         #[cfg(feature = "rt")]
         crate::interrupt::ipc::install_app();
