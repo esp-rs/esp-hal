@@ -54,6 +54,9 @@ mod quad_xtensa;
 #[cfg_attr(esp32s31, path = "esp32s31.rs")]
 pub(crate) mod implem;
 
+#[cfg(code_in_psram)]
+pub(crate) mod code_in_psram;
+
 pub use implem::*;
 use portable_atomic::{AtomicUsize, Ordering};
 
@@ -73,6 +76,7 @@ pub enum PsramSize {
     Size(usize),
 }
 
+#[cfg(not(code_in_psram))]
 impl PsramSize {
     pub(crate) fn get(&self) -> usize {
         match self {
@@ -111,17 +115,48 @@ pub struct Psram {
     _peri: PSRAM<'static>,
 }
 
+/// Records the PSRAM after the code, which `Psram::raw_parts` returns. `esp_hal::init` calls it,
+/// after the start-up in [`code_in_psram`] filled in its record.
+#[cfg(code_in_psram)]
+pub(crate) fn start_with_code() {
+    const PAGE: usize = property!("mmu.page_size");
+
+    implem::request_clock();
+
+    let size = code_in_psram::SIZE.load(Ordering::Relaxed);
+    let start = code_in_psram::CODE_END
+        .load(Ordering::Relaxed)
+        .next_multiple_of(PAGE);
+    info!("PSRAM size: {} MB", size / 1_024 / 1_024);
+    if code_in_psram::flash_encrypted() {
+        warn!("The code copied to PSRAM is plaintext: esp-hal does not encrypt PSRAM");
+    }
+    unsafe { set_psram_range(start..EXTMEM_ORIGIN + size) };
+}
+
 impl Psram {
     /// Initializes PSRAM.
-    pub fn new(peri: PSRAM<'static>, mut config: PsramConfig) -> Self {
-        if init_psram(&mut config) {
-            info!("PSRAM size: {} MB", config.size.get() / 1_024 / 1_024);
-            let range = map_psram(config);
+    pub fn new(peri: PSRAM<'static>, config: PsramConfig) -> Self {
+        cfg_select! {
+            code_in_psram => {
+                if config != PsramConfig::default() {
+                    warn!(
+                        "PSRAM runs from start-up with `psram-frequency`, and ignores this config"
+                    );
+                }
+            }
+            _ => {
+                let mut config = config;
+                if init_psram(&mut config) {
+                    info!("PSRAM size: {} MB", config.size.get() / 1_024 / 1_024);
+                    let range = map_psram(config);
 
-            unsafe { set_psram_range(range) };
+                    unsafe { set_psram_range(range) };
 
-            #[cfg(all(cache_livelock_workaround, feature = "rt"))]
-            crate::soc::cache_livelock::psram_mapped();
+                    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
+                    crate::soc::cache_livelock::psram_mapped();
+                }
+            }
         }
         Self { _peri: peri }
     }
@@ -130,5 +165,15 @@ impl Psram {
     pub fn raw_parts(&self) -> (*mut u8, usize) {
         let range = psram_range();
         (range.start as *mut u8, range.end - range.start)
+    }
+
+    /// The PSRAM size in bytes. The range from `raw_parts` is smaller when code is in
+    /// PSRAM, because the code comes first.
+    #[instability::unstable]
+    pub fn size(&self) -> usize {
+        cfg_select! {
+            code_in_psram => code_in_psram::SIZE.load(Ordering::Relaxed),
+            _ => psram_range().len(),
+        }
     }
 }
