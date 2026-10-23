@@ -12,9 +12,9 @@ on:
         default: "main"
         type: string
       package_name:
-        description: "The package name"
+        description: "The package name(s), comma-separated"
         required: true
-        default: "esp-hal"
+        default: "esp-hal,esp-rom-sys,esp-radio"
       force_regeneration:
         description: "Force baseline regeneration even without breaking change"
         required: false
@@ -34,6 +34,10 @@ env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   GITHUB_REPOSITORY: ${{ github.repository }}
+
+permissions:
+  contents: write
+  pull-requests: read
 
 jobs:
   manage-baselines:
@@ -119,7 +123,7 @@ jobs:
               # -P: Perl-compatible regular expressions
               # `(?<=)`: look-behind: match only if this is present, but do not make this part of the match
               PACKAGES=$(echo "$LABELS" \
-                | grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true \
+                | { grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true; } \
                 | tr '\n' ',' \
                 | sed 's/,$//')
             fi
@@ -159,13 +163,29 @@ jobs:
 
           echo "API baseline generation completed"
 
-      - name: Upload API baselines as artifact
+      - name: Upload API baselines to release
         if: steps.check-generation.outputs.should_generate == 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: api-baselines-${{ steps.check-generation.outputs.packages }}
-          path: ${{ steps.check-generation.outputs.packages }}/api-baseline/
-          retention-days: 90 # Maximum for public repos
+        shell: bash
+        run: |
+          if ! gh release view api-baselines -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/api-baselines" > /dev/null 2>&1; then
+              SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/commits" -f message="Storage for the API baselines release, not part of any branch" -f tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904 --jq .sha)
+              gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/tags/api-baselines -f sha="$SHA"
+            fi
+            gh release create api-baselines -R "$GITHUB_REPOSITORY" --verify-tag --prerelease --latest=false --title "API baselines" --notes "Latest API baselines for semver checks. Not a release."
+          fi
+          COMMIT=$(git rev-parse HEAD)
+          PACKAGES="${{ steps.check-generation.outputs.packages }}"
+          for PACKAGE_NAME in ${PACKAGES//,/ }; do
+            ASSET_NAME="api-baselines-$PACKAGE_NAME.zip"
+            TEMP_ASSET="api-baselines-$PACKAGE_NAME.tmp.zip"
+            ASSET_LABEL="$ASSET_NAME ($COMMIT)"
+            (cd "$PACKAGE_NAME/api-baseline" && zip -q "$GITHUB_WORKSPACE/$TEMP_ASSET" ./*.json.gz)
+            gh release upload api-baselines "$GITHUB_WORKSPACE/$TEMP_ASSET#$ASSET_LABEL" -R "$GITHUB_REPOSITORY" --clobber
+            gh release delete-asset api-baselines "$ASSET_NAME" -R "$GITHUB_REPOSITORY" -y || true
+            ASSET_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/api-baselines" --jq ".assets[] | select(.name == \"$TEMP_ASSET\") | .id")
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$ASSET_ID" -f name="$ASSET_NAME" -f label="$ASSET_LABEL" > /dev/null
+          done
 
       - name: Create baseline summary
         if: steps.check-generation.outputs.should_generate == 'true'
@@ -174,7 +194,6 @@ jobs:
           PACKAGE_NAME="${{ steps.check-generation.outputs.packages }}"
           echo "Successfully generated and uploaded API baselines"
           echo "Artifact name: api-baselines-$PACKAGE_NAME"
-          echo "Retention: 90 days (expires on $(date -d '+90 days' '+%Y-%m-%d'))"
           echo "Source branch: ${{ github.event.inputs.source_branch || 'main' }}"
           echo "Commit: ${{ github.sha }}"
           echo "Target repository: $GITHUB_REPOSITORY"
@@ -203,19 +222,19 @@ jobs:
           echo "- **Target Repository**: \`$GITHUB_REPOSITORY\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Source Branch**: \`${{ github.event.inputs.source_branch || 'main' }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Artifact Name**: \`api-baselines-$PACKAGE_NAME\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Retention**: 90 days (expires $(date -d '+90 days' '+%Y-%m-%d'))" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Baseline Files Generated" >> $GITHUB_STEP_SUMMARY
           echo "| Chip | File Size |" >> $GITHUB_STEP_SUMMARY
           echo "|------|-----------|" >> $GITHUB_STEP_SUMMARY
 
-          cd "$PACKAGE_NAME/api-baseline"
-          for file in *.json.gz; do
+          for pkg in ${PACKAGE_NAME//,/ }; do
+            for file in "$pkg"/api-baseline/*.json.gz; do
               if [ -f "$file" ]; then
                   chip=$(basename "$file" .json.gz)
                   size=$(du -h "$file" | cut -f1)
-                  echo "| $chip | $size |" >> $GITHUB_STEP_SUMMARY
+                  echo "| $pkg ($chip) | $size |" >> $GITHUB_STEP_SUMMARY
               fi
+            done
           done
 
       - name: Create no-action summary
