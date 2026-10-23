@@ -201,12 +201,30 @@ impl InterruptHandler {
     }
 }
 
+use core::sync::atomic::{AtomicU32, Ordering};
+
 const STATUS_WORDS: usize = property!("interrupts.status_registers");
+
+/// The status bits that name a variant of [`Interrupt`].
+static VALID_INTERRUPTS: [AtomicU32; STATUS_WORDS] = [const { AtomicU32::new(0) }; STATUS_WORDS];
+
+pub(crate) fn init_valid_interrupts() {
+    for (word, valid) in VALID_INTERRUPTS.iter().enumerate() {
+        let mut mask = 0;
+        for bit in 0..32 {
+            if Interrupt::try_from((word * 32 + bit) as _).is_ok() {
+                mask |= 1 << bit;
+            }
+        }
+        valid.store(mask, Ordering::Relaxed);
+    }
+}
 
 /// Representation of peripheral-interrupt status bits.
 #[derive(Clone, Copy, Default, Debug)]
 #[instability::unstable]
 pub struct InterruptStatus {
+    // Every set bit names a variant of `Interrupt`.
     status: [u32; STATUS_WORDS],
 }
 
@@ -266,9 +284,22 @@ impl InterruptStatus {
     /// Returns the status of peripheral interrupts.
     #[instability::unstable]
     pub fn current() -> InterruptStatus {
+        #[cfg(not(feature = "rt"))]
+        {
+            static INITIALIZED: core::sync::atomic::AtomicBool =
+                core::sync::atomic::AtomicBool::new(false);
+            if !INITIALIZED.load(Ordering::Relaxed) {
+                init_valid_interrupts();
+                INITIALIZED.store(true, Ordering::Relaxed);
+            }
+        }
+
         let cpu = Cpu::current();
         InterruptStatus {
-            status: core::array::from_fn(|word| Self::interrupt_status_word(cpu, word)),
+            status: core::array::from_fn(|word| {
+                Self::interrupt_status_word(cpu, word)
+                    & VALID_INTERRUPTS[word].load(Ordering::Relaxed)
+            }),
         }
     }
 
@@ -280,8 +311,9 @@ impl InterruptStatus {
 
     /// Sets the given interrupt status bit.
     #[instability::unstable]
-    pub fn set(&mut self, interrupt: u8) {
-        self.status[interrupt as usize / 32] |= 1 << (interrupt % 32);
+    pub fn set(&mut self, interrupt: Interrupt) {
+        let interrupt = interrupt as usize;
+        self.status[interrupt / 32] |= 1 << (interrupt % 32);
     }
 
     /// Returns an iterator over the set interrupt status bits.
@@ -308,13 +340,13 @@ impl Iterator for InterruptStatusIterator {
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         for i in self.idx..STATUS_WORDS {
-            while self.status.status[i] != 0 {
+            if self.status.status[i] != 0 {
                 let bit = self.status.status[i].trailing_zeros();
                 self.status.status[i] ^= 1 << bit;
                 self.idx = i;
-                if let Ok(interrupt) = Interrupt::try_from((bit + 32 * i as u32) as _) {
-                    return Some(interrupt);
-                }
+                let nr = (bit + 32 * i as u32) as u16;
+                // SAFETY: every set bit in `InterruptStatus` names a variant of `Interrupt`.
+                return Some(unsafe { core::mem::transmute::<u16, Interrupt>(nr) });
             }
         }
         self.idx = usize::MAX;
@@ -600,6 +632,8 @@ pub(crate) fn setup_interrupts() {
             })
             .ok();
     }
+
+    init_valid_interrupts();
 
     unsafe { crate::interrupt::init_vectoring() };
 }
