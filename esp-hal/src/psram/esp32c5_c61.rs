@@ -189,10 +189,13 @@ pub use tuning::MspiTimingTuningParam;
 
 /// PSRAM configuration
 ///
-/// [`Psram::new`](super::Psram::new) runs the PSRAM start-up, which changes the MSPI clocks. An
-/// interrupt handler in flash must not run in that time, so `Psram::new` must be called before any
-/// interrupt is enabled. See [Optimization level](crate#optimization-level) for the build
-/// requirement.
+/// The PSRAM start-up changes the MSPI clocks. See [Optimization level](crate#optimization-level)
+/// for the build requirement.
+#[cfg_attr(
+    not(code_in_psram),
+    doc = "\n[`Psram::new`](super::Psram::new) runs the start-up. An interrupt handler in flash must \
+           not run in that time, so `Psram::new` must be called before any interrupt is enabled."
+)]
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PsramConfig {

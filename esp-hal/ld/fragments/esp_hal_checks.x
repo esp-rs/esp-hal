@@ -7,3 +7,11 @@
 NOCROSSREFS_TO(.text .rwtext.checked)
 NOCROSSREFS_TO(.rodata .rwtext.checked)
 NOCROSSREFS_TO(.rwtext .rwtext.checked)
+
+#IF psram_separate_window && ESP_HAL_CONFIG_CODE_IN_PSRAM
+/* The start-up runs before `.text` and `.rodata` are in PSRAM. Code in `.rwtext` can call
+   `.text`, so the start-up must not call `.rwtext` either. */
+NOCROSSREFS_TO(.text .boot.code_in_psram)
+NOCROSSREFS_TO(.rodata .boot.code_in_psram)
+NOCROSSREFS_TO(.rwtext .boot.code_in_psram)
+#ENDIF

@@ -180,7 +180,15 @@ fn main() -> ! {
 //! With `-Z stack-protector`, the code of these operations is instrumented too. If it detects
 //! stack corruption while the caches are suspended, the panic handler cannot run, because it lives
 //! in flash, and the chip locks up instead of reporting the corruption.
-//!
+#![cfg_attr(psram_separate_window, doc = "")]
+#![cfg_attr(
+    psram_separate_window,
+    doc = "The `code-in-psram` option adds a second rule. The start-up runs before the code is in \
+           PSRAM, so it must not call code outside RAM. The link fails with `prohibited cross \
+           reference from '.boot.code_in_psram'` when the start-up refers to a function in \
+           `.text` or `.rwtext`. esp-hal must be built at `opt-level` 2 or 3, as above."
+)]
+#![doc = ""]
 //! ## Don't use `core::mem::forget`
 //!
 //! You should never use `core::mem::forget` on any type defined in [esp crates].
@@ -799,6 +807,9 @@ pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 
     crate::clock::init(config.clock_config());
+
+    #[cfg(code_in_psram)]
+    crate::psram::start_with_code();
 
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.RTC_TIMER.reborrow());

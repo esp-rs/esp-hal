@@ -230,6 +230,16 @@ options:
     default:
       - value: false
 
+  - name: code-in-psram
+    description: "Run `.text` and `.rodata` from PSRAM. Start-up brings PSRAM up and
+      copies both from flash before `esp_hal::init`. With flash encryption, the copy in PSRAM is
+      plaintext and can be read from the PSRAM pins. On a chip whose PSRAM has its own address
+      window, such as the ESP32-S31, esp-hal must be built at opt-level 2 or 3, as the
+      [Optimization level](#optimization-level) section states."
+    default:
+      - value: false
+    active: "false"
+
   - name: clear-crypto-secrets
     description: "Clear secret material (keys, exponents, intermediate results) from
       the crypto accelerator registers after each operation. Disabling
