@@ -1,8 +1,10 @@
-# Builds a few examples on every chip, once at the current `main` and once at
-# the `main` the last successful run measured, and compares their sizes. An
-# example that grew past the limits is also built after each pull request
-# merged in between, to find the one behind it. Reports to an issue (or
-# comments on the open one).
+# Builds a few examples on every chip, once at the current `main` (or a chosen
+# end commit) and once at the `main` the last successful run measured (or a
+# chosen start commit, date, or release tag), and compares their sizes. Commits
+# whose sizes are already stored in the Espressif App Metrics service are
+# fetched via its API instead of being rebuilt. Reports to the job summary,
+# uploads newly measured `HEAD` metrics to S3 from a Brno self-hosted runner,
+# and on scheduled runs opens or comments on the regression issue.
 #
 # `binary-size.yml` measures a single pull request the same way (`/test-size`).
 
@@ -13,8 +15,23 @@ on:
     - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
+      range:
+        description: "Range to compare (overridden by base/head below)"
+        required: false
+        default: "since-last-run"
+        type: choice
+        options:
+          - since-last-run
+          - since-last-release
+          - last-7-days
+          - last-30-days
       base:
-        description: "Commit to compare against. Empty: where the last successful scheduled run ended."
+        description: "Start date (YYYY-MM-DD), tag (esp-hal-v1.2.0), or commit"
+        required: false
+        default: ""
+        type: string
+      head:
+        description: "End date (YYYY-MM-DD), tag, or commit. Empty: HEAD"
         required: false
         default: ""
         type: string
@@ -45,7 +62,7 @@ jobs:
   prepare:
     # Forks can still dispatch the workflow by hand.
     if: github.event_name != 'schedule' || github.repository_owner == 'esp-rs'
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository_owner == 'esp-rs' && 'macos-m1-self-hosted' || 'ubuntu-latest' }}
     permissions:
       contents: read
       # Finds the last successful run.
@@ -55,6 +72,8 @@ jobs:
       head: ${{ steps.range.outputs.head }}
       between: ${{ steps.range.outputs.between }}
       chips: ${{ steps.range.outputs.chips }}
+      all_chips: ${{ steps.range.outputs.all_chips }}
+      has_cached: ${{ steps.range.outputs.has_cached }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -64,15 +83,26 @@ jobs:
         id: range
         uses: actions/github-script@v8
         env:
+          INPUT_RANGE: ${{ inputs.range }}
           INPUT_BASE: ${{ inputs.base }}
+          INPUT_HEAD: ${{ inputs.head }}
+          ESP_METRICS_API_URL: ${{ vars.ESP_METRICS_API_URL || secrets.ESP_METRICS_API_URL }}
+          ESP_METRICS_API_TOKEN: ${{ secrets.ESP_METRICS_API_TOKEN }}
         with:
           script: |
             const { resolveNightlyRange } = require('./.github/scripts/binary-size.js');
             await resolveNightlyRange({ github, context, core, exec });
 
+      - uses: actions/upload-artifact@v6
+        if: steps.range.outputs.has_cached == 'true'
+        with:
+          name: sizes-cached
+          path: sizes/cached.txt
+          if-no-files-found: ignore
+
   measure:
     needs: prepare
-    if: needs.prepare.outputs.base != ''
+    if: needs.prepare.outputs.chips != ''
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -90,15 +120,18 @@ jobs:
           base: ${{ needs.prepare.outputs.base }}
           head: ${{ needs.prepare.outputs.head }}
           between: ${{ needs.prepare.outputs.between }}
+          has-cached: ${{ needs.prepare.outputs.has_cached }}
 
   report:
     needs: [prepare, measure]
-    # Report what was measured, also when some chips failed.
+    # Report what was measured, also when some chips failed or all sizes were cached.
     if: always() && needs.prepare.outputs.base != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
+    outputs:
+      has_metrics: ${{ steps.report.outputs.has_metrics }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -113,13 +146,36 @@ jobs:
           merge-multiple: true
 
       - name: Compare and report
+        id: report
         uses: actions/github-script@v8
         env:
           BASE: ${{ needs.prepare.outputs.base }}
           HEAD: ${{ needs.prepare.outputs.head }}
           BETWEEN: ${{ needs.prepare.outputs.between }}
-          CHIPS: ${{ needs.prepare.outputs.chips }}
+          CHIPS: ${{ needs.prepare.outputs.all_chips }}
         with:
           script: |
             const { reportNightly } = require('./.github/scripts/binary-size.js');
             await reportNightly({ github, context, core, exec });
+
+      - uses: actions/upload-artifact@v6
+        if: steps.report.outputs.has_metrics == 'true'
+        with:
+          name: binary-size-metrics
+          path: binary_size_metrics.json
+          if-no-files-found: ignore
+
+  upload-metrics:
+    needs: [prepare, report]
+    if: github.repository_owner == 'esp-rs' && needs.report.outputs.has_metrics == 'true'
+    runs-on: macos-m1-self-hosted
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github
+
+      - uses: ./.github/actions/upload-metrics
+        with:
+          commit-sha: ${{ needs.prepare.outputs.head }}
+          s3-access-key: ${{ secrets.ESP_METRICS_S3_ACCESS_KEY }}
+          s3-secret-key: ${{ secrets.ESP_METRICS_S3_SECRET_KEY }}
