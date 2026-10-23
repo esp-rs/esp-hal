@@ -1,0 +1,158 @@
+//! Minimal ES8389 codec setup for the Korvo-1.
+//!
+//! The codec runs as an I2S slave and derives its clocks from BCLK (no MCLK), with 16-bit Philips
+//! frames at 48 kHz in both directions. The register sequence follows Espressif's `esp_codec_dev`
+//! ES8389 driver (`es8389_open`, `es8389_set_fs`, `es8389_set_bias_on`).
+
+use esp_hal::{
+    Blocking,
+    i2c::master::{Error, I2c},
+};
+
+/// 7-bit I2C address (`ES8389_CODEC_DEFAULT_ADDR` is the 8-bit form, 0x20).
+const ADDRESS: u8 = 0x10;
+
+/// Microphone PGA gain step (`0b1100` = 30.5 dB) on the differential inputs (bits 6:4 = 1).
+const MIC_GAIN: u8 = 0x10 | 0b1100;
+
+/// DAC volume in 0.5 dB steps from -95.5 dB (`0xBF` = 0 dB).
+const DAC_VOLUME: u8 = 0xBF;
+
+/// The register writes of `es8389_open`.
+const OPEN: &[(u8, u8)] = &[
+    (0xF3, 0x00),
+    (0x00, 0x7E),
+    (0xF3, 0x38),
+    (0x24, 0x64),
+    (0x25, 0x04),
+    (0x45, 0x03),
+    (0x60, 0x2A),
+    (0x61, 0xC9),
+    (0x62, 0x4F),
+    (0x63, 0x06),
+    (0x6B, 0x00),
+    (0x6D, 0x16),
+    (0x6E, 0xAA),
+    (0x6F, 0x66),
+    (0x70, 0x99),
+    (0x23, 0x00),
+    (0x72, MIC_GAIN),
+    (0x73, MIC_GAIN),
+    (0x10, 0xC4),
+    (0x01, 0x08),
+    (0xF1, 0x00),
+    (0x12, 0x01),
+    (0x13, 0x01),
+    (0x14, 0x01),
+    (0x15, 0x01),
+    (0x16, 0x35),
+    (0x17, 0x09),
+    (0x18, 0x91),
+    (0x19, 0x28),
+    (0x1A, 0x01),
+    (0x1B, 0x01),
+    (0x1C, 0x11),
+    (0x2A, 0x00),
+    // ADC and DAC serial ports: 16-bit Philips I2S, unmuted.
+    (0x20, 0x60),
+    (0x40, 0x60),
+    (0xF0, 0x01),
+    (0x02, 0x00),
+    (0x04, 0x00),
+    (0x05, 0x10),
+    (0x06, 0x00),
+    (0x07, 0xC0),
+    (0x08, 0x00),
+    (0x09, 0xC0),
+    (0x0A, 0x80),
+    (0x0B, 0x04),
+    (0x0C, 0x01),
+    (0x0D, 0x00),
+    (0x0F, 0x10),
+    (0x21, 0x1F),
+    (0x22, 0x7F),
+    (0x2F, 0xC0),
+    (0x30, 0xF4),
+    (0x31, 0x00),
+    (0x44, 0x00),
+    (0x41, 0x7F),
+    (0x42, 0x7F),
+    (0x43, 0x10),
+    (0x49, 0x0F),
+    (0x4C, 0xC0),
+    (0x00, 0x00),
+    (0x03, 0xC1),
+    (0x00, 0x01),
+    (0x4D, 0x00),
+    (0x26, 0xBF),
+    (0x27, 0xBF),
+    (0x28, 0xBF),
+    (0x46, DAC_VOLUME),
+    (0x47, DAC_VOLUME),
+    (0x48, 0xBE),
+];
+
+/// `es8389_config_sample` for 48 kHz with BCLK = 64 × LRCK (the `{64, 3072000, 48000}` entry).
+const SAMPLE_RATE_48K: &[(u8, u8)] = &[
+    (0x04, 0x00),
+    (0x05, 0x51),
+    (0x06, 0x04),
+    (0x07, 0xC0),
+    (0x08, 0x10),
+    (0x09, 0xC1),
+    (0x0A, 0x80),
+    (0x11, 0x00),
+    (0x21, 0x1F),
+    (0x22, 0x7F),
+    (0x26, 0xBF),
+    (0x41, 0x7F),
+    (0x42, 0x7F),
+    (0xF1, 0x00),
+    (0x16, 0x35),
+    (0x18, 0x91),
+    (0x19, 0x28),
+];
+
+/// `es8389_set_bias_on` without register 0x69, which needs a read-modify-write.
+const BIAS_ON: &[(u8, u8)] = &[
+    (0x61, 0xD9),
+    (0x64, 0x8F),
+    (0x10, 0xE4),
+    (0x00, 0x01),
+    (0x03, 0xC3),
+    (0x24, 0x6A),
+    (0x25, 0x0A),
+];
+
+/// Configures the codec for 48 kHz playback and recording.
+///
+/// The codec drops into analog standby without BCLK, so I2S must already be clocking.
+pub fn init(i2c: &mut I2c<'_, Blocking>) -> Result<(), Error> {
+    let mut id = [0; 2];
+    i2c.write_read(ADDRESS, &[0xFD], &mut id)?;
+    log::info!("ES8389 chip ID: {:02x?}", id);
+
+    write_all(i2c, OPEN)?;
+    bias_on(i2c)?;
+    // `OPEN` left the codec in slave mode. Take the internal clock from the BCLK pin and leave the
+    // DAC reference out of the ADC data.
+    write_all(i2c, &[(0x02, 0x40), (0xF0, 0x12)])?;
+
+    write_all(i2c, SAMPLE_RATE_48K)?;
+    bias_on(i2c)
+}
+
+fn bias_on(i2c: &mut I2c<'_, Blocking>) -> Result<(), Error> {
+    write_all(i2c, &[(0x4D, 0x00)])?;
+    let mut value = [0];
+    i2c.write_read(ADDRESS, &[0x69], &mut value)?;
+    write_all(i2c, &[(0x69, value[0] | 0x20)])?;
+    write_all(i2c, BIAS_ON)
+}
+
+fn write_all(i2c: &mut I2c<'_, Blocking>, registers: &[(u8, u8)]) -> Result<(), Error> {
+    for &(register, value) in registers {
+        i2c.write(ADDRESS, &[register, value])?;
+    }
+    Ok(())
+}
