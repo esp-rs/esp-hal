@@ -160,6 +160,14 @@ mod tests {
             )
             .unwrap();
 
+        // The first transfer has a start-up delay of a few hundred microseconds. Time the
+        // second one.
+        let tx_transfer = pio_tx
+            .write(dma_tx_buf.len(), dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        let (_, pio_tx, dma_tx_buf) = tx_transfer.wait();
+
         let start = Instant::now();
         let tx_transfer = pio_tx
             .write(dma_tx_buf.len(), dma_tx_buf)
