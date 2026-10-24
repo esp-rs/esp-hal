@@ -1138,6 +1138,10 @@ driver_configs![
             driver: psram,
             name: "PSRAM",
             properties: {
+                /// Whether a sleep that powers the CPU down must first write back the data cache,
+                /// because the power-down loses its dirty lines.
+                #[serde(default)]
+                writeback_before_cpu_power_down: bool,
                 #[serde(default)]
                 octal_spi: bool,
                 #[serde(default)]

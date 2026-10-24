@@ -12,6 +12,11 @@
 //! A chip whose default CPU clock is already the maximum skips the duplicate
 //! maximum-clock active cases. Dual-core cases run only on multi-core chips.
 //! CPU power-down and tag-memory cases run only where the hardware supports them.
+//!
+//! On a chip with a PSRAM driver, the program enables PSRAM, so the currents include
+//! it. Each light-sleep case writes a pattern over all of PSRAM before the sleep, and
+//! checks it after the wake. The check then writes and checks the inverted pattern, and
+//! panics on the first pattern that does not read back.
 
 //% CHIP_FILTER: sleep_driver_supported && sleep_deep_sleep
 
@@ -49,6 +54,34 @@ const HOLD: Duration = Duration::from_secs(3);
 
 /// Interrupt period that lets WAITI/WFI return and check the hold deadline.
 const WAITI_TICK: Duration = Duration::from_millis(250);
+
+#[cfg(psram_driver_supported)]
+fn psram_pattern(index: usize, invert: u32) -> u32 {
+    (index as u32).wrapping_mul(0x9E37_79B9) ^ invert
+}
+
+#[cfg(psram_driver_supported)]
+fn fill_psram(words: &mut [u32], invert: u32) {
+    for (i, word) in words.iter_mut().enumerate() {
+        unsafe { core::ptr::write_volatile(word, psram_pattern(i, invert)) };
+    }
+}
+
+#[cfg(psram_driver_supported)]
+fn check_psram(label: &str, words: &[u32], invert: u32) {
+    let mut bad = 0;
+    let mut first = None;
+    for (i, word) in words.iter().enumerate() {
+        if unsafe { core::ptr::read_volatile(word) } != psram_pattern(i, invert) {
+            bad += 1;
+            first.get_or_insert(i);
+        }
+    }
+    match first {
+        None => println!("PSRAM {label}: ok"),
+        Some(first) => panic!("PSRAM {label}: {bad} bad words, first at {first}"),
+    }
+}
 
 #[cfg(not(any(feature = "esp32c2", feature = "esp32c61", feature = "esp32h4")))]
 #[esp_hal::ram(unstable(rtc_fast, persistent))]
@@ -332,6 +365,18 @@ fn main() -> ! {
     }
     let peripherals = esp_hal::init(hal_config);
 
+    #[cfg(psram_driver_supported)]
+    let psram_words: &mut [u32] = {
+        let psram =
+            esp_hal::psram::Psram::new(peripherals.PSRAM, esp_hal::psram::PsramConfig::default());
+        let (start, size) = psram.raw_parts();
+        if size == 0 {
+            &mut []
+        } else {
+            unsafe { core::slice::from_raw_parts_mut(start.cast::<u32>(), size / 4) }
+        }
+    };
+
     let delay = Delay::new();
     let mut lpwr = LowPower::new(peripherals.LPWR);
 
@@ -460,10 +505,20 @@ fn main() -> ! {
                 #[cfg(not(supports_tagmem_power_down))]
                 let _ = tagmem;
 
+                #[cfg(psram_driver_supported)]
+                fill_psram(psram_words, 0);
+
                 delay.delay_millis(100);
                 lpwr.set_wakeup_deadline(Instant::now() + HOLD);
                 lpwr.sleep_light(RtcSleepConfig::default());
                 println!("woke from light sleep, cause={:?}", wakeup_cause());
+
+                #[cfg(psram_driver_supported)]
+                if !psram_words.is_empty() {
+                    check_psram("after the sleep", psram_words, 0);
+                    fill_psram(psram_words, u32::MAX);
+                    check_psram("after a new write", psram_words, u32::MAX);
+                }
             }
             Case::DeepSleep => {
                 periodic.unlisten();

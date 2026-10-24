@@ -83,7 +83,12 @@ impl AnalogSleepConfig {
             },
         };
 
-        if !pd_flags.pd_xtal() {
+        // Like esp-idf's `pmu_sleep_config_default`, this code keeps the reference current on
+        // while PSRAM is mapped, see
+        // <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L223-L229>.
+        // Without the current, PSRAM loses its data in light sleep. It also loses the latencies
+        // that `Psram::new` wrote to its mode registers.
+        if !pd_flags.pd_xtal() || !crate::psram::psram_range().is_empty() {
             this.hp_sys.bias.set_pd_cur(false);
             this.lp_sys_sleep.bias.set_pd_cur(false);
         }

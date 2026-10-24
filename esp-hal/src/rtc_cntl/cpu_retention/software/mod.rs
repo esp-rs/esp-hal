@@ -666,12 +666,25 @@ pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Optio
 /// The retained path returns twice, so it owns the request and the wait. A sleep that keeps the
 /// domain powered needs no frames, and it must not write them back: the registers still hold what
 /// a save would have read, and a restore repeats side effects such as an interrupt claim.
+///
+/// With PSRAM, a CPU power-down loses the dirty lines of the cache. Like esp-idf's
+/// `sleep_cache_safe_writeback`, this function writes them back first, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L61-L72>.
 #[crate::ram]
 pub(crate) fn enter_sleep_with_retention(
     config: &RtcSleepConfig,
     buffer: Option<NonNull<u8>>,
 ) -> bool {
-    match buffer.filter(|_| config.pd_flags.pd_cpu()) {
+    let retained = buffer.filter(|_| config.pd_flags.pd_cpu());
+
+    // The flag marks the chips that meet esp-idf's condition for the writeback, see
+    // <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L55>.
+    #[cfg(psram_writeback_before_cpu_power_down)]
+    if retained.is_some() && !crate::psram::psram_range().is_empty() {
+        crate::soc::cache_writeback_all();
+    }
+
+    match retained {
         Some(buffer) => {
             cpu_retention::sleep_retained(buffer.as_ptr(), sleep::pmu_common::request_sleep)
         }
