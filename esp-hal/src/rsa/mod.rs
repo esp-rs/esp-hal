@@ -244,17 +244,25 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Starts the modular exponentiation operation.
     fn start_modexp(&self) {
+        self.prepare_operation();
         low_level::start_modexp(self.regs());
     }
 
     /// Starts the multiplication operation.
     fn start_multi(&self) {
+        self.prepare_operation();
         low_level::start_multi(self.regs());
     }
 
     /// Starts the modular multiplication operation.
     fn start_modmulti(&self) {
+        self.prepare_operation();
         low_level::start_modmulti(self.regs());
+    }
+
+    fn prepare_operation(&self) {
+        #[cfg(rsa_version = "1")]
+        SIGNALED.store(false, Ordering::Relaxed);
     }
 
     /// Clears the RSA interrupt flag.
@@ -264,6 +272,11 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Returns whether the RSA peripheral is idle.
     fn is_idle(&self) -> bool {
+        #[cfg(rsa_version = "1")]
+        if SIGNALED.load(Ordering::Acquire) {
+            // The interrupt handler clears RSA v1's hardware completion flag.
+            return true;
+        }
         low_level::is_idle(self.regs())
     }
 
@@ -655,9 +668,6 @@ struct RsaFuture<'a, 'd> {
 
 impl<'a, 'd> RsaFuture<'a, 'd> {
     fn new(driver: &'a Rsa<'d, Async>) -> Self {
-        #[cfg(rsa_version = "1")]
-        SIGNALED.store(false, Ordering::Relaxed);
-
         driver.internal_enable_disable_interrupt(true);
 
         Self {
