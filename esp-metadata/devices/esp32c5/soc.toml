@@ -491,6 +491,7 @@ instances = [
 
 [device.psram]
 extmem_origin = 0x42000000
+writeback_before_cpu_power_down = true
 
 [device.sd_slave]
 support_status = { status = "not_supported", issue = 5169 }
