@@ -547,6 +547,9 @@ macro_rules! property {
     ("mmu.entry_num", str) => {
         stringify!(1024)
     };
+    ("psram.writeback_before_cpu_power_down") => {
+        true
+    };
     ("psram.octal_spi") => {
         true
     };

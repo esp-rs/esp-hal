@@ -50,6 +50,36 @@ pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     }
 }
 
+/// Writes back every dirty line of the cache.
+///
+/// The write-back runs twice, as in the ESP-IDF patch of the ROM function `Cache_WriteBack_All`.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_rom/patches/esp_rom_cache_writeback_esp32c5_esp32c61_esp32h4.c#L35-L45>.
+#[crate::ram]
+pub(crate) fn cache_writeback_all() {
+    const CACHE_MAP_FLASH_CACHE: u32 = 1 << 4;
+
+    let cache = crate::peripherals::CACHE::regs();
+    cache
+        .cache_sync_map()
+        .write(|w| unsafe { w.bits(CACHE_MAP_FLASH_CACHE) });
+    cache.cache_sync_addr().write(|w| unsafe { w.bits(0) });
+    cache.cache_sync_size().write(|w| unsafe { w.bits(0) });
+    for _ in 0..2 {
+        // The register resets with `INVALIDATE_ENA` set, and an invalidate drops the dirty lines.
+        unsafe {
+            cache
+                .cache_sync_ctrl()
+                .write_with_zero(|w| w.cache_writeback_ena().set_bit())
+        };
+        while cache
+            .cache_sync_ctrl()
+            .read()
+            .cache_sync_done()
+            .bit_is_clear()
+        {}
+    }
+}
+
 /// Invalidate a specific range of addresses in the cache.
 #[doc(hidden)]
 #[crate::ram]
