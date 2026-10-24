@@ -32,22 +32,28 @@ macro_rules! configure_clk {
         let clkrst = HP_SYS_CLKRST::regs();
 
         clkrst.$ctrl_reg().modify(|_, w| unsafe { w.$n().bits(2) });
-        clkrst.$div_ctrl_reg().modify(|_, w| {
-            w.$yn1().clear_bit();
-            unsafe {
-                w.$y().bits(1);
-                w.$z().bits(0);
-                w.$x().bits(0)
-            }
+        clkrst.$div_ctrl_reg().modify(|_, w| w.$yn1().clear_bit());
+        clkrst.$div_ctrl_reg().modify(|_, w| unsafe {
+            w.$y().bits(1);
+        });
+        clkrst.$div_ctrl_reg().modify(|_, w| unsafe {
+            w.$z().bits(0);
+        });
+        clkrst.$div_ctrl_reg().modify(|_, w| unsafe {
+            w.$x().bits(0);
         });
 
-        clkrst.$div_ctrl_reg().modify(|_, w| {
-            w.$yn1().bit($fraction.yn1);
-            unsafe {
-                w.$z().bits($fraction.z);
-                w.$y().bits($fraction.y);
-                w.$x().bits($fraction.x)
-            }
+        clkrst
+            .$div_ctrl_reg()
+            .modify(|_, w| w.$yn1().bit($fraction.yn1));
+        clkrst.$div_ctrl_reg().modify(|_, w| unsafe {
+            w.$z().bits($fraction.z);
+        });
+        clkrst.$div_ctrl_reg().modify(|_, w| unsafe {
+            w.$y().bits($fraction.y);
+        });
+        clkrst.$div_ctrl_reg().modify(|_, w| unsafe {
+            w.$x().bits($fraction.x);
         });
 
         clkrst.$ctrl_reg().modify(|_, w| unsafe {
