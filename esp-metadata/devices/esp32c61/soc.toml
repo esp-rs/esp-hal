@@ -288,6 +288,7 @@ support_status = { status = "not_supported", issue = 1909 }
 [device.psram]
 extmem_origin = 0x42000000
 has_timing_tuning = true
+writeback_before_cpu_power_down = true
 
 [device.sha]
 support_status = "partial"

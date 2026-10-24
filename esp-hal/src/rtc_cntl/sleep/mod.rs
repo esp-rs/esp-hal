@@ -445,6 +445,16 @@ impl<'d> LowPower<'d> {
                 gpio::wakeup::isolate_pads_for_deep_sleep();
             }
 
+            // A CPU power-down loses the dirty cache lines, and with them the writes to PSRAM.
+            // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L55-L72>.
+            #[cfg(psram_writeback_before_cpu_power_down)]
+            if retention_buffer.is_some()
+                && config.pd_flags.pd_cpu()
+                && !crate::psram::psram_range().is_empty()
+            {
+                crate::soc::cache_writeback_all();
+            }
+
             let rejected = cfg_select! {
                 cpu_retention = "software" => {
                     // The software chips save the CPU inside the request, so the request belongs to

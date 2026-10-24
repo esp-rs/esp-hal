@@ -598,6 +598,7 @@ support_status = "partial"
 extmem_origin = 0x5000_0000
 octal_spi = true
 has_timing_tuning = true
+writeback_before_cpu_power_down = true
 
 [device.pixel_accelerator]
 support_status = "not_supported"
