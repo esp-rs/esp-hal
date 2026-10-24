@@ -1,4 +1,3 @@
-//! Debug Assist Tests
 //! Interrupt Tests
 //!     "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
 //! MCPWM Tests
@@ -6,6 +5,7 @@
 //! RNG Tests
 //! System Timer Tests
 //! TWAI Tests
+//! Debug Assist Tests
 //% CHIP_FILTER: gpio_driver_supported
 //% FEATURES: unstable embassy
 
