@@ -13,7 +13,7 @@ use crate::{
 
 /// DMA appropriate wrapper type for internal memory values.
 ///
-/// The value wrapped in this type is guaranteed to be safely useable
+/// The value wrapped in this type is guaranteed to be safely usable
 /// as a DMA buffer or descriptor array, meaning DMA or cache management
 /// operations will not corrupt surrounding data.
 ///

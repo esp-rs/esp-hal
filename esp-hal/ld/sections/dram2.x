@@ -1,4 +1,4 @@
-/* an uninitialized section of RAM otherwise not useable */
+/* an uninitialized section of RAM otherwise not usable */
 SECTIONS {
     .dram2_uninit.bss (NOLOAD) : ALIGN(4) {
         _dram2_uninit_bss_start = ABSOLUTE(.);

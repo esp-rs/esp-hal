@@ -2110,7 +2110,7 @@ fn build_descriptor_list_for_psram(
     let min_alignment = ExternalBurstConfig::DEFAULT.min_psram_alignment(TransferDirection::In);
     let chunk_size = 4096 - min_alignment;
 
-    let mut desciptor_iter = DescriptorChainingIter::new(&mut descriptors.descriptors);
+    let mut descriptor_iter = DescriptorChainingIter::new(&mut descriptors.descriptors);
     let mut copy_buffer_iter = copy_buffers.iter_mut();
 
     // MIN_LAST_DMA_LEN could make this really annoying, so we're just allocating a bit larger
@@ -2149,7 +2149,7 @@ fn build_descriptor_list_for_psram(
             copy_buffer.insert(ManualWritebackBuffer::new(get_range(data, 0..head_to_copy)));
         buffer.prepare_for_dma();
 
-        let Some(descriptor) = desciptor_iter.next() else {
+        let Some(descriptor) = descriptor_iter.next() else {
             return consumed;
         };
         descriptor.set_size(head_to_copy);
@@ -2160,7 +2160,7 @@ fn build_descriptor_list_for_psram(
     // Chain up descriptors for the main aligned data part.
     let mut aligned_data = get_range(data, head_to_copy..data.len() - tail_to_copy);
     while !aligned_data.is_empty() {
-        let Some(descriptor) = desciptor_iter.next() else {
+        let Some(descriptor) = descriptor_iter.next() else {
             return consumed;
         };
         let chunk = aligned_data.len().min(chunk_size);
@@ -2180,7 +2180,7 @@ fn build_descriptor_list_for_psram(
         )));
         buffer.prepare_for_dma();
 
-        let Some(descriptor) = desciptor_iter.next() else {
+        let Some(descriptor) = descriptor_iter.next() else {
             return consumed;
         };
         descriptor.set_size(tail_to_copy);

@@ -744,7 +744,7 @@ mod tests {
                         // representation in memory and in the i2s stream (the naming is very
                         // confusing here). This simplifies the loopback test.
                         .with_endianness(Endianness::BigEndian)
-                        // Ensures that all the data fron the i2s stream comes back in
+                        // Ensures that all the data from the i2s stream comes back in
                         .with_channels(Channels::STEREO)
                         .with_alignment(rx_alignment),
                 ),

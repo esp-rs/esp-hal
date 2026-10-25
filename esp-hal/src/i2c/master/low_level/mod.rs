@@ -1719,7 +1719,7 @@ mod bus_clear {
             driver.info.scl_output.disconnect_from(&scl);
             driver.info.sda_output.disconnect_from(&sda);
 
-            // Starting from (9, false), becase:
+            // Starting from (9, false), because:
             // - we start with SCL low
             // - a complete SCL cycle consists of a high period and a low period
             // - we decrement the remaining counter at the beginning of a cycle, which gives us 9

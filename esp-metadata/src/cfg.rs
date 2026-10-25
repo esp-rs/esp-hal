@@ -731,7 +731,7 @@ driver_configs![
                 rx_store_and_forward: bool,
                 /// When true, Type-2 RX IP checksum offload (`MAC.config.IPC`) is
                 /// enabled and the driver inspects RDES4. False on chips whose COE
-                /// mis-flags valid frames.
+                /// can false-positive on valid frames.
                 #[serde(default)]
                 rx_checksum_offload: bool,
                 /// When true, TX IP/TCP/UDP checksum insertion (`TDES0.CIC`) is

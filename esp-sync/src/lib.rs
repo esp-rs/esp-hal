@@ -1,4 +1,4 @@
-//! Syncronization primitives for ESP32 devices
+//! Synchronization primitives for ESP32 devices
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
@@ -288,7 +288,7 @@ impl<L: RawLock> GenericRawMutex<L> {
 #[cfg_attr(
     multi_core,
     doc = r#"It needs a bit of memory, but it does not take a global critical
-    section, making it preferrable for use in multi-core systems."#
+    section, making it preferable for use in multi-core systems."#
 )]
 pub struct RawMutex {
     inner: GenericRawMutex<SingleCoreInterruptLock>,

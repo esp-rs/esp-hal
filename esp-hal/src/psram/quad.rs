@@ -307,7 +307,7 @@ fn psram_config_cmd(
         addr_bit_len: u32,    // Address byte length
         tx_data: *const u32,  // Point to send data buffer
         tx_data_bit_len: u32, // Send data byte length.
-        rx_data: *mut u32,    // Point to recevie data buffer
+        rx_data: *mut u32,    // Point to receive data buffer
         rx_data_bit_len: u32, // Recevie Data byte length.
         dummy_bit_len: u32,
     }

@@ -3386,7 +3386,7 @@ ignored."
     #[procmacros::doc_replace]
     /// An async Wi-Fi network scan with caller-provided scanning options.
     ///
-    /// Scanning is not supported in AcessPoint-only mode.
+    /// Scanning is not supported in AccessPoint-only mode.
     ///
     /// ## Example
     ///

@@ -238,7 +238,7 @@ impl<'d> LpI2c<'d> {
 
         self.select_lp_fast_clock();
 
-        // Configure LP I2C timing paramters. source_clk is ignored for LP_I2C in this
+        // Configure LP I2C timing parameters. source_clk is ignored for LP_I2C in this
         // call
 
         let source_clk = 16_000_000;

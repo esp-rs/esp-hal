@@ -842,7 +842,7 @@ mod async_tx {
             )
             .unwrap();
 
-        // use a PCNT unit to count the negitive clock edges only when valid is high
+        // use a PCNT unit to count the negative clock edges only when valid is high
         let clock_unit = ctx.pcnt_unit;
         clock_unit.channel0.set_edge_signal(ctx.clock_loopback);
         clock_unit.channel0.set_ctrl_signal(ctx.valid_loopback);
@@ -900,7 +900,7 @@ mod async_tx {
             )
             .unwrap();
 
-        // use a PCNT unit to count the negitive clock edges only when
+        // use a PCNT unit to count the negative clock edges only when
         // valid is high
         let clock_unit = ctx.pcnt_unit;
         clock_unit.channel0.set_edge_signal(ctx.clock_loopback);
