@@ -203,6 +203,8 @@ impl<'d> I2cSlave<'d, Blocking> {
     }
 
     /// Reconfigures the driver to operate in [`Async`] mode.
+    ///
+    /// Pending requests are preserved.
     pub fn into_async(self) -> I2cSlave<'d, Async> {
         self.i2c
             .set_interrupt_handler(self.driver().info.async_handler);
@@ -220,6 +222,8 @@ impl<'d> I2cSlave<'d, Blocking> {
 
 impl<'d> I2cSlave<'d, Async> {
     /// Reconfigures the driver to operate in [`Blocking`] mode.
+    ///
+    /// Pending requests are preserved.
     pub fn into_blocking(self) -> I2cSlave<'d, Blocking> {
         self.i2c.disable_peri_interrupt();
 
@@ -900,10 +904,6 @@ impl AnyI2c<'_> {
         self.disable_peri_interrupt();
 
         self.info().regs().int_ena().write(|w| unsafe { w.bits(0) });
-        self.info()
-            .regs()
-            .int_clr()
-            .write(|w| unsafe { w.bits(0x3fff) });
 
         self.bind_peri_interrupt(handler);
         self.enable_peri_interrupt(handler.priority());
