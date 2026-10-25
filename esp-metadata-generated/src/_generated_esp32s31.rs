@@ -511,6 +511,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.pmu_sleep_steps") => {
+        true
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };

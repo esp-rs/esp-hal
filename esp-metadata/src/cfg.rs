@@ -1053,6 +1053,11 @@ driver_configs![
                 /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
                 #[serde(default)]
                 deep_sleep_needs_gpio_isolation: bool,
+                /// Whether the chip module has its own `pmu_sleep_start` and `pmu_sleep_finish`,
+                /// which every light sleep calls around the sleep request, like
+                /// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L355-L409>.
+                #[serde(default)]
+                pmu_sleep_steps: bool,
                 /// CPU retention capabilities and reachable retention-memory bounds.
                 ///
                 /// Not `Option`: an absent table must emit no symbols at all, and an optional

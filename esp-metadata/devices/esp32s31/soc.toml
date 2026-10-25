@@ -228,6 +228,7 @@ is_lp_sys = false
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+pmu_sleep_steps = true
 ext1_version = 3
 pin_wakeup_version = 3
 wakeup_sources = {
