@@ -672,6 +672,17 @@ impl RtcSleepConfig {
     /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        // PSRAM must slow down before the CPU moves to XTAL_CLK. [`SavedState::restore`] restores
+        // the PSRAM speed after the CPU moves back.
+        // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_modes.c#L1036-L1043>
+        // and <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_modes.c#L1195>.
+        // esp-hal does not tune PSRAM or flash. The tuning registers keep the reset value at
+        // both speeds, so the low speed needs no tuning change.
+        let psram_slowed = !self.deep;
+        if psram_slowed {
+            crate::psram::low_speed::enter();
+        }
+
         let cpu_root_clk = ClockTree::with(|clocks| {
             let old = clocks.cpu_root_clk();
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
@@ -731,7 +742,10 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl0()
             .write(|w| w.slp_reject_en().bit(reject_mask != 0));
 
-        SavedState { cpu_root_clk }
+        SavedState {
+            cpu_root_clk,
+            psram_slowed,
+        }
     }
 
     /// Requests the sleep.
@@ -753,6 +767,7 @@ impl RtcSleepConfig {
 #[must_use]
 pub(crate) struct SavedState {
     cpu_root_clk: Option<CpuRootClkConfig>,
+    psram_slowed: bool,
 }
 
 impl SavedState {
@@ -769,5 +784,8 @@ impl SavedState {
                 clocks::configure_cpu_root_clk(clocks, cpu_root_clk);
             }
         });
+        if self.psram_slowed {
+            crate::psram::low_speed::exit();
+        }
     }
 }
