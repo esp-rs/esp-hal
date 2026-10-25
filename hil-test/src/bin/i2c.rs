@@ -506,14 +506,14 @@ mod i2c_slave {
     use core::sync::atomic::{AtomicBool, Ordering};
 
     use embassy_time::Timer;
+    #[cfg(soc_has_pcr)]
+    use esp_hal::peripherals::PCR;
     use esp_hal::{
         delay::Delay,
         gpio::{DriveMode, Flex, Level, OutputConfig, Pull},
-        i2c::slave::{Command, Config, Error, FIFO_SIZE, I2cSlave, ReadStatus},
+        i2c::slave::{Command, Config, ConfigError, Error, FIFO_SIZE, I2cSlave, ReadStatus},
         peripherals::{I2C0, Peripherals},
     };
-    #[cfg(soc_has_pcr)]
-    use esp_hal::{i2c::slave::ConfigError, peripherals::PCR};
     use hil_test::{assert, assert_eq};
 
     use super::*;
@@ -534,9 +534,12 @@ mod i2c_slave {
     const MAX_RESPONSE_LEN: usize = u16::MAX as usize;
     static LONG_RESPONSE: [u8; MAX_RESPONSE_LEN + 2] = [0x5a; MAX_RESPONSE_LEN + 2];
     static MASTER_DONE: AtomicBool = AtomicBool::new(false);
+    static MASTER_PAUSED: AtomicBool = AtomicBool::new(false);
     trait TestSlave {
         async fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error>;
         async fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error>;
+
+        fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError>;
     }
 
     impl TestSlave for I2cSlave<'_, Blocking> {
@@ -547,6 +550,10 @@ mod i2c_slave {
         async fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
             I2cSlave::respond_to_read(self, buffer)
         }
+
+        fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+            I2cSlave::apply_config(self, config)
+        }
     }
 
     impl TestSlave for I2cSlave<'_, Async> {
@@ -556,6 +563,10 @@ mod i2c_slave {
 
         async fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
             self.respond_to_read_async(buffer).await
+        }
+
+        fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+            I2cSlave::apply_config(self, config)
         }
     }
 
@@ -617,7 +628,7 @@ mod i2c_slave {
             Timer::after_micros(50).await;
         }
 
-        async fn write_byte(&mut self, byte: u8) -> bool {
+        async fn write_bits(&mut self, byte: u8) {
             // Busy-wait so repeated START and address match can be pending together.
             for bit in (0..8).rev() {
                 self.sda.set_level(Level::from(byte & (1 << bit) != 0));
@@ -626,6 +637,10 @@ mod i2c_slave {
                 Delay::new().delay_micros(50);
                 self.scl.set_low();
             }
+        }
+
+        async fn write_byte(&mut self, byte: u8) -> bool {
+            self.write_bits(byte).await;
 
             self.sda.set_high();
             Delay::new().delay_micros(50);
@@ -692,8 +707,22 @@ mod i2c_slave {
         }
     }
 
+    async fn wait_for_pause() {
+        while !MASTER_PAUSED.load(Ordering::SeqCst) {
+            embassy_futures::yield_now().await;
+        }
+    }
+
+    async fn pause_master() {
+        MASTER_PAUSED.store(true, Ordering::SeqCst);
+        while MASTER_PAUSED.load(Ordering::SeqCst) {
+            Timer::after_micros(50).await;
+        }
+    }
+
     fn setup(peripherals: Peripherals) -> Context {
         MASTER_DONE.store(false, Ordering::SeqCst);
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
         let timg = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg.timer0);
 
@@ -759,6 +788,76 @@ mod i2c_slave {
             drop(slave);
             assert!(!function_clock_enabled());
         }
+    }
+
+    #[test]
+    fn invalid_config_preserves_state(peripherals: Peripherals) {
+        let mut slave = I2cSlave::new(peripherals.I2C0, Config::new(ADDRESS)).unwrap();
+        let regs = I2C0::regs();
+        #[cfg(i2c_master_has_arbitration_en)]
+        assert!(regs.ctr().read().arbitration_en().bit_is_clear());
+        regs.data()
+            .write(|w| unsafe { w.fifo_rdata().bits(WRITE_DATA[0]) });
+        assert_eq!(regs.sr().read().txfifo_cnt().bits(), 1);
+        let control = regs.ctr().read().bits();
+        let address = regs.slave_addr().read().bits();
+        assert_eq!(
+            slave.apply_config(&Config::new(0x80)),
+            Err(ConfigError::AddressInvalid)
+        );
+        assert_eq!(regs.sr().read().txfifo_cnt().bits(), 1);
+        assert_eq!(regs.ctr().read().bits(), control);
+        assert_eq!(regs.slave_addr().read().bits(), address);
+    }
+
+    #[embassy_executor::task]
+    async fn reconfiguration_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        master.start().await;
+        assert!(master.write_byte(ADDRESS << 1).await);
+        master.write_bits(WRITE_DATA[0]).await;
+        master.sda.set_high();
+        pause_master().await;
+        master.clock().await;
+        for &byte in &WRITE_DATA[1..] {
+            let _ = master.write_byte(byte).await;
+        }
+        master.start().await;
+        assert!(master.write_byte((ADDRESS + 1) << 1).await);
+        for byte in SECOND_RESPONSE {
+            assert!(master.write_byte(byte).await);
+        }
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_reconfiguration(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner
+            .spawn(reconfiguration_master(ctx.master).unwrap());
+        wait_for_pause().await;
+        slave.apply_config(&Config::new(ADDRESS + 1)).unwrap();
+        #[cfg(i2c_master_has_arbitration_en)]
+        assert!(I2C0::regs().ctr().read().arbitration_en().bit_is_clear());
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+
+        let mut data = [0; SECOND_RESPONSE.len()];
+        assert_eq!(
+            slave.listen(&mut data).await,
+            Ok(Command::Write(data.len()))
+        );
+        assert_eq!(data, SECOND_RESPONSE);
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_reconfiguration(peripherals: Peripherals) {
+        check_reconfiguration(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_reconfiguration(peripherals: Peripherals) {
+        check_reconfiguration(setup(peripherals).into_async()).await;
     }
 
     #[embassy_executor::task]
