@@ -334,8 +334,11 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     ///
     /// Returns [`Command::Read`] for a read request and holds SCL low until
     /// [`Self::respond_to_read`] supplies the response.
-    /// Pending receive data is preserved unless recovering from a bus error.
+    /// Pending receive data is preserved between calls.
     /// A pending write holds SCL low until this method receives its data.
+    ///
+    /// After [`Error::Timeout`] or [`Error::ArbitrationLost`], the next call resets
+    /// the controller and discards pending data.
     ///
     /// # Errors
     ///
@@ -350,7 +353,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
 
         let mut bytes_read = 0;
         loop {
-            driver.check_errors()?;
+            Driver::check_errors(driver.regs(), true)?;
             if let Some(res) = driver.listen_step(buffer, &mut bytes_read) {
                 return res;
             }
@@ -377,7 +380,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
         driver.start_read(buffer)?;
 
         loop {
-            driver.check_errors()?;
+            Driver::check_errors(driver.regs(), !nack_received)?;
             if let Some(status) =
                 driver.respond_to_read_step(buffer, &mut bytes_written, &mut nack_received)
             {
@@ -424,15 +427,13 @@ impl Future for I2cSlaveFuture<'_> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         self.state.waker.register(cx.waker());
 
+        if let Err(error) =
+            Driver::check_errors(self.regs, self.events.contains(Event::SlaveStretch))
+        {
+            return Poll::Ready(Err(error));
+        }
+
         let raw = self.regs.int_raw().read();
-
-        if raw.arbitration_lost().bit_is_set() {
-            return Poll::Ready(Err(Error::ArbitrationLost));
-        }
-        if raw.time_out().bit_is_set() {
-            return Poll::Ready(Err(Error::Timeout));
-        }
-
         let triggered = (self.events.contains(Event::SlaveStretch)
             && raw.slave_stretch().bit_is_set())
             || (self.events.contains(Event::TransComplete) && raw.trans_complete().bit_is_set())
@@ -651,23 +652,49 @@ impl Driver<'_> {
         regs.fifo_conf().modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
 
-    fn check_errors(&self) -> Result<(), Error> {
-        let r = self.regs().int_raw().read();
+    fn check_errors(regs: &RegisterBlock, allow_tx_stretch: bool) -> Result<(), Error> {
+        let r = regs.int_raw().read();
 
         if r.arbitration_lost().bit_is_set() {
             return Err(Error::ArbitrationLost);
         }
+        // The timeout counter also runs while the slave holds SCL low.
         if r.time_out().bit_is_set() {
-            return Err(Error::Timeout);
+            let status = regs.sr().read();
+            // ACK stretching can retain the previous TX stretch cause.
+            let tx_finished = status.slave_rw().bit_is_set()
+                && status.stretch_cause().bits() == 1
+                && (!allow_tx_stretch || r.nack().bit_is_set());
+            if r.slave_stretch().bit_is_clear() || tx_finished {
+                return Err(Error::Timeout);
+            }
         }
         Ok(())
     }
 
-    fn start_listen(&self) {
+    fn release_stretch(&self) {
         let regs = self.regs();
-        if self.check_errors().is_err() {
-            self.reset_fifo();
-            regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
+        // Restart timeout counting when the master regains control of SCL.
+        regs.to().modify(|_, w| w.time_out_en().clear_bit());
+        self.update_registers();
+        regs.int_clr().write(|w| {
+            w.slave_stretch().clear_bit_by_one();
+            w.time_out().clear_bit_by_one()
+        });
+        regs.scl_stretch_conf()
+            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+        regs.to().modify(|_, w| w.time_out_en().set_bit());
+        self.update_registers();
+    }
+
+    fn recover(&self) {
+        let address = self.regs().slave_addr().read().slave_addr().bits() as u8;
+        self.setup(&Config::new(address)).ok();
+    }
+
+    fn start_listen(&self) {
+        if Self::check_errors(self.regs(), true).is_err() {
+            self.recover();
         } else {
             self.reset_tx_fifo();
         }
@@ -714,10 +741,7 @@ impl Driver<'_> {
         if write_pending && write_complete {
             regs.int_clr().write(|w| w.rxfifo_ovf().clear_bit_by_one());
             if fifo_overflow && status.stretch_cause().bits() == 2 {
-                regs.int_clr()
-                    .write(|w| w.slave_stretch().clear_bit_by_one());
-                regs.scl_stretch_conf()
-                    .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+                self.release_stretch();
             }
             return Some(if overflow {
                 Err(Error::Overflow)
@@ -727,13 +751,12 @@ impl Driver<'_> {
         }
 
         if ints.slave_stretch().bit_is_set() {
-            regs.int_clr()
-                .write(|w| w.slave_stretch().clear_bit_by_one());
             if read_pending {
+                regs.int_clr()
+                    .write(|w| w.slave_stretch().clear_bit_by_one());
                 return Some(Ok(Command::Read));
             }
-            regs.scl_stretch_conf()
-                .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+            self.release_stretch();
         }
 
         None
@@ -754,9 +777,7 @@ impl Driver<'_> {
             w.bits(0x3fff);
             w.det_start().clear_bit_by_one()
         });
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        self.update_registers();
+        self.release_stretch();
         Ok(())
     }
 
@@ -805,12 +826,7 @@ impl Driver<'_> {
                 regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
                 *bytes_written += 1;
             }
-            // Clear the stretch interrupt before the master can advance.
-            regs.int_clr()
-                .write(|w| w.slave_stretch().clear_bit_by_one());
-            regs.scl_stretch_conf()
-                .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-            self.update_registers();
+            self.release_stretch();
         }
 
         None
