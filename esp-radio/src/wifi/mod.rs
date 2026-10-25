@@ -660,7 +660,7 @@ pub enum DisconnectReason {
     /// Transmission link establishment failed
     TransmissionLinkEstablishmentFailed,
     /// Alternative channel occupied
-    AlterativeChannelOccupied,
+    AlternativeChannelOccupied,
     /// Beacon timeout
     BeaconTimeout,
     /// No access point found
@@ -738,7 +738,7 @@ impl DisconnectReason {
             50 => Self::InvalidMde,
             51 => Self::InvalidFte,
             67 => Self::TransmissionLinkEstablishmentFailed,
-            68 => Self::AlterativeChannelOccupied,
+            68 => Self::AlternativeChannelOccupied,
             200 => Self::BeaconTimeout,
             201 => Self::NoAccessPointFound,
             202 => Self::AuthenticationFailed,
@@ -3386,7 +3386,7 @@ ignored."
     #[procmacros::doc_replace]
     /// An async Wi-Fi network scan with caller-provided scanning options.
     ///
-    /// Scanning is not supported in AcessPoint-only mode.
+    /// Scanning is not supported in AccessPoint-only mode.
     ///
     /// ## Example
     ///

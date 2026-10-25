@@ -171,7 +171,7 @@ pub(crate) fn ieee802154_pib_set_extended_address(
     PIB.with(|pib| pib.ext_addr[index as usize] = address)
 }
 
-pub(crate) fn ieee802154_pib_set_cca_theshold(cca_threshold: i8) {
+pub(crate) fn ieee802154_pib_set_cca_threshold(cca_threshold: i8) {
     PIB.with(|pib| pib.cca_threshold = cca_threshold)
 }
 

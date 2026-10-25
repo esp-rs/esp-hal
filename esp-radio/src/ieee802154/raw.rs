@@ -451,8 +451,8 @@ pub fn set_extended_address(index: u8, address: [u8; IEEE802154_FRAME_EXT_ADDR_S
     ieee802154_pib_set_extended_address(index, address);
 }
 
-pub fn set_cca_theshold(cca_threshold: i8) {
-    ieee802154_pib_set_cca_theshold(cca_threshold);
+pub fn set_cca_threshold(cca_threshold: i8) {
+    ieee802154_pib_set_cca_threshold(cca_threshold);
 }
 
 pub fn set_cca_mode(mode: CcaMode) {
