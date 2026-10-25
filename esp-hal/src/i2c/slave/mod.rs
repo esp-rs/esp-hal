@@ -5,6 +5,16 @@
 //! Receives writes and responds to read requests at a 7-bit I2C address.
 //! The driver uses SCL clock stretching for flow control in [`Blocking`] and [`Async`] modes.
 //! Writes stretch SCL at each data byte's ACK until the driver consumes that byte.
+//!
+//! ## Timeouts
+//!
+//! Operations have no software time limit and can wait indefinitely.
+//! [`Error::Timeout`] reports a detected hardware bus timeout.
+//! A later request's clock stretch can hide an earlier bus timeout.
+//!
+//! Operations reset the controller before returning [`Error::Timeout`] or
+//! [`Error::ArbitrationLost`]. This releases the slave's outputs and discards pending requests.
+//! The master must retry these requests.
 
 use core::{
     future::Future,
@@ -49,14 +59,16 @@ pub const FIFO_SIZE: usize = property!("i2c_master.fifo_size");
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Error {
-    /// A timeout occurred during transmission.
+    /// A hardware bus timeout is detected.
     Timeout,
-    /// The arbitration for the bus was lost.
+    /// Bus arbitration is lost.
     ArbitrationLost,
     /// The receive buffer is too small, or the RX FIFO overflows.
     Overflow,
     /// The unread response exceeds 65,535 bytes and cannot fit in [`ReadStatus::LeftoverBytes`].
     ResponseTooLong,
+    /// The master ends a read without a NACK.
+    ReadAborted,
 }
 
 impl core::error::Error for Error {}
@@ -68,6 +80,7 @@ impl core::fmt::Display for Error {
             Self::ArbitrationLost => "Bus arbitration lost",
             Self::Overflow => "Receive buffer or RX FIFO overflow",
             Self::ResponseTooLong => "Unread response length exceeds 65,535 bytes",
+            Self::ReadAborted => "Read ended without a NACK",
         })
     }
 }
@@ -77,6 +90,7 @@ impl embedded_hal::i2c::Error for Error {
         match self {
             Self::ArbitrationLost => embedded_hal::i2c::ErrorKind::ArbitrationLoss,
             Self::Overflow => embedded_hal::i2c::ErrorKind::Overrun,
+            Self::ReadAborted => embedded_hal::i2c::ErrorKind::Bus,
             _ => embedded_hal::i2c::ErrorKind::Other,
         }
     }
@@ -268,7 +282,7 @@ impl<'d> I2cSlave<'d, Async> {
                     | Event::StartDetected
                     | Event::ReceiveBoundary,
             )
-            .await?;
+            .await;
             if let Some(res) = driver.listen_step(buffer, &mut bytes_read) {
                 return res;
             }
@@ -292,7 +306,7 @@ impl<'d> I2cSlave<'d, Async> {
                 state,
                 Event::SlaveStretch | Event::Nack | Event::TransComplete | Event::StartDetected,
             )
-            .await?;
+            .await;
 
             if let Some(status) = driver.respond_to_read_step(buffer, &mut bytes_written) {
                 return status;
@@ -346,23 +360,25 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     ///
     /// Returns [`Command::Read`] for a read request and holds SCL low until
     /// [`Self::respond_to_read`] supplies the response.
-    /// Pending receive data is preserved unless recovering from a bus error.
+    /// Pending receive data is preserved between calls.
     /// The controller stretches SCL at each write byte's ACK until this method consumes the byte.
+    ///
+    /// If a bus error is detected when this method starts, it resets the controller
+    /// and discards pending data.
     ///
     /// # Errors
     ///
     /// [`Error::Overflow`] when the receive buffer is too small or the RX FIFO overflows.
     /// The error is reported after STOP or repeated START.
     ///
-    /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
-    /// when arbitration is lost.
+    /// [`Error::Timeout`] when a hardware bus timeout is detected.
+    /// [`Error::ArbitrationLost`] when arbitration is lost.
     pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let driver = self.driver();
         driver.start_listen();
 
         let mut bytes_read = 0;
         loop {
-            driver.check_errors()?;
             if let Some(res) = driver.listen_step(buffer, &mut bytes_read) {
                 return res;
             }
@@ -381,15 +397,18 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     /// [`Error::ResponseTooLong`] when more than 65,535 provided bytes remain unread.
     /// The response completes, but the remaining count cannot fit in [`ReadStatus::LeftoverBytes`].
     ///
-    /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
-    /// when arbitration is lost.
+    /// [`Error::ReadAborted`] when the master ends the read without a NACK.
+    /// The controller resets and discards pending requests.
+    /// The master must retry these requests.
+    ///
+    /// [`Error::Timeout`] when a hardware bus timeout is detected.
+    /// [`Error::ArbitrationLost`] when arbitration is lost.
     pub fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
         let driver = self.driver();
         let mut bytes_written = 1;
         driver.start_read(buffer);
 
         loop {
-            driver.check_errors()?;
             if let Some(status) = driver.respond_to_read_step(buffer, &mut bytes_written) {
                 return status;
             }
@@ -430,20 +449,12 @@ impl<'a> I2cSlaveFuture<'a> {
 }
 
 impl Future for I2cSlaveFuture<'_> {
-    type Output = Result<(), Error>;
+    type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         self.state.waker.register(cx.waker());
 
         let raw = self.regs.int_raw().read();
-
-        if raw.arbitration_lost().bit_is_set() {
-            return Poll::Ready(Err(Error::ArbitrationLost));
-        }
-        if raw.time_out().bit_is_set() {
-            return Poll::Ready(Err(Error::Timeout));
-        }
-
         let triggered = (self.events.contains(Event::SlaveStretch)
             && raw.slave_stretch().bit_is_set())
             || (self.events.contains(Event::TransComplete) && raw.trans_complete().bit_is_set())
@@ -459,8 +470,8 @@ impl Future for I2cSlaveFuture<'_> {
                     || Driver::address_pending(&status)
             };
 
-        if triggered || boundary_pending {
-            Poll::Ready(Ok(()))
+        if triggered || boundary_pending || Driver::check_errors(self.regs).is_err() {
+            Poll::Ready(())
         } else {
             self.regs.int_ena().modify(|_, w| {
                 if self.events.contains(Event::SlaveStretch) {
@@ -477,6 +488,8 @@ impl Future for I2cSlaveFuture<'_> {
                 }
                 w.arbitration_lost().set_bit();
                 w.time_out().set_bit();
+                w.scl_st_to().set_bit();
+                w.scl_main_st_to().set_bit();
                 w
             });
             Poll::Pending
@@ -714,24 +727,55 @@ impl Driver<'_> {
         regs.fifo_conf().modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
 
-    fn check_errors(&self) -> Result<(), Error> {
-        let r = self.regs().int_raw().read();
+    fn check_errors(regs: &RegisterBlock) -> Result<(), Error> {
+        let r = regs.int_raw().read();
 
         if r.arbitration_lost().bit_is_set() {
             return Err(Error::ArbitrationLost);
         }
-        if r.time_out().bit_is_set() {
-            return Err(Error::Timeout);
+        // The timeout counter also runs while the slave holds SCL low.
+        // A later stretch can hide an earlier timeout; preserve the pending request.
+        if r.time_out().bit_is_set()
+            || r.scl_st_to().bit_is_set()
+            || r.scl_main_st_to().bit_is_set()
+        {
+            let status = regs.sr().read();
+            // ACK stretching can retain the previous TX stretch cause.
+            let tx_finished = status.slave_rw().bit_is_set()
+                && status.stretch_cause().bits() == Self::STRETCH_TX_EMPTY
+                && r.nack().bit_is_set();
+            if r.slave_stretch().bit_is_clear() || tx_finished {
+                return Err(Error::Timeout);
+            }
         }
         Ok(())
     }
 
-    fn start_listen(&self) {
+    fn release_stretch(&self) {
         let regs = self.regs();
-        if self.check_errors().is_err() {
-            self.state.set_receive_boundary(ReceiveBoundary::default());
-            self.reset_fifo();
-            regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
+        // Restart timeout counting when the master regains control of SCL.
+        regs.to().modify(|_, w| w.time_out_en().clear_bit());
+        self.update_registers();
+        regs.int_clr().write(|w| {
+            w.slave_stretch().clear_bit_by_one();
+            w.scl_st_to().clear_bit_by_one();
+            w.scl_main_st_to().clear_bit_by_one();
+            w.time_out().clear_bit_by_one()
+        });
+        regs.scl_stretch_conf()
+            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+        regs.to().modify(|_, w| w.time_out_en().set_bit());
+        self.update_registers();
+    }
+
+    fn recover(&self) {
+        let address = self.regs().slave_addr().read().slave_addr().bits() as u8;
+        self.setup(&Config::new(address)).ok();
+    }
+
+    fn start_listen(&self) {
+        if Self::check_errors(self.regs()).is_err() {
+            self.recover();
         } else {
             self.reset_tx_fifo();
         }
@@ -761,6 +805,7 @@ impl Driver<'_> {
         bytes_read: &mut usize,
     ) -> Option<Result<Command, Error>> {
         let regs = self.regs();
+        let error = Self::check_errors(regs).err();
         let mut boundary = self.state.receive_boundary();
         let mut ints = self.take_receive_events(&mut boundary);
         let mut status = regs.sr().read();
@@ -793,6 +838,14 @@ impl Driver<'_> {
                     && (*bytes_read > 0
                         || (previous_bytes > 0 && (next_write_byte || !addressed)))));
 
+        // A following request's timeout must not discard a completed write.
+        if let Some(error) = error {
+            if error != Error::Timeout || !write_ended {
+                self.recover();
+                return Some(Err(error));
+            }
+        }
+
         if wait_for_ack {
             self.state.set_receive_boundary(boundary);
             return None;
@@ -821,10 +874,7 @@ impl Driver<'_> {
         if write_pending && write_complete {
             regs.int_clr().write(|w| w.rxfifo_ovf().clear_bit_by_one());
             if fifo_overflow && status.stretch_cause().bits() == Self::STRETCH_RX_FULL {
-                regs.int_clr()
-                    .write(|w| w.slave_stretch().clear_bit_by_one());
-                regs.scl_stretch_conf()
-                    .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+                self.release_stretch();
             }
             return Some(if overflow {
                 Err(Error::Overflow)
@@ -834,13 +884,12 @@ impl Driver<'_> {
         }
 
         if stretched {
-            regs.int_clr()
-                .write(|w| w.slave_stretch().clear_bit_by_one());
             if read_pending {
+                regs.int_clr()
+                    .write(|w| w.slave_stretch().clear_bit_by_one());
                 return Some(Ok(Command::Read));
             }
-            regs.scl_stretch_conf()
-                .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+            self.release_stretch();
         }
 
         None
@@ -857,9 +906,7 @@ impl Driver<'_> {
             w.bits(0x3fff);
             w.det_start().clear_bit_by_one()
         });
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        self.update_registers();
+        self.release_stretch();
     }
 
     fn respond_to_read_step(
@@ -868,12 +915,25 @@ impl Driver<'_> {
         bytes_written: &mut usize,
     ) -> Option<Result<ReadStatus, Error>> {
         let regs = self.regs();
+        let error = Self::check_errors(regs).err();
         let ints = regs.int_raw().read();
+
+        // A later timeout must not replace a completed read.
+        if let Some(error) = error {
+            if error != Error::Timeout || ints.nack().bit_is_clear() {
+                self.recover();
+                return Some(Err(error));
+            }
+        }
 
         if ints.nack().bit_is_set()
             || ints.trans_complete().bit_is_set()
             || ints.det_start().bit_is_set()
         {
+            if ints.nack().bit_is_clear() {
+                self.recover();
+                return Some(Err(Error::ReadAborted));
+            }
             let bytes_read =
                 bytes_written.saturating_sub(regs.sr().read().txfifo_cnt().bits() as usize);
             // START and STOP can already belong to the next request.
@@ -897,12 +957,7 @@ impl Driver<'_> {
                 regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
                 *bytes_written = bytes_written.saturating_add(1);
             }
-            // Clear the stretch interrupt before the master can advance.
-            regs.int_clr()
-                .write(|w| w.slave_stretch().clear_bit_by_one());
-            regs.scl_stretch_conf()
-                .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-            self.update_registers();
+            self.release_stretch();
         }
 
         None
