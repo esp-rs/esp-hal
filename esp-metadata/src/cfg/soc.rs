@@ -1462,7 +1462,7 @@ impl SystemClocks {
                     /// - If `XTAL_CLK` is not specified, the crystal frequency will be automatically detected
                     ///   if possible.
                     /// - The CPU and its upstream clock nodes will be set to a default configuration.
-                    /// - Other unspecified clock sources will not be usable by peripherals.
+                    /// - Other unspecified clock sources will not be useable by peripherals.
                     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
                     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                     #[instability::unstable]
