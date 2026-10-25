@@ -499,3 +499,52 @@ mod tests {
         assert_ne!(data, [0u8; 22]);
     }
 }
+
+#[cfg(all(i2c_slave_driver_supported, soc_has_pcr))]
+#[embedded_test::tests(default_timeout = 3)]
+mod i2c_slave {
+    use esp_hal::{
+        i2c::slave::{Config, ConfigError, I2cSlave},
+        peripherals::{PCR, Peripherals},
+    };
+
+    fn function_clock_enabled() -> bool {
+        PCR::regs()
+            .i2c_sclk_conf(0)
+            .read()
+            .i2c_sclk_en()
+            .bit_is_set()
+    }
+
+    #[init]
+    fn init() -> Peripherals {
+        esp_hal::init(esp_hal::Config::default())
+    }
+
+    #[test]
+    fn function_clock_lifetime(peripherals: Peripherals) {
+        let mut i2c = peripherals.I2C0;
+        // An inherited enabled gate would hide a missing clock request.
+        PCR::regs()
+            .i2c_sclk_conf(0)
+            .modify(|_, w| w.i2c_sclk_en().clear_bit());
+        assert!(!function_clock_enabled());
+
+        assert!(matches!(
+            I2cSlave::new(i2c.reborrow(), Config::new(0x80)),
+            Err(ConfigError::AddressInvalid)
+        ));
+        assert!(!function_clock_enabled());
+
+        for _ in 0..2 {
+            let slave = I2cSlave::new(i2c.reborrow(), Config::new(0x55)).unwrap();
+            assert!(function_clock_enabled());
+            let slave = slave.into_async();
+            assert!(function_clock_enabled());
+            let slave = slave.into_blocking();
+            assert!(function_clock_enabled());
+            drop(slave);
+            assert!(!function_clock_enabled());
+        }
+    }
+}
