@@ -500,9 +500,7 @@ pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSl
 ///
 /// `enter_sleep` requests the sleep. `wait` blocks until the hardware reports the result.
 ///
-/// esp-idf does not write back or invalidate the cache on this chip. It saves and restores the
-/// cache configuration registers in the device-region frame instead
-/// (`esp32c6/sleep_cpu.c:317-341`).
+/// The caller suspends the caches before the call. This function does not invalidate the caches.
 #[crate::ram]
 pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool {
     let core = system::raw_core();
@@ -666,12 +664,21 @@ pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Optio
 /// The retained path returns twice, so it owns the request and the wait. A sleep that keeps the
 /// domain powered needs no frames, and it must not write them back: the registers still hold what
 /// a save would have read, and a restore repeats side effects such as an interrupt claim.
+///
+/// A light sleep suspends the caches and turns off the branch predictor. The caches and the
+/// predictor stay off from before the sleep request until the end of the restore. In that time,
+/// code must not run from flash or access PSRAM.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L24-L53>.
 #[crate::ram]
 pub(crate) fn enter_sleep_with_retention(
     config: &RtcSleepConfig,
     buffer: Option<NonNull<u8>>,
 ) -> bool {
-    match buffer.filter(|_| config.pd_flags.pd_cpu()) {
+    let retained = buffer.filter(|_| config.pd_flags.pd_cpu());
+
+    let _cache = (!config.is_deep_sleep()).then(crate::soc::cache::CacheGuard::suspend);
+
+    match retained {
         Some(buffer) => {
             cpu_retention::sleep_retained(buffer.as_ptr(), sleep::pmu_common::request_sleep)
         }

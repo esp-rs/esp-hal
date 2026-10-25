@@ -88,6 +88,7 @@ macro_rules! non_critical_frame {
             /// # Safety
             ///
             /// The caller must own the CPU state that the frame describes.
+            #[crate::ram]
             pub(crate) unsafe fn save(&mut self) {
                 $(self.$field = unsafe { read_csr!($csr) };)*
             }
@@ -97,6 +98,7 @@ macro_rules! non_critical_frame {
             /// # Safety
             ///
             /// The frame must hold a state that [`Self::save`] read from this core.
+            #[crate::ram]
             pub(crate) unsafe fn restore(&self) {
                 $(unsafe { write_csr!($csr, self.$field) };)*
             }
