@@ -531,6 +531,11 @@ mod i2c_slave {
         (FIFO_SIZE, ReadStatus::LeftoverBytes(1)),
         (RESPONSE.len(), ReadStatus::Done),
     ];
+    const ABORT_CASES: [(usize, Option<Command>); 3] = [
+        (0, None),
+        (3, Some(Command::Read)),
+        (6, Some(Command::Write(WRITE_DATA.len()))),
+    ];
     const MAX_RESPONSE_LEN: usize = u16::MAX as usize;
     static LONG_RESPONSE: [u8; MAX_RESPONSE_LEN + 2] = [0x5a; MAX_RESPONSE_LEN + 2];
     static MASTER_DONE: AtomicBool = AtomicBool::new(false);
@@ -1471,5 +1476,76 @@ mod i2c_slave {
     #[test]
     async fn async_recovers_after_timeout(peripherals: Peripherals) {
         check_recovers_after_timeout(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn aborted_read_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        for &(bits, following) in &ABORT_CASES {
+            master.read(&mut []).await;
+            for _ in 0..bits {
+                assert!(master.clock().await);
+            }
+
+            // Recovery may reject the following request.
+            match following {
+                None => master.stop().await,
+                Some(Command::Read) => {
+                    master.start().await;
+                    let _ = master.write_byte((ADDRESS << 1) | 1).await;
+                    master.stop().await;
+                }
+
+                Some(Command::Write(length)) => {
+                    master.start().await;
+                    let _ = master.write_byte(ADDRESS << 1).await;
+                    for &byte in &WRITE_DATA[..length] {
+                        let _ = master.write_byte(byte).await;
+                    }
+
+                    master.stop().await;
+                }
+            }
+
+            pause_master().await;
+            let mut response = [0; SHORT_READ_LEN];
+            master.read(&mut response).await;
+            assert_eq!(response, RESPONSE[..SHORT_READ_LEN]);
+            master.stop().await;
+        }
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_aborted_read(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner.spawn(aborted_read_master(ctx.master).unwrap());
+
+        for _ in 0..ABORT_CASES.len() {
+            assert_eq!(slave.listen(&mut []).await, Ok(Command::Read));
+            assert_eq!(
+                slave.respond_to_read(&[0xff]).await,
+                Err(Error::ReadAborted)
+            );
+            wait_for_pause().await;
+            MASTER_PAUSED.store(false, Ordering::SeqCst);
+            assert_eq!(slave.listen(&mut []).await, Ok(Command::Read));
+            assert_eq!(
+                slave.respond_to_read(&RESPONSE).await,
+                Ok(ReadStatus::LeftoverBytes(
+                    (RESPONSE.len() - SHORT_READ_LEN) as u16
+                ))
+            );
+        }
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_aborted_read(peripherals: Peripherals) {
+        check_aborted_read(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_aborted_read(peripherals: Peripherals) {
+        check_aborted_read(setup(peripherals).into_async()).await;
     }
 }

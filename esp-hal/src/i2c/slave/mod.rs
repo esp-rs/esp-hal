@@ -61,6 +61,8 @@ pub enum Error {
     Overflow,
     /// The response buffer exceeds 65,535 bytes.
     ResponseTooLong,
+    /// The master ended a read without a NACK.
+    ReadAborted,
 }
 
 impl embedded_hal::i2c::Error for Error {
@@ -68,6 +70,7 @@ impl embedded_hal::i2c::Error for Error {
         match self {
             Self::ArbitrationLost => embedded_hal::i2c::ErrorKind::ArbitrationLoss,
             Self::Overflow => embedded_hal::i2c::ErrorKind::Overrun,
+            Self::ReadAborted => embedded_hal::i2c::ErrorKind::Bus,
             _ => embedded_hal::i2c::ErrorKind::Other,
         }
     }
@@ -282,7 +285,7 @@ impl<'d> I2cSlave<'d, Async> {
                 self.driver()
                     .respond_to_read_step(buffer, &mut bytes_written, &mut nack_received)
             {
-                return Ok(status);
+                return status;
             }
         }
     }
@@ -371,6 +374,10 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     /// [`Error::ResponseTooLong`] when `buffer` contains more than 65,535 bytes.
     /// The pending read request is preserved.
     ///
+    /// [`Error::ReadAborted`] when the master ends the read without a NACK.
+    /// The controller resets and discards pending requests.
+    /// The master must retry these requests.
+    ///
     /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
     /// when arbitration is lost.
     pub fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
@@ -384,7 +391,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
             if let Some(status) =
                 driver.respond_to_read_step(buffer, &mut bytes_written, &mut nack_received)
             {
-                return Ok(status);
+                return status;
             }
         }
     }
@@ -786,12 +793,16 @@ impl Driver<'_> {
         buffer: &[u8],
         bytes_written: &mut usize,
         nack_received: &mut bool,
-    ) -> Option<ReadStatus> {
+    ) -> Option<Result<ReadStatus, Error>> {
         let regs = self.regs();
         let ints = regs.int_raw().read();
 
         // NACK ends the data phase; STOP or repeated START ends the response.
         if ints.trans_complete().bit_is_set() || ints.det_start().bit_is_set() {
+            if !*nack_received && ints.nack().bit_is_clear() {
+                self.recover();
+                return Some(Err(Error::ReadAborted));
+            }
             let bytes_read =
                 bytes_written.saturating_sub(regs.sr().read().txfifo_cnt().bits() as usize);
             regs.int_clr().write(|w| {
@@ -801,13 +812,13 @@ impl Driver<'_> {
             });
             self.reset_tx_fifo();
             if bytes_read > buffer.len() {
-                return Some(ReadStatus::NeedMoreBytes);
+                return Some(Ok(ReadStatus::NeedMoreBytes));
             } else if bytes_read < buffer.len() {
-                return Some(ReadStatus::LeftoverBytes(
+                return Some(Ok(ReadStatus::LeftoverBytes(
                     (buffer.len() - bytes_read) as u16,
-                ));
+                )));
             } else {
-                return Some(ReadStatus::Done);
+                return Some(Ok(ReadStatus::Done));
             }
         }
 
