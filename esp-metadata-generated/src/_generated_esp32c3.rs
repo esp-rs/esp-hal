@@ -457,6 +457,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         true
     };
+    ("sleep.pmu_sleep_steps") => {
+        false
+    };
     ("sleep.cpu_retention_mem_size") => {
         1744
     };
