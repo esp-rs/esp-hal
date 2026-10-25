@@ -661,50 +661,31 @@ impl Driver<'_> {
         let regs = self.regs();
         let ints = regs.int_raw().read();
 
-        if ints.slave_stretch().bit_is_set() {
-            let cause = regs.sr().read().stretch_cause().bits();
-            match cause {
-                0 => {
-                    let rw = regs.sr().read().slave_rw().bit_is_set();
-                    if rw {
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                        return Some(Ok(Command::Read));
-                    } else {
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                    }
-                }
-                2 => {
-                    while regs.sr().read().rxfifo_cnt().bits() > 0 && *bytes_read < buffer.len() {
-                        buffer[*bytes_read] = regs.data().read().fifo_rdata().bits();
-                        *bytes_read += 1;
-                    }
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                }
-                _ => {
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                }
-            }
-        }
+        let status = regs.sr().read();
+        let read_pending = ints.slave_stretch().bit_is_set()
+            && status.stretch_cause().bits() == 0
+            && status.slave_rw().bit_is_set();
 
         while regs.sr().read().rxfifo_cnt().bits() > 0 && *bytes_read < buffer.len() {
             buffer[*bytes_read] = regs.data().read().fifo_rdata().bits();
             *bytes_read += 1;
         }
 
-        if ints.trans_complete().bit_is_set() {
+        // Keep the read address stretched until the preceding write is delivered.
+        if ints.trans_complete().bit_is_set() || (read_pending && *bytes_read > 0) {
             regs.int_clr()
                 .write(|w| w.trans_complete().clear_bit_by_one());
             return Some(Ok(Command::Write(*bytes_read)));
+        }
+
+        if ints.slave_stretch().bit_is_set() {
+            regs.int_clr()
+                .write(|w| w.slave_stretch().clear_bit_by_one());
+            if read_pending {
+                return Some(Ok(Command::Read));
+            }
+            regs.scl_stretch_conf()
+                .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
         }
 
         None

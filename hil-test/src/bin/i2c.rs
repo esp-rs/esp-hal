@@ -983,4 +983,43 @@ mod i2c_slave {
     async fn async_response_length(peripherals: Peripherals) {
         check_response_length(setup(peripherals).into_async()).await;
     }
+
+    #[embassy_executor::task]
+    async fn write_read_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        for length in [WRITE_DATA.len(), RESPONSE.len()] {
+            let request = &RESPONSE[..length];
+            master.write(request).await;
+            let mut response = [0; 3];
+            master.read(&mut response).await;
+            assert_eq!(response, [length as u8, request[0], request[length - 1]]);
+            master.stop().await;
+        }
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_write_read(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner.spawn(write_read_master(ctx.master).unwrap());
+
+        for length in [WRITE_DATA.len(), RESPONSE.len()] {
+            let mut request = [0; RESPONSE.len()];
+            assert_eq!(slave.listen(&mut request).await, Ok(Command::Write(length)));
+            assert_eq!(&request[..length], &RESPONSE[..length]);
+            assert_eq!(slave.listen(&mut request).await, Ok(Command::Read));
+            let response = [length as u8, request[0], request[length - 1]];
+            assert_eq!(slave.respond_to_read(&response).await, Ok(ReadStatus::Done));
+        }
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_write_read(peripherals: Peripherals) {
+        check_write_read(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_write_read(peripherals: Peripherals) {
+        check_write_read(setup(peripherals).into_async()).await;
+    }
 }
