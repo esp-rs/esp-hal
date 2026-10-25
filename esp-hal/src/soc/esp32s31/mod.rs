@@ -29,15 +29,7 @@ pub(crate) fn pre_init() {
     // masters except the HP CPU boot in REE mode, so AXI GDMA cannot fetch
     // descriptors or touch SRAM until these filters are disabled. Mirrors
     // ESP-IDF `bootloader_init_mem` / esp32c6 `pre_init`.
-    crate::peripherals::LP_APM::regs()
-        .func_ctrl()
-        .write(|w| unsafe { w.bits(0) });
-    crate::peripherals::HP_APM::regs()
-        .func_ctrl()
-        .write(|w| unsafe { w.bits(0) });
-    crate::peripherals::HP_MEM_APM::regs()
-        .func_ctrl()
-        .write(|w| unsafe { w.bits(0) });
+    disable_apm_filters();
 
     // TODO: [ESP32S31] IDF-14620 — temp. bring-up fix from ESP-IDF: open all LP/HP
     // peripheral PMS control registers for every security mode.
@@ -55,6 +47,26 @@ pub(crate) fn pre_init() {
 
     // Mirrors ESP-IDF's `init_rng`, see <https://github.com/espressif/esp-idf/blob/8d7d8aef588/components/esp_hw_support/hw_random.c#L114-L120>
     trng::rng_ll_enable();
+}
+
+/// Turns off every APM access-path filter.
+///
+/// The S31 loses the APM settings in light sleep, so the wake code calls this function again. The
+/// wake code runs with the caches suspended, so this function must be inlined.
+///
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_security/include/hal/apm_hal.h#L499-L506>
+/// and <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L458-L462>.
+#[inline(always)]
+pub(crate) fn disable_apm_filters() {
+    crate::peripherals::LP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0) });
+    crate::peripherals::HP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0) });
+    crate::peripherals::HP_MEM_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0) });
 }
 
 /// Opens LP/HP peripheral PMS regions for all security modes.

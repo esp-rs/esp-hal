@@ -1061,6 +1061,10 @@ driver_configs![
                 /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
                 #[serde(default)]
                 deep_sleep_needs_gpio_isolation: bool,
+                /// Whether the chip module has `pmu_sleep_start` and `pmu_sleep_finish`. Every
+                /// light sleep calls these functions around the sleep request.
+                #[serde(default)]
+                pmu_sleep_steps: bool,
                 /// CPU retention capabilities and reachable retention-memory bounds.
                 ///
                 /// Not `Option`: an absent table must emit no symbols at all, and an optional

@@ -227,6 +227,9 @@ const REGI2C_RTC_ADDR_SHIFT: u32 = 8;
 const REGI2C_RTC_ADDR_MASK: u32 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_MASK: u32 = 0xFF;
 
+// Light sleep restores the MPLL with the caches suspended, so the functions below must be inlined.
+// With a constant `block`, the compiler removes the `match` and the jump table in flash.
+#[inline(always)]
 fn regi2c_enable_block(block: u8) -> usize {
     // Match the S31 bootloader setup explicitly instead of relying on a
     // previous-stage bootloader to leave the analog-I2C source and force bit
@@ -272,7 +275,7 @@ fn regi2c_enable_block(block: u8) -> usize {
     if i2c_sel_set { 0 } else { 1 }
 }
 
-#[inline]
+#[inline(always)]
 fn i2c_ctrl_reg(master: usize) -> u32 {
     if master == 0 {
         I2C_ANA_MST_I2C0_CTRL_REG
@@ -281,7 +284,7 @@ fn i2c_ctrl_reg(master: usize) -> u32 {
     }
 }
 
-#[inline]
+#[inline(always)]
 fn wait_i2c_idle(ctrl: u32) {
     unsafe {
         while (ctrl as *const u32).read_volatile() & REGI2C_RTC_BUSY_BIT != 0 {
@@ -290,6 +293,7 @@ fn wait_i2c_idle(ctrl: u32) {
     }
 }
 
+#[inline(always)]
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     let master = regi2c_enable_block(block);
     let ctrl = i2c_ctrl_reg(master);
@@ -309,6 +313,7 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     ((val >> REGI2C_RTC_DATA_SHIFT) & REGI2C_RTC_DATA_MASK) as u8
 }
 
+#[inline(always)]
 pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     let master = regi2c_enable_block(block);
     let ctrl = i2c_ctrl_reg(master);

@@ -526,6 +526,11 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool
         arm_wake_stub();
         enter_sleep()
     } else {
+        // `pmu_sleep_finish` must run after the critical restore and before the non-critical
+        // restore.
+        // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/lowpower/port/esp32s31/sleep_cpu.c#L333>.
+        #[cfg(sleep_pmu_sleep_steps)]
+        sleep::pmu_sleep_finish();
         // The wake holds the APP CPU in reset. A core that waits in the rendezvous comes back
         // through the wake stub once it runs again.
         #[cfg(all(multi_core, feature = "rt"))]
@@ -691,7 +696,11 @@ pub(crate) fn enter_sleep_with_retention(
 
     match retained {
         Some(buffer) => {
-            cpu_retention::sleep_retained(buffer.as_ptr(), sleep::pmu_common::request_sleep)
+            let request = cfg_select! {
+                sleep_pmu_sleep_steps => sleep::pmu_sleep_start,
+                _ => sleep::pmu_common::request_sleep,
+            };
+            cpu_retention::sleep_retained(buffer.as_ptr(), request)
         }
         None => config.enter_sleep(),
     }
