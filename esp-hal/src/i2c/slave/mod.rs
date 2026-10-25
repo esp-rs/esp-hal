@@ -8,9 +8,7 @@
 //!
 //! ## Implementation
 //!
-//! This driver supports both Blocking and Async modes, using hardware SCL clock stretching
-//! to handle flow control. The async implementation runs a callback-free waker model, waking
-//! the task waker when stretching or transaction completeness interrupts occur.
+//! This driver uses SCL clock stretching for flow control in [`Blocking`] and [`Async`] modes.
 
 use core::{
     future::Future,
@@ -116,15 +114,15 @@ pub enum Command {
     Write(usize),
 }
 
-/// Possible responses to responding to a read request
+/// Result of a response to a master read request.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ReadStatus {
-    /// Transaction Complete; master completed reading all provided bytes.
+    /// The master read exactly the provided number of bytes.
     Done,
-    /// Transaction Incomplete; master is trying to read more bytes than were provided.
+    /// The master read beyond the provided data and received `0xff` padding.
     NeedMoreBytes,
-    /// Transaction Complete, but master stopped reading before all bytes were consumed.
+    /// The number of provided bytes the master did not read.
     LeftoverBytes(u16),
 }
 
@@ -137,7 +135,8 @@ pub struct I2cSlave<'d, Dm: DriverMode> {
     // Release the function clock before disabling peripheral register access.
     clock_guard: I2cClockGuard,
     guard: PeripheralGuard,
-    config: DriverConfig,
+    sda_pin: PinGuard,
+    scl_pin: PinGuard,
 }
 
 #[derive(Debug)]
@@ -167,14 +166,6 @@ impl Drop for I2cClockGuard {
     }
 }
 
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-struct DriverConfig {
-    config: Config,
-    sda_pin: PinGuard,
-    scl_pin: PinGuard,
-}
-
 impl<Dm: DriverMode> embedded_hal::i2c::ErrorType for I2cSlave<'_, Dm> {
     type Error = Error;
 }
@@ -197,11 +188,8 @@ impl<'d> I2cSlave<'d, Blocking> {
             phantom: PhantomData,
             clock_guard,
             guard,
-            config: DriverConfig {
-                config,
-                sda_pin,
-                scl_pin,
-            },
+            sda_pin,
+            scl_pin,
         };
 
         slave.apply_config(&config)?;
@@ -218,7 +206,8 @@ impl<'d> I2cSlave<'d, Blocking> {
             phantom: PhantomData,
             clock_guard: self.clock_guard,
             guard: self.guard,
-            config: self.config,
+            sda_pin: self.sda_pin,
+            scl_pin: self.scl_pin,
         }
     }
 }
@@ -233,108 +222,11 @@ impl<'d> I2cSlave<'d, Async> {
             phantom: PhantomData,
             clock_guard: self.clock_guard,
             guard: self.guard,
-            config: self.config,
-        }
-    }
-}
-
-impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
-    fn driver(&self) -> Driver<'_> {
-        Driver {
-            info: self.i2c.info(),
-            state: self.i2c.state(),
-            config: &self.config,
+            sda_pin: self.sda_pin,
+            scl_pin: self.scl_pin,
         }
     }
 
-    /// Connects a pin to the I2C SDA signal.
-    pub fn with_sda(mut self, sda: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        let info = self.driver().info;
-        let input = info.sda_input;
-        let output = info.sda_output;
-        Driver::connect_pin(sda.into(), input, output, &mut self.config.sda_pin);
-        self
-    }
-
-    /// Connects a pin to the I2C SCL signal.
-    pub fn with_scl(mut self, scl: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        let info = self.driver().info;
-        let input = info.scl_input;
-        let output = info.scl_output;
-        Driver::connect_pin(scl.into(), input, output, &mut self.config.scl_pin);
-        self
-    }
-
-    /// Applies a new configuration.
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.config.config = *config;
-        self.driver().setup(config)?;
-        Ok(())
-    }
-}
-
-impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
-    /// Listens for a request from the master.
-    ///
-    /// If the master writes to the slave, this method reads data into the provided
-    /// `buffer` and returns `Command::Write(len)`.
-    /// If the master is requesting a read, it returns `Command::Read` with the SCL line
-    /// stretched (held low).
-    pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
-        let regs = self.driver().info.regs();
-
-        self.driver().reset_fifo();
-
-        regs.scl_stretch_conf().modify(|_, w| unsafe {
-            w.stretch_protect_num().bits(0x3ff);
-            w.slave_scl_stretch_en().set_bit()
-        });
-
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        self.driver().update_registers();
-
-        let mut bytes_read = 0;
-        loop {
-            self.driver().check_errors()?;
-            if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
-                return res;
-            }
-        }
-    }
-
-    /// Responds to a master read request.
-    ///
-    /// Writes the contents of `buffer` to the TX FIFO, clears the clock stretch,
-    /// and waits for the transaction to complete.
-    pub fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
-        let regs = self.driver().info.regs();
-        let mut bytes_written = 0;
-        let initial_write = core::cmp::min(buffer.len(), FIFO_SIZE);
-        for &byte in buffer.iter().take(initial_write) {
-            regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
-        }
-        bytes_written += initial_write;
-
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        self.driver().update_registers();
-
-        loop {
-            self.driver().check_errors()?;
-            if let Some(res) = self
-                .driver()
-                .respond_to_read_step(buffer, &mut bytes_written)
-            {
-                return res;
-            }
-        }
-    }
-}
-
-impl<'d> I2cSlave<'d, Async> {
     /// Listens for a request from the master asynchronously.
     pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let regs = self.driver().info.regs();
@@ -348,8 +240,6 @@ impl<'d> I2cSlave<'d, Async> {
         });
 
         regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
         self.driver().update_registers();
 
         let mut bytes_read = 0;
@@ -362,35 +252,114 @@ impl<'d> I2cSlave<'d, Async> {
     }
 
     /// Responds to a master read request asynchronously.
+    ///
+    /// See [`Self::respond_to_read`] for the response behavior.
     pub async fn respond_to_read_async(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
         let regs = self.driver().info.regs();
         let state = self.i2c.state();
 
-        let mut bytes_written = 0;
-        let initial_write = core::cmp::min(buffer.len(), FIFO_SIZE);
-        for &byte in buffer.iter().take(initial_write) {
-            regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
-        }
-        bytes_written += initial_write;
-
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        self.driver().update_registers();
+        let mut bytes_written = 1;
+        let mut nack_received = false;
+        self.driver().start_read(buffer);
 
         loop {
-            I2cSlaveFuture::new(
-                regs,
-                state,
-                Event::SlaveStretch | Event::TransComplete | Event::Nack,
-            )
-            .await?;
+            let mut events = Event::TransComplete | Event::StartDetected;
+            if !nack_received {
+                events |= Event::SlaveStretch | Event::Nack;
+            }
+            I2cSlaveFuture::new(regs, state, events).await?;
 
-            if let Some(res) = self
-                .driver()
-                .respond_to_read_step(buffer, &mut bytes_written)
+            if let Some(status) =
+                self.driver()
+                    .respond_to_read_step(buffer, &mut bytes_written, &mut nack_received)
             {
+                return Ok(status);
+            }
+        }
+    }
+}
+
+impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
+    fn driver(&self) -> Driver<'_> {
+        Driver {
+            info: self.i2c.info(),
+        }
+    }
+
+    /// Connects a pin to the I2C SDA signal.
+    pub fn with_sda(mut self, sda: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
+        let info = self.driver().info;
+        let input = info.sda_input;
+        let output = info.sda_output;
+        Driver::connect_pin(sda.into(), input, output, &mut self.sda_pin);
+        self
+    }
+
+    /// Connects a pin to the I2C SCL signal.
+    pub fn with_scl(mut self, scl: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
+        let info = self.driver().info;
+        let input = info.scl_input;
+        let output = info.scl_output;
+        Driver::connect_pin(scl.into(), input, output, &mut self.scl_pin);
+        self
+    }
+
+    /// Applies a new configuration.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.driver().setup(config)
+    }
+
+    /// Listens for a request from the master.
+    ///
+    /// If the master writes to the slave, this method reads data into the provided
+    /// `buffer` and returns `Command::Write(len)`.
+    /// If the master is requesting a read, it returns `Command::Read` with the SCL line
+    /// stretched (held low).
+    pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
+        let driver = self.driver();
+        let regs = driver.info.regs();
+
+        driver.reset_fifo();
+
+        regs.scl_stretch_conf().modify(|_, w| unsafe {
+            w.stretch_protect_num().bits(0x3ff);
+            w.slave_scl_stretch_en().set_bit()
+        });
+
+        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
+        driver.update_registers();
+
+        let mut bytes_read = 0;
+        loop {
+            driver.check_errors()?;
+            if let Some(res) = driver.listen_step(buffer, &mut bytes_read) {
                 return res;
+            }
+        }
+    }
+
+    /// Responds to a master read request.
+    ///
+    /// Sends data from `buffer` and releases SCL clock stretching.
+    /// Waits for STOP or a repeated START to complete the response.
+    /// Data is padded with `0xff` if the master reads past the end of `buffer`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
+    /// when arbitration is lost.
+    pub fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
+        let driver = self.driver();
+        let mut bytes_written = 1;
+        let mut nack_received = false;
+        driver.start_read(buffer);
+
+        loop {
+            driver.check_errors()?;
+            if let Some(status) =
+                driver.respond_to_read_step(buffer, &mut bytes_written, &mut nack_received)
+            {
+                return Ok(status);
             }
         }
     }
@@ -405,6 +374,7 @@ pub(crate) enum Event {
     SlaveStretch,
     TransComplete,
     Nack,
+    StartDetected,
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -416,22 +386,7 @@ struct I2cSlaveFuture<'a> {
 }
 
 impl<'a> I2cSlaveFuture<'a> {
-    pub fn new(regs: &'a RegisterBlock, state: &'a State, events: EnumSet<Event>) -> Self {
-        regs.int_ena().modify(|_, w| {
-            if events.contains(Event::SlaveStretch) {
-                w.slave_stretch().set_bit();
-            }
-            if events.contains(Event::TransComplete) {
-                w.trans_complete().set_bit();
-            }
-            if events.contains(Event::Nack) {
-                w.nack().set_bit();
-            }
-            w.arbitration_lost().set_bit();
-            w.time_out().set_bit();
-            w
-        });
-
+    fn new(regs: &'a RegisterBlock, state: &'a State, events: EnumSet<Event>) -> Self {
         Self {
             regs,
             state,
@@ -456,16 +411,11 @@ impl Future for I2cSlaveFuture<'_> {
             return Poll::Ready(Err(Error::Timeout));
         }
 
-        let mut triggered = false;
-        if self.events.contains(Event::SlaveStretch) && raw.slave_stretch().bit_is_set() {
-            triggered = true;
-        }
-        if self.events.contains(Event::TransComplete) && raw.trans_complete().bit_is_set() {
-            triggered = true;
-        }
-        if self.events.contains(Event::Nack) && raw.nack().bit_is_set() {
-            triggered = true;
-        }
+        let triggered = (self.events.contains(Event::SlaveStretch)
+            && raw.slave_stretch().bit_is_set())
+            || (self.events.contains(Event::TransComplete) && raw.trans_complete().bit_is_set())
+            || (self.events.contains(Event::Nack) && raw.nack().bit_is_set())
+            || (self.events.contains(Event::StartDetected) && raw.det_start().bit_is_set());
 
         if triggered {
             Poll::Ready(Ok(()))
@@ -479,6 +429,9 @@ impl Future for I2cSlaveFuture<'_> {
                 }
                 if self.events.contains(Event::Nack) {
                     w.nack().set_bit();
+                }
+                if self.events.contains(Event::StartDetected) {
+                    w.det_start().set_bit();
                 }
                 w.arbitration_lost().set_bit();
                 w.time_out().set_bit();
@@ -555,11 +508,8 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
     }
 }
 
-#[allow(dead_code)]
 struct Driver<'a> {
     info: &'a Info,
-    state: &'a State,
-    config: &'a DriverConfig,
 }
 
 impl Driver<'_> {
@@ -684,18 +634,6 @@ impl Driver<'_> {
             .modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
 
-    fn reset_fsm(&self) {
-        #[cfg(i2c_master_has_reliable_fsm_reset)]
-        {
-            self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
-        }
-        #[cfg(not(i2c_master_has_reliable_fsm_reset))]
-        {
-            crate::system::PeripheralClockControl::reset(self.info.peripheral);
-            self.setup(&self.config.config).ok();
-        }
-    }
-
     fn check_errors(&self) -> Result<(), Error> {
         let r = self.regs().int_raw().read();
 
@@ -765,69 +703,74 @@ impl Driver<'_> {
         None
     }
 
+    fn start_read(&self, buffer: &[u8]) {
+        let regs = self.regs();
+        // Queue one byte at a time to count short reads correctly.
+        regs.data()
+            .write(|w| unsafe { w.fifo_rdata().bits(buffer.first().copied().unwrap_or(0xff)) });
+
+        // Clear the current START before releasing the address stretch.
+        regs.int_clr().write(|w| unsafe {
+            w.bits(0x3fff);
+            w.det_start().clear_bit_by_one()
+        });
+        regs.scl_stretch_conf()
+            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+        self.update_registers();
+    }
+
     fn respond_to_read_step(
         &self,
         buffer: &[u8],
         bytes_written: &mut usize,
-    ) -> Option<Result<ReadStatus, Error>> {
+        nack_received: &mut bool,
+    ) -> Option<ReadStatus> {
         let regs = self.regs();
         let ints = regs.int_raw().read();
 
-        if ints.trans_complete().bit_is_set() || ints.nack().bit_is_set() {
-            let is_nack = ints.nack().bit_is_set();
+        // NACK ends the data phase; STOP or repeated START ends the response.
+        if ints.trans_complete().bit_is_set() || ints.det_start().bit_is_set() {
+            let bytes_read =
+                bytes_written.saturating_sub(regs.sr().read().txfifo_cnt().bits() as usize);
             regs.int_clr().write(|w| {
                 w.trans_complete().clear_bit_by_one();
+                w.det_start().clear_bit_by_one();
                 w.nack().clear_bit_by_one()
             });
-            if is_nack {
-                self.reset_fifo();
-                self.reset_fsm();
-            }
-
-            if *bytes_written > buffer.len() {
-                return Some(Ok(ReadStatus::NeedMoreBytes));
-            } else if *bytes_written < buffer.len() {
-                let rem = (buffer.len() - *bytes_written) as u16;
-                return Some(Ok(ReadStatus::LeftoverBytes(rem)));
+            regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().set_bit());
+            regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().clear_bit());
+            if bytes_read > buffer.len() {
+                return Some(ReadStatus::NeedMoreBytes);
+            } else if bytes_read < buffer.len() {
+                return Some(ReadStatus::LeftoverBytes(
+                    (buffer.len() - bytes_read) as u16,
+                ));
             } else {
-                return Some(Ok(ReadStatus::Done));
+                return Some(ReadStatus::Done);
             }
         }
 
-        if ints.slave_stretch().bit_is_set() {
-            let cause = regs.sr().read().stretch_cause().bits();
-            if cause == 1 {
-                if *bytes_written < buffer.len() {
-                    let txfifo_cnt = regs.sr().read().txfifo_cnt().bits() as usize;
-                    let free = FIFO_SIZE - txfifo_cnt;
-                    let to_write = core::cmp::min(buffer.len() - *bytes_written, free);
-                    for i in 0..to_write {
-                        regs.data()
-                            .write(|w| unsafe { w.fifo_rdata().bits(buffer[*bytes_written + i]) });
-                    }
-                    *bytes_written += to_write;
+        if !*nack_received && ints.nack().bit_is_set() {
+            *nack_received = true;
+            regs.int_clr().write(|w| w.nack().clear_bit_by_one());
+        }
 
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                    self.update_registers();
-                } else {
-                    regs.data().write(|w| unsafe { w.fifo_rdata().bits(0xFF) });
-                    *bytes_written += 1;
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                    self.update_registers();
-                }
-            } else {
-                regs.scl_stretch_conf()
-                    .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                regs.int_clr()
-                    .write(|w| w.slave_stretch().clear_bit_by_one());
-                self.update_registers();
+        if *nack_received {
+            return None;
+        }
+
+        if ints.slave_stretch().bit_is_set() {
+            if regs.sr().read().stretch_cause().bits() == 1 {
+                let byte = buffer.get(*bytes_written).copied().unwrap_or(0xff);
+                regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
+                *bytes_written += 1;
             }
+            // Clear the stretch interrupt before the master can advance.
+            regs.int_clr()
+                .write(|w| w.slave_stretch().clear_bit_by_one());
+            regs.scl_stretch_conf()
+                .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+            self.update_registers();
         }
 
         None
