@@ -19,6 +19,7 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
+    clock::ll::{ClockTree, I2cFunctionClockConfig, I2cInstance},
     gpio::{
         DriveMode,
         InputSignal,
@@ -137,8 +138,37 @@ pub enum ReadStatus {
 pub struct I2cSlave<'d, Dm: DriverMode> {
     i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
+    // Release the function clock before disabling peripheral register access.
+    clock_guard: I2cClockGuard,
     guard: PeripheralGuard,
     config: DriverConfig,
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct I2cClockGuard {
+    clock: I2cInstance,
+}
+
+impl I2cClockGuard {
+    fn new(clock: I2cInstance) -> Self {
+        ClockTree::with(|clocks| {
+            let config = I2cFunctionClockConfig::new(
+                Default::default(),
+                #[cfg(any(i2c_master_version = "3", i2c_master_version = "4"))]
+                0,
+            );
+            clock.configure_function_clock(clocks, config);
+            clock.request_function_clock(clocks);
+        });
+        Self { clock }
+    }
+}
+
+impl Drop for I2cClockGuard {
+    fn drop(&mut self) {
+        ClockTree::with(|clocks| self.clock.release_function_clock(clocks));
+    }
 }
 
 #[derive(Debug)]
@@ -161,6 +191,7 @@ impl<'d> I2cSlave<'d, Blocking> {
     /// [`ConfigError::AddressInvalid`] when the address is not a valid 7-bit address.
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
+        let clock_guard = I2cClockGuard::new(i2c.info().clock_instance);
 
         let sda_pin = PinGuard::new_unconnected();
         let scl_pin = PinGuard::new_unconnected();
@@ -168,6 +199,7 @@ impl<'d> I2cSlave<'d, Blocking> {
         let mut slave = I2cSlave {
             i2c: i2c.degrade(),
             phantom: PhantomData,
+            clock_guard,
             guard,
             config: DriverConfig {
                 config,
@@ -188,6 +220,7 @@ impl<'d> I2cSlave<'d, Blocking> {
         I2cSlave {
             i2c: self.i2c,
             phantom: PhantomData,
+            clock_guard: self.clock_guard,
             guard: self.guard,
             config: self.config,
         }
@@ -202,6 +235,7 @@ impl<'d> I2cSlave<'d, Async> {
         I2cSlave {
             i2c: self.i2c,
             phantom: PhantomData,
+            clock_guard: self.clock_guard,
             guard: self.guard,
             config: self.config,
         }
@@ -490,6 +524,7 @@ pub struct Info {
     pub(crate) register_block: *const RegisterBlock,
     pub(crate) peripheral: crate::system::Peripheral,
     pub(crate) async_handler: InterruptHandler,
+    pub(crate) clock_instance: I2cInstance,
     pub(crate) scl_output: OutputSignal,
     pub(crate) scl_input: InputSignal,
     pub(crate) sda_output: OutputSignal,
@@ -819,6 +854,7 @@ impl crate::i2c::slave::Instance for crate::peripherals::I2C0<'_> {
             register_block: crate::peripherals::I2C0::ptr(),
             peripheral: crate::system::Peripheral::I2cExt0,
             async_handler: irq_handler,
+            clock_instance: I2cInstance::I2c0,
             scl_output: OutputSignal::I2CEXT0_SCL,
             scl_input: InputSignal::I2CEXT0_SCL,
             sda_output: OutputSignal::I2CEXT0_SDA,
@@ -845,6 +881,7 @@ impl crate::i2c::slave::Instance for crate::peripherals::I2C1<'_> {
             register_block: crate::peripherals::I2C1::ptr(),
             peripheral: crate::system::Peripheral::I2cExt1,
             async_handler: irq_handler,
+            clock_instance: I2cInstance::I2c1,
             scl_output: OutputSignal::I2CEXT1_SCL,
             scl_input: InputSignal::I2CEXT1_SCL,
             sda_output: OutputSignal::I2CEXT1_SDA,
