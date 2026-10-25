@@ -562,6 +562,8 @@ mod i2c_slave {
         async fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error>;
         async fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error>;
 
+        fn switch_mode(self) -> impl TestSlave;
+
         async fn expect_read(&mut self, response: &[u8], expected: Result<ReadStatus, Error>) {
             assert_eq!(self.listen(&mut []).await, Ok(Command::Read));
             assert_eq!(self.respond_to_read(response).await, expected);
@@ -584,6 +586,10 @@ mod i2c_slave {
         async fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
             I2cSlave::respond_to_read(self, buffer)
         }
+
+        fn switch_mode(self) -> impl TestSlave {
+            self.into_async()
+        }
     }
 
     impl TestSlave for I2cSlave<'_, Async> {
@@ -593,6 +599,10 @@ mod i2c_slave {
 
         async fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
             self.respond_to_read_async(buffer).await
+        }
+
+        fn switch_mode(self) -> impl TestSlave {
+            self.into_blocking()
         }
     }
 
@@ -615,11 +625,19 @@ mod i2c_slave {
     struct TestMaster {
         sda: Flex<'static>,
         scl: Flex<'static>,
+        pause_on_read_stretch: bool,
     }
 
     impl TestMaster {
         async fn raise_scl(&mut self) {
             self.scl.set_high();
+            if self.pause_on_read_stretch
+                && I2C0::regs().int_raw().read().slave_stretch().bit_is_set()
+                && I2C0::regs().sr().read().slave_rw().bit_is_set()
+            {
+                self.pause_on_read_stretch = false;
+                pause_master().await;
+            }
             while self.scl.is_low() {
                 Timer::after_micros(50).await;
             }
@@ -785,6 +803,12 @@ mod i2c_slave {
         assert!(raw.scl_main_st_to().bit_is_clear());
     }
 
+    fn assert_scl_stretched(scl: &esp_hal::gpio::interconnect::InputSignal<'_>) {
+        // The paused master drives SCL high; allow a released line to rise.
+        Delay::new().delay_micros(50);
+        assert_eq!(scl.level(), Level::Low);
+    }
+
     async fn wait_for_pending_write() {
         let regs = I2C0::regs();
         while regs.int_raw().read().slave_stretch().bit_is_clear()
@@ -840,7 +864,11 @@ mod i2c_slave {
         );
         Context {
             slave,
-            master: TestMaster { sda, scl },
+            master: TestMaster {
+                sda,
+                scl,
+                pause_on_read_stretch: false,
+            },
             spawner: executor.start(Priority::Priority3),
         }
     }
@@ -1345,5 +1373,72 @@ mod i2c_slave {
     #[test]
     async fn async_pending_write(peripherals: Peripherals) {
         check_pending_write(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn mode_change_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        master.write(&WRITE_DATA).await;
+        master.stop().await;
+
+        master.write(&[]).await;
+        // Keep STOP as the only pending transaction boundary.
+        I2C0::regs()
+            .int_clr()
+            .write(|w| w.det_start().clear_bit_by_one());
+        for bit in (1..8).rev() {
+            master
+                .sda
+                .set_level(Level::from(WRITE_DATA[0] & (1 << bit) != 0));
+            master.clock().await;
+        }
+        // STOP supplies the last data clock before ACK.
+        master.stop_without_yield();
+        assert_eq!(I2C0::regs().sr().read().rxfifo_cnt().bits(), 1);
+        assert!(I2C0::regs().int_raw().read().det_start().bit_is_clear());
+        assert!(I2C0::regs().int_raw().read().trans_complete().bit_is_set());
+        pause_master().await;
+
+        master.pause_on_read_stretch = true;
+        master.expect_read(&SECOND_RESPONSE).await;
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_mode_changes(ctx: Context<impl TestSlave>) {
+        let scl = ctx.master.scl.peripheral_input();
+        ctx.spawner.spawn(mode_change_master(ctx.master).unwrap());
+        wait_for_pending_write().await;
+        let mut slave = ctx.slave.switch_mode();
+        let mut data = [0; WRITE_DATA.len()];
+        slave.expect_write(&mut data, &WRITE_DATA).await;
+
+        wait_for_pause().await;
+        let mut slave = slave.switch_mode();
+        slave.expect_write(&mut data, &[WRITE_DATA[0] & !1]).await;
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+
+        wait_for_pause().await;
+        let mut slave = slave.switch_mode();
+        assert_scl_stretched(&scl);
+        assert_eq!(slave.listen(&mut []).await, Ok(Command::Read));
+        let mut slave = slave.switch_mode();
+        assert_scl_stretched(&scl);
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+        assert_eq!(
+            slave.respond_to_read(&SECOND_RESPONSE).await,
+            Ok(ReadStatus::Done)
+        );
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn pending_requests_from_blocking(peripherals: Peripherals) {
+        check_mode_changes(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn pending_requests_from_async(peripherals: Peripherals) {
+        check_mode_changes(setup(peripherals).into_async()).await;
     }
 }
