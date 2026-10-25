@@ -56,6 +56,8 @@ pub enum Error {
     Timeout,
     /// The arbitration for the bus was lost.
     ArbitrationLost,
+    /// The response buffer exceeds 65,535 bytes.
+    ResponseTooLong,
 }
 
 impl embedded_hal::i2c::Error for Error {
@@ -253,14 +255,14 @@ impl<'d> I2cSlave<'d, Async> {
 
     /// Responds to a master read request asynchronously.
     ///
-    /// See [`Self::respond_to_read`] for the response behavior.
+    /// See [`Self::respond_to_read`] for the response behavior and errors.
     pub async fn respond_to_read_async(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
         let regs = self.driver().info.regs();
         let state = self.i2c.state();
 
         let mut bytes_written = 1;
         let mut nack_received = false;
-        self.driver().start_read(buffer);
+        self.driver().start_read(buffer)?;
 
         loop {
             let mut events = Event::TransComplete | Event::StartDetected;
@@ -346,13 +348,16 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     ///
     /// # Errors
     ///
+    /// [`Error::ResponseTooLong`] when `buffer` contains more than 65,535 bytes.
+    /// The pending read request is preserved.
+    ///
     /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
     /// when arbitration is lost.
     pub fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
         let driver = self.driver();
         let mut bytes_written = 1;
         let mut nack_received = false;
-        driver.start_read(buffer);
+        driver.start_read(buffer)?;
 
         loop {
             driver.check_errors()?;
@@ -703,7 +708,11 @@ impl Driver<'_> {
         None
     }
 
-    fn start_read(&self, buffer: &[u8]) {
+    fn start_read(&self, buffer: &[u8]) -> Result<(), Error> {
+        if buffer.len() > u16::MAX as usize {
+            return Err(Error::ResponseTooLong);
+        }
+
         let regs = self.regs();
         // Queue one byte at a time to count short reads correctly.
         regs.data()
@@ -717,6 +726,7 @@ impl Driver<'_> {
         regs.scl_stretch_conf()
             .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
         self.update_registers();
+        Ok(())
     }
 
     fn respond_to_read_step(

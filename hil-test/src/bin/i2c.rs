@@ -531,6 +531,8 @@ mod i2c_slave {
         (FIFO_SIZE, ReadStatus::LeftoverBytes(1)),
         (RESPONSE.len(), ReadStatus::Done),
     ];
+    const MAX_RESPONSE_LEN: usize = u16::MAX as usize;
+    static LONG_RESPONSE: [u8; MAX_RESPONSE_LEN + 2] = [0x5a; MAX_RESPONSE_LEN + 2];
     static MASTER_DONE: AtomicBool = AtomicBool::new(false);
     trait TestSlave {
         async fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error>;
@@ -839,5 +841,47 @@ mod i2c_slave {
     #[test]
     async fn async_read_response(peripherals: Peripherals) {
         check_read_response(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn response_length_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        let mut response = [0; 1];
+        master.read(&mut response).await;
+        assert_eq!(response, [LONG_RESPONSE[0]]);
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_response_length(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner
+            .spawn(response_length_master(ctx.master).unwrap());
+
+        assert_eq!(slave.listen(&mut []).await, Ok(Command::Read));
+        for length in [MAX_RESPONSE_LEN + 2, MAX_RESPONSE_LEN + 1] {
+            assert_eq!(
+                slave.respond_to_read(&LONG_RESPONSE[..length]).await,
+                Err(Error::ResponseTooLong)
+            );
+        }
+
+        assert_eq!(
+            slave
+                .respond_to_read(&LONG_RESPONSE[..MAX_RESPONSE_LEN])
+                .await,
+            Ok(ReadStatus::LeftoverBytes(u16::MAX - 1))
+        );
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_response_length(peripherals: Peripherals) {
+        check_response_length(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_response_length(peripherals: Peripherals) {
+        check_response_length(setup(peripherals).into_async()).await;
     }
 }
