@@ -2,15 +2,8 @@
 //!
 //! ## Overview
 //!
-//! This driver implements the I2C Slave mode. In this mode, the MCU responds to
-//! and communicates with one or more master devices. The MCU acts as a slave
-//! device on the I2C bus, identified by its unique I2C address.
-//!
-//! ## Implementation
-//!
-//! This driver supports both Blocking and Async modes, using hardware SCL clock stretching
-//! to handle flow control. The async implementation runs a callback-free waker model, waking
-//! the task waker when stretching or transaction completeness interrupts occur.
+//! Receives writes and responds to read requests at a 7-bit I2C address.
+//! The driver uses SCL clock stretching for flow control in [`Blocking`] and [`Async`] modes.
 
 use core::{
     future::Future,
@@ -48,7 +41,7 @@ use crate::{
 /// FIFO size of the I2C peripheral.
 pub const FIFO_SIZE: usize = property!("i2c_master.fifo_size");
 
-/// I2C Slave error
+/// I2C slave errors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -57,6 +50,17 @@ pub enum Error {
     Timeout,
     /// The arbitration for the bus was lost.
     ArbitrationLost,
+}
+
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(match self {
+            Self::Timeout => "Hardware bus timeout",
+            Self::ArbitrationLost => "Bus arbitration lost",
+        })
+    }
 }
 
 impl embedded_hal::i2c::Error for Error {
@@ -87,7 +91,7 @@ impl Config {
 }
 
 /// I2C slave configuration errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
@@ -105,13 +109,13 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
-/// Received command from the master
+/// Request received from the master.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Command {
-    /// The master is requesting data from the slave.
+    /// The master requests data from the slave.
     Read,
-    /// The master wrote the specified number of bytes to the slave.
+    /// A write request with the number of received bytes.
     Write(usize),
 }
 
@@ -127,7 +131,7 @@ pub enum ReadStatus {
     LeftoverBytes(u16),
 }
 
-/// I2C Slave driver
+/// I2C slave driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct I2cSlave<'d, Dm: DriverMode> {
@@ -150,7 +154,11 @@ impl<Dm: DriverMode> embedded_hal::i2c::ErrorType for I2cSlave<'_, Dm> {
 }
 
 impl<'d> I2cSlave<'d, Blocking> {
-    /// Creates a new I2C slave instance.
+    /// Creates a new I2C slave instance in [`Blocking`] mode.
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::AddressInvalid`] when the address is not a valid 7-bit address.
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
@@ -198,105 +206,7 @@ impl<'d> I2cSlave<'d, Async> {
             config: self.config,
         }
     }
-}
 
-impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
-    fn driver(&self) -> Driver<'_> {
-        Driver {
-            info: self.i2c.info(),
-            state: self.i2c.state(),
-            config: &self.config,
-        }
-    }
-
-    /// Connects a pin to the I2C SDA signal.
-    pub fn with_sda(mut self, sda: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        let info = self.driver().info;
-        let input = info.sda_input;
-        let output = info.sda_output;
-        Driver::connect_pin(sda.into(), input, output, &mut self.config.sda_pin);
-        self
-    }
-
-    /// Connects a pin to the I2C SCL signal.
-    pub fn with_scl(mut self, scl: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        let info = self.driver().info;
-        let input = info.scl_input;
-        let output = info.scl_output;
-        Driver::connect_pin(scl.into(), input, output, &mut self.config.scl_pin);
-        self
-    }
-
-    /// Applies a new configuration.
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.config.config = *config;
-        self.driver().setup(config)?;
-        Ok(())
-    }
-}
-
-impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
-    /// Listens for a request from the master.
-    ///
-    /// If the master writes to the slave, this method reads data into the provided
-    /// `buffer` and returns `Command::Write(len)`.
-    /// If the master is requesting a read, it returns `Command::Read` with the SCL line
-    /// stretched (held low).
-    pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
-        let regs = self.driver().info.regs();
-
-        self.driver().reset_fifo();
-
-        regs.scl_stretch_conf().modify(|_, w| unsafe {
-            w.stretch_protect_num().bits(0x3ff);
-            w.slave_scl_stretch_en().set_bit()
-        });
-
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        self.driver().update_registers();
-
-        let mut bytes_read = 0;
-        loop {
-            self.driver().check_errors()?;
-            if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
-                return res;
-            }
-        }
-    }
-
-    /// Responds to a master read request.
-    ///
-    /// Writes the contents of `buffer` to the TX FIFO, clears the clock stretch,
-    /// and waits for the transaction to complete.
-    pub fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
-        let regs = self.driver().info.regs();
-        let mut bytes_written = 0;
-        let initial_write = core::cmp::min(buffer.len(), FIFO_SIZE);
-        for &byte in buffer.iter().take(initial_write) {
-            regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
-        }
-        bytes_written += initial_write;
-
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        self.driver().update_registers();
-
-        loop {
-            self.driver().check_errors()?;
-            if let Some(res) = self
-                .driver()
-                .respond_to_read_step(buffer, &mut bytes_written)
-            {
-                return res;
-            }
-        }
-    }
-}
-
-impl<'d> I2cSlave<'d, Async> {
     /// Listens for a request from the master asynchronously.
     pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let regs = self.driver().info.regs();
@@ -348,6 +258,100 @@ impl<'d> I2cSlave<'d, Async> {
             )
             .await?;
 
+            if let Some(res) = self
+                .driver()
+                .respond_to_read_step(buffer, &mut bytes_written)
+            {
+                return res;
+            }
+        }
+    }
+}
+
+impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
+    fn driver(&self) -> Driver<'_> {
+        Driver {
+            info: self.i2c.info(),
+            state: self.i2c.state(),
+            config: &self.config,
+        }
+    }
+
+    /// Connects a pin to the I2C SDA signal.
+    pub fn with_sda(mut self, sda: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
+        let info = self.driver().info;
+        let input = info.sda_input;
+        let output = info.sda_output;
+        Driver::connect_pin(sda.into(), input, output, &mut self.config.sda_pin);
+        self
+    }
+
+    /// Connects a pin to the I2C SCL signal.
+    pub fn with_scl(mut self, scl: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
+        let info = self.driver().info;
+        let input = info.scl_input;
+        let output = info.scl_output;
+        Driver::connect_pin(scl.into(), input, output, &mut self.config.scl_pin);
+        self
+    }
+
+    /// Applies a new configuration.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.config.config = *config;
+        self.driver().setup(config)?;
+        Ok(())
+    }
+
+    /// Listens for a request from the master.
+    ///
+    /// If the master writes to the slave, this method reads data into the provided
+    /// `buffer` and returns `Command::Write(len)`.
+    /// If the master is requesting a read, it returns `Command::Read` with the SCL line
+    /// stretched (held low).
+    pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
+        let regs = self.driver().info.regs();
+
+        self.driver().reset_fifo();
+
+        regs.scl_stretch_conf().modify(|_, w| unsafe {
+            w.stretch_protect_num().bits(0x3ff);
+            w.slave_scl_stretch_en().set_bit()
+        });
+
+        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
+        regs.scl_stretch_conf()
+            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+        self.driver().update_registers();
+
+        let mut bytes_read = 0;
+        loop {
+            self.driver().check_errors()?;
+            if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
+                return res;
+            }
+        }
+    }
+
+    /// Responds to a master read request.
+    ///
+    /// Writes the contents of `buffer` to the TX FIFO, clears the clock stretch,
+    /// and waits for the transaction to complete.
+    pub fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
+        let regs = self.driver().info.regs();
+        let mut bytes_written = 0;
+        let initial_write = core::cmp::min(buffer.len(), FIFO_SIZE);
+        for &byte in buffer.iter().take(initial_write) {
+            regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
+        }
+        bytes_written += initial_write;
+
+        regs.scl_stretch_conf()
+            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
+        self.driver().update_registers();
+
+        loop {
+            self.driver().check_errors()?;
             if let Some(res) = self
                 .driver()
                 .respond_to_read_step(buffer, &mut bytes_written)
@@ -463,7 +467,8 @@ fn async_handler(info: &Info, state: &State) {
     state.waker.wake();
 }
 
-/// I2C Slave state.
+// Public for the sealed instance interface.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct State {
     pub(crate) waker: AtomicWaker,
@@ -477,7 +482,8 @@ impl core::fmt::Debug for State {
     }
 }
 
-/// I2C Slave peripheral information.
+// Public for the sealed instance interface.
+#[doc(hidden)]
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Info {
@@ -498,7 +504,8 @@ impl Info {
 
 unsafe impl Sync for Info {}
 
-/// I2C Slave peripheral instance.
+// Public constructor bound; implementations are sealed.
+#[doc(hidden)]
 pub trait Instance: crate::private::Sealed + any::Degrade {
     #[doc(hidden)]
     fn parts(&self) -> (&Info, &State);
