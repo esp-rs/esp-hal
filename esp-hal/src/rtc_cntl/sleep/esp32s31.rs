@@ -677,6 +677,16 @@ impl RtcSleepConfig {
         let restore_clock_config = ClockTree::with(|clocks| {
             let old_cpu_root_clk = clocks.cpu_root_clk();
 
+            // PSRAM must slow down before the CPU moves to XTAL_CLK. The guard restores the PSRAM
+            // speed after the CPU moves back.
+            // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_modes.c#L1036-L1043>
+            // and <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_modes.c#L1195>.
+            // esp-hal does not tune PSRAM or flash. The tuning registers keep the reset value at
+            // both speeds, so the low speed needs no tuning change.
+            let psram_slowed = !self.deep
+                && crate::psram::slow_in_light_sleep()
+                && crate::psram::low_speed::enter();
+
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
 
             DropGuard::new((), move |_| {
@@ -685,6 +695,9 @@ impl RtcSleepConfig {
                         clocks::configure_cpu_root_clk(clocks, old);
                     }
                 });
+                if psram_slowed {
+                    crate::psram::low_speed::exit();
+                }
             })
         });
 

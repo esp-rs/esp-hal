@@ -143,7 +143,7 @@ pub(super) fn set_bus_clock(clock: u32) -> bool {
 
     write_bus_clock_divider((source_mhz / clock) as u8);
 
-    #[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+    #[cfg(all(psram_idle_low_speed_switch, any(idle_frequency_scaling, esp32s31)))]
     low_speed::set_divider(source_mhz, clock);
 
     true
@@ -164,22 +164,29 @@ const fn bus_clock_bits(div: u8) -> u32 {
 
 fn write_bus_clock_divider(div: u8) {
     let bits = bus_clock_bits(div);
-    MEMSPI2::regs().sram_clk().write(|w| unsafe { w.bits(bits) });
+    MEMSPI2::regs()
+        .sram_clk()
+        .write(|w| unsafe { w.bits(bits) });
     MEMSPI3::regs().clock().write(|w| unsafe { w.bits(bits) });
 }
 
 /// The PSRAM low-speed mode, used while the CPU clock comes from XTAL_CLK.
 ///
-/// The AXI bus clock must not be slower than the PSRAM clock, otherwise writes can overflow the
+/// The PSRAM clock must stay below four times the AXI bus clock, otherwise writes can overflow the
 /// MSPI FIFO. Only the bus clock changes: the latency and dummy settings count cycles, so the
 /// values for the configured speed are also correct at the lower speed.
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+///
+/// [`enter`] and [`exit`] freeze the cache while the PSRAM speed changes.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_mspi/mspi_timing_tuning/mspi_timing_tuning.c#L561-L594>.
+// On the ESP32-S31, light sleep also uses the low-speed mode.
+#[cfg(all(psram_idle_low_speed_switch, any(idle_frequency_scaling, esp32s31)))]
 pub(crate) mod low_speed {
     use core::sync::atomic::{AtomicU32, Ordering};
 
     use crate::peripherals::{MEMSPI2, MEMSPI3};
 
-    /// The PSRAM clock in the low-speed mode, in MHz. ESP-IDF uses the same value.
+    /// The PSRAM clock in the low-speed mode, in MHz.
+    /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_mspi/mspi_timing_tuning/mspi_timing_tuning.c#L496-L499>.
     const LOW_SPEED_MHZ: u32 = 20;
 
     /// The bus clock register value of the low-speed mode, or 0 if PSRAM does not change its
@@ -200,7 +207,7 @@ pub(crate) mod low_speed {
 
     /// Switches PSRAM to the low speed. Returns `false` if PSRAM does not change its speed.
     ///
-    /// The other cores must be stalled.
+    /// While the cache is frozen, the other core stalls at its next cache miss until the unfreeze.
     pub(crate) fn enter() -> bool {
         let bits = LOW_SPEED_BITS.load(Ordering::Relaxed);
         if bits == 0 {
@@ -215,14 +222,14 @@ pub(crate) mod low_speed {
 
     /// Restores the PSRAM speed that [`enter`] changed.
     ///
-    /// The other cores must be stalled.
+    /// While the cache is frozen, the other core stalls at its next cache miss until the unfreeze.
     pub(crate) fn exit() {
         unsafe { write_bus_clock_frozen(SAVED_BITS.load(Ordering::Relaxed)) };
     }
 
     /// Writes the bus clock registers of both controllers while the cache is frozen.
     ///
-    /// While the cache is frozen, no code may run from flash, so the register writes are
+    /// While the cache is frozen, code must not run from flash. So the register writes are
     /// assembly instructions, and every value is ready before the freeze.
     #[crate::ram]
     unsafe fn write_bus_clock_frozen(bits: u32) {
