@@ -73,17 +73,19 @@ impl embedded_hal::i2c::Error for Error {
     }
 }
 
-/// I2C Slave configuration
+/// I2C slave configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
-    /// The I2C slave address.
+    /// The I2C slave address. Only 7-bit addresses are supported.
     address: I2cAddress,
 }
 
 impl Config {
     /// Creates a new I2C slave configuration with the specified address.
+    ///
+    /// The driver validates the address during construction or reconfiguration.
     pub fn new(address: impl Into<I2cAddress>) -> Self {
         Config {
             address: address.into(),
@@ -91,12 +93,12 @@ impl Config {
     }
 }
 
-/// I2C slave configuration errors
+/// I2C slave configuration errors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
-    /// Provided address is not valid.
+    /// The address is not a valid 7-bit address.
     AddressInvalid,
 }
 
@@ -330,9 +332,17 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     }
 
     /// Applies a new configuration.
+    ///
+    /// A valid configuration resets the controller and discards pending requests.
+    /// The master must retry these requests.
+    /// Invalid configurations preserve the current settings and FIFO contents.
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::AddressInvalid`] when the address is not a valid 7-bit address.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.config.config = *config;
         self.driver().setup(config)?;
+        self.config.config = *config;
         Ok(())
     }
 
@@ -590,7 +600,8 @@ impl Driver<'_> {
 
     fn init_slave(&self) {
         self.regs().ctr().write(|w| {
-            w.ms_mode().clear_bit(); // Slave mode
+            w.ms_mode().clear_bit();
+            w.rx_full_ack_level().clear_bit();
             w.sda_force_out().set_bit();
             w.scl_force_out().set_bit();
             #[cfg(i2c_master_has_arbitration_en)]
@@ -608,29 +619,26 @@ impl Driver<'_> {
         });
     }
 
-    fn set_slave_addr(&self, address: I2cAddress) -> Result<(), ConfigError> {
-        match address {
-            I2cAddress::SevenBit(addr) if addr <= 0x7F => {
-                self.regs().slave_addr().write(|w| unsafe {
-                    w.slave_addr().bits(addr as u16);
-                    w.addr_10bit_en().bit(false)
-                });
-                Ok(())
-            }
-            _ => Err(ConfigError::AddressInvalid),
-        }
-    }
-
     fn update_registers(&self) {
         #[cfg(i2c_master_has_conf_update)]
         self.regs().ctr().modify(|_, w| w.conf_upgate().set_bit());
     }
 
     fn setup(&self, config: &Config) -> Result<(), ConfigError> {
+        let address = match config.address {
+            I2cAddress::SevenBit(addr) if addr <= 0x7F => addr,
+            _ => return Err(ConfigError::AddressInvalid),
+        };
+
+        // FIFO resets do not clear an active transaction.
+        crate::system::PeripheralClockControl::reset(self.info.peripheral);
         self.init_slave();
-        self.set_slave_addr(config.address)?;
 
         let regs = self.regs();
+        regs.slave_addr().write(|w| unsafe {
+            w.slave_addr().bits(address as u16);
+            w.addr_10bit_en().clear_bit()
+        });
         regs.to().modify(|_, w| unsafe {
             w.time_out_en().set_bit();
             w.time_out_value().bits(14);
@@ -638,7 +646,6 @@ impl Driver<'_> {
         });
 
         regs.clk_conf().modify(|_, w| w.sclk_sel().clear_bit());
-        self.set_slave_addr(config.address)?;
 
         regs.ctr()
             .modify(|_, w| w.addr_broadcasting_en().clear_bit());
@@ -648,12 +655,11 @@ impl Driver<'_> {
             unsafe { w.txfifo_wm_thrhd().bits(0) }
         });
 
-        regs.fifo_conf().modify(|_, w| w.fifo_prt_en().set_bit());
-        regs.ctr().write(|w| w.rx_full_ack_level().clear_bit());
-
         regs.fifo_conf()
             .modify(|_, w| unsafe { w.rxfifo_wm_thrhd().bits(0x1F) });
 
+        // SDA hold/sample periods match ESP-IDF.
+        // https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/esp_driver_i2c/i2c_slave.c#L303
         regs.sda_hold().write(|w| unsafe { w.time().bits(10u16) });
         regs.sda_sample().write(|w| unsafe { w.time().bits(10u16) });
 
