@@ -56,6 +56,8 @@ pub enum Error {
     Timeout,
     /// The arbitration for the bus was lost.
     ArbitrationLost,
+    /// The receive buffer is too small, or the RX FIFO overflowed.
+    Overflow,
     /// The response buffer exceeds 65,535 bytes.
     ResponseTooLong,
 }
@@ -64,6 +66,7 @@ impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
         match self {
             Self::ArbitrationLost => embedded_hal::i2c::ErrorKind::ArbitrationLoss,
+            Self::Overflow => embedded_hal::i2c::ErrorKind::Overrun,
             _ => embedded_hal::i2c::ErrorKind::Other,
         }
     }
@@ -230,6 +233,8 @@ impl<'d> I2cSlave<'d, Async> {
     }
 
     /// Listens for a request from the master asynchronously.
+    ///
+    /// See [`Self::listen`] for the receive behavior and errors.
     pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let regs = self.driver().info.regs();
         let state = self.i2c.state();
@@ -325,6 +330,15 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     /// `buffer` and returns `Command::Write(len)`.
     /// If the master is requesting a read, it returns `Command::Read` with the SCL line
     /// stretched (held low).
+    /// Extra received bytes are discarded if `buffer` is too small.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Overflow`] when the receive buffer is too small or the RX FIFO overflows.
+    /// The error is reported after STOP or a following read address match.
+    ///
+    /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
+    /// when arbitration is lost.
     pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let driver = self.driver();
         let regs = driver.info.regs();
@@ -666,16 +680,26 @@ impl Driver<'_> {
             && status.stretch_cause().bits() == 0
             && status.slave_rw().bit_is_set();
 
-        while regs.sr().read().rxfifo_cnt().bits() > 0 && *bytes_read < buffer.len() {
-            buffer[*bytes_read] = regs.data().read().fifo_rdata().bits();
-            *bytes_read += 1;
+        while regs.sr().read().rxfifo_cnt().bits() > 0 {
+            let byte = regs.data().read().fifo_rdata().bits();
+            if let Some(dest) = buffer.get_mut(*bytes_read) {
+                *dest = byte;
+            }
+            *bytes_read = bytes_read.saturating_add(1);
         }
 
-        // Keep the read address stretched until the preceding write is delivered.
-        if ints.trans_complete().bit_is_set() || (read_pending && *bytes_read > 0) {
-            regs.int_clr()
-                .write(|w| w.trans_complete().clear_bit_by_one());
-            return Some(Ok(Command::Write(*bytes_read)));
+        let overflow = *bytes_read > buffer.len() || ints.rxfifo_ovf().bit_is_set();
+        // Keep the read address stretch pending for the next listen call.
+        if ints.trans_complete().bit_is_set() || (read_pending && (*bytes_read > 0 || overflow)) {
+            regs.int_clr().write(|w| {
+                w.trans_complete().clear_bit_by_one();
+                w.rxfifo_ovf().clear_bit_by_one()
+            });
+            return Some(if overflow {
+                Err(Error::Overflow)
+            } else {
+                Ok(Command::Write(*bytes_read))
+            });
         }
 
         if ints.slave_stretch().bit_is_set() {

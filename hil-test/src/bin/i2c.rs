@@ -1022,4 +1022,57 @@ mod i2c_slave {
     async fn async_write_read(peripherals: Peripherals) {
         check_write_read(setup(peripherals).into_async()).await;
     }
+
+    #[embassy_executor::task]
+    async fn receive_overflow_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        let overflow_data: [u8; FIFO_SIZE * 2 + 1] = core::array::from_fn(|index| index as u8);
+        master.write(&overflow_data[..WRITE_DATA.len()]).await;
+        master.stop().await;
+        master.write(&overflow_data).await;
+
+        let mut response = [0; SECOND_RESPONSE.len()];
+        master.read(&mut response).await;
+        assert_eq!(response, SECOND_RESPONSE);
+        master.stop().await;
+
+        master.write(&WRITE_DATA).await;
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_receive_overflow(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner
+            .spawn(receive_overflow_master(ctx.master).unwrap());
+        let mut data = [0; WRITE_DATA.len()];
+
+        let mut request = [0xff; SHORT_READ_LEN];
+        assert_eq!(slave.listen(&mut request).await, Err(Error::Overflow));
+        assert_eq!(request, [0, 1, 2]);
+        assert_eq!(slave.listen(&mut []).await, Err(Error::Overflow));
+
+        assert_eq!(slave.listen(&mut data).await, Ok(Command::Read));
+        assert_eq!(
+            slave.respond_to_read(&SECOND_RESPONSE).await,
+            Ok(ReadStatus::Done)
+        );
+
+        assert_eq!(
+            slave.listen(&mut data).await,
+            Ok(Command::Write(WRITE_DATA.len()))
+        );
+        assert_eq!(data, WRITE_DATA);
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_receive_overflow(peripherals: Peripherals) {
+        check_receive_overflow(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_receive_overflow(peripherals: Peripherals) {
+        check_receive_overflow(setup(peripherals).into_async()).await;
+    }
 }
