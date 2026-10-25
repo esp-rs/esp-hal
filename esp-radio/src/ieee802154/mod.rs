@@ -111,6 +111,8 @@ impl Default for Config {
 pub struct Ieee802154<'a> {
     _align: u32,
     transmit_buffer: [u8; FRAME_SIZE],
+    // Before the PHY guards, so that it drops first.
+    _entropy_source_guard: EntropySourceGuard,
     _phy_clock_guard: PhyClockGuard<'a>,
     _phy_init_guard: PhyInitGuard<'a>,
     // Fields drop in declaration order: this guard must stay last so the PHY
@@ -125,10 +127,12 @@ impl<'a> Ieee802154<'a> {
     /// NOTE: Coexistence with Wi-Fi is currently not supported.
     #[instability::unstable]
     pub fn new(radio: IEEE802154<'a>) -> Self {
-        let (_phy_clock_guard, _phy_init_guard, _radio_clock_guard) = esp_ieee802154_enable(radio);
+        let (_entropy_source_guard, _phy_clock_guard, _phy_init_guard, _radio_clock_guard) =
+            esp_ieee802154_enable(radio);
         Self {
             _align: 0,
             transmit_buffer: [0u8; FRAME_SIZE],
+            _entropy_source_guard,
             _phy_clock_guard,
             _phy_init_guard,
             _radio_clock_guard,
