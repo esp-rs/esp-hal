@@ -81,6 +81,59 @@ fn write_pms_ctrl_range(base: usize, start: usize, end: usize) {
 
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 
+// The ROM cache function table, up to the freeze functions. See `cache_internal_stub_table` in
+// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_rom/esp32s31/include/esp32s31/rom/cache.h#L168-L188>.
+#[repr(C)]
+struct CacheInternalStubTable {
+    _unused: [usize; 11],
+    freeze_l1_icache0_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l1_icache0_disable: unsafe extern "C" fn(),
+    freeze_l1_icache1_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l1_icache1_disable: unsafe extern "C" fn(),
+    freeze_l1_dcache_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l1_dcache_disable: unsafe extern "C" fn(),
+}
+
+unsafe extern "C" {
+    static rom_cache_internal_table_ptr: *const CacheInternalStubTable;
+}
+
+/// Freezes the L1 caches, which cache the external memory. An access to flash or PSRAM stalls
+/// until [`unfreeze_ext_mem_cache`].
+///
+/// This function ports ESP-IDF's `esp_cache_freeze_ext_mem_cache`, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_mm/esp_cache_utils.c#L48-L79>,
+/// and its `cache_ll_l1_freeze_icache` and `cache_ll_l1_freeze_dcache`, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_cache/esp32s31/include/hal/cache_ll.h#L564-L587>.
+///
+/// The caller must run from RAM. The other core stalls at its next cache miss until the unfreeze.
+#[inline(always)]
+pub(crate) fn freeze_ext_mem_cache() {
+    // `CACHE_FREEZE_ACK_BUSY`: a cache miss stalls the requester.
+    const ACK_BUSY: u32 = 0;
+    unsafe {
+        let table = &*rom_cache_internal_table_ptr;
+        (table.freeze_l1_icache0_enable)(ACK_BUSY);
+        (table.freeze_l1_icache1_enable)(ACK_BUSY);
+        (table.freeze_l1_dcache_enable)(ACK_BUSY);
+    }
+}
+
+/// Releases the freeze of [`freeze_ext_mem_cache`].
+///
+/// This function ports ESP-IDF's `cache_ll_l1_unfreeze_icache` and `cache_ll_l1_unfreeze_dcache`,
+/// in the order of `esp_cache_unfreeze_ext_mem_cache`, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_cache/esp32s31/include/hal/cache_ll.h#L625-L676>.
+#[inline(always)]
+pub(crate) fn unfreeze_ext_mem_cache() {
+    unsafe {
+        let table = &*rom_cache_internal_table_ptr;
+        (table.freeze_l1_dcache_disable)();
+        (table.freeze_l1_icache1_disable)();
+        (table.freeze_l1_icache0_disable)();
+    }
+}
+
 /// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[crate::ram]

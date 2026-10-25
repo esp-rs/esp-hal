@@ -17,6 +17,9 @@ use crate::{
     soc::{regi2c, xtal32k},
 };
 
+/// The crystal frequency in MHz. The S31 supports only a 40 MHz crystal (`SOC_XTAL_SUPPORT_40M`).
+pub(crate) const XTAL_MHZ: u32 = 40;
+
 define_clock_tree_types!();
 
 /// CPU clock speed options.

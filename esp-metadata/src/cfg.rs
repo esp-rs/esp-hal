@@ -1147,6 +1147,10 @@ driver_configs![
                 #[serde(default)]
                 hex_spi: bool,
                 extmem_origin: u32,
+                /// Whether PSRAM must switch to a low speed while the CPU clock comes from
+                /// XTAL_CLK, because the PSRAM clock must not exceed four times the AXI bus clock.
+                #[serde(default)]
+                idle_low_speed_switch: bool,
             }
         },
         RomProperties {

@@ -520,6 +520,9 @@ macro_rules! property {
     ("psram.extmem_origin", str) => {
         stringify!(1065353216)
     };
+    ("psram.idle_low_speed_switch") => {
+        false
+    };
     ("rom.has_crc_le") => {
         true
     };
