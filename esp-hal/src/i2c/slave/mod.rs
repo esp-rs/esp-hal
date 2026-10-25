@@ -9,6 +9,7 @@
 //! ## Implementation
 //!
 //! This driver uses SCL clock stretching for flow control in [`Blocking`] and [`Async`] modes.
+//! Writes stretch SCL at each data byte's ACK until the driver consumes that byte.
 
 use core::{
     future::Future,
@@ -239,19 +240,16 @@ impl<'d> I2cSlave<'d, Async> {
         let regs = self.driver().info.regs();
         let state = self.i2c.state();
 
-        self.driver().reset_fifo();
-
-        regs.scl_stretch_conf().modify(|_, w| unsafe {
-            w.stretch_protect_num().bits(0x3ff);
-            w.slave_scl_stretch_en().set_bit()
-        });
-
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        self.driver().update_registers();
+        self.driver().start_listen();
 
         let mut bytes_read = 0;
         loop {
-            I2cSlaveFuture::new(regs, state, Event::SlaveStretch | Event::TransComplete).await?;
+            I2cSlaveFuture::new(
+                regs,
+                state,
+                Event::SlaveStretch | Event::TransComplete | Event::StartDetected,
+            )
+            .await?;
             if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
                 return res;
             }
@@ -326,32 +324,25 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
 
     /// Listens for a request from the master.
     ///
-    /// If the master writes to the slave, this method reads data into the provided
-    /// `buffer` and returns `Command::Write(len)`.
-    /// If the master is requesting a read, it returns `Command::Read` with the SCL line
-    /// stretched (held low).
-    /// Extra received bytes are discarded if `buffer` is too small.
+    /// Receives writes into `buffer` and returns [`Command::Write`] with the number
+    /// of received bytes at STOP or repeated START. Address-only write probes are ignored.
+    /// Extra bytes are discarded if `buffer` is too small.
+    ///
+    /// Returns [`Command::Read`] for a read request and holds SCL low until
+    /// [`Self::respond_to_read`] supplies the response.
+    /// Pending receive data is preserved unless recovering from a bus error.
+    /// A pending write holds SCL low until this method receives its data.
     ///
     /// # Errors
     ///
     /// [`Error::Overflow`] when the receive buffer is too small or the RX FIFO overflows.
-    /// The error is reported after STOP or a following read address match.
+    /// The error is reported after STOP or repeated START.
     ///
     /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
     /// when arbitration is lost.
     pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let driver = self.driver();
-        let regs = driver.info.regs();
-
-        driver.reset_fifo();
-
-        regs.scl_stretch_conf().modify(|_, w| unsafe {
-            w.stretch_protect_num().bits(0x3ff);
-            w.slave_scl_stretch_en().set_bit()
-        });
-
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        driver.update_registers();
+        driver.start_listen();
 
         let mut bytes_read = 0;
         loop {
@@ -630,6 +621,9 @@ impl Driver<'_> {
 
         regs.scl_stretch_conf().modify(|_, w| unsafe {
             w.stretch_protect_num().bits(0x3ff);
+            // Service each byte before the master can cross a transaction boundary.
+            w.slave_byte_ack_ctl_en().set_bit();
+            w.slave_byte_ack_lvl().clear_bit();
             w.slave_scl_stretch_en().set_bit()
         });
 
@@ -640,19 +634,17 @@ impl Driver<'_> {
         Ok(())
     }
 
+    fn reset_tx_fifo(&self) {
+        let regs = self.regs();
+        regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().set_bit());
+        regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().clear_bit());
+    }
+
     fn reset_fifo(&self) {
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().set_bit());
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().clear_bit());
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.rx_fifo_rst().set_bit());
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.rx_fifo_rst().clear_bit());
+        self.reset_tx_fifo();
+        let regs = self.regs();
+        regs.fifo_conf().modify(|_, w| w.rx_fifo_rst().set_bit());
+        regs.fifo_conf().modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
 
     fn check_errors(&self) -> Result<(), Error> {
@@ -667,6 +659,16 @@ impl Driver<'_> {
         Ok(())
     }
 
+    fn start_listen(&self) {
+        let regs = self.regs();
+        if self.check_errors().is_err() {
+            self.reset_fifo();
+            regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
+        } else {
+            self.reset_tx_fifo();
+        }
+    }
+
     fn listen_step(
         &self,
         buffer: &mut [u8],
@@ -675,26 +677,44 @@ impl Driver<'_> {
         let regs = self.regs();
         let ints = regs.int_raw().read();
 
+        // START and STOP are reported even for unmatched addresses.
+        regs.int_clr().write(|w| {
+            w.trans_complete().bit(ints.trans_complete().bit());
+            w.det_start().bit(ints.det_start().bit())
+        });
         let status = regs.sr().read();
+        let fifo_overflow = ints.rxfifo_ovf().bit_is_set();
         let read_pending = ints.slave_stretch().bit_is_set()
             && status.stretch_cause().bits() == 0
             && status.slave_rw().bit_is_set();
+        let write_ended = (ints.trans_complete().bit_is_set()
+            && (*bytes_read > 0 || fifo_overflow))
+            || (ints.det_start().bit_is_set() && *bytes_read > 0);
 
-        while regs.sr().read().rxfifo_cnt().bits() > 0 {
-            let byte = regs.data().read().fifo_rdata().bits();
-            if let Some(dest) = buffer.get_mut(*bytes_read) {
-                *dest = byte;
+        // Drain at ACK so STOP cannot race with FIFO reads.
+        // Preserve the next write's byte when the previous write has ended.
+        if (ints.slave_stretch().bit_is_set() && !write_ended) || fifo_overflow {
+            while regs.sr().read().rxfifo_cnt().bits() > 0 {
+                let byte = regs.data().read().fifo_rdata().bits();
+                if let Some(dest) = buffer.get_mut(*bytes_read) {
+                    *dest = byte;
+                }
+                *bytes_read = bytes_read.saturating_add(1);
             }
-            *bytes_read = bytes_read.saturating_add(1);
         }
 
-        let overflow = *bytes_read > buffer.len() || ints.rxfifo_ovf().bit_is_set();
-        // Keep the read address stretch pending for the next listen call.
-        if ints.trans_complete().bit_is_set() || (read_pending && (*bytes_read > 0 || overflow)) {
-            regs.int_clr().write(|w| {
-                w.trans_complete().clear_bit_by_one();
-                w.rxfifo_ovf().clear_bit_by_one()
-            });
+        let overflow = *bytes_read > buffer.len() || fifo_overflow;
+        let write_pending = *bytes_read > 0 || overflow;
+        let write_complete = read_pending || write_ended;
+        // Keep the next request stretched until the next listen call.
+        if write_pending && write_complete {
+            regs.int_clr().write(|w| w.rxfifo_ovf().clear_bit_by_one());
+            if fifo_overflow && status.stretch_cause().bits() == 2 {
+                regs.int_clr()
+                    .write(|w| w.slave_stretch().clear_bit_by_one());
+                regs.scl_stretch_conf()
+                    .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+            }
             return Some(if overflow {
                 Err(Error::Overflow)
             } else {
@@ -754,8 +774,7 @@ impl Driver<'_> {
                 w.det_start().clear_bit_by_one();
                 w.nack().clear_bit_by_one()
             });
-            regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().set_bit());
-            regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().clear_bit());
+            self.reset_tx_fifo();
             if bytes_read > buffer.len() {
                 return Some(ReadStatus::NeedMoreBytes);
             } else if bytes_read < buffer.len() {
