@@ -245,6 +245,14 @@ impl<'d> LowPower<'d> {
     /// hardware rejects the request because a wakeup source is already asserted. It reports
     /// neither case. For the caller, a rejected sleep and a very short sleep have the same
     /// result.
+    #[cfg_attr(
+        cpu_retention = "software",
+        doc = "\n\nPart of the sleep runs with the caches suspended, so it must not call code in \
+               flash. Build esp-hal at `opt-level` 2 or 3, or build every crate with \
+               optimization. Otherwise esp-hal can call helper functions in flash. A debug build \
+               can set the level for esp-hal only:\n\n```toml\n[profile.dev.package.esp-hal]\n\
+               opt-level = 2\n```"
+    )]
     #[cfg(sleep_light_sleep)]
     #[cfg(feature = "rt")]
     pub fn sleep_light(&mut self, config: RtcSleepConfig) -> LightSleep {
