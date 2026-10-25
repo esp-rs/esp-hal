@@ -82,8 +82,7 @@ fn write_pms_ctrl_range(base: usize, start: usize, end: usize) {
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 
 // The ROM cache function table, up to the freeze functions. See `cache_internal_stub_table` in
-// ESP-IDF `esp_rom/esp32s31/include/esp32s31/rom/cache.h`.
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_rom/esp32s31/include/esp32s31/rom/cache.h#L168-L188>.
 #[repr(C)]
 struct CacheInternalStubTable {
     _unused: [usize; 11],
@@ -95,7 +94,6 @@ struct CacheInternalStubTable {
     freeze_l1_dcache_disable: unsafe extern "C" fn(),
 }
 
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
 unsafe extern "C" {
     static rom_cache_internal_table_ptr: *const CacheInternalStubTable;
 }
@@ -103,8 +101,10 @@ unsafe extern "C" {
 /// Freezes the L1 caches, which cache the external memory. An access to flash or PSRAM stalls
 /// until [`unfreeze_ext_mem_cache`].
 ///
-/// The caller must run from RAM, and the other core must be stalled.
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+/// The caller must run from RAM. The other core stalls at its next cache miss until the unfreeze.
+///
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_mm/esp_cache_utils.c#L48-L79>
+/// and <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_cache/esp32s31/include/hal/cache_ll.h#L564-L587>.
 #[inline(always)]
 pub(crate) fn freeze_ext_mem_cache() {
     // `CACHE_FREEZE_ACK_BUSY`: a cache miss stalls the requester.
@@ -118,7 +118,9 @@ pub(crate) fn freeze_ext_mem_cache() {
 }
 
 /// Releases the freeze of [`freeze_ext_mem_cache`].
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+///
+/// The data cache unfreezes first, then the instruction caches.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_cache/esp32s31/include/hal/cache_ll.h#L625-L676>.
 #[inline(always)]
 pub(crate) fn unfreeze_ext_mem_cache() {
     unsafe {
