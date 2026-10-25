@@ -4,11 +4,13 @@
 //!
 //! Receives writes and responds to read requests at a 7-bit I2C address.
 //! The driver uses SCL clock stretching for flow control in [`Blocking`] and [`Async`] modes.
+//! Writes stretch SCL at each data byte's ACK until the driver consumes that byte.
 
 use core::{
     future::Future,
     marker::PhantomData,
     pin::Pin,
+    sync::atomic::{AtomicBool, Ordering},
     task::{Context, Poll},
 };
 
@@ -51,6 +53,8 @@ pub enum Error {
     Timeout,
     /// The arbitration for the bus was lost.
     ArbitrationLost,
+    /// The receive buffer is too small, or the RX FIFO overflows.
+    Overflow,
     /// The unread response exceeds 65,535 bytes and cannot fit in [`ReadStatus::LeftoverBytes`].
     ResponseTooLong,
 }
@@ -62,6 +66,7 @@ impl core::fmt::Display for Error {
         f.write_str(match self {
             Self::Timeout => "Hardware bus timeout",
             Self::ArbitrationLost => "Bus arbitration lost",
+            Self::Overflow => "Receive buffer or RX FIFO overflow",
             Self::ResponseTooLong => "Unread response length exceeds 65,535 bytes",
         })
     }
@@ -71,6 +76,7 @@ impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
         match self {
             Self::ArbitrationLost => embedded_hal::i2c::ErrorKind::ArbitrationLoss,
+            Self::Overflow => embedded_hal::i2c::ErrorKind::Overrun,
             _ => embedded_hal::i2c::ErrorKind::Other,
         }
     }
@@ -239,24 +245,26 @@ impl<'d> I2cSlave<'d, Async> {
     }
 
     /// Listens for a request from the master asynchronously.
+    ///
+    /// See [`Self::listen`] for the receive behavior and errors.
     pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let driver = self.driver();
         let regs = driver.regs();
         let state = self.i2c.state();
 
-        driver.reset_fifo();
-
-        regs.scl_stretch_conf().modify(|_, w| unsafe {
-            w.stretch_protect_num().bits(0x3ff);
-            w.slave_scl_stretch_en().set_bit()
-        });
-
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        driver.update_registers();
+        driver.start_listen();
 
         let mut bytes_read = 0;
         loop {
-            I2cSlaveFuture::new(regs, state, Event::SlaveStretch | Event::TransComplete).await?;
+            I2cSlaveFuture::new(
+                regs,
+                state,
+                Event::SlaveStretch
+                    | Event::TransComplete
+                    | Event::StartDetected
+                    | Event::ReceiveBoundary,
+            )
+            .await?;
             if let Some(res) = driver.listen_step(buffer, &mut bytes_read) {
                 return res;
             }
@@ -291,9 +299,8 @@ impl<'d> I2cSlave<'d, Async> {
 
 impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     fn driver(&self) -> Driver<'_> {
-        Driver {
-            info: self.i2c.info(),
-        }
+        let (info, state) = self.i2c.parts();
+        Driver { info, state }
     }
 
     /// Connects a pin to the I2C SDA signal.
@@ -329,23 +336,25 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
 
     /// Listens for a request from the master.
     ///
-    /// If the master writes to the slave, this method reads data into the provided
-    /// `buffer` and returns `Command::Write(len)`.
-    /// If the master is requesting a read, it returns `Command::Read` with the SCL line
-    /// stretched (held low).
+    /// Receives writes into `buffer` and returns [`Command::Write`] with the number
+    /// of received bytes at STOP or repeated START. Address-only write probes are ignored.
+    /// Extra bytes are discarded if `buffer` is too small.
+    ///
+    /// Returns [`Command::Read`] for a read request and holds SCL low until
+    /// [`Self::respond_to_read`] supplies the response.
+    /// Pending receive data is preserved unless recovering from a bus error.
+    /// The controller stretches SCL at each write byte's ACK until this method consumes the byte.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Overflow`] when the receive buffer is too small or the RX FIFO overflows.
+    /// The error is reported after STOP or repeated START.
+    ///
+    /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
+    /// when arbitration is lost.
     pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let driver = self.driver();
-        let regs = driver.info.regs();
-
-        driver.reset_fifo();
-
-        regs.scl_stretch_conf().modify(|_, w| unsafe {
-            w.stretch_protect_num().bits(0x3ff);
-            w.slave_scl_stretch_en().set_bit()
-        });
-
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        driver.update_registers();
+        driver.start_listen();
 
         let mut bytes_read = 0;
         loop {
@@ -394,6 +403,7 @@ pub(crate) enum Event {
     TransComplete,
     Nack,
     StartDetected,
+    ReceiveBoundary,
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -436,7 +446,16 @@ impl Future for I2cSlaveFuture<'_> {
             || (self.events.contains(Event::Nack) && raw.nack().bit_is_set())
             || (self.events.contains(Event::StartDetected) && raw.det_start().bit_is_set());
 
-        if triggered {
+        let boundary_pending = self.events.contains(Event::ReceiveBoundary)
+            && self.state.receive_boundary().is_pending()
+            && {
+                let status = self.regs.sr().read();
+                status.slave_addressed().bit_is_clear()
+                    || status.slave_rw().bit_is_set()
+                    || Driver::address_pending(&status)
+            };
+
+        if triggered || boundary_pending {
             Poll::Ready(Ok(()))
         } else {
             self.regs.int_ena().modify(|_, w| {
@@ -473,17 +492,47 @@ fn async_handler(info: &Info, state: &State) {
     state.waker.wake();
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+struct ReceiveBoundary {
+    start: bool,
+    stop: bool,
+}
+
+impl ReceiveBoundary {
+    fn is_pending(self) -> bool {
+        self.start || self.stop
+    }
+}
+
 // Public for the sealed instance interface.
 #[doc(hidden)]
 #[non_exhaustive]
 pub struct State {
     pub(crate) waker: AtomicWaker,
+    rx_start_pending: AtomicBool,
+    rx_stop_pending: AtomicBool,
+}
+
+impl State {
+    fn receive_boundary(&self) -> ReceiveBoundary {
+        ReceiveBoundary {
+            start: self.rx_start_pending.load(Ordering::Relaxed),
+            stop: self.rx_stop_pending.load(Ordering::Relaxed),
+        }
+    }
+
+    fn set_receive_boundary(&self, boundary: ReceiveBoundary) {
+        self.rx_start_pending
+            .store(boundary.start, Ordering::Relaxed);
+        self.rx_stop_pending.store(boundary.stop, Ordering::Relaxed);
+    }
 }
 
 impl core::fmt::Debug for State {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("State")
             .field("waker", &"<AtomicWaker>")
+            .field("receive_boundary", &self.receive_boundary())
             .finish()
     }
 }
@@ -532,6 +581,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 
 struct Driver<'a> {
     info: &'a Info,
+    state: &'a State,
 }
 
 impl Driver<'_> {
@@ -595,6 +645,7 @@ impl Driver<'_> {
             _ => return Err(ConfigError::AddressInvalid),
         };
 
+        self.state.set_receive_boundary(ReceiveBoundary::default());
         // FIFO resets do not clear an active transaction.
         crate::system::PeripheralClockControl::reset(self.info.peripheral);
         self.init_slave();
@@ -633,6 +684,9 @@ impl Driver<'_> {
 
         regs.scl_stretch_conf().modify(|_, w| unsafe {
             w.stretch_protect_num().bits(0x3ff);
+            // Service each byte before the master can cross a transaction boundary.
+            w.slave_byte_ack_ctl_en().set_bit();
+            w.slave_byte_ack_lvl().clear_bit();
             w.slave_scl_stretch_en().set_bit()
         });
 
@@ -643,19 +697,17 @@ impl Driver<'_> {
         Ok(())
     }
 
+    fn reset_tx_fifo(&self) {
+        let regs = self.regs();
+        regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().set_bit());
+        regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().clear_bit());
+    }
+
     fn reset_fifo(&self) {
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().set_bit());
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().clear_bit());
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.rx_fifo_rst().set_bit());
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.rx_fifo_rst().clear_bit());
+        self.reset_tx_fifo();
+        let regs = self.regs();
+        regs.fifo_conf().modify(|_, w| w.rx_fifo_rst().set_bit());
+        regs.fifo_conf().modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
 
     fn check_errors(&self) -> Result<(), Error> {
@@ -670,60 +722,121 @@ impl Driver<'_> {
         Ok(())
     }
 
+    fn start_listen(&self) {
+        let regs = self.regs();
+        if self.check_errors().is_err() {
+            self.state.set_receive_boundary(ReceiveBoundary::default());
+            self.reset_fifo();
+            regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
+        } else {
+            self.reset_tx_fifo();
+        }
+    }
+
+    fn address_pending(status: &crate::pac::i2c0::sr::R) -> bool {
+        // SLAVE_ADDRESSED retains the preceding match during address shift/ACK.
+        matches!(status.scl_main_state_last().bits(), 1 | 2)
+    }
+
+    fn take_receive_events(&self, boundary: &mut ReceiveBoundary) -> crate::pac::i2c0::int_raw::R {
+        let regs = self.regs();
+        let ints = regs.int_raw().read();
+        boundary.start |= ints.det_start().bit_is_set();
+        boundary.stop |= ints.trans_complete().bit_is_set();
+        // Acknowledge boundaries before sampling the FIFO they delimit.
+        regs.int_clr().write(|w| {
+            w.trans_complete().bit(ints.trans_complete().bit());
+            w.det_start().bit(ints.det_start().bit())
+        });
+        ints
+    }
+
     fn listen_step(
         &self,
         buffer: &mut [u8],
         bytes_read: &mut usize,
     ) -> Option<Result<Command, Error>> {
         let regs = self.regs();
-        let ints = regs.int_raw().read();
+        let mut boundary = self.state.receive_boundary();
+        let mut ints = self.take_receive_events(&mut boundary);
+        let mut status = regs.sr().read();
+        // An ACK stretch can start between the interrupt and FIFO snapshots.
+        if ints.slave_stretch().bit_is_clear() && regs.int_raw().read().slave_stretch().bit_is_set()
+        {
+            ints = self.take_receive_events(&mut boundary);
+            status = regs.sr().read();
+        }
 
-        if ints.slave_stretch().bit_is_set() {
-            let cause = regs.sr().read().stretch_cause().bits();
-            match cause {
-                Self::STRETCH_ADDRESS_MATCH => {
-                    let rw = regs.sr().read().slave_rw().bit_is_set();
-                    if rw {
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                        return Some(Ok(Command::Read));
-                    } else {
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                    }
+        let fifo_overflow = ints.rxfifo_ovf().bit_is_set();
+        let stretched = ints.slave_stretch().bit_is_set();
+        let read_pending = stretched
+            && status.stretch_cause().bits() == Self::STRETCH_ADDRESS_MATCH
+            && status.slave_rw().bit_is_set();
+        let fifo_count = status.rxfifo_cnt().bits() as usize;
+        let addressed = status.slave_addressed().bit_is_set() && !Self::address_pending(&status);
+        let active_write = addressed && status.slave_rw().bit_is_clear();
+        let next_write_byte = stretched
+            && active_write
+            // Byte-ACK stretching can retain an earlier RX-full cause.
+            && (fifo_count < FIFO_SIZE || status.stretch_cause().bits() != Self::STRETCH_RX_FULL);
+        // FIFO insertion precedes ACK stretching. Until ACK, a buffered byte
+        // may belong to either side of a previously observed boundary.
+        let wait_for_ack = boundary.is_pending() && fifo_count > 0 && active_write && !stretched;
+        let previous_bytes = fifo_count.saturating_sub(usize::from(next_write_byte));
+        let write_ended = !wait_for_ack
+            && ((boundary.stop && (*bytes_read > 0 || previous_bytes > 0 || fifo_overflow))
+                || (boundary.start
+                    && (*bytes_read > 0
+                        || (previous_bytes > 0 && (next_write_byte || !addressed)))));
+
+        if wait_for_ack {
+            self.state.set_receive_boundary(boundary);
+            return None;
+        }
+        self.state.set_receive_boundary(ReceiveBoundary::default());
+
+        if stretched || write_ended || fifo_overflow {
+            let count = if write_ended {
+                previous_bytes
+            } else {
+                fifo_count
+            };
+            for _ in 0..count {
+                let byte = regs.data().read().fifo_rdata().bits();
+                if let Some(dest) = buffer.get_mut(*bytes_read) {
+                    *dest = byte;
                 }
-                Self::STRETCH_RX_FULL => {
-                    while regs.sr().read().rxfifo_cnt().bits() > 0 && *bytes_read < buffer.len() {
-                        buffer[*bytes_read] = regs.data().read().fifo_rdata().bits();
-                        *bytes_read += 1;
-                    }
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                }
-                _ => {
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                }
+                *bytes_read = bytes_read.saturating_add(1);
             }
         }
 
-        while regs.sr().read().rxfifo_cnt().bits() > 0 && *bytes_read < buffer.len() {
-            buffer[*bytes_read] = regs.data().read().fifo_rdata().bits();
-            *bytes_read += 1;
+        let overflow = *bytes_read > buffer.len() || fifo_overflow;
+        let write_pending = *bytes_read > 0 || overflow;
+        let write_complete = read_pending || write_ended;
+        // Keep the next request stretched until the next listen call.
+        if write_pending && write_complete {
+            regs.int_clr().write(|w| w.rxfifo_ovf().clear_bit_by_one());
+            if fifo_overflow && status.stretch_cause().bits() == Self::STRETCH_RX_FULL {
+                regs.int_clr()
+                    .write(|w| w.slave_stretch().clear_bit_by_one());
+                regs.scl_stretch_conf()
+                    .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+            }
+            return Some(if overflow {
+                Err(Error::Overflow)
+            } else {
+                Ok(Command::Write(*bytes_read))
+            });
         }
 
-        if ints.trans_complete().bit_is_set() {
+        if stretched {
             regs.int_clr()
-                .write(|w| w.trans_complete().clear_bit_by_one());
-            if regs.sr().read().slave_rw().bit_is_clear() {
-                return Some(Ok(Command::Write(*bytes_read)));
+                .write(|w| w.slave_stretch().clear_bit_by_one());
+            if read_pending {
+                return Some(Ok(Command::Read));
             }
+            regs.scl_stretch_conf()
+                .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
         }
 
         None
@@ -759,13 +872,9 @@ impl Driver<'_> {
         {
             let bytes_read =
                 bytes_written.saturating_sub(regs.sr().read().txfifo_cnt().bits() as usize);
-            regs.int_clr().write(|w| {
-                w.trans_complete().clear_bit_by_one();
-                w.det_start().clear_bit_by_one();
-                w.nack().clear_bit_by_one()
-            });
-            regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().set_bit());
-            regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().clear_bit());
+            // START and STOP can already belong to the next request.
+            regs.int_clr().write(|w| w.nack().clear_bit_by_one());
+            self.reset_tx_fifo();
             let status = if bytes_read > buffer.len() {
                 Ok(ReadStatus::NeedMoreBytes)
             } else if bytes_read < buffer.len() {
@@ -807,6 +916,8 @@ impl crate::i2c::slave::Instance for crate::peripherals::I2C0<'_> {
 
         static STATE: State = State {
             waker: AtomicWaker::new(),
+            rx_start_pending: AtomicBool::new(false),
+            rx_stop_pending: AtomicBool::new(false),
         };
 
         static PERIPHERAL: Info = Info {
@@ -834,6 +945,8 @@ impl crate::i2c::slave::Instance for crate::peripherals::I2C1<'_> {
 
         static STATE: State = State {
             waker: AtomicWaker::new(),
+            rx_start_pending: AtomicBool::new(false),
+            rx_stop_pending: AtomicBool::new(false),
         };
 
         static PERIPHERAL: Info = Info {

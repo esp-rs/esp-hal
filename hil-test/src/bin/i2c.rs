@@ -557,6 +557,7 @@ mod i2c_slave {
     static LONG_RESPONSE: [u8; MAX_LEFTOVER_BYTES + 2] = [0x5a; MAX_LEFTOVER_BYTES + 2];
     static MASTER_DONE: AtomicBool = AtomicBool::new(false);
     static MASTER_PAUSED: AtomicBool = AtomicBool::new(false);
+
     trait TestSlave {
         async fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error>;
         async fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error>;
@@ -653,9 +654,19 @@ mod i2c_slave {
             Timer::after_micros(50).await;
         }
 
-        async fn write_bits(&mut self, byte: u8) {
+        fn stop_without_yield(&mut self) {
+            self.sda.set_low();
+            Delay::new().delay_micros(50);
+            self.scl.set_high();
+            Delay::new().delay_micros(50);
+            assert!(self.scl.is_high());
+            self.sda.set_high();
+            Delay::new().delay_micros(50);
+        }
+
+        async fn write_bits(&mut self, byte: u8, bits: u8) {
             // Busy-wait so repeated START and address match can be pending together.
-            for bit in (0..8).rev() {
+            for bit in (8 - bits..8).rev() {
                 self.sda.set_level(Level::from(byte & (1 << bit) != 0));
                 Delay::new().delay_micros(50);
                 self.raise_scl().await;
@@ -664,8 +675,25 @@ mod i2c_slave {
             }
         }
 
+        async fn write_byte_delayed_ack(&mut self, byte: u8, delay_us: u64) -> bool {
+            self.write_bits(byte, 7).await;
+            self.sda.set_level(Level::from(byte & 1 != 0));
+            Delay::new().delay_micros(50);
+            self.raise_scl().await;
+            Delay::new().delay_micros(50);
+            let status = I2C0::regs().sr().read();
+            assert!(status.rxfifo_cnt().bits() > 0);
+            assert!(status.slave_addressed().bit_is_set());
+            assert!(I2C0::regs().int_raw().read().slave_stretch().bit_is_clear());
+            // Let the slave run after FIFO insertion but before ACK stretching.
+            Timer::after_micros(delay_us).await;
+            self.scl.set_low();
+            self.sda.set_high();
+            !self.clock().await
+        }
+
         async fn write_byte(&mut self, byte: u8) -> bool {
-            self.write_bits(byte).await;
+            self.write_bits(byte, 8).await;
 
             self.sda.set_high();
             Delay::new().delay_micros(50);
@@ -673,6 +701,13 @@ mod i2c_slave {
             Delay::new().delay_micros(50);
             let ack = self.sda.is_low();
             self.scl.set_low();
+            ack
+        }
+
+        async fn probe(&mut self, address: u8) -> bool {
+            self.start().await;
+            let ack = self.write_byte(address << 1).await;
+            self.stop().await;
             ack
         }
 
@@ -709,7 +744,6 @@ mod i2c_slave {
         }
 
         async fn write(&mut self, buffer: &[u8]) {
-            Timer::after_micros(200).await;
             self.start().await;
             assert!(self.write_byte(ADDRESS << 1).await);
             for &byte in buffer {
@@ -749,6 +783,17 @@ mod i2c_slave {
         assert!(raw.time_out().bit_is_clear());
         assert!(raw.scl_st_to().bit_is_clear());
         assert!(raw.scl_main_st_to().bit_is_clear());
+    }
+
+    async fn wait_for_pending_write() {
+        let regs = I2C0::regs();
+        while regs.int_raw().read().slave_stretch().bit_is_clear()
+            || regs.sr().read().rxfifo_cnt().bits() == 0
+        {
+            embassy_futures::yield_now().await;
+        }
+        assert_eq!(regs.sr().read().rxfifo_cnt().bits(), 1);
+        assert!(!MASTER_DONE.load(Ordering::SeqCst));
     }
 
     async fn pause_master() {
@@ -851,7 +896,7 @@ mod i2c_slave {
         Timer::after_micros(50).await;
         master.start().await;
         assert!(master.write_byte(ADDRESS << 1).await);
-        master.write_bits(WRITE_DATA[0]).await;
+        master.write_bits(WRITE_DATA[0], 8).await;
         master.sda.set_high();
         pause_master().await;
         master.clock().await;
@@ -917,9 +962,32 @@ mod i2c_slave {
         Timer::after_micros(200).await;
 
         master.expect_read(&[0xff; 2]).await;
+        master.write(&[]).await;
+        master.write_bits(WRITE_DATA[0], 7).await;
+        // Repeated START supplies the eighth data clock before ACK.
+        master.start().await;
+        assert!(!master.write_byte((ADDRESS + 1) << 1).await);
+        let raw = I2C0::regs().int_raw().read();
+        assert!(raw.nack().bit_is_set());
+        assert!(raw.det_start().bit_is_set());
+        assert!(raw.trans_complete().bit_is_clear());
+        assert_eq!(I2C0::regs().sr().read().rxfifo_cnt().bits(), 1);
+        pause_master().await;
         master.stop().await;
-        master.write(&WRITE_DATA).await;
-        master.stop().await;
+
+        for delay_us in [0, 50, 200, 500] {
+            master.expect_read(&[0xff]).await;
+            master.stop_without_yield();
+            master.write(&[]).await;
+            assert!(I2C0::regs().int_raw().read().trans_complete().bit_is_set());
+            assert!(master.write_byte_delayed_ack(WRITE_DATA[0], delay_us).await);
+            assert!(master.write_byte(WRITE_DATA[1]).await);
+            Timer::after_micros(500).await;
+            for &byte in &WRITE_DATA[2..] {
+                assert!(master.write_byte(byte).await);
+            }
+            master.stop().await;
+        }
 
         master.expect_read(&[LONG_RESPONSE[0]]).await;
         master.expect_read(&[LONG_RESPONSE[0]; 2]).await;
@@ -947,7 +1015,13 @@ mod i2c_slave {
             .expect_read(&RESPONSE, Ok(ReadStatus::NeedMoreBytes))
             .await;
         slave.expect_read(&[], Ok(ReadStatus::NeedMoreBytes)).await;
-        slave.expect_write(&mut data, &WRITE_DATA).await;
+        slave.expect_write(&mut data, &WRITE_DATA[..1]).await;
+        wait_for_pause().await;
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+        for _ in 0..4 {
+            slave.expect_read(&[0xff], Ok(ReadStatus::Done)).await;
+            slave.expect_write(&mut data, &WRITE_DATA).await;
+        }
 
         for expected in [
             Err(Error::ResponseTooLong),
@@ -966,5 +1040,310 @@ mod i2c_slave {
     #[test]
     async fn async_read_response(peripherals: Peripherals) {
         check_read_response(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn write_read_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        for length in [WRITE_DATA.len(), RESPONSE.len()] {
+            let request = &RESPONSE[..length];
+            master.write(request).await;
+            master
+                .expect_read(&[length as u8, request[0], request[length - 1]])
+                .await;
+            master.stop().await;
+        }
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_write_read(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner.spawn(write_read_master(ctx.master).unwrap());
+
+        for length in [WRITE_DATA.len(), RESPONSE.len()] {
+            let mut request = [0; RESPONSE.len()];
+            slave.expect_write(&mut request, &RESPONSE[..length]).await;
+            let response = [length as u8, request[0], request[length - 1]];
+            slave.expect_read(&response, Ok(ReadStatus::Done)).await;
+        }
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_write_read(peripherals: Peripherals) {
+        check_write_read(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_write_read(peripherals: Peripherals) {
+        check_write_read(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn receive_overflow_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        let overflow_data: [u8; FIFO_SIZE * 2 + 1] = core::array::from_fn(|index| index as u8);
+        master.write(&overflow_data[..WRITE_DATA.len()]).await;
+        master.stop().await;
+        master.write(&overflow_data).await;
+
+        master.expect_read(&SECOND_RESPONSE).await;
+        master.stop().await;
+
+        master.write(&WRITE_DATA).await;
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_receive_overflow(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner
+            .spawn(receive_overflow_master(ctx.master).unwrap());
+        let mut data = [0; WRITE_DATA.len()];
+
+        let mut request = [0xff; WRITE_DATA.len() - 1];
+        assert_eq!(slave.listen(&mut request).await, Err(Error::Overflow));
+        assert_eq!(request, [0, 1, 2]);
+        assert_eq!(slave.listen(&mut []).await, Err(Error::Overflow));
+
+        slave
+            .expect_read(&SECOND_RESPONSE, Ok(ReadStatus::Done))
+            .await;
+
+        slave.expect_write(&mut data, &WRITE_DATA).await;
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_receive_overflow(peripherals: Peripherals) {
+        check_receive_overflow(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_receive_overflow(peripherals: Peripherals) {
+        check_receive_overflow(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn hardware_overflow_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        let overflow_data = [0x5a; FIFO_SIZE + 1];
+        // Disable stretching to force a hardware RX FIFO overflow.
+        let regs = I2C0::regs();
+        regs.scl_stretch_conf().modify(|_, w| {
+            w.slave_byte_ack_ctl_en().clear_bit();
+            w.slave_scl_stretch_en().clear_bit()
+        });
+        regs.ctr().modify(|_, w| w.conf_upgate().set_bit());
+        master.write(&overflow_data).await;
+        assert!(regs.int_raw().read().rxfifo_ovf().bit_is_set());
+        master.stop().await;
+        // Drain the full FIFO before restoring clock stretching.
+        pause_master().await;
+        regs.scl_stretch_conf().modify(|_, w| {
+            w.slave_byte_ack_ctl_en().set_bit();
+            w.slave_scl_stretch_en().set_bit()
+        });
+        regs.ctr().modify(|_, w| w.conf_upgate().set_bit());
+        assert!(master.probe(ADDRESS).await);
+        master.write(&WRITE_DATA).await;
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_hardware_overflow(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner
+            .spawn(hardware_overflow_master(ctx.master).unwrap());
+
+        let mut request = [0; FIFO_SIZE + 1];
+        assert_eq!(slave.listen(&mut request).await, Err(Error::Overflow));
+        assert!(I2C0::regs().int_raw().read().slave_stretch().bit_is_clear());
+        wait_for_pause().await;
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+        wait_for_pending_write().await;
+        slave.expect_write(&mut request, &WRITE_DATA).await;
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_hardware_overflow(peripherals: Peripherals) {
+        check_hardware_overflow(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_hardware_overflow(peripherals: Peripherals) {
+        check_hardware_overflow(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn consecutive_writes_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        master.write(&[]).await;
+        master.write_bits(WRITE_DATA[0], 7).await;
+        master.start().await;
+        let status = I2C0::regs().sr().read();
+        assert_eq!(status.scl_main_state_last().bits(), 1);
+        assert_eq!(status.rxfifo_cnt().bits(), 1);
+        I2C0::regs().int_clr().write(|w| {
+            w.trans_complete().clear_bit_by_one();
+            w.slave_stretch().clear_bit_by_one()
+        });
+        assert!(I2C0::regs().int_raw().read().det_start().bit_is_set());
+        assert_no_timeout();
+        // Require delivery before the next address can resolve the retained match.
+        pause_master().await;
+        assert!(!master.write_byte((ADDRESS + 1) << 1).await);
+        master.stop().await;
+
+        master.start().await;
+        assert!(master.write_byte(ADDRESS << 1).await);
+        master.stop_without_yield();
+
+        for data in [&WRITE_DATA, &SECOND_RESPONSE] {
+            master.write(data).await;
+            // Keep STOP pending until the following write stretches SCL.
+            master.stop_without_yield();
+        }
+        master.write(&WRITE_DATA).await;
+        master.write(&SECOND_RESPONSE).await;
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_consecutive_writes(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner
+            .spawn(consecutive_writes_master(ctx.master).unwrap());
+        let mut data = [0; WRITE_DATA.len() * 2];
+
+        slave.expect_write(&mut data, &WRITE_DATA[..1]).await;
+        wait_for_pause().await;
+        assert_no_timeout();
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+        slave.expect_write(&mut data, &WRITE_DATA).await;
+        assert_eq!(slave.listen(&mut []).await, Err(Error::Overflow));
+        for expected in [&WRITE_DATA, &SECOND_RESPONSE] {
+            slave.expect_write(&mut data, expected).await;
+        }
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_consecutive_writes(peripherals: Peripherals) {
+        check_consecutive_writes(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_consecutive_writes(peripherals: Peripherals) {
+        check_consecutive_writes(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn interrupted_write_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        for read in [false, true] {
+            for prefix in [0, WRITE_DATA.len()] {
+                for bits in [6, 7] {
+                    master.write(&WRITE_DATA[..prefix]).await;
+                    for bit in (8 - bits..8).rev() {
+                        master
+                            .sda
+                            .set_level(Level::from(WRITE_DATA[0] & (1 << bit) != 0));
+                        master.clock().await;
+                    }
+                    if read {
+                        master.expect_read(&SECOND_RESPONSE).await;
+                    } else {
+                        master.stop_without_yield();
+                        master.write(&[]).await;
+                        assert!(master.write_byte_delayed_ack(SECOND_RESPONSE[0], 200).await);
+                        for byte in &SECOND_RESPONSE[1..] {
+                            assert!(master.write_byte(*byte).await);
+                        }
+                    }
+                    master.stop().await;
+                }
+            }
+        }
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_interrupted_write(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner
+            .spawn(interrupted_write_master(ctx.master).unwrap());
+        let mut data = [0; WRITE_DATA.len() + 1];
+        for read in [false, true] {
+            for prefix in [0, WRITE_DATA.len()] {
+                for bits in [6, 7] {
+                    // The boundary supplies the eighth clock after seven data bits.
+                    let length = prefix + usize::from(bits == 7);
+                    let mut expected = [0; WRITE_DATA.len() + 1];
+                    expected[..prefix].copy_from_slice(&WRITE_DATA[..prefix]);
+                    expected[prefix] = if read {
+                        WRITE_DATA[0]
+                    } else {
+                        WRITE_DATA[0] & !1
+                    };
+                    if length > 0 {
+                        slave.expect_write(&mut data, &expected[..length]).await;
+                    }
+                    if read {
+                        slave
+                            .expect_read(&SECOND_RESPONSE, Ok(ReadStatus::Done))
+                            .await;
+                    } else {
+                        slave.expect_write(&mut data, &SECOND_RESPONSE).await;
+                    }
+                }
+            }
+        }
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_interrupted_write(peripherals: Peripherals) {
+        check_interrupted_write(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_interrupted_write(peripherals: Peripherals) {
+        check_interrupted_write(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn pending_write_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        assert!(!master.probe(ADDRESS + 1).await);
+        assert!(master.probe(ADDRESS).await);
+        let mut response = [0; SHORT_READ_LEN];
+        master.read(&mut response).await;
+        assert_eq!(response, RESPONSE[..SHORT_READ_LEN]);
+        master.write(&WRITE_DATA).await;
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn check_pending_write(ctx: Context<impl TestSlave>) {
+        let mut slave = ctx.slave;
+        ctx.spawner.spawn(pending_write_master(ctx.master).unwrap());
+        let mut data = [0; WRITE_DATA.len()];
+
+        slave.expect_read(&RESPONSE, Ok(SHORT_READ_STATUS)).await;
+        wait_for_pending_write().await;
+
+        slave.expect_write(&mut data, &WRITE_DATA).await;
+        wait_for_master().await;
+    }
+
+    #[test]
+    async fn blocking_pending_write(peripherals: Peripherals) {
+        check_pending_write(setup(peripherals)).await;
+    }
+
+    #[test]
+    async fn async_pending_write(peripherals: Peripherals) {
+        check_pending_write(setup(peripherals).into_async()).await;
     }
 }
