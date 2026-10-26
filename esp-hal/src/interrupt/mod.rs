@@ -61,7 +61,7 @@ The HAL defines the `Software0` interrupt handler, and switches tasks in that in
 "
 )]
 
-use core::sync::atomic::{AtomicU32, Ordering};
+use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{peripherals::Interrupt, system::Cpu};
 
@@ -205,16 +205,16 @@ impl InterruptHandler {
 
 const STATUS_WORDS: usize = property!("interrupts.status_registers");
 
-// One crate version can enable `rt`. That version owns `ESP_HAL_VALID_INTERRUPTS`.
+// One crate version can enable `rt`. That version owns `_ESP_HAL_VALID_INTERRUPTS`.
 cfg_select! {
     feature = "rt" => {
         /// The status bits that name a variant of [`Interrupt`].
         #[unsafe(no_mangle)]
-        static ESP_HAL_VALID_INTERRUPTS: [AtomicU32; STATUS_WORDS] =
+        static _ESP_HAL_VALID_INTERRUPTS: [AtomicU32; STATUS_WORDS] =
             [const { AtomicU32::new(0) }; STATUS_WORDS];
 
         fn init_valid_interrupts() {
-            for (word, valid) in ESP_HAL_VALID_INTERRUPTS.iter().enumerate() {
+            for (word, valid) in _ESP_HAL_VALID_INTERRUPTS.iter().enumerate() {
                 let mut mask = 0;
                 for bit in 0..32 {
                     if Interrupt::try_from((word * 32 + bit) as _).is_ok() {
@@ -226,16 +226,17 @@ cfg_select! {
         }
 
         fn valid_interrupts() -> &'static [AtomicU32; STATUS_WORDS] {
-            &ESP_HAL_VALID_INTERRUPTS
+            &_ESP_HAL_VALID_INTERRUPTS
         }
     }
     _ => {
         unsafe extern "Rust" {
-            static ESP_HAL_VALID_INTERRUPTS: [AtomicU32; STATUS_WORDS];
+            static _ESP_HAL_VALID_INTERRUPTS: [AtomicU32; STATUS_WORDS];
         }
 
         fn valid_interrupts() -> &'static [AtomicU32; STATUS_WORDS] {
-            unsafe { &ESP_HAL_VALID_INTERRUPTS }
+            // SAFETY: the `rt` build defines `_ESP_HAL_VALID_INTERRUPTS`.
+            unsafe { &_ESP_HAL_VALID_INTERRUPTS }
         }
     }
 }
