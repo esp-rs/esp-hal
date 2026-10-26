@@ -1634,7 +1634,7 @@ where
     Dm: crate::DriverMode,
 {
     // Conceptually, this retains a reference to the main driver struct, even when the
-    // `ChannelCreator` is taken out of it and the `Rmt` dropped. This prevents re-inititalizing
+    // `ChannelCreator` is taken out of it and the `Rmt` dropped. This prevents re-initializing
     // the `Rmt` and obtaining a duplicate `ChannelCreator`.
     _rmt: PhantomData<Rmt<'ch, Dm>>,
 

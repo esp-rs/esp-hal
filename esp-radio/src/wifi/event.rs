@@ -68,7 +68,7 @@ pub enum WifiEvent {
     /// Received report of Fine-Timing-Measurement procedure.
     FineTimingMeasurementReport,
 
-    /// Station Receive-Signal-Strenght-Indicator goes below the configured threshold.
+    /// Station Receive-Signal-Strength-Indicator goes below the configured threshold.
     StationBasicServiceSetReceivedSignalStrengthIndicatorLow,
     /// Status indication of Action Transmission operation.
     ActionTransmissionStatus,
@@ -952,7 +952,7 @@ pub enum EventInfo {
         entries: Collection<FineTimingMeasurementReportInfo>,
     },
 
-    /// Station Receive-Signal-Strenght-Indicator goes below the configured threshold.
+    /// Station Receive-Signal-Strength-Indicator goes below the configured threshold.
     StationBasicServiceSetReceivedSignalStrengthIndicatorLow {
         /// RSSI value of bss
         rssi: i8,

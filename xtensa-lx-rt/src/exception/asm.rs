@@ -115,7 +115,7 @@ global_asm!(
     //   context.
     //
     // - If the WOE bit is not enabled (for example, in code written for
-    //   the CALL0 ABI), this becomes a silent noop and operates compatbily.
+    //   the CALL0 ABI), this becomes a silent noop and operates compatibly.
     //
     // - Hilariously it's ACTUALLY FASTER than the HAL routine.  And not
     //   just a little bit, it's MUCH faster.  With a mostly full register

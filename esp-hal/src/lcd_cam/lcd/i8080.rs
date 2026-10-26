@@ -482,7 +482,7 @@ where
         });
         ll::set_2byte_mode(self.regs(), is_2byte_mode);
 
-        // Use continous mode for DMA. FROM the S3 TRM:
+        // Use continuous mode for DMA. FROM the S3 TRM:
         // > In a continuous output, LCD module keeps sending data till:
         // > i. LCD_CAM_LCD_START is cleared;
         // > ii. or LCD_CAM_LCD_RESET is set;

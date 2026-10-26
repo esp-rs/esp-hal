@@ -1873,8 +1873,8 @@ mod asynch {
         /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
         ///
         /// The transmission is aborted if the future is dropped. The technical
-        /// reference manual does not specifiy if aborting the transmission also
-        /// stops it, in case it is activly transmitting. Therefor it could be
+        /// reference manual does not specify if aborting the transmission also
+        /// stops it, in case it is actively transmitting. Therefore it could be
         /// the case that even though the future is dropped, the frame was sent
         /// anyways.
         ///
@@ -1971,8 +1971,8 @@ mod asynch {
         /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
         ///
         /// The transmission is aborted if the future is dropped. The technical
-        /// reference manual does not specifiy if aborting the transmission also
-        /// stops it, in case it is actively transmitting. Therefor it could be
+        /// reference manual does not specify if aborting the transmission also
+        /// stops it, in case it is actively transmitting. Therefore it could be
         /// the case that even though the future is dropped, the frame was sent
         /// anyways.
         ///

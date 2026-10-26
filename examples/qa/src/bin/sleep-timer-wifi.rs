@@ -48,7 +48,7 @@ async fn main(_spawner: Spawner) -> ! {
     let delay = Delay::new();
     let mut lpwr = LowPower::new(peripherals.LPWR);
 
-    println!("up and runnning!");
+    println!("up and running!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
     let wake_reason = wakeup_cause();
