@@ -146,7 +146,7 @@ impl<'a> Ieee802154<'a> {
         set_rx_when_idle(cfg.rx_when_idle);
         set_tx_power(cfg.txpower);
         set_channel(cfg.channel);
-        set_cca_theshold(cfg.cca_threshold);
+        set_cca_threshold(cfg.cca_threshold);
         set_cca_mode(cfg.cca_mode);
 
         if let Some(pan_id) = cfg.pan_id {
