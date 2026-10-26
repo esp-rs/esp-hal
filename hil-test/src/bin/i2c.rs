@@ -526,7 +526,10 @@ mod tests {
 #[cfg(i2c_slave_driver_supported)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod i2c_slave {
-    use core::sync::atomic::{AtomicBool, Ordering};
+    use core::{
+        future::Future,
+        sync::atomic::{AtomicBool, Ordering},
+    };
 
     use embassy_time::Timer;
     #[cfg(soc_has_pcr)]
@@ -1646,5 +1649,76 @@ mod i2c_slave {
     #[test]
     async fn async_aborted_read(peripherals: Peripherals) {
         check_aborted_read(setup(peripherals).into_async()).await;
+    }
+
+    #[embassy_executor::task]
+    async fn cancellation_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        master.write(&[]).await;
+        master.write_bits(WRITE_DATA[0], 7).await;
+        master.stop_without_yield();
+        master.write(&[]).await;
+        pause_master().await;
+        for byte in WRITE_DATA {
+            assert!(master.write_byte(byte).await);
+        }
+        master.stop().await;
+
+        master.write(&RESPONSE).await;
+        pause_master().await;
+        master.stop().await;
+        master.write(&WRITE_DATA).await;
+        master.stop().await;
+
+        master.read(&mut []).await;
+        for _ in 0..3 {
+            assert!(master.clock().await);
+        }
+
+        pause_master().await;
+        master.stop().await;
+        master.expect_read(&SECOND_RESPONSE).await;
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    async fn expect_cancel(operation: impl Future, until: impl Future<Output = ()>) {
+        assert!(matches!(select(operation, until).await, Either::Second(())));
+        assert_eq!(I2C0::regs().int_ena().read().bits(), 0);
+    }
+
+    #[test]
+    async fn async_cancellation(peripherals: Peripherals) {
+        let ctx = setup(peripherals);
+        let mut slave = ctx.slave.into_async();
+        let mut data = [0; RESPONSE.len()];
+        let regs = I2C0::regs();
+        expect_cancel(slave.listen_async(&mut data), core::future::ready(())).await;
+        ctx.spawner.spawn(cancellation_master(ctx.master).unwrap());
+
+        expect_cancel(slave.listen_async(&mut data), wait_for_pause()).await;
+        assert!(regs.sr().read().slave_addressed().bit_is_set());
+        assert_eq!(regs.sr().read().rxfifo_cnt().bits(), 1);
+        let mut slave = slave.into_blocking().into_async();
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+        slave.expect_write(&mut data, &[WRITE_DATA[0] & !1]).await;
+        slave.expect_write(&mut data, &WRITE_DATA).await;
+
+        expect_cancel(slave.listen_async(&mut data), wait_for_pause()).await;
+        assert_eq!(regs.sr().read().rxfifo_cnt().bits(), 0);
+        assert!(regs.sr().read().slave_addressed().bit_is_clear());
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+        slave.expect_write(&mut data, &WRITE_DATA).await;
+
+        assert_eq!(slave.listen_async(&mut data).await, Ok(Command::Read));
+        // Keep SDA high so the master can issue STOP during the partial byte.
+        expect_cancel(slave.respond_to_read_async(&[0xff]), wait_for_pause()).await;
+        assert_eq!(regs.sr().read().txfifo_cnt().bits(), 0);
+        assert!(regs.sr().read().slave_addressed().bit_is_clear());
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+        slave
+            .expect_read(&SECOND_RESPONSE, Ok(ReadStatus::Done))
+            .await;
+        wait_for_master().await;
     }
 }

@@ -45,7 +45,7 @@ use crate::{
     i2c::master::I2cAddress,
     interrupt::InterruptHandler,
     pac::i2c0::RegisterBlock,
-    private,
+    private::{self, DropGuard},
     ram,
     rtc_cntl::WakeLock,
     system::PeripheralGuard,
@@ -265,6 +265,13 @@ impl<'d> I2cSlave<'d, Async> {
     /// Listens for a request from the master asynchronously.
     ///
     /// See [`Self::listen`] for the receive behavior and errors.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Canceling after this operation consumes receive data resets the controller
+    /// and discards pending requests. Otherwise, cancellation does not reset the controller.
+    /// The master must retry discarded requests.
+    /// The receive buffer can contain partial data.
     pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let driver = self.driver();
         let regs = driver.regs();
@@ -272,26 +279,41 @@ impl<'d> I2cSlave<'d, Async> {
 
         driver.start_listen();
 
-        let mut bytes_read = 0;
-        loop {
-            I2cSlaveFuture::new(
-                regs,
-                state,
-                Event::SlaveStretch
-                    | Event::TransComplete
-                    | Event::StartDetected
-                    | Event::ReceiveBoundary,
-            )
-            .await;
-            if let Some(res) = driver.listen_step(buffer, &mut bytes_read) {
-                return res;
+        let mut bytes_read = DropGuard::new(0, |bytes_read| {
+            if bytes_read > 0 {
+                driver.recover();
+            }
+        });
+        let result = async {
+            loop {
+                I2cSlaveFuture::new(
+                    regs,
+                    state,
+                    Event::SlaveStretch
+                        | Event::TransComplete
+                        | Event::StartDetected
+                        | Event::ReceiveBoundary,
+                )
+                .await;
+                if let Some(res) = driver.listen_step(buffer, &mut bytes_read) {
+                    return res;
+                }
             }
         }
+        .await;
+        bytes_read.defuse();
+        result
     }
 
     /// Responds to a master read request asynchronously.
     ///
     /// See [`Self::respond_to_read`] for the response behavior and errors.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Dropping an unpolled future does not change the controller.
+    /// Canceling a pending operation after its first poll resets the controller
+    /// and discards pending requests. The master must retry these requests.
     pub async fn respond_to_read_async(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
         let driver = self.driver();
         let regs = driver.regs();
@@ -300,18 +322,24 @@ impl<'d> I2cSlave<'d, Async> {
         let mut bytes_written = 1;
         driver.start_read(buffer);
 
-        loop {
-            I2cSlaveFuture::new(
-                regs,
-                state,
-                Event::SlaveStretch | Event::Nack | Event::TransComplete | Event::StartDetected,
-            )
-            .await;
+        let cancel_on_drop = DropGuard::new(&driver, Driver::recover);
+        let result = async {
+            loop {
+                I2cSlaveFuture::new(
+                    regs,
+                    state,
+                    Event::SlaveStretch | Event::Nack | Event::TransComplete | Event::StartDetected,
+                )
+                .await;
 
-            if let Some(status) = driver.respond_to_read_step(buffer, &mut bytes_written) {
-                return status;
+                if let Some(status) = driver.respond_to_read_step(buffer, &mut bytes_written) {
+                    return status;
+                }
             }
         }
+        .await;
+        cancel_on_drop.defuse();
+        result
     }
 }
 
