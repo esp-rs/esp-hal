@@ -86,7 +86,7 @@ jobs:
           INPUT_RANGE: ${{ inputs.range }}
           INPUT_BASE: ${{ inputs.base }}
           INPUT_HEAD: ${{ inputs.head }}
-          ESP_METRICS_API_URL: ${{ vars.ESP_METRICS_API_URL || secrets.ESP_METRICS_API_URL }}
+          ESP_METRICS_API_URL: ${{ secrets.ESP_METRICS_API_URL }}
           ESP_METRICS_API_TOKEN: ${{ secrets.ESP_METRICS_API_TOKEN }}
         with:
           script: |
@@ -177,5 +177,6 @@ jobs:
       - uses: ./.github/actions/upload-metrics
         with:
           commit-sha: ${{ needs.prepare.outputs.head }}
+          s3-server: ${{ secrets.ESP_METRICS_S3_SERVER }}
           s3-access-key: ${{ secrets.ESP_METRICS_S3_ACCESS_KEY }}
           s3-secret-key: ${{ secrets.ESP_METRICS_S3_SECRET_KEY }}

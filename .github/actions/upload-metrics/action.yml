@@ -26,8 +26,7 @@ inputs:
     default: ${{ github.ref_name }}
   s3-server:
     description: S3 endpoint URL.
-    required: false
-    default: https://idf-s3.espressif.cn:9000
+    required: true
   long-term-bucket:
     description: S3 bucket for default/release branches.
     required: false
