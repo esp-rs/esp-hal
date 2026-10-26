@@ -297,14 +297,6 @@ fn timer_handler() {
 
 #[cfg(multi_core)]
 fn app_core_entry() -> ! {
-    cfg_select! {
-        xtensa => unsafe {
-            let _ = esp_hal::xtensa_lx::interrupt::enable();
-        },
-        riscv => unsafe {
-            let _ = esp_hal::riscv::interrupt::enable();
-        },
-    }
     interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::min());
 
     loop {
