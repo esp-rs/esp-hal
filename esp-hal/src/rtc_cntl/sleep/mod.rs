@@ -247,11 +247,14 @@ impl<'d> LowPower<'d> {
     /// result.
     #[cfg_attr(
         cpu_retention = "software",
-        doc = "\n\nPart of the sleep runs with the caches suspended, so it must not call code in \
-               flash. Build esp-hal at `opt-level` 2 or 3, or build every crate with \
-               optimization. Otherwise esp-hal can call helper functions in flash. A debug build \
-               can set the level for esp-hal only:\n\n```toml\n[profile.dev.package.esp-hal]\n\
-               opt-level = 2\n```"
+        doc = "\n\nPart of the sleep runs with the caches suspended, and that part must not call \
+               code in flash. esp-hal must be built at `opt-level` 2 or 3 in each profile that \
+               uses light sleep. At other levels, the link fails with `prohibited cross \
+               reference from '.rwtext.caches_suspended'` and the name of a helper function. \
+               The `Cargo.toml` of the application can set the level for esp-hal \
+               only:\n\n```toml\n\
+               [profile.dev.package.esp-hal]\nopt-level = 2\n\n\
+               [profile.release.package.esp-hal]\nopt-level = 2\n```"
     )]
     #[cfg(sleep_light_sleep)]
     #[cfg(feature = "rt")]
