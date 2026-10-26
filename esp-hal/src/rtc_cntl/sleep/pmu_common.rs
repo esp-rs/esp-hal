@@ -76,7 +76,8 @@ impl SleepTimeConfig {
 /// dirty line. The retention frames are among them, because the save writes them through the cache.
 /// esp-idf writes the cache back in `pmu_sleep_start` (`esp32p4/pmu_sleep.c:410`), and it uses the
 /// registers and not the ROM helper, because the return of a call dirties the cache again.
-#[crate::ram]
+#[unsafe(link_section = ".rwtext.caches_suspended.writeback_data_cache")]
+#[inline(never)]
 #[cfg(soc_internal_memory_cached)]
 fn writeback_data_cache() {
     // `CACHE_MAP_L1_DCACHE` of `esp32p4/rom/cache.h`.
@@ -96,7 +97,12 @@ fn writeback_data_cache() {
 ///
 /// The software retention path calls this through a function pointer after the critical frame is
 /// saved.
-#[inline(always)]
+#[cfg_attr(
+    cpu_retention = "software",
+    unsafe(link_section = ".rwtext.caches_suspended.request_sleep"),
+    inline(never)
+)]
+#[cfg_attr(not(cpu_retention = "software"), inline(always))]
 pub(crate) fn request_sleep() -> bool {
     #[cfg(soc_internal_memory_cached)]
     writeback_data_cache();

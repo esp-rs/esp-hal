@@ -248,10 +248,14 @@ impl<'d> LowPower<'d> {
     #[cfg_attr(
         cpu_retention = "software",
         doc = "\n\nPart of the sleep runs with the caches suspended, so it must not call code in \
-               flash. Build esp-hal at `opt-level` 2 or 3, or build every crate with \
-               optimization. Otherwise esp-hal can call helper functions in flash. A debug build \
-               can set the level for esp-hal only:\n\n```toml\n[profile.dev.package.esp-hal]\n\
-               opt-level = 2\n```"
+               flash. esp-hal must be built at `opt-level` 2 or 3 in each profile that \
+               light-sleeps. At \
+               0, 1, `\"s\"` and `\"z\"`, esp-hal can call helper functions in flash, and the \
+               program fails to link with `prohibited cross reference from \
+               '.rwtext.caches_suspended'`, followed by the name of the helper. The \
+               application's `Cargo.toml` can set the level for esp-hal alone:\n\n```toml\n\
+               [profile.dev.package.esp-hal]\nopt-level = 2\n\n\
+               [profile.release.package.esp-hal]\nopt-level = 2\n```"
     )]
     #[cfg(sleep_light_sleep)]
     #[cfg(feature = "rt")]
@@ -451,6 +455,18 @@ impl<'d> LowPower<'d> {
             ))]
             if kind == SleepKind::Deep {
                 gpio::wakeup::isolate_pads_for_deep_sleep();
+            }
+
+            // With PSRAM, a CPU power-down loses the dirty lines of the cache. Like esp-idf's
+            // `sleep_cache_safe_writeback`, this code writes them back first, see
+            // <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L55-L72>.
+            // It runs before the caches are suspended, so it is not in the checked section.
+            #[cfg(psram_writeback_before_cpu_power_down)]
+            if retention_buffer.is_some()
+                && config.pd_flags.pd_cpu()
+                && !crate::psram::psram_range().is_empty()
+            {
+                crate::soc::cache_writeback_all();
             }
 
             let rejected = cfg_select! {

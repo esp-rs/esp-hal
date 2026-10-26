@@ -882,7 +882,8 @@ fn disable_bbpll() {
 /// Returns `true` if the hardware rejected the request. This function runs from RAM, because the
 /// caches are suspended. A wake from a CPU power-down does not return here. The retention code
 /// calls [`pmu_sleep_finish`] instead.
-#[crate::ram]
+#[unsafe(link_section = ".rwtext.caches_suspended.pmu_sleep_start")]
+#[inline(never)]
 pub(crate) fn pmu_sleep_start() -> bool {
     let psram = !crate::psram::psram_range().is_empty();
     PSRAM_IN_SLEEP.store(psram, Ordering::Relaxed);
@@ -930,7 +931,8 @@ pub(crate) fn pmu_sleep_start() -> bool {
 ///
 /// esp-idf asserts that the modem's PLL clock gate and its clock source agree. This port does not
 /// assert, because a panic cannot print while the caches are suspended.
-#[crate::ram]
+#[unsafe(link_section = ".rwtext.caches_suspended.pmu_sleep_finish")]
+#[inline(never)]
 pub(crate) fn pmu_sleep_finish() {
     // The eFuse controller reloads after a wake.
     while EFUSE::regs().status().read().state().bits() != 1 {}

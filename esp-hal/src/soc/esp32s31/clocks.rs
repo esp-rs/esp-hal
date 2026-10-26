@@ -315,8 +315,8 @@ pub(crate) fn set_mpll_power(on: bool) {
 ///
 /// Ref: [IDF `clk_ll_mpll_set_config` (esp32s31)](https://github.com/espressif/esp-idf/blob/27506a49bc919926f546e325d5f5334ba23db316/components/esp_hal_clock/esp32s31/include/hal/clk_tree_ll.h#L527-L545)
 ///
-/// It runs from RAM, because light sleep restores the MPLL while the caches are suspended.
-#[crate::ram]
+/// It is inlined, because light sleep calls it while the caches are suspended.
+#[inline(always)]
 pub(crate) fn set_mpll_frequency(mpll_mhz: u32) {
     // Analog settings IDF writes before each calibration.
     regi2c::I2C_MPLL_IR_CAL_EXT_CAP.write_field(3);
@@ -333,7 +333,8 @@ pub(crate) fn set_mpll_frequency(mpll_mhz: u32) {
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().clear_bit());
     let ref_div = 1;
-    let fb_div = mpll_mhz * (ref_div + 1) / XTAL_MHZ - 1;
+    // The arithmetic wraps, because the panic of an overflow check is in flash.
+    let fb_div = (mpll_mhz.wrapping_mul(ref_div + 1) / XTAL_MHZ).wrapping_sub(1);
     LP_AON_CLK_RST::regs()
         .mspi_div()
         .modify(|_, w| unsafe { w.mspi_fb_div().bits(fb_div as u8) });

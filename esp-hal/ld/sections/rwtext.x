@@ -9,11 +9,24 @@
 } > RWTEXT
 #ENDIF
 
+#IF cpu_retention == "software"
+/* The code that runs while light sleep suspends the caches. `text.x` forbids references from it
+   to flash. It comes before `.rwtext`, which would otherwise take its input sections. */
+.rwtext.caches_suspended : ALIGN(4)
+{
+  _rwtext_start = .;
+  *(.rwtext.caches_suspended.*)
+  . = ALIGN(4);
+} > RWTEXT
+#ENDIF
+
 .rwtext : ALIGN(4)
 {
   . = ALIGN (4);
 
+  #IF cpu_retention != "software"
   _rwtext_start = .;
+  #ENDIF
 
   /* Keep each object's literal pool adjacent to its code (see comment in `text.x`). */
   *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
