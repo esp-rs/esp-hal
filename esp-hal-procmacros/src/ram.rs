@@ -194,12 +194,19 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         _ => Err(()),
     };
 
-    let section = match (is_fn, section_name) {
-        (true, Ok(section_name)) => quote::quote! {
-            #[unsafe(link_section = #section_name)]
-            #[inline(never)] // make certain function is not inlined
-        },
-        (false, Ok(section_name)) => quote::quote! {
+    let section = match (&item, section_name) {
+        (Item::Fn(function), Ok(section_name)) => {
+            // rustc puts every function with the same `link_section` in one input section, which
+            // the linker keeps whole. A section per function lets `--gc-sections` drop each unused
+            // one. The `ram` part keeps a function's name apart from the named sections that the
+            // linker scripts place first, such as `.rwtext.interrupt`.
+            let section_name = format!("{section_name}.ram.{}", function.sig.ident);
+            quote::quote! {
+                #[unsafe(link_section = #section_name)]
+                #[inline(never)] // make certain function is not inlined
+            }
+        }
+        (_, Ok(section_name)) => quote::quote! {
             #[unsafe(link_section = #section_name)]
         },
         (_, Err(_)) => {
@@ -262,7 +269,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rwtext")]
+                #[unsafe (link_section = ".rwtext.ram.foo")]
                 #[inline (never)]
                 fn foo () { }
             }
@@ -287,7 +294,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_fast.text")]
+                #[unsafe (link_section = ".rtc_fast.text.ram.foo")]
                 #[inline (never)]
                 fn foo () { }
             }
@@ -312,7 +319,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_slow.text")]
+                #[unsafe (link_section = ".rtc_slow.text.ram.foo")]
                 #[inline (never)]
                 fn foo () { }
             }
