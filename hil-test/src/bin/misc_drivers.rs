@@ -1032,16 +1032,16 @@ mod lp_timekeeping {
     }
 }
 
-#[cfg(all(assist_debug_has_region_monitor, multi_core, soc_has_cpu_ctrl))]
+#[cfg(assist_debug_has_region_monitor)]
 #[embedded_test::tests(default_timeout = 3)]
 mod assist_debug {
-    use core::{hint::spin_loop, ptr::addr_of};
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    use core::hint::spin_loop;
+    use core::ptr::addr_of;
 
-    use esp_hal::{
-        assist_debug::DebugAssist,
-        peripherals::Peripherals,
-        system::{CpuControl, Stack},
-    };
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    use esp_hal::system::{CpuControl, Stack};
+    use esp_hal::{assist_debug::DebugAssist, peripherals::Peripherals};
     use hil_test::mk_static;
 
     #[esp_hal::ram]
@@ -1082,6 +1082,7 @@ mod assist_debug {
         assert_pc_in_ram(pc);
     }
 
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
     #[test]
     fn core1_region_monitor_pc(p: Peripherals) {
         let address = mk_static!(u32, 0) as *mut u32 as u32;
