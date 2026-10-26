@@ -5833,10 +5833,10 @@ macro_rules! memory_range {
         "503744"
     };
     ("DRAM2_UNINIT") => {
-        0x2F07AFC0..0x2F07CFB0
+        0x2F06CFB0..0x2F07CFB0
     };
     (size as str, "DRAM2_UNINIT") => {
-        "8176"
+        "65536"
     };
     ("IROM") => {
         0x40000000..0x50000000
