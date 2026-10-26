@@ -5,6 +5,7 @@
 //! RNG Tests
 //! System Timer Tests
 //! TWAI Tests
+//! Debug Assist Tests
 //% CHIP_FILTER: gpio_driver_supported
 //% FEATURES: unstable embassy
 
@@ -1028,5 +1029,84 @@ mod lp_timekeeping {
             "RTC only advanced by {:?}",
             rtc_duration
         );
+    }
+}
+
+#[cfg(assist_debug_has_region_monitor)]
+#[embedded_test::tests(default_timeout = 3)]
+mod assist_debug {
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    use core::hint::spin_loop;
+    use core::ptr::addr_of;
+
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    use esp_hal::system::{CpuControl, Stack};
+    use esp_hal::{assist_debug::DebugAssist, peripherals::Peripherals};
+    use hil_test::mk_static;
+
+    #[esp_hal::ram]
+    fn monitored_write(address: u32) {
+        unsafe { (address as *mut u32).write_volatile(0x1234_5678) };
+    }
+
+    fn assert_pc_in_ram(pc: u32) {
+        unsafe extern "C" {
+            static _rwtext_start: u8;
+            static _rwtext_end: u8;
+        }
+
+        let code = addr_of!(_rwtext_start) as u32..addr_of!(_rwtext_end) as u32;
+        assert!(
+            code.contains(&pc),
+            "captured PC {pc:#x} is outside RAM code"
+        );
+    }
+
+    #[init]
+    fn init() -> Peripherals {
+        esp_hal::init(esp_hal::Config::default())
+    }
+
+    #[test]
+    fn region_monitor_pc(p: Peripherals) {
+        let address = mk_static!(u32, 0) as *mut u32 as u32;
+        let mut da = DebugAssist::new(p.ASSIST_DEBUG);
+        da.enable_region0_monitor(address, address + size_of::<u32>() as u32, false, true);
+
+        monitored_write(address);
+        assert!(da.is_region0_monitor_interrupt_set());
+        let pc = da.region_monitor_pc();
+        da.disable_region0_monitor();
+        da.clear_region0_monitor_interrupt();
+
+        assert_pc_in_ram(pc);
+    }
+
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    #[test]
+    fn core1_region_monitor_pc(p: Peripherals) {
+        let address = mk_static!(u32, 0) as *mut u32 as u32;
+        let mut da = DebugAssist::new(p.ASSIST_DEBUG);
+        da.enable_core1_region0_monitor(address, address + size_of::<u32>() as u32, false, true);
+
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, move || {
+                monitored_write(address);
+                loop {
+                    spin_loop();
+                }
+            })
+            .unwrap();
+
+        while !da.is_core1_region0_monitor_interrupt_set() {
+            spin_loop();
+        }
+        let pc = da.core1_region_monitor_pc();
+        da.disable_core1_region0_monitor();
+        da.clear_core1_region0_monitor_interrupt();
+
+        assert_pc_in_ram(pc);
     }
 }
