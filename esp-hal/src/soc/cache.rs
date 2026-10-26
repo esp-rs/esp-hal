@@ -3,6 +3,7 @@
 //! Dropping cache lines for a flash range needs the MMU table and lives in
 //! `flash::mmu` instead.
 
+#[cfg(not(cpu_retention = "software"))]
 use procmacros::ram;
 
 /// Suspends the flash-backed caches for the duration of a ROM flash operation or a light sleep.
@@ -50,7 +51,12 @@ cfg_select! {
 impl CacheGuard {
     /// Disable the branch predictor (it issues cache requests) and suspend the
     /// external-memory caches.
-    #[ram]
+    #[cfg_attr(
+        cpu_retention = "software",
+        unsafe(link_section = ".rwtext.caches_suspended.cache_guard_suspend"),
+        inline(never)
+    )]
+    #[cfg_attr(not(cpu_retention = "software"), ram)]
     pub(crate) fn suspend() -> Self {
         #[cfg(soc_cpu_has_branch_predictor)]
         let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
@@ -79,7 +85,12 @@ impl CacheGuard {
 }
 
 impl Drop for CacheGuard {
-    #[ram]
+    #[cfg_attr(
+        cpu_retention = "software",
+        unsafe(link_section = ".rwtext.caches_suspended.cache_guard_drop"),
+        inline(never)
+    )]
+    #[cfg_attr(not(cpu_retention = "software"), ram)]
     fn drop(&mut self) {
         resume_caches(&self.inner);
     }
@@ -128,7 +139,12 @@ unsafe extern "C" {
     }
 }
 
-#[ram]
+#[cfg_attr(
+    cpu_retention = "software",
+    unsafe(link_section = ".rwtext.caches_suspended.suspend_caches"),
+    inline(never)
+)]
+#[cfg_attr(not(cpu_retention = "software"), ram)]
 fn suspend_caches() -> Inner {
     cfg_select! {
         esp32 => {
@@ -202,7 +218,12 @@ fn suspend_caches() -> Inner {
     }
 }
 
-#[ram]
+#[cfg_attr(
+    cpu_retention = "software",
+    unsafe(link_section = ".rwtext.caches_suspended.resume_caches"),
+    inline(never)
+)]
+#[cfg_attr(not(cpu_retention = "software"), ram)]
 fn resume_caches(inner: &Inner) {
     cfg_select! {
         esp32 => {
