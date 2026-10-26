@@ -1548,4 +1548,70 @@ mod i2c_slave {
     async fn async_aborted_read(peripherals: Peripherals) {
         check_aborted_read(setup(peripherals).into_async()).await;
     }
+
+    #[embassy_executor::task]
+    async fn cancellation_master(mut master: TestMaster) {
+        Timer::after_micros(50).await;
+        master.write(&RESPONSE).await;
+        pause_master().await;
+        master.stop().await;
+        master.write(&WRITE_DATA).await;
+        master.stop().await;
+
+        master.read(&mut []).await;
+        for _ in 0..3 {
+            assert!(master.clock().await);
+        }
+
+        pause_master().await;
+        master.stop().await;
+        let mut response = [0; SECOND_RESPONSE.len()];
+        master.read(&mut response).await;
+        assert_eq!(response, SECOND_RESPONSE);
+        master.stop().await;
+        MASTER_DONE.store(true, Ordering::SeqCst);
+    }
+
+    #[test]
+    async fn async_cancellation(peripherals: Peripherals) {
+        let ctx = setup(peripherals);
+        let mut slave = ctx.slave.into_async();
+        let mut data = [0; RESPONSE.len()];
+        let regs = I2C0::regs();
+        assert!(matches!(
+            select(slave.listen_async(&mut data), core::future::ready(())).await,
+            Either::Second(())
+        ));
+        assert_eq!(regs.int_ena().read().bits(), 0);
+        ctx.spawner.spawn(cancellation_master(ctx.master).unwrap());
+
+        assert!(matches!(
+            select(slave.listen_async(&mut data), wait_for_pause()).await,
+            Either::Second(())
+        ));
+        assert_eq!(regs.int_ena().read().bits(), 0);
+        assert_eq!(regs.sr().read().rxfifo_cnt().bits(), 0);
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+        assert_eq!(
+            slave.listen_async(&mut data).await,
+            Ok(Command::Write(WRITE_DATA.len()))
+        );
+        assert_eq!(&data[..WRITE_DATA.len()], &WRITE_DATA);
+
+        assert_eq!(slave.listen_async(&mut data).await, Ok(Command::Read));
+        // Keep SDA high so the master can issue STOP during the partial byte.
+        assert!(matches!(
+            select(slave.respond_to_read_async(&[0xff]), wait_for_pause()).await,
+            Either::Second(())
+        ));
+        assert_eq!(regs.int_ena().read().bits(), 0);
+        assert_eq!(regs.sr().read().txfifo_cnt().bits(), 0);
+        MASTER_PAUSED.store(false, Ordering::SeqCst);
+        assert_eq!(slave.listen_async(&mut data).await, Ok(Command::Read));
+        assert_eq!(
+            slave.respond_to_read_async(&SECOND_RESPONSE).await,
+            Ok(ReadStatus::Done)
+        );
+        wait_for_master().await;
+    }
 }

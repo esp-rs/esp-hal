@@ -39,7 +39,7 @@ use crate::{
     i2c::master::I2cAddress,
     interrupt::InterruptHandler,
     pac::i2c0::RegisterBlock,
-    private,
+    private::{self, DropGuard},
     ram,
     rtc_cntl::WakeLock,
     system::PeripheralGuard,
@@ -243,29 +243,46 @@ impl<'d> I2cSlave<'d, Async> {
     /// Listens for a request from the master asynchronously.
     ///
     /// See [`Self::listen`] for the receive behavior and errors.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Canceling a pending operation resets the controller and discards pending
+    /// requests. The master must retry these requests.
+    /// The receive buffer can contain partial data.
     pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let regs = self.driver().info.regs();
         let state = self.i2c.state();
 
         self.driver().start_listen();
 
-        let mut bytes_read = 0;
-        loop {
-            I2cSlaveFuture::new(
-                regs,
-                state,
-                Event::SlaveStretch | Event::TransComplete | Event::StartDetected,
-            )
-            .await?;
-            if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
-                return res;
+        let cancel_on_drop = DropGuard::new(self.driver(), |driver| driver.recover());
+        let result = async {
+            let mut bytes_read = 0;
+            loop {
+                I2cSlaveFuture::new(
+                    regs,
+                    state,
+                    Event::SlaveStretch | Event::TransComplete | Event::StartDetected,
+                )
+                .await?;
+                if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
+                    return res;
+                }
             }
         }
+        .await;
+        cancel_on_drop.defuse();
+        result
     }
 
     /// Responds to a master read request asynchronously.
     ///
     /// See [`Self::respond_to_read`] for the response behavior and errors.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Canceling a pending operation resets the controller and discards pending
+    /// requests. The master must retry these requests.
     pub async fn respond_to_read_async(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
         let regs = self.driver().info.regs();
         let state = self.i2c.state();
@@ -274,20 +291,27 @@ impl<'d> I2cSlave<'d, Async> {
         let mut nack_received = false;
         self.driver().start_read(buffer)?;
 
-        loop {
-            let mut events = Event::TransComplete | Event::StartDetected;
-            if !nack_received {
-                events |= Event::SlaveStretch | Event::Nack;
-            }
-            I2cSlaveFuture::new(regs, state, events).await?;
+        let cancel_on_drop = DropGuard::new(self.driver(), |driver| driver.recover());
+        let result = async {
+            loop {
+                let mut events = Event::TransComplete | Event::StartDetected;
+                if !nack_received {
+                    events |= Event::SlaveStretch | Event::Nack;
+                }
+                I2cSlaveFuture::new(regs, state, events).await?;
 
-            if let Some(status) =
-                self.driver()
-                    .respond_to_read_step(buffer, &mut bytes_written, &mut nack_received)
-            {
-                return status;
+                if let Some(status) = self.driver().respond_to_read_step(
+                    buffer,
+                    &mut bytes_written,
+                    &mut nack_received,
+                ) {
+                    return status;
+                }
             }
         }
+        .await;
+        cancel_on_drop.defuse();
+        result
     }
 }
 
