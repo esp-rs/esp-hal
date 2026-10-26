@@ -205,18 +205,38 @@ impl InterruptHandler {
 
 const STATUS_WORDS: usize = property!("interrupts.status_registers");
 
-/// The status bits that name a variant of [`Interrupt`].
-static VALID_INTERRUPTS: [AtomicU32; STATUS_WORDS] = [const { AtomicU32::new(0) }; STATUS_WORDS];
+// One crate version can enable `rt`. That version owns `ESP_HAL_VALID_INTERRUPTS`.
+cfg_select! {
+    feature = "rt" => {
+        /// The status bits that name a variant of [`Interrupt`].
+        #[unsafe(no_mangle)]
+        static ESP_HAL_VALID_INTERRUPTS: [AtomicU32; STATUS_WORDS] =
+            [const { AtomicU32::new(0) }; STATUS_WORDS];
 
-pub(crate) fn init_valid_interrupts() {
-    for (word, valid) in VALID_INTERRUPTS.iter().enumerate() {
-        let mut mask = 0;
-        for bit in 0..32 {
-            if Interrupt::try_from((word * 32 + bit) as _).is_ok() {
-                mask |= 1 << bit;
+        fn init_valid_interrupts() {
+            for (word, valid) in ESP_HAL_VALID_INTERRUPTS.iter().enumerate() {
+                let mut mask = 0;
+                for bit in 0..32 {
+                    if Interrupt::try_from((word * 32 + bit) as _).is_ok() {
+                        mask |= 1 << bit;
+                    }
+                }
+                valid.store(mask, Ordering::Relaxed);
             }
         }
-        valid.store(mask, Ordering::Relaxed);
+
+        fn valid_interrupts() -> &'static [AtomicU32; STATUS_WORDS] {
+            &ESP_HAL_VALID_INTERRUPTS
+        }
+    }
+    _ => {
+        unsafe extern "Rust" {
+            static ESP_HAL_VALID_INTERRUPTS: [AtomicU32; STATUS_WORDS];
+        }
+
+        fn valid_interrupts() -> &'static [AtomicU32; STATUS_WORDS] {
+            unsafe { &ESP_HAL_VALID_INTERRUPTS }
+        }
     }
 }
 
@@ -286,21 +306,11 @@ impl InterruptStatus {
     /// A status bit with no [`Interrupt`] variant reads as clear.
     #[instability::unstable]
     pub fn current() -> InterruptStatus {
-        #[cfg(not(feature = "rt"))]
-        {
-            static INITIALIZED: core::sync::atomic::AtomicBool =
-                core::sync::atomic::AtomicBool::new(false);
-            if !INITIALIZED.load(Ordering::Relaxed) {
-                init_valid_interrupts();
-                INITIALIZED.store(true, Ordering::Relaxed);
-            }
-        }
-
         let cpu = Cpu::current();
         InterruptStatus {
             status: core::array::from_fn(|word| {
                 Self::interrupt_status_word(cpu, word)
-                    & VALID_INTERRUPTS[word].load(Ordering::Relaxed)
+                    & valid_interrupts()[word].load(Ordering::Relaxed)
             }),
         }
     }
