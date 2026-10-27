@@ -149,7 +149,7 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(display::run(dpi).unwrap());
 
     // Audio. The audio task must keep the DMA fed while other tasks block the thread executor, for
-    // example while Wi-Fi starts or a TLS connection is set up.
+    // example while a TLS connection is set up.
     static AUDIO_EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
     let audio_spawner = AUDIO_EXECUTOR
         .init(InterruptExecutor::new(peripherals.FROM_CPU_INTR2))
@@ -166,6 +166,16 @@ async fn main(spawner: Spawner) -> ! {
         .unwrap(),
     );
 
+    // The codec needs BCLK, which the audio task provides from now on.
+    let mut i2c = I2c::new(peripherals.I2C0, i2c::master::Config::default())
+        .unwrap()
+        .with_sda(peripherals.GPIO0)
+        .with_scl(peripherals.GPIO1)
+        .into_async();
+    es8389::init(&mut i2c).await.unwrap();
+
+    spawner.spawn(touch::run(i2c).unwrap());
+
     // Wi-Fi
     let station_config = Config::Station(
         StationConfig::default()
@@ -179,17 +189,6 @@ async fn main(spawner: Spawner) -> ! {
         ControllerConfig::default().with_initial_config(station_config),
     )
     .unwrap();
-
-    // Starting Wi-Fi stops I2S for a moment, which puts the codec into analog standby. Configure
-    // the codec afterwards.
-    let mut i2c = I2c::new(peripherals.I2C0, i2c::master::Config::default())
-        .unwrap()
-        .with_sda(peripherals.GPIO0)
-        .with_scl(peripherals.GPIO1)
-        .into_async();
-    es8389::init(&mut i2c).await.unwrap();
-
-    spawner.spawn(touch::run(i2c).unwrap());
 
     let rng = Rng::new();
     let seed = u64::from(rng.random()) << 32 | u64::from(rng.random());
