@@ -41,6 +41,8 @@
 
 use crate::gpio::AnalogPin;
 
+static DAC_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+
 // Only specific pins can be used with each DAC peripheral, and of course
 // these pins are different depending on which chip you are using; for this
 // reason, we will type alias the pins for ease of use later in this module:
@@ -76,12 +78,16 @@ where
         // TODO: Revert on drop.
         pin.set_analog(crate::private::Internal);
 
-        #[cfg(esp32s2)]
-        crate::peripherals::SENS::regs()
-            .sar_dac_ctrl1()
-            .modify(|_, w| w.dac_clkgate_en().set_bit());
+        DAC_LOCK.lock(|| {
+            #[cfg(esp32s2)]
+            crate::peripherals::SENS::regs()
+                .sar_dac_ctrl1()
+                .modify(|_, w| w.dac_clkgate_en().set_bit());
 
-        T::enable_xpd();
+            crate::peripherals::RTC_IO::regs()
+                .pad_dac(T::INDEX)
+                .modify(|_, w| w.dac_xpd_force().set_bit().xpd_dac().set_bit());
+        });
 
         Self {
             _inner: dac,
@@ -94,34 +100,27 @@ where
     /// For each DAC channel, the output analog voltage can be calculated as
     /// follows: DACn_OUT = VDD3P3_RTC * PDACn_DAC/256
     pub fn write(&mut self, value: u8) {
-        T::set_pad_source();
-        T::write_byte(value);
+        DAC_LOCK.lock(|| {
+            set_pad_source(T::INDEX);
+            crate::peripherals::RTC_IO::regs()
+                .pad_dac(T::INDEX)
+                .modify(|_, w| unsafe { w.dac().bits(value) });
+        });
     }
 }
 
+// Public because it appears in the bounds of Dac.
 #[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
     const INDEX: usize;
 
     type Pin;
+}
 
-    fn enable_xpd() {
-        crate::peripherals::RTC_IO::regs()
-            .pad_dac(Self::INDEX)
-            .modify(|_, w| w.dac_xpd_force().set_bit().xpd_dac().set_bit());
-    }
-
-    fn set_pad_source() {
-        crate::peripherals::SENS::regs()
-            .sar_dac_ctrl2()
-            .modify(|_, w| w.dac_cw_en(Self::INDEX as u8).clear_bit());
-    }
-
-    fn write_byte(value: u8) {
-        crate::peripherals::RTC_IO::regs()
-            .pad_dac(Self::INDEX)
-            .modify(|_, w| unsafe { w.dac().bits(value) });
-    }
+fn set_pad_source(index: usize) {
+    crate::peripherals::SENS::regs()
+        .sar_dac_ctrl2()
+        .modify(|_, w| w.dac_cw_en(index as u8).clear_bit());
 }
 
 #[cfg(dac_dac1)]
