@@ -1,23 +1,16 @@
 //! Xtensa context switching implementation.
 //!
-//! Context switching is implemented via interrupt handlers. Servicing the interrupt request
-//! saves context to the stack. The OS copies the state to memory, replaces it with the new task's
-//! state, then returns from the interrupt handler.
-//!
-//! The HAL owns the interrupt that carries the context switch. Context switching must happen at
-//! the lowest interrupt priority. A switch then does not interfere with other interrupts, and no
-//! interrupt handler is left partially executed.
+//! The interrupt entry of esp-hal saves the context of the interrupted task as a frame on the
+//! stack of that task. The context switch handler stores the address of that frame in the task,
+//! and returns the frame of the task to resume.
 
 use core::{ffi::c_void, sync::atomic::Ordering};
 
-pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
-use esp_hal::{interrupt::__rtos_implementation::set_context_switch_handler, ram, system::Cpu};
+use esp_hal::interrupt::__rtos_implementation::TASK_FRAME_SIZE;
+pub(crate) use esp_hal::interrupt::__rtos_implementation::TaskFrame;
 use portable_atomic::AtomicPtr;
 
-use crate::{
-    SCHEDULER,
-    task::{IdleFn, Task},
-};
+use crate::task::{IdleFn, Task};
 
 static IDLE_HOOK: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 
@@ -43,18 +36,28 @@ const PS_WOE: u32 = 1 << 18;
 // CALLINC field value for call4 instruction.
 const PS_CALLINC_CALL4: u32 = 1 << 16;
 
-pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn) {
+pub(crate) fn set_idle_hook(hook_fn: IdleFn) {
     IDLE_HOOK.store(hook_fn as *mut (), Ordering::Relaxed);
+}
 
-    // Point idle context PC at the assembly that calls the idle hook. We need a new stack
-    // frame for the idle task on the main stack.
-    idle_context.PC = idle_entry as *const () as u32;
-    // Set a valid processor status value, that will not end up spilling registers into the main
-    // task's stack. Here we jump to a naked function so we can omit the CALLINC bits.
-    idle_context.PS = PS_EXCM | PS_UM | PS_WOE;
+/// Writes a frame that enters the idle hook with its stack pointer at `stack_top`, and returns
+/// the frame.
+pub(crate) fn new_idle_frame(stack_top: *mut TaskFrame) -> *mut TaskFrame {
+    let frame = stack_top.wrapping_byte_sub(TASK_FRAME_SIZE);
 
-    // The idle context has no thread-local data
-    idle_context.THREADPTR = 0;
+    let context = TaskFrame {
+        PC: idle_entry as *const () as u32,
+        A1: stack_top as u32,
+        // A valid processor status that does not spill registers above `stack_top`. `idle_entry`
+        // is naked, so the CALLINC bits can stay 0.
+        PS: PS_EXCM | PS_UM | PS_WOE,
+        // The idle context has no thread-local data.
+        THREADPTR: 0,
+        ..Default::default()
+    };
+    unsafe { frame.write(context) };
+
+    frame
 }
 
 #[inline(always)]
@@ -69,15 +72,17 @@ pub(crate) fn write_thread_pointer(task: *mut Task) {
     unsafe { core::arch::asm!("wur.threadptr {0}", in(reg) task, options(nostack)) };
 }
 
+/// Writes the first frame of a task at the top of its stack, and returns the frame.
 pub(crate) fn new_task_context(
     task_fn: extern "C" fn(*mut c_void),
     param: *mut c_void,
     stack_top: *mut (),
-) -> CpuContext {
+) -> *mut TaskFrame {
     // stack must be aligned by 16
     let stack_top = stack_top as u32;
     let stack_top = stack_top - (stack_top % 16);
 
+    // The base save area of the task entry. The frame below leaves these words alone.
     unsafe {
         *((stack_top - 4) as *mut u32) = 0;
         *((stack_top - 8) as *mut u32) = 0;
@@ -85,7 +90,8 @@ pub(crate) fn new_task_context(
         *((stack_top - 16) as *mut u32) = 0;
     }
 
-    CpuContext {
+    let frame = (stack_top as usize - TASK_FRAME_SIZE) as *mut TaskFrame;
+    let context = TaskFrame {
         PC: super::task_wrapper as *const () as u32,
         A0: 0,
         A1: stack_top,
@@ -98,29 +104,8 @@ pub(crate) fn new_task_context(
         PS: PS_EXCM | PS_UM | PS_WOE | PS_CALLINC_CALL4,
 
         ..Default::default()
-    }
-}
+    };
+    unsafe { frame.write(context) };
 
-#[inline]
-pub(crate) fn task_switch(
-    current_context: *mut CpuContext,
-    next_context: *mut CpuContext,
-    trap_frame: &mut CpuContext,
-) {
-    if !current_context.is_null() {
-        unsafe { core::ptr::copy_nonoverlapping(trap_frame, current_context, 1) };
-    }
-    unsafe { core::ptr::copy_nonoverlapping(next_context, trap_frame, 1) };
-}
-
-pub(crate) fn setup_multitasking() {
-    // The HAL runs this handler in the lowest-priority interrupt of this CPU.
-    unsafe {
-        set_context_switch_handler(Cpu::current(), trigger_task_switch);
-    }
-}
-
-#[ram]
-extern "C" fn trigger_task_switch(context: &mut CpuContext) {
-    SCHEDULER.with(|scheduler| scheduler.switch_task(context));
+    frame
 }

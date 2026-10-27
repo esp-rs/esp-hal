@@ -84,6 +84,10 @@ fn try_main() -> Result<(), Box<dyn Error>> {
     if std::env::var_os("DEP_ESP_RISCV_RT_FPU_DISABLED_IN_INTERRUPTS").is_some() {
         println!("cargo:rustc-cfg=fpu_disabled_in_interrupts");
     }
+    println!("cargo:rustc-check-cfg=cfg(float_save_restore)");
+    if std::env::var_os("DEP_ESP_RISCV_RT_FLOAT_SAVE_RESTORE").is_some() {
+        println!("cargo:rustc-cfg=float_save_restore");
+    }
 
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");

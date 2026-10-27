@@ -2,13 +2,9 @@ fn main() {
     // required for `riscv-rt-macros` to actually generate code
     println!("cargo:rustc-env=RISCV_RT_BASE_ISA=rv32i");
 
-    println!("cargo::rustc-check-cfg=cfg(riscv_has_f)");
     println!("cargo::rerun-if-changed=build.rs");
 
     let has_f = has_f_extension();
-    if has_f {
-        println!("cargo::rustc-cfg=riscv_has_f");
-    }
 
     // Crates that depend directly on `esp-riscv-rt` read these values as
     // `DEP_ESP_RISCV_RT_FLOAT_SAVE_RESTORE` and `DEP_ESP_RISCV_RT_FPU_DISABLED_IN_INTERRUPTS`.

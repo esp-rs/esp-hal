@@ -61,15 +61,15 @@ cfg_select! {
 
         pub(crate) use implem::install;
         #[cfg(riscv)]
-        pub(crate) use implem::install_app;
+        pub(crate) use implem::{install_app, machine_software_interrupt};
         use runtime::esp_hal_ipc_post;
         pub(crate) use runtime::{
+            context_switch_deferred,
             defer_context_switch,
             fail_stranded,
-            request_context_switch,
+            raise,
             reset_context_switch_deferral,
             resume_context_switch,
-            set_context_switch_handler,
         };
     }
     _ => {

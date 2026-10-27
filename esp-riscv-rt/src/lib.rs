@@ -220,131 +220,6 @@ r#"
 "#,
 }
 
-#[cfg(not(riscv_has_f))]
-macro_rules! interrupt_handler {
-    () => {
-        "handle_interrupts"
-    };
-}
-
-#[cfg(all(riscv_has_f, not(feature = "float-save-restore")))]
-macro_rules! interrupt_handler {
-    () => {
-        "handle_interrupts_disable_fpu"
-    };
-}
-
-#[cfg(all(riscv_has_f, feature = "float-save-restore"))]
-macro_rules! interrupt_handler {
-    () => {
-        "handle_interrupts_save_fpu"
-    };
-}
-
-/// Calls `handle_interrupts` and keeps `fcsr` and the caller-saved FPU registers.
-///
-/// The `riscv-rt` trap handler saves the integer registers and executes `mret`. Return to the
-/// trap handler with `ret`. Keep `sp` 16-byte aligned.
-#[cfg(all(riscv_has_f, feature = "float-save-restore"))]
-#[unsafe(naked)]
-#[unsafe(no_mangle)]
-#[unsafe(link_section = ".trap.start")]
-extern "C" fn handle_interrupts_save_fpu() {
-    core::arch::naked_asm! {
-        "
-        .option push
-        .option arch, +f
-        addi sp, sp, -96
-        sw ra, 0(sp)
-        frcsr t0
-        sw t0, 4(sp)
-
-        fsw ft0, 8(sp)
-        fsw ft1, 12(sp)
-        fsw ft2, 16(sp)
-        fsw ft3, 20(sp)
-        fsw ft4, 24(sp)
-        fsw ft5, 28(sp)
-        fsw ft6, 32(sp)
-        fsw ft7, 36(sp)
-        fsw ft8, 40(sp)
-        fsw ft9, 44(sp)
-        fsw ft10, 48(sp)
-        fsw ft11, 52(sp)
-        fsw fa0, 56(sp)
-        fsw fa1, 60(sp)
-        fsw fa2, 64(sp)
-        fsw fa3, 68(sp)
-        fsw fa4, 72(sp)
-        fsw fa5, 76(sp)
-        fsw fa6, 80(sp)
-        fsw fa7, 84(sp)
-
-        jal ra, handle_interrupts
-
-        flw ft0, 8(sp)
-        flw ft1, 12(sp)
-        flw ft2, 16(sp)
-        flw ft3, 20(sp)
-        flw ft4, 24(sp)
-        flw ft5, 28(sp)
-        flw ft6, 32(sp)
-        flw ft7, 36(sp)
-        flw ft8, 40(sp)
-        flw ft9, 44(sp)
-        flw ft10, 48(sp)
-        flw ft11, 52(sp)
-        flw fa0, 56(sp)
-        flw fa1, 60(sp)
-        flw fa2, 64(sp)
-        flw fa3, 68(sp)
-        flw fa4, 72(sp)
-        flw fa5, 76(sp)
-        flw fa6, 80(sp)
-        flw fa7, 84(sp)
-
-        lw t0, 4(sp)
-        fscsr t0
-        lw ra, 0(sp)
-        addi sp, sp, 96
-        ret
-        .option pop
-        "
-    }
-}
-
-/// Calls `handle_interrupts` with `mstatus.FS` set to Off.
-///
-/// An FPU instruction in an interrupt handler then causes an illegal instruction exception. The
-/// hardware does not change `mstatus.FS` on a trap or on `mret`, so this routine restores the
-/// previous value.
-#[cfg(all(riscv_has_f, not(feature = "float-save-restore")))]
-#[unsafe(naked)]
-#[unsafe(no_mangle)]
-#[unsafe(link_section = ".trap.start")]
-extern "C" fn handle_interrupts_disable_fpu() {
-    core::arch::naked_asm! {
-        "
-        addi sp, sp, -16
-        sw ra, 0(sp)
-        li t0, 0x6000
-        csrrc t0, mstatus, t0
-        sw t0, 4(sp)
-
-        jal ra, handle_interrupts
-
-        li t1, 0x6000
-        csrc mstatus, t1
-        lw t0, 4(sp)
-        and t0, t0, t1
-        csrs mstatus, t0
-        lw ra, 0(sp)
-        addi sp, sp, 16
-        ret
-        "
-    }
-}
-
 macro_rules! define_interrupt {
     ($num:literal, $name:ident, $fname:ident) => {
         #[derive(Copy, Clone)]
@@ -372,7 +247,7 @@ macro_rules! define_interrupt {
                 concat!(
                 "
                 li a0,",$num,"
-                j ", interrupt_handler!(), "
+                j handle_interrupts
                 "
                 )
             }
