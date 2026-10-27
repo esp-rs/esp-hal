@@ -41,13 +41,11 @@ fn _async_driver_is_compatible_with_blocking_ehal() {
     fn _with_ehal(_: impl embedded_hal::i2c::I2c) {}
 }
 
-// Daniel's test device:
-// const DUT_ADDRESS: u8 = 0x29;
-// const READ_DATA_COMMAND: &[u8] = &[0, 0];
-
-// HIL test device:
-const DUT_ADDRESS: u8 = 0x77;
-const READ_DATA_COMMAND: &[u8] = &[0xaa];
+// HIL test device (MCP4725):
+const DUT_ADDRESS: u8 = 0x60;
+// Fast-mode write setting DAC code 0x800 (2048). On readback, bytes 1 and 2 carry
+// D11:D4 = 0x80 and D3:D0 << 4 = 0x00.
+const WRITE_COMMAND: &[u8] = &[0x08, 0x00];
 
 const NON_EXISTENT_ADDRESS: u8 = 0x6b;
 
@@ -137,8 +135,8 @@ mod tests {
     }
 
     #[test]
-    fn test_read_cali(mut ctx: Context) {
-        let mut read_data = [0u8; 22];
+    fn test_read(mut ctx: Context) {
+        let mut read_data = [0u8; 5];
 
         // have a failing read which might could leave the peripheral in an undesirable
         // state
@@ -148,28 +146,30 @@ mod tests {
 
         // do the real read which should succeed
         ctx.i2c
-            .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+            .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .unwrap();
 
-        assert_ne!(read_data, [0u8; 22])
+        assert_ne!(read_data, [0u8; 5]);
+        assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
     #[test]
-    fn test_read_cali_with_transactions(mut ctx: Context) {
-        let mut read_data = [0u8; 22];
+    fn test_read_with_transactions(mut ctx: Context) {
+        let mut read_data = [0u8; 5];
 
         // do the real read which should succeed
         ctx.i2c
             .transaction(
                 DUT_ADDRESS,
                 &mut [
-                    Operation::Write(READ_DATA_COMMAND),
+                    Operation::Write(WRITE_COMMAND),
                     Operation::Read(&mut read_data),
                 ],
             )
             .unwrap();
 
-        assert_ne!(read_data, [0u8; 22])
+        assert_ne!(read_data, [0u8; 5]);
+        assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
     #[test]
@@ -191,9 +191,9 @@ mod tests {
     }
 
     #[test]
-    async fn async_test_read_cali(ctx: Context) {
+    async fn async_test_read(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
-        let mut read_data = [0u8; 22];
+        let mut read_data = [0u8; 5];
 
         // have a failing read which might could leave the peripheral in an undesirable
         // state
@@ -202,30 +202,32 @@ mod tests {
             .expect_err("Expected error for non-existent address");
 
         // do the real read which should succeed
-        i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+        i2c.write_read_async(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .await
             .unwrap();
 
-        assert_ne!(read_data, [0u8; 22])
+        assert_ne!(read_data, [0u8; 5]);
+        assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
     #[test]
-    async fn async_test_read_cali_with_transactions(ctx: Context) {
+    async fn async_test_read_with_transactions(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
-        let mut read_data = [0u8; 22];
+        let mut read_data = [0u8; 5];
 
         // do the real read which should succeed
         i2c.transaction_async(
             DUT_ADDRESS,
             &mut [
-                Operation::Write(READ_DATA_COMMAND),
+                Operation::Write(WRITE_COMMAND),
                 Operation::Read(&mut read_data),
             ],
         )
         .await
         .unwrap();
 
-        assert_ne!(read_data, [0u8; 22])
+        assert_ne!(read_data, [0u8; 5]);
+        assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
     #[test]
@@ -243,7 +245,7 @@ mod tests {
                 i2c.transaction_async(
                     DUT_ADDRESS,
                     &mut [
-                        Operation::Write(READ_DATA_COMMAND),
+                        Operation::Write(WRITE_COMMAND),
                         Operation::Read(&mut read_data),
                     ],
                 ),
@@ -270,24 +272,25 @@ mod tests {
 
             defmt::info!("Transaction cancelled");
 
-            // Ping the sensor to ensure we don't randomly get an address failure in the next
+            // Ping the device to ensure we don't randomly get an address failure in the next
             // iteration.
             _ = i2c.write_async(DUT_ADDRESS, &[]).await;
         }
 
-        let mut read_data = [0u8; 22];
+        let mut read_data = [0u8; 5];
         // do the real read which should succeed
         i2c.transaction_async(
             DUT_ADDRESS,
             &mut [
-                Operation::Write(READ_DATA_COMMAND),
+                Operation::Write(WRITE_COMMAND),
                 Operation::Read(&mut read_data),
             ],
         )
         .await
         .unwrap();
 
-        assert_ne!(read_data, [0u8; 22])
+        assert_ne!(read_data, [0u8; 5]);
+        assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
     #[test]
@@ -302,9 +305,9 @@ mod tests {
 
         pull_scl_low();
 
-        let mut read_data = [0u8; 22];
+        let mut read_data = [0u8; 5];
         // will run into an error but it should return at least
-        i2c.write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+        i2c.write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .expect_err("Expected timeout error");
     }
 
@@ -321,9 +324,9 @@ mod tests {
 
         pull_scl_low();
 
-        let mut read_data = [0u8; 22];
+        let mut read_data = [0u8; 5];
         // will run into an error but it should return at least
-        i2c.write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+        i2c.write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .expect_err("Expected timeout error");
     }
 
@@ -339,9 +342,9 @@ mod tests {
 
         pull_scl_low();
 
-        let mut read_data = [0u8; 22];
+        let mut read_data = [0u8; 5];
         // will run into an error but it should return at least
-        i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+        i2c.write_read_async(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .await
             .expect_err("Expected timeout error");
     }
@@ -358,9 +361,9 @@ mod tests {
 
         let mut ticker = Ticker::every(Duration::from_millis(10));
         for i in 0..100 {
-            let mut read_data = [0u8; 22];
+            let mut read_data = [0u8; 5];
             let result = embassy_futures::join::join(
-                i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data),
+                i2c.write_read_async(DUT_ADDRESS, WRITE_COMMAND, &mut read_data),
                 async {
                     for _ in 0..4 {
                         spawner.spawn(waiting_blocking_task().unwrap());
@@ -383,7 +386,7 @@ mod tests {
     #[test]
     // Only APB is supported on v1, so skip the test for that version.
     #[cfg(not(i2c_master_version = "1"))]
-    fn test_read_cali_with_different_clock_sources(mut ctx: Context) {
+    fn test_read_with_different_clock_sources(mut ctx: Context) {
         use esp_hal::i2c::master::ClockSource;
 
         let configs = cfg_select! {
@@ -398,12 +401,13 @@ mod tests {
                 .apply_config(&Config::default().with_clock_source(clock_source))
                 .unwrap_or_else(|e| panic!("{:?}: failed to apply {:?}", e, clock_source));
 
-            let mut read_data = [0u8; 22];
+            let mut read_data = [0u8; 5];
             ctx.i2c
-                .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+                .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
                 .unwrap_or_else(|e| panic!("{:?}: failed to read with {:?}", e, clock_source));
 
-            assert_ne!(read_data, [0u8; 22]);
+            assert_ne!(read_data, [0u8; 5]);
+            assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
         }
     }
 
@@ -430,11 +434,12 @@ mod tests {
         ctx.i2c.force_scl_low(false);
         ctx.i2c.apply_config(&Config::default()).unwrap();
 
-        let mut read_data = [0u8; 22];
+        let mut read_data = [0u8; 5];
         ctx.i2c
-            .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+            .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .expect("bus should work normally after releasing SCL");
-        assert_ne!(read_data, [0u8; 22]);
+        assert_ne!(read_data, [0u8; 5]);
+        assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
     // Verify that `force_sda_low(true)` drives SDA low and that
@@ -450,14 +455,12 @@ mod tests {
             .unwrap();
 
         ctx.i2c.force_sda_low(true);
-        let mut data = [0xFFu8; 22];
-        let result = ctx
-            .i2c
-            .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut data);
+        let mut data = [0xFFu8; 5];
+        let result = ctx.i2c.write_read(DUT_ADDRESS, WRITE_COMMAND, &mut data);
         // force_sda_low must have observable effect: either the
         // transaction failed, or it "succeeded" but with all-zero data.
         assert!(
-            result.is_err() || data == [0u8; 22],
+            result.is_err() || data == [0u8; 5],
             "force_sda_low had no observable effect: got Ok with non-zero data {:?}",
             data
         );
@@ -465,16 +468,17 @@ mod tests {
         ctx.i2c.force_sda_low(false);
         ctx.i2c.apply_config(&Config::default()).unwrap();
 
-        let mut read_data = [0u8; 22];
+        let mut read_data = [0u8; 5];
         ctx.i2c
-            .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+            .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .expect("bus should work normally after releasing SDA");
-        assert_ne!(read_data, [0u8; 22]);
+        assert_ne!(read_data, [0u8; 5]);
+        assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
     #[test]
     #[cfg(lp_i2c_master_driver_supported)]
-    fn test_read_cali_with_lp_i2c() {
+    fn test_read_with_lp_i2c() {
         use esp_hal::i2c::lp_i2c::{Config, LpI2c};
 
         let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
@@ -491,11 +495,13 @@ mod tests {
 
         let mut i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
 
-        let mut data = [0; 22];
-
-        i2c.read(DUT_ADDRESS, READ_DATA_COMMAND[0], &mut data)
+        // Fast-mode write of DAC code 0x800: register = 0x08, data = [0x00].
+        i2c.write(DUT_ADDRESS, WRITE_COMMAND[0], &WRITE_COMMAND[1..])
             .unwrap();
 
-        assert_ne!(data, [0u8; 22]);
+        let mut data = [0; 5];
+        i2c.read(DUT_ADDRESS, WRITE_COMMAND[0], &mut data).unwrap();
+
+        assert_ne!(data, [0u8; 5]);
     }
 }

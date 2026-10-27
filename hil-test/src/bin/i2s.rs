@@ -42,7 +42,7 @@ macro_rules! i2s_instance_resources {
         // with the common test pin, so just use a fixed GPIO pin which is not used for anything
         // else in this test on that chip in the hope it will fix it
         #[cfg(esp32c5)]
-        let dout = peripherals.GPIO6;
+        let dout = peripherals.GPIO7;
 
         let dout = dout.degrade();
         (i2s, dma_channel, dout)
@@ -1359,11 +1359,12 @@ macro_rules! pdm_instance_resources {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        let (clk, dout) = hil_test::common_test_pins!(peripherals);
         (
             peripherals.$i2s,
             pdm_test_dma_channel!(peripherals, $i2s),
-            peripherals.GPIO1,
-            peripherals.GPIO2,
+            clk,
+            dout,
         )
     }};
 }
