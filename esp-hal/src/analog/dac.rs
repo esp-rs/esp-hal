@@ -84,6 +84,8 @@ where
                 .sar_dac_ctrl1()
                 .modify(|_, w| w.dac_clkgate_en().set_bit());
 
+            select_direct_source(T::INDEX);
+
             crate::peripherals::RTC_IO::regs()
                 .pad_dac(T::INDEX)
                 .modify(|_, w| w.dac_xpd_force().set_bit().xpd_dac().set_bit());
@@ -101,7 +103,7 @@ where
     /// follows: DACn_OUT = VDD3P3_RTC * PDACn_DAC/256
     pub fn write(&mut self, value: u8) {
         DAC_LOCK.lock(|| {
-            set_pad_source(T::INDEX);
+            select_direct_source(T::INDEX);
             crate::peripherals::RTC_IO::regs()
                 .pad_dac(T::INDEX)
                 .modify(|_, w| unsafe { w.dac().bits(value) });
@@ -117,10 +119,19 @@ pub trait Instance: crate::private::Sealed {
     type Pin;
 }
 
-fn set_pad_source(index: usize) {
+fn select_direct_source(index: usize) {
+    // Select the channel source before releasing the shared DMA override.
+    // https://github.com/espressif/esp-idf/blob/4d80c1b29aeabc8e735ffc6e1be9bb23e95d1d5d/components/esp_hal_ana_conv/esp32s2/include/hal/dac_ll.h#L66-L81
     crate::peripherals::SENS::regs()
         .sar_dac_ctrl2()
         .modify(|_, w| w.dac_cw_en(index as u8).clear_bit());
+    crate::peripherals::SENS::regs()
+        .sar_dac_ctrl1()
+        .modify(|_, w| w.dac_dig_force().clear_bit());
+    #[cfg(esp32s2)]
+    crate::peripherals::APB_SARADC::regs()
+        .apb_dac_ctrl()
+        .modify(|_, w| w.trans().clear_bit());
 }
 
 #[cfg(dac_dac1)]
