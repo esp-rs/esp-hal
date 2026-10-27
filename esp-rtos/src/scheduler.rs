@@ -15,16 +15,16 @@ use crate::TraceEvents;
 #[cfg(feature = "embassy")]
 use crate::timer::embassy::TimerQueue;
 use crate::{
-    run_queue::{Priority, RunQueue, RunSchedulerOn},
+    run_queue::{Priority, RunQueue},
     task::{
         self,
         ContextExt,
-        CpuContext,
         IdleFn,
         Task,
         TaskAllocListElement,
         TaskDeleteListElement,
         TaskExt,
+        TaskFrame,
         TaskList,
         TaskListItem,
         TaskPtr,
@@ -87,8 +87,6 @@ pub(crate) struct SchedulerState {
 }
 
 pub(crate) struct CpuState {
-    idle_context: CpuContext,
-
     /// A pointer to the current task.
     ///
     /// While the task pointer is available through the thread pointer register,
@@ -115,7 +113,6 @@ pub(crate) struct CpuState {
 impl CpuState {
     const fn new() -> Self {
         Self {
-            idle_context: CpuContext::new(),
             to_delete: TaskList::new(),
             idle: false,
 
@@ -123,7 +120,7 @@ impl CpuState {
             current_task: core::ptr::null_mut(),
 
             main_task: Task {
-                cpu_context: CpuContext::new(),
+                saved_sp: core::ptr::null_mut(),
                 thread_local: ThreadLocalData::new(),
                 name: None,
                 state: TaskState::Ready,
@@ -194,9 +191,7 @@ impl SchedulerState {
         );
         self.time_driver = Some(time_driver);
         self.active_cores = ActiveCores::Single(Cpu::current());
-        for per_cpu in &mut self.per_cpu {
-            task::set_idle_hook_entry(&mut per_cpu.idle_context, idle_hook);
-        }
+        task::set_idle_hook(idle_hook);
     }
 
     /// Adds a task to the scheduler.
@@ -213,12 +208,8 @@ impl SchedulerState {
             );
         }
 
-        unsafe {
-            task_ptr
-                .as_mut()
-                .cpu_context
-                .set_tp(task_ptr.as_ptr() as u32)
-        };
+        // The task learns its address only here, so its first frame gets the thread pointer now.
+        unsafe { (*task_ptr.as_mut().saved_sp).set_tp(task_ptr.as_ptr() as u32) };
 
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::task_new(task_ptr.rtos_trace_id());
@@ -232,58 +223,33 @@ impl SchedulerState {
         debug!("Task created: {:?}", task_ptr);
     }
 
-    /// Deletes the tasks marked for deletion on `cpu`, except the one that owns `current_sp`.
+    /// Deletes the tasks marked for deletion on `cpu`.
     ///
-    /// A task that deletes itself keeps running on its own stack until the scheduler switches away
-    /// from it. Freeing that stack here would hand it back to the allocator while this CPU still
-    /// writes to it, and the other core could hand it out again. Such a task stays in the list,
-    /// and this function requests another scheduler run, which deletes the task once this CPU runs
-    /// on a different stack. Without that request the task could stay in the list forever, because
-    /// a CPU that has nothing else to run goes idle.
-    ///
-    /// Only the task the CPU currently runs on can be deferred, so the list holds at most one task
-    /// after this function returns.
+    /// The scheduler runs on the interrupt stack, and calls this function after it selected the
+    /// next context. This CPU does not use the stack of a deleted task again, so the task can be
+    /// freed, even if it deleted itself.
     #[cold]
     #[inline(never)]
-    fn delete_marked_tasks(&mut self, cpu: Cpu, current_sp: usize) {
-        let mut in_use = None;
-
+    fn delete_marked_tasks(&mut self, cpu: Cpu) {
         while let Some(task_ptr) = self.per_cpu[cpu as usize].to_delete.pop() {
             assert!(task_ptr.state() == TaskState::Deleted);
-
-            if unsafe { task_ptr.as_ref() }.owns_stack_pointer(current_sp) {
-                trace!("delete_marked_tasks {:?} is still in use", task_ptr);
-                in_use = Some(task_ptr);
-                continue;
-            }
 
             trace!("delete_marked_tasks {:?}", task_ptr);
             self.delete_task(task_ptr);
         }
-
-        if let Some(task_ptr) = in_use {
-            self.per_cpu[cpu as usize].to_delete.push(task_ptr);
-            task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
-        }
     }
 
-    /// Selects the next task of this CPU, and switches to it.
+    /// Selects the next context of this CPU.
     ///
-    /// `current_sp` is a stack pointer in the stack of the interrupted context.
-    fn run_scheduler(
-        &mut self,
-        current_sp: usize,
-        task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext),
-    ) {
+    /// `saved` is the frame of the interrupted context, on its stack. Returns the frame of the
+    /// context to resume.
+    fn run_scheduler(&mut self, saved: *mut TaskFrame) -> *mut TaskFrame {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_begin(TraceEvents::RunSchedule as u32);
 
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
-
-        if !self.per_cpu[cpu as usize].to_delete.is_empty() {
-            self.delete_marked_tasks(cpu, current_sp);
-        }
+        let current_sp = saved.addr();
 
         let current_task = NonNull::new(read_thread_pointer());
 
@@ -318,6 +284,7 @@ impl SchedulerState {
         }
 
         let mut arm_next_timeslice_tick = false;
+        let mut resume = saved;
 
         #[cfg(multi_core)]
         let other_core_task = self.per_cpu[1 - current_cpu].current_task;
@@ -329,15 +296,13 @@ impl SchedulerState {
         if next_task != current_task || deleted_self {
             debug!("Switching task {:?} -> {:?}", current_task, next_task);
 
-            // If the current task is deleted, we can skip saving its context. We signal this by
-            // using a null pointer.
-            let current_context = if let Some(current) = current_task {
+            // A task that deleted itself is not resumed, so its context is not saved.
+            if let Some(mut current) = current_task {
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::task_exec_end(); // FIXME: rtos-trace should take the task ID for multi-core
 
-                // TODO: the SMP scheduler relies on at least the context saving to happen within
-                // the scheduler's critical section. We can't run the scheduler on the other core
-                // while it might try to restore a partially saved context.
+                unsafe { current.as_mut().saved_sp = saved };
+
                 #[cfg(multi_core)]
                 let current_ref = unsafe { current.as_ref() };
                 // The other core can only pick up the task we switch away from if it runs the
@@ -349,13 +314,9 @@ impl SchedulerState {
                 {
                     task::schedule_other_core();
                 }
+            }
 
-                unsafe { &raw mut (*current.as_ptr()).cpu_context }
-            } else {
-                core::ptr::null_mut()
-            };
-
-            let next_context = if let Some(next) = next_task {
+            resume = if let Some(next) = next_task {
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::task_exec_begin(next.rtos_trace_id());
 
@@ -366,43 +327,32 @@ impl SchedulerState {
                 let new_core_priority = next.priority(&mut self.run_queue);
                 arm_next_timeslice_tick = !self.run_queue.is_level_empty(new_core_priority);
 
-                unsafe { &raw mut (*next.as_ptr()).cpu_context }
+                unsafe { next.as_ref().saved_sp }
             } else {
-                // If there is no next task, set up and return to the idle hook.
-                // Reuse the stack frame of the main task. Note that this requires the main task to
-                // be pinned to the current CPU. If we're switching out the main task, however, we
-                // can't rely on its saved context - use the current stack pointer which will still
-                // point to the right stack, just to another place we can use within it.
-                let idle_sp = if current_context
-                    == &raw mut self.per_cpu[current_cpu].main_task.cpu_context
-                {
-                    // We're using the current task's stack, for which the watchpoint is already set
-                    // up.
-                    current_sp as u32
-                } else {
-                    // We're using the main task's stack.
-                    self.per_cpu[current_cpu]
-                        .main_task
-                        .set_up_stack_watchpoint();
-
-                    self.per_cpu[current_cpu].main_task.cpu_context.sp()
-                };
-
-                self.per_cpu[current_cpu].idle_context.set_sp(idle_sp);
+                // If there is no next task, run the idle hook on the stack of the main task, below
+                // its saved context. The main task is pinned to this CPU, and does not run, so its
+                // saved context stays where it is.
+                let main_task = &self.per_cpu[current_cpu].main_task;
+                debug_assert!(!main_task.saved_sp.is_null());
+                main_task.set_up_stack_watchpoint();
 
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::system_idle();
 
-                &raw mut self.per_cpu[current_cpu].idle_context
+                task::new_idle_frame(main_task.saved_sp)
             };
 
-            self.per_cpu[current_cpu].idle = next_task.is_none();
+            trace!("Task switch: {:x} -> {:x}", saved as usize, resume as usize);
 
-            task_switch(current_context, next_context);
+            self.per_cpu[current_cpu].idle = next_task.is_none();
 
             // If we went to idle, this will be None and we won't mess up the main task's stack.
             #[cfg(multi_core)]
             self.set_current_task(cpu, next_task);
+        }
+
+        if !self.per_cpu[current_cpu].to_delete.is_empty() {
+            self.delete_marked_tasks(cpu);
         }
 
         let time_driver = unwrap!(self.time_driver.as_mut());
@@ -412,32 +362,17 @@ impl SchedulerState {
 
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_end(TraceEvents::RunSchedule as u32);
+
+        resume
     }
 
-    pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
-        // On Xtensa, the handler runs on the interrupt stack of esp-hal. The trap frame is on the
-        // interrupted stack.
-        let current_sp: usize = cfg_select! {
-            xtensa => core::ptr::from_mut(trap_frame).addr(),
-            _ => {{
-                let sp: usize;
-                unsafe { core::arch::asm!("mv {0}, sp", out(reg) sp) };
-                sp
-            }}
-        };
-
-        self.run_scheduler(current_sp, |current_context, next_context| {
-            trace!(
-                "Task switch: {:x} -> {:x}",
-                current_context as usize, next_context as usize
-            );
-            task::task_switch(
-                current_context,
-                next_context,
-                #[cfg(xtensa)]
-                trap_frame,
-            )
-        });
+    /// Runs the scheduler of this CPU on its interrupt stack.
+    ///
+    /// `saved` is the complete frame of the interrupted context. Returns the frame of the context
+    /// to resume. After this function returns, the CPU reads only that frame, which no other CPU
+    /// resumes, so the lock can be released before.
+    pub(crate) fn switch_task(&mut self, saved: *mut TaskFrame) -> *mut TaskFrame {
+        self.run_scheduler(saved)
     }
 
     /// Returns whether `task` is the main task of any CPU.
@@ -528,11 +463,8 @@ impl SchedulerState {
 
     fn delete_task(&mut self, to_delete: TaskPtr) {
         unsafe {
-            let saved_sp = cfg_select! {
-                xtensa => to_delete.as_ref().cpu_context.A1 as usize,
-                _ => to_delete.as_ref().cpu_context.sp,
-            };
-            to_delete.as_ref().ensure_no_stack_overflow(saved_sp)
+            let task = to_delete.as_ref();
+            task.ensure_no_stack_overflow(task.saved_sp.addr())
         };
 
         debug!("Dropping task: {:x}", to_delete.as_ptr() as usize);

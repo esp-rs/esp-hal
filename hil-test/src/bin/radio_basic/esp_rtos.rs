@@ -792,6 +792,216 @@ mod tests {
         }
     }
 
+    /// Counts and yields forever. `context` points to the `AtomicUsize` to increment.
+    #[cfg(multi_core)]
+    extern "C" fn count_and_yield(context: *mut c_void) {
+        let counter = unsafe { &*(context as *const AtomicUsize) };
+        loop {
+            counter.fetch_add(1, Ordering::Relaxed);
+            preempt::yield_task();
+        }
+    }
+
+    #[test]
+    #[timeout(10)]
+    #[cfg(multi_core)]
+    fn unpinned_tasks_survive_migration(ctx: Context) {
+        // Unpinned tasks that yield in a loop move between the cores. A periodic high-priority
+        // interrupt delays core 0 at random points. Thus, core 1 can take a task that core 0
+        // switches away from.
+        use esp_hal::{Blocking, handler, peripherals::TIMG1, timer::PeriodicTimer};
+        use esp_sync::NonReentrantMutex;
+
+        const TASKS: usize = 3;
+        static COUNTERS: [AtomicUsize; TASKS] = [const { AtomicUsize::new(0) }; TASKS];
+        static TIMER: NonReentrantMutex<Option<PeriodicTimer<'static, Blocking>>> =
+            NonReentrantMutex::new(None);
+
+        #[handler(priority = Priority::Priority3)]
+        fn keep_core_busy() {
+            TIMER.with(|timer| {
+                if let Some(timer) = timer {
+                    timer.clear_interrupt();
+                }
+            });
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(100) {}
+        }
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        // The main task must preempt the counting tasks to check the result.
+        CurrentThreadHandle::get().set_priority(5);
+
+        let timg1 = TimerGroup::new(unsafe { TIMG1::steal() });
+        let mut timer = PeriodicTimer::new(timg1.timer0);
+        timer.set_interrupt_handler(keep_core_busy);
+        timer.listen();
+        timer.start(Duration::from_millis(1)).unwrap();
+        TIMER.with(|slot| *slot = Some(timer));
+
+        for counter in &COUNTERS {
+            unsafe {
+                preempt::task_create(
+                    "counter",
+                    count_and_yield,
+                    (&raw const *counter).cast::<c_void>().cast_mut(),
+                    1,
+                    None,
+                    4096,
+                );
+            }
+        }
+
+        let started = COUNTERS
+            .each_ref()
+            .map(|counter| counter.load(Ordering::Relaxed));
+        CurrentThreadHandle::get().delay(Duration::from_secs(3));
+
+        TIMER.with(|slot| {
+            if let Some(timer) = slot {
+                timer.unlisten();
+            }
+        });
+
+        for (index, counter) in COUNTERS.iter().enumerate() {
+            hil_test::assert!(
+                counter.load(Ordering::Relaxed) > started[index],
+                "Counting task {} stopped running",
+                index
+            );
+        }
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
+    #[test]
+    #[timeout(10)]
+    #[cfg(multi_core)]
+    fn deleting_migrating_tasks_keeps_other_tasks_alive(ctx: Context) {
+        // Core 0 deletes unpinned tasks while they move between the cores. The scheduler must not
+        // free a task while core 1 switches away from it, because a new task can then reuse the
+        // stack that core 1 uses.
+        static SURVIVOR: AtomicUsize = AtomicUsize::new(0);
+        static VICTIMS: AtomicUsize = AtomicUsize::new(0);
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        // The spinning tasks must not starve the main task.
+        CurrentThreadHandle::get().set_priority(5);
+
+        unsafe {
+            preempt::task_create(
+                "survivor",
+                count_and_yield,
+                (&raw const SURVIVOR).cast::<c_void>().cast_mut(),
+                1,
+                None,
+                4096,
+            );
+        }
+
+        for _ in 0..200 {
+            let victim = unsafe {
+                preempt::task_create(
+                    "victim",
+                    count_and_yield,
+                    (&raw const VICTIMS).cast::<c_void>().cast_mut(),
+                    1,
+                    None,
+                    4096,
+                )
+            };
+            CurrentThreadHandle::get().delay(Duration::from_millis(1));
+            unsafe { preempt::schedule_task_deletion(Some(victim)) };
+        }
+
+        let before = SURVIVOR.load(Ordering::Relaxed);
+        CurrentThreadHandle::get().delay(Duration::from_millis(10));
+        hil_test::assert!(
+            SURVIVOR.load(Ordering::Relaxed) > before,
+            "The surviving task stopped running"
+        );
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
+    #[test]
+    #[timeout(10)]
+    #[cfg(multi_core)]
+    fn tasks_delete_themselves_on_both_cores(ctx: Context) {
+        // The scheduler frees a task that deleted itself in the same run that switches away from
+        // it. Each round starts one such task on each core.
+        const ROUNDS: usize = 100;
+        static DELETED: AtomicUsize = AtomicUsize::new(0);
+
+        extern "C" fn delete_self(_context: *mut c_void) {
+            DELETED.fetch_add(1, Ordering::Relaxed);
+            unsafe { preempt::schedule_task_deletion(None) };
+
+            unreachable!("A deleted task must not run again");
+        }
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        for round in 1..=ROUNDS {
+            for core in [0, 1] {
+                unsafe {
+                    preempt::task_create(
+                        "delete_self",
+                        delete_self,
+                        core::ptr::null_mut(),
+                        1,
+                        Some(core),
+                        4096,
+                    );
+                }
+            }
+
+            let start = Instant::now();
+            while DELETED.load(Ordering::Relaxed) < 2 * round {
+                hil_test::assert!(
+                    start.elapsed() < Duration::from_millis(100),
+                    "A task did not run in round {}",
+                    round
+                );
+                CurrentThreadHandle::get().delay(Duration::from_millis(1));
+            }
+        }
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
     #[test]
     #[cfg(multi_core)]
     async fn embassy_cross_core(ctx: Context) {
