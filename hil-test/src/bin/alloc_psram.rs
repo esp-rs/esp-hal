@@ -221,6 +221,125 @@ mod multi_core_tests {
     }
 }
 
+#[cfg(all(multi_core, dma_can_access_psram))]
+#[embedded_test::tests(default_timeout = 30)]
+mod multi_core_cache_tests {
+    use core::{
+        ptr,
+        sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    };
+
+    use allocator_api2::{boxed::Box, vec::Vec};
+    use esp_alloc::ExternalMemory;
+    use esp_hal::{
+        clock::CpuClock,
+        dma::aligned::DmaAlignedMut,
+        peripherals::CPU_CTRL,
+        system::{CpuControl, Stack},
+        time::{Duration, Instant},
+    };
+    use hil_test::mk_static;
+
+    /// The largest PSRAM cache line size of the supported chips.
+    #[derive(Clone, Copy)]
+    #[repr(C, align(128))]
+    struct PsramLine([u32; 32]);
+
+    #[init]
+    fn init() -> CPU_CTRL<'static> {
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let p = esp_hal::init(config);
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+
+        p.CPU_CTRL
+    }
+
+    /// The other core writes back a large PSRAM buffer in a loop. This core writes `line`, then
+    /// writes back, invalidates and reads `line`. A lost write-back makes the read return old data.
+    fn writeback_is_not_lost_during_other_core_writeback(
+        cpu_ctrl: CPU_CTRL<'static>,
+        mut line: DmaAlignedMut<'static, [u32]>,
+    ) {
+        const BIG_LINES: usize = 1024 * 1024 / size_of::<PsramLine>();
+        static STOP: AtomicBool = AtomicBool::new(false);
+        static STOPPED: AtomicBool = AtomicBool::new(false);
+        static ROUNDS: AtomicU32 = AtomicU32::new(0);
+
+        let mut big = Vec::with_capacity_in(BIG_LINES, ExternalMemory);
+        big.resize(BIG_LINES, PsramLine([0; 32]));
+        let mut big = DmaAlignedMut::new(Box::leak(big.into_boxed_slice())).unwrap();
+
+        let mut cpu_control = CpuControl::new(cpu_ctrl);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        // Dropping the guard parks the other core. Stop the loop first, so that the other core
+        // does not stop in a cache operation.
+        let _guard = cpu_control
+            .start_app_core(stack, move || {
+                let mut round = 0u32;
+                while !STOP.load(Ordering::Acquire) {
+                    round = round.wrapping_add(1);
+                    for big_line in big.iter_mut() {
+                        unsafe { ptr::write_volatile(&mut big_line.0[0], round) };
+                    }
+                    big.writeback();
+                    ROUNDS.store(round, Ordering::Release);
+                }
+                STOPPED.store(true, Ordering::Release);
+                loop {}
+            })
+            .unwrap();
+
+        while ROUNDS.load(Ordering::Acquire) == 0 {}
+
+        let mut value = 0u32;
+        let mut lost = 0u32;
+        let end = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < end {
+            value = value.wrapping_add(1);
+            for word in line.iter_mut() {
+                unsafe { ptr::write_volatile(word, value) };
+            }
+            line.writeback();
+            line.invalidate();
+            if line
+                .iter()
+                .any(|word| unsafe { ptr::read_volatile(word) } != value)
+            {
+                lost += 1;
+            }
+        }
+
+        STOP.store(true, Ordering::Release);
+        while !STOPPED.load(Ordering::Acquire) {}
+
+        defmt::info!(
+            "{} of {} write-backs lost, {} rounds on the other core",
+            lost,
+            value,
+            ROUNDS.load(Ordering::Relaxed)
+        );
+        hil_test::assert_eq!(lost, 0);
+    }
+
+    #[test]
+    fn psram_writeback_is_not_lost_during_other_core_writeback(cpu_ctrl: CPU_CTRL<'static>) {
+        let line = Box::leak(Box::new_in(PsramLine([0; 32]), ExternalMemory));
+        let line = DmaAlignedMut::new(&mut line.0).unwrap().unsize();
+
+        writeback_is_not_lost_during_other_core_writeback(cpu_ctrl, line);
+    }
+
+    #[test]
+    #[cfg(soc_internal_memory_cached)]
+    fn internal_writeback_is_not_lost_during_other_core_writeback(cpu_ctrl: CPU_CTRL<'static>) {
+        use esp_hal::dma::aligned::InternalMemory;
+
+        let line = mk_static!(InternalMemory<[u32; 16]>, InternalMemory::new([0; 16]));
+
+        writeback_is_not_lost_during_other_core_writeback(cpu_ctrl, line.get_mut().unsize());
+    }
+}
+
 #[cfg(flash_driver_supported)]
 #[embedded_test::tests]
 mod flash_tests {
