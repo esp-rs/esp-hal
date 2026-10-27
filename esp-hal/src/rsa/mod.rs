@@ -21,7 +21,7 @@ mod low_level;
 use core::{marker::PhantomData, ptr::NonNull, task::Poll};
 
 #[cfg(rsa_version = "1")]
-use portable_atomic::{AtomicBool, Ordering};
+use esp_sync::NonReentrantMutex;
 use procmacros::{handler, ram};
 
 use crate::{
@@ -244,25 +244,27 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Starts the modular exponentiation operation.
     fn start_modexp(&self) {
-        self.prepare_operation();
-        low_level::start_modexp(self.regs());
+        self.start_operation(low_level::start_modexp);
     }
 
     /// Starts the multiplication operation.
     fn start_multi(&self) {
-        self.prepare_operation();
-        low_level::start_multi(self.regs());
+        self.start_operation(low_level::start_multi);
     }
 
     /// Starts the modular multiplication operation.
     fn start_modmulti(&self) {
-        self.prepare_operation();
-        low_level::start_modmulti(self.regs());
+        self.start_operation(low_level::start_modmulti);
     }
 
-    fn prepare_operation(&self) {
-        #[cfg(rsa_version = "1")]
-        SIGNALED.store(false, Ordering::Relaxed);
+    fn start_operation(&self, start: impl FnOnce(&pac::rsa::RegisterBlock)) {
+        cfg_select! {
+            rsa_version = "1" => SIGNALED.with(|signaled| {
+                *signaled = false;
+                start(self.regs());
+            }),
+            _ => start(self.regs()),
+        }
     }
 
     /// Clears the RSA interrupt flag.
@@ -272,12 +274,12 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Returns whether the RSA peripheral is idle.
     fn is_idle(&self) -> bool {
-        #[cfg(rsa_version = "1")]
-        if SIGNALED.load(Ordering::Acquire) {
-            // The interrupt handler clears RSA v1's hardware completion flag.
-            return true;
+        cfg_select! {
+            rsa_version = "1" => {
+                SIGNALED.with(|signaled| *signaled || low_level::is_idle(self.regs()))
+            }
+            _ => low_level::is_idle(self.regs()),
         }
-        low_level::is_idle(self.regs())
     }
 
     fn wait_for_idle(&mut self) {
@@ -657,7 +659,7 @@ where
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 #[cfg(rsa_version = "1")]
-static SIGNALED: AtomicBool = AtomicBool::new(false);
+static SIGNALED: NonReentrantMutex<bool> = NonReentrantMutex::new(false);
 
 /// `Future` that waits for the RSA operation to complete.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -678,7 +680,7 @@ impl<'a, 'd> RsaFuture<'a, 'd> {
 
     fn is_done(&self) -> bool {
         cfg_select! {
-            rsa_version = "1" => SIGNALED.load(Ordering::Acquire),
+            rsa_version = "1" => SIGNALED.with(|signaled| *signaled),
             _ => self.driver.is_idle(),
         }
     }
@@ -777,10 +779,16 @@ where
 pub(super) fn rsa_interrupt_handler() {
     let rsa = RSA::regs();
 
-    #[cfg(rsa_version = "1")]
-    SIGNALED.store(true, Ordering::Release);
-
-    low_level::clear_interrupt(rsa);
+    cfg_select! {
+        rsa_version = "1" => SIGNALED.with(|signaled| {
+            // A blocking read may have already acknowledged this interrupt.
+            if low_level::is_idle(rsa) {
+                *signaled = true;
+                low_level::clear_interrupt(rsa);
+            }
+        }),
+        _ => low_level::clear_interrupt(rsa),
+    }
 
     WAKER.wake();
 }
