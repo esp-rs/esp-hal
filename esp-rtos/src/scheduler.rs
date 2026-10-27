@@ -267,25 +267,22 @@ impl SchedulerState {
         }
     }
 
-    fn run_scheduler(&mut self, task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext)) {
+    /// Selects the next task of this CPU, and switches to it.
+    ///
+    /// `current_sp` is a stack pointer in the stack of the interrupted context.
+    fn run_scheduler(
+        &mut self,
+        current_sp: usize,
+        task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext),
+    ) {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_begin(TraceEvents::RunSchedule as u32);
 
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
 
-        let current_sp: u32;
-        cfg_select! {
-            xtensa => unsafe {
-                core::arch::asm!("mov {0}, sp", out(reg) current_sp);
-            },
-            _ => unsafe {
-                core::arch::asm!("mv {0}, sp", out(reg) current_sp);
-            },
-        }
-
         if !self.per_cpu[cpu as usize].to_delete.is_empty() {
-            self.delete_marked_tasks(cpu, current_sp as usize);
+            self.delete_marked_tasks(cpu, current_sp);
         }
 
         let current_task = NonNull::new(read_thread_pointer());
@@ -308,11 +305,7 @@ impl SchedulerState {
             None => None,
         };
         if let Some(stack_owner) = stack_owner {
-            unsafe {
-                stack_owner
-                    .as_ref()
-                    .ensure_no_stack_overflow(current_sp as usize)
-            };
+            unsafe { stack_owner.as_ref().ensure_no_stack_overflow(current_sp) };
         }
 
         if let Some(current_task) = current_task
@@ -385,7 +378,7 @@ impl SchedulerState {
                 {
                     // We're using the current task's stack, for which the watchpoint is already set
                     // up.
-                    current_sp
+                    current_sp as u32
                 } else {
                     // We're using the main task's stack.
                     self.per_cpu[current_cpu]
@@ -422,7 +415,18 @@ impl SchedulerState {
     }
 
     pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
-        self.run_scheduler(|current_context, next_context| {
+        // On Xtensa, the handler runs on the interrupt stack of esp-hal. The trap frame is on the
+        // interrupted stack.
+        let current_sp: usize = cfg_select! {
+            xtensa => core::ptr::from_mut(trap_frame).addr(),
+            _ => {{
+                let sp: usize;
+                unsafe { core::arch::asm!("mv {0}, sp", out(reg) sp) };
+                sp
+            }}
+        };
+
+        self.run_scheduler(current_sp, |current_context, next_context| {
             trace!(
                 "Task switch: {:x} -> {:x}",
                 current_context as usize, next_context as usize
