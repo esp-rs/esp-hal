@@ -686,6 +686,112 @@ mod tests {
         }
     }
 
+    /// State that the victim and the waker of `woken_task_runs_on_one_core` share.
+    #[cfg(multi_core)]
+    struct WakeTest {
+        victim: SemaphoreHandle,
+        waker: SemaphoreHandle,
+        victim_blocks_on_core_0: AtomicBool,
+        victim_running: AtomicBool,
+        rounds: AtomicUsize,
+    }
+
+    /// Wakes the waker, then blocks. `context` points to a `WakeTest`.
+    #[cfg(multi_core)]
+    extern "C" fn wake_test_victim(context: *mut c_void) {
+        let test = unsafe { &*(context as *const WakeTest) };
+        loop {
+            test.waker.give();
+            test.victim_blocks_on_core_0
+                .store(Cpu::current() == Cpu::ProCpu, Ordering::Relaxed);
+            test.victim.take(None);
+
+            hil_test::assert!(
+                !test.victim_running.swap(true, Ordering::Relaxed),
+                "Two cores run the same task"
+            );
+            // Must be longer than the busy interrupt, so that two copies of the task overlap here.
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(200) {}
+            test.victim_running.store(false, Ordering::Relaxed);
+
+            test.rounds.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Delays core 0 while the victim blocks, wakes the victim, then blocks.
+    ///
+    /// `context` points to a `WakeTest`.
+    #[cfg(multi_core)]
+    extern "C" fn wake_test_waker(context: *mut c_void) {
+        let test = unsafe { &*(context as *const WakeTest) };
+        loop {
+            test.waker.take(None);
+
+            let start = Instant::now();
+            while !test.victim_blocks_on_core_0.swap(false, Ordering::Relaxed)
+                && start.elapsed() < Duration::from_millis(10)
+            {}
+            SoftwareInterrupt::<'static, 2>::new(unsafe { FROM_CPU_INTR2::steal() }).raise();
+            test.victim.give();
+        }
+    }
+
+    #[test]
+    #[timeout(10)]
+    #[cfg(multi_core)]
+    fn woken_task_runs_on_one_core(ctx: Context) {
+        // The victim blocks on core 0. The waker on core 1 delays the switch on core 0.
+        // The waker then wakes the victim and blocks.
+        // Core 1 selects a task while core 0 still runs the victim.
+        #[esp_hal::handler(priority = Priority::Priority3)]
+        fn keep_core_busy() {
+            SoftwareInterrupt::<'static, 2>::new(unsafe { FROM_CPU_INTR2::steal() }).reset();
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(100) {}
+        }
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        // The main task must preempt the victim to check the result.
+        CurrentThreadHandle::get().set_priority(5);
+
+        let mut sw_int2 = SoftwareInterrupt::new(ctx.sw_int2);
+        sw_int2.set_interrupt_handler(keep_core_busy);
+
+        let test: &'static WakeTest = Box::leak(Box::new(WakeTest {
+            victim: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
+            waker: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
+            victim_blocks_on_core_0: AtomicBool::new(false),
+            victim_running: AtomicBool::new(false),
+            rounds: AtomicUsize::new(0),
+        }));
+        let context = (test as *const WakeTest).cast::<c_void>().cast_mut();
+        unsafe {
+            preempt::task_create("waker", wake_test_waker, context, 2, Some(1), 4096);
+            preempt::task_create("victim", wake_test_victim, context, 1, None, 4096);
+        }
+
+        CurrentThreadHandle::get().delay(Duration::from_secs(3));
+
+        hil_test::assert!(
+            test.rounds.load(Ordering::Relaxed) > 0,
+            "The victim never woke up"
+        );
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
     #[test]
     #[cfg(multi_core)]
     async fn embassy_cross_core(ctx: Context) {
