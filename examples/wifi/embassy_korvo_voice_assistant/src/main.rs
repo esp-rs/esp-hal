@@ -1,6 +1,6 @@
 //! Embassy Voice Assistant Example
 //!
-//! Set SSID, PASSWORD, DEEPGRAM_API_KEY and CLAUDE_API_KEY env variables before running this
+//! Set SSID, PASSWORD, DEEPGRAM_API_KEY and ANTHROPIC_API_KEY env variables before running this
 //! example.
 //!
 //! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the button on the screen
