@@ -38,8 +38,7 @@ cfg_select! {
 
 /// The cores share the cache sync registers. A cache operation from one core while the other
 /// core's operation runs can discard either one.
-#[allow(unused)]
-#[cfg(multi_core)]
+#[cfg(all(multi_core, not(esp32)))]
 pub(crate) static CACHE_SYNC_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 #[allow(unused)]
