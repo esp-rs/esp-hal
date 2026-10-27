@@ -58,7 +58,7 @@ runs:
       id: setup-python
       uses: actions/setup-python@v7
       with:
-        python-version: "3.11"
+        python-version: "3.14"
 
     - name: Validate and upload metrics
       shell: bash
