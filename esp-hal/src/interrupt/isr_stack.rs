@@ -30,6 +30,9 @@ const ISR_STACK_SIZE: usize = esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG
 struct IsrStack(MaybeUninit<[u8; ISR_STACK_SIZE]>);
 
 /// The interrupt stacks. The stack of CPU `n` ends at `ISR_STACKS + (n + 1) * ISR_STACK_SIZE`.
+///
+/// Tests find the stack guard of CPU 0 through the exported name.
+#[unsafe(export_name = "_isr_stack_bottom_cpu0")]
 static mut ISR_STACKS: [IsrStack; Cpu::COUNT] =
     [const { IsrStack(MaybeUninit::uninit()) }; Cpu::COUNT];
 
@@ -38,6 +41,73 @@ static mut ISR_STACKS: [IsrStack; Cpu::COUNT] =
 /// The entry code moves to the interrupt stack only when the depth was 0. The entry and exit
 /// code change the depth while interrupts that use the interrupt stack are masked.
 static mut NESTING: [u32; Cpu::COUNT] = [0; Cpu::COUNT];
+
+/// The value that fills the unused part of an interrupt stack.
+const FILL_PATTERN: u32 = 0xA5A5_A5A5;
+
+#[cfg(isr_stack_guard_monitoring)]
+const GUARD_OFFSET: usize = esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET");
+
+#[cfg(isr_stack_guard_monitoring)]
+const _: () = core::assert!(
+    GUARD_OFFSET + 4 <= ISR_STACK_SIZE,
+    "The stack guard offset must be inside the interrupt stack."
+);
+
+/// Returns the words of the interrupt stack of `cpu`, from the bottom to the top.
+fn stack_of(cpu: Cpu) -> *mut [u32] {
+    let bottom = unsafe { &raw mut ISR_STACKS[cpu as usize] }.cast::<u32>();
+    core::ptr::slice_from_raw_parts_mut(bottom, ISR_STACK_SIZE / size_of::<u32>())
+}
+
+/// Prepares the interrupt stack of the current CPU.
+///
+/// The function resets the nesting depth, fills the stack with [`FILL_PATTERN`], and writes the
+/// stack guard.
+///
+/// # Safety
+///
+/// No interrupt handler runs on the interrupt stack of the current CPU, and the CPU does not
+/// enable such interrupts before the function returns.
+pub(crate) unsafe fn init_current_cpu() {
+    let cpu = Cpu::current();
+    unsafe { (&raw mut NESTING[cpu as usize]).write_volatile(0) };
+
+    let stack = stack_of(cpu);
+    let bottom = stack.cast::<u32>();
+    for index in 0..stack.len() {
+        unsafe { bottom.add(index).write_volatile(FILL_PATTERN) };
+    }
+
+    #[cfg(isr_stack_guard_monitoring)]
+    unsafe {
+        let guard = bottom.byte_add(GUARD_OFFSET);
+        guard.write_volatile(esp_config::esp_config_int!(
+            u32,
+            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+        ));
+        crate::debugger::set_isr_stack_watchpoint(guard.addr());
+    }
+}
+
+/// Returns the number of bytes at the bottom of the interrupt stack of `cpu` that still hold the
+/// fill pattern.
+pub(super) fn unused(cpu: Cpu) -> usize {
+    let stack = stack_of(cpu);
+    let bottom = stack.cast::<u32>();
+
+    #[cfg(isr_stack_guard_monitoring)]
+    let guard = GUARD_OFFSET / size_of::<u32>();
+    #[cfg(not(isr_stack_guard_monitoring))]
+    let guard = usize::MAX;
+
+    let unused = (0..stack.len())
+        .take_while(|&index| {
+            index == guard || unsafe { bottom.add(index).read_volatile() } == FILL_PATTERN
+        })
+        .count();
+    unused * size_of::<u32>()
+}
 
 /// Concatenates the assembly on dual-core chips. Expands to an empty string on single-core chips.
 #[cfg(multi_core)]
@@ -355,17 +425,26 @@ mod riscv {
                         ),
                         "
                     1:
-                        addi sp, sp, -16
+                        addi sp, sp, -32
                         sw   ra, 0(sp)
                         sw   t0, 4(sp)
                         sw   t1, 8(sp)
                         ",
                         fpu_entry_store!(),
                         "
+                        # A frame record that links a frame-pointer backtrace to the interrupted
+                        # code: the interrupted frame pointer, and the interrupted PC as the
+                        # return address.
+                        sw   s0, 24(sp)
+                        csrr t2, mepc
+                        sw   t2, 28(sp)
+                        addi s0, sp, 32
+
                         call {handler}
 
                         lw   t0, 4(sp)
                         lw   t1, 8(sp)
+                        lw   s0, 24(sp)
 
                         # The handler returns with interrupts disabled.
                         lw   t3, 0(t1)

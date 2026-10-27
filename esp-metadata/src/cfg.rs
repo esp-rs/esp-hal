@@ -1203,6 +1203,9 @@ driver_configs![
                 has_swd_watchdog: bool,
                 #[serde(default)]
                 cpu_mcause_mask: u32,
+                /// Number of data watchpoints of a CPU.
+                /// ESP-IDF: `SOC_CPU_WATCHPOINTS_NUM`.
+                cpu_watchpoints: u32,
                 /// PMP address matching granularity, in bytes.
                 /// ESP-IDF: `SOC_CPU_PMP_REGION_GRANULARITY`.
                 #[serde(default = "default_cpu_pmp_granularity")]
