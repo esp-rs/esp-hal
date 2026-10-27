@@ -212,6 +212,10 @@ fn start_core1_init() -> ! {
     // Do not call setup_interrupts as that would disable peripheral interrupts, too.
     unsafe { crate::interrupt::init_vectoring() };
 
+    // The APP CPU can be stopped inside an interrupt handler, so the interrupt state of an earlier
+    // run is not valid.
+    unsafe { crate::interrupt::init_isr_stack() };
+
     #[cfg(cache_livelock_workaround)]
     crate::soc::cache_livelock::app_core_started();
 
@@ -280,6 +284,9 @@ fn start_core1_init_impl() -> ! {
             crate::debugger::set_stack_watchpoint(stack_guard as usize);
         }
         crate::interrupt::init_vectoring();
+        // The APP CPU can be stopped inside an interrupt handler, so the interrupt state of an
+        // earlier run is not valid.
+        crate::interrupt::init_isr_stack();
     }
 
     enable_app_core_interrupts();

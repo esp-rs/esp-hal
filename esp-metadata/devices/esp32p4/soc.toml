@@ -34,6 +34,7 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 context_switch_source = "ipc"
 
 [device.soc]
+cpu_watchpoints = 3
 cpu_has_branch_predictor = true
 multi_core_enabled = true
 cpu_has_csr_pc = false
