@@ -105,6 +105,9 @@ fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     println!("cargo:rustc-link-arg=-T{manifest_dir}/picolibc_tls.x");
 
+    // The Wi-Fi libraries need `floor`, which only picolibc defines, but come after it.
+    println!("cargo:rustc-link-arg=--undefined=floor");
+
     println!("cargo:rustc-link-arg=--start-group");
     for library in LATE_WIFI_LIBRARIES {
         println!("cargo:rustc-link-arg=-l{library}");

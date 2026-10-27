@@ -9,6 +9,7 @@ use core::{
 };
 
 use esp_alloc::{HEAP, MemoryCapability, export::enumset::EnumSet};
+use esp_hal::system::Cpu;
 
 // The C allocation functions of ESP-SR, the Wi-Fi driver and esp-rtos. They replace those of
 // esp-alloc's `compat` feature, which align to 4 bytes only and cannot free the aligned allocations
@@ -24,6 +25,12 @@ const MALLOC_CAP_INTERNAL: u32 = 1 << 11;
 const HEADER: usize = 8;
 
 fn allocate(size: usize, align: usize, capabilities: EnumSet<MemoryCapability>) -> *mut c_void {
+    // Only ESP-SR runs on the second core. Its memory is in PSRAM, so that it cannot take the
+    // internal RAM that Wi-Fi needs.
+    let capabilities = match Cpu::current() {
+        Cpu::AppCpu => MemoryCapability::External.into(),
+        Cpu::ProCpu => capabilities,
+    };
     let align = align.max(4);
     let offset = align.max(HEADER);
     let Ok(layout) = Layout::from_size_align(size + offset, align) else {
