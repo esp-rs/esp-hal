@@ -9,8 +9,11 @@ SECTIONS {
   /*
     Depending on the input sections which go into .rodata the alignment might get adjusted to >4.
     Make sure we have a "merge-section" here to make the tooling NOT emit more than two sections which go into flash.
+    The byte makes GNU ld emit the padding as contents. Without contents, the padding would be a
+    gap in the flash data.
   */
   .rodata_merge : ALIGN (4) {
+    BYTE(0);
     . = ALIGN(ALIGNOF(.rodata));
   } > RODATA
 
