@@ -54,6 +54,12 @@ runs:
         name: ${{ inputs.artifact }}
         path: metrics
 
+    - name: Set up Python
+      id: setup-python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.11"
+
     - name: Validate and upload metrics
       shell: bash
       env:
@@ -68,9 +74,16 @@ runs:
         ESP_METRICS_BRANCH_NAME: ${{ inputs.branch-name }}
         DEFINITIONS: ${{ inputs.definitions }}
         METRICS_FILE: metrics/${{ inputs.metrics-file }}
+        PYTHON: ${{ steps.setup-python.outputs.python-path }}
       run: |
+        set -euo pipefail
         trap 'rm -rf .metrics-venv metrics' EXIT
-        python3 -m venv .metrics-venv
+
+        echo "Using interpreter: $PYTHON"
+        "$PYTHON" -V
+
+        "$PYTHON" -m venv .metrics-venv
+        .metrics-venv/bin/python -m pip install --upgrade pip
         .metrics-venv/bin/pip install --no-cache-dir esp-metrics-cli
         .metrics-venv/bin/esp-metrics-cli validate -d "$DEFINITIONS" -i "$METRICS_FILE" --verbose
         .metrics-venv/bin/esp-metrics-cli upload   -d "$DEFINITIONS" -i "$METRICS_FILE" --verbose
