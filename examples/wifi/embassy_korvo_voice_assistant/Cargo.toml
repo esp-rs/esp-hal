@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
-# `embedded-tls` 0.18, used by `reqwless`, does not build with the stable `der` 0.8 releases.
+# `embedded-tls` 0.18 does not build with the stable `der` 0.8 releases.
 der = "=0.8.0-rc.10"
 der_derive = "=0.8.0-rc.6"
 embassy-executor = "0.10.0"
@@ -20,6 +20,8 @@ embassy-sync = "0.8.0"
 embassy-time = "0.5.0"
 embedded-graphics = "0.8.1"
 embedded-io-async = "0.7.0"
+# `rsa` verifies certificates signed with RSA keys, such as both root certificates.
+embedded-tls = { version = "0.18.0", default-features = false, features = ["rsa"] }
 embedded-text = "0.7.2"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
@@ -37,8 +39,9 @@ esp-radio = { path = "../../../esp-radio", features = [
 ] }
 esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
 log = "0.4.27"
-# `rsa` lets `embedded-tls` connect to servers with RSA certificates, such as Deepgram's.
-reqwless = { version = "0.14.0", features = ["rsa"] }
+rand_chacha = { version = "0.3.1", default-features = false }
+rand_core = "0.6.4"
+reqwless = { version = "0.14.0", default-features = false }
 serde = { version = "1.0.228", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1.0.145", default-features = false, features = ["alloc"] }
 static_cell = "2.1.0"

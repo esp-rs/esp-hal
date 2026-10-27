@@ -10,8 +10,6 @@
 //! The API keys are stored in the firmware in plain text, and anyone with access to the board can
 //! read them. Use keys with a spending limit.
 //!
-//! The server certificate is not verified yet.
-//!
 //! Hardware setup:
 //! - Connect the LCD sub-board.
 //! - Connect the USB-UART port to the computer and switch the board on.
@@ -67,7 +65,7 @@ use esp_rtos::embassy::InterruptExecutor;
 use static_cell::StaticCell;
 
 use crate::{
-    api::{Api, TcpState},
+    api::Api,
     display::{Button, Screen},
 };
 
@@ -219,8 +217,7 @@ async fn assistant(stack: Stack<'static>) -> ! {
     display::show(&screen);
     stack.wait_config_up().await;
 
-    static TCP_STATE: StaticCell<TcpState> = StaticCell::new();
-    let mut api = Api::new(stack, TCP_STATE.init(TcpState::new()));
+    let mut api = Api::new(stack);
 
     loop {
         screen.status = String::from("Ready");
