@@ -34,7 +34,7 @@ use serde_json::json;
 use crate::audio::RECORDING_SAMPLE_RATE;
 
 const DEEPGRAM_AUTHORIZATION: &str = concat!("Token ", env!("DEEPGRAM_API_KEY"));
-const CLAUDE_API_KEY: &str = env!("CLAUDE_API_KEY");
+const ANTHROPIC_API_KEY: &str = env!("ANTHROPIC_API_KEY");
 
 const DEEPGRAM_HOST: &str = "api.deepgram.com";
 /// Raw 16-bit 16 kHz mono speech in, text out.
@@ -224,7 +224,7 @@ impl Api {
             "messages": [{ "role": "user", "content": question }],
         }))?;
         let headers = [
-            ("x-api-key", CLAUDE_API_KEY),
+            ("x-api-key", ANTHROPIC_API_KEY),
             ("anthropic-version", "2023-06-01"),
             ("Content-Type", ContentType::ApplicationJson.as_str()),
         ];
