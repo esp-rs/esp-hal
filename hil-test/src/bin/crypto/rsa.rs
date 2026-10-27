@@ -456,6 +456,34 @@ mod work_queue_tests {
     }
 
     #[test]
+    async fn test_rsa_work_queue_multiple_requests(mut ctx: Context<'static>) {
+        let _rsa = ctx.rsa.start();
+        let mut rsa1 = RsaContext::new();
+        let mut rsa2 = RsaContext::new();
+        let mut outbuf = [0_u32; U512::LIMBS];
+        let mut multi_outbuf = [0_u32; U1024::LIMBS];
+        let r = compute_r(&BIGNUM_3);
+
+        let mut handle1 = rsa1.modular_exponentiate::<Op512>(
+            BIGNUM_1.as_words(),
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            compute_mprime(&BIGNUM_3),
+            &mut outbuf,
+        );
+        let mut handle2 =
+            rsa2.multiply::<Op512>(BIGNUM_1.as_words(), BIGNUM_2.as_words(), &mut multi_outbuf);
+
+        handle1.wait().await;
+        handle2.wait().await;
+        core::mem::drop((handle1, handle2));
+
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+        hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, multi_outbuf);
+    }
+
+    #[test]
     fn test_rsa_work_queue_blocking(mut ctx: Context<'static>) {
         let _rsa = ctx.rsa.start();
 

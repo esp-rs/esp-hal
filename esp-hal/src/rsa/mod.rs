@@ -901,6 +901,7 @@ impl<'d> RsaBackend<'d> {
     }
 
     fn process_item(&mut self, item: &mut RsaWorkItem) -> work_queue::Poll {
+        // The queue has its own interrupt handler and does not use SIGNALED.
         match core::mem::take(&mut self.state) {
             RsaBackendState::Idle => {
                 let driver = Rsa {
@@ -916,6 +917,7 @@ impl<'d> RsaBackend<'d> {
                 // instruct the work queue to wake the polling task immediately.
                 self.state = if rsa.ready() {
                     rsa.set_interrupt_handler(rsa_work_queue_handler);
+                    low_level::clear_interrupt(rsa.regs());
                     rsa.enable_disable_interrupt(true);
                     RsaBackendState::Ready(rsa)
                 } else {
@@ -934,7 +936,7 @@ impl<'d> RsaBackend<'d> {
                         // Non-modular multiplication result is twice as wide as its operands.
                         rsa.write_multi_mode(2 * n / WORDS_PER_INCREMENT - 1, false);
                         rsa.write_multi_operand_b(unsafe { y.as_ref() });
-                        rsa.start_multi();
+                        low_level::start_multi(rsa.regs());
                     }
 
                     RsaOperation::ModularMultiplication {
@@ -958,7 +960,7 @@ impl<'d> RsaBackend<'d> {
                         rsa.write_mprime(m_prime);
                         rsa.write_r(unsafe { r_inv.as_ref() });
 
-                        rsa.start_modmulti();
+                        low_level::start_modmulti(rsa.regs());
 
                         #[cfg(rsa_version = "1")]
                         {
@@ -1001,7 +1003,7 @@ impl<'d> RsaBackend<'d> {
                             rsa.write_search_position(find_search_pos(unsafe { y.as_ref() }));
                         }
 
-                        rsa.start_modexp();
+                        low_level::start_modexp(rsa.regs());
                     }
                 }
 
@@ -1012,14 +1014,16 @@ impl<'d> RsaBackend<'d> {
 
             #[cfg(rsa_version = "1")]
             RsaBackendState::ModularMultiplicationRoundOne(mut rsa) => {
-                if rsa.is_idle() {
+                if low_level::is_idle(rsa.regs()) {
                     let RsaOperation::ModularMultiplication { y, .. } = item.operation else {
                         unreachable!();
                     };
 
+                    low_level::clear_interrupt(rsa.regs());
+
                     // Y needs to be written to the X memory.
                     rsa.write_operand_a(unsafe { y.as_ref() });
-                    rsa.start_modmulti();
+                    low_level::start_modmulti(rsa.regs());
 
                     self.state = RsaBackendState::Processing(rsa);
                 } else {
@@ -1030,7 +1034,8 @@ impl<'d> RsaBackend<'d> {
             }
 
             RsaBackendState::Processing(rsa) => {
-                if rsa.is_idle() {
+                if low_level::is_idle(rsa.regs()) {
+                    low_level::clear_interrupt(rsa.regs());
                     rsa.read_out(unsafe { item.result.as_mut() });
 
                     self.state = RsaBackendState::Ready(rsa);
@@ -1111,11 +1116,8 @@ enum RsaOperation {
 #[handler]
 #[ram]
 fn rsa_work_queue_handler() {
-    if !RSA_WORK_QUEUE.process() {
-        // The queue may indicate that it needs to be polled again. In this case, we do not clear
-        // the interrupt bit, which causes the interrupt to be re-handled.
-        low_level::clear_interrupt(RSA::regs());
-    }
+    // Clearing the interrupt after processing can lose the next operation's completion event.
+    RSA_WORK_QUEUE.process();
 }
 
 /// An RSA work queue user.
