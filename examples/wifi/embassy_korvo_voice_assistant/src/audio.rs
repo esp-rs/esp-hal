@@ -82,8 +82,8 @@ pub async fn run(
         .with_dout(dout)
         .build();
     let microphones = i2s.i2s_rx.with_din(din).build();
-    // About 170 ms each. Starting Wi-Fi blocks interrupts for about 80 ms (the PHY calibration),
-    // and the buffers must bridge that.
+    // About 170 ms each. Starting Wi-Fi blocks interrupts for about 80 ms (the PHY calibration, see
+    // https://github.com/esp-rs/esp-hal/issues/6605), and the buffers must bridge that.
     let Ok(mut tx) = tx.write(dma_tx_stream_buffer!(32 * 1024, 2048)) else {
         panic!("Failed to start the I2S TX DMA");
     };

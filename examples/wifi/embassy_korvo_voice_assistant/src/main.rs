@@ -1,11 +1,14 @@
-//! Voice assistant for the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board.
+//! Embassy Voice Assistant Example
 //!
-//! Tap the button on the screen and speak, then tap it again. Deepgram transcribes the recording,
-//! Claude answers, and the question and the answer are shown on the screen.
+//! Set SSID, PASSWORD, DEEPGRAM_API_KEY and CLAUDE_API_KEY env variables before running this
+//! example.
 //!
-//! Set the `SSID`, `PASSWORD`, `DEEPGRAM_API_KEY` and `CLAUDE_API_KEY` environment variables before
-//! building. The API keys are stored in the firmware in plain text, and anyone with access to the
-//! board can read them. Use keys with a spending limit.
+//! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the button on the screen
+//! and speak, then tap it again. Deepgram transcribes the recording, Claude answers, and the
+//! question and the answer are shown on the screen.
+//!
+//! The API keys are stored in the firmware in plain text, and anyone with access to the board can
+//! read them. Use keys with a spending limit.
 //!
 //! The server certificate is not verified yet.
 //!

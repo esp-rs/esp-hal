@@ -79,8 +79,8 @@ pub async fn run(mut dpi: Dpi<'static, Blocking>) {
             panic!("Failed to start the display refresh");
         };
         let screen = SCREEN.wait().await;
-        // A bus stall (Wi-Fi starting, for example) can starve the LCD, which then keeps going one
-        // frame offset from the data. Restarting the refresh realigns the picture.
+        // Starting Wi-Fi shifts a running picture, for a reason not known yet. Restarting the
+        // refresh realigns it.
         (dpi, frame) = transfer.stop();
         draw(&mut FrameBuffer(frame.buffer.as_mut()), &screen);
         frame.buffer.writeback();
