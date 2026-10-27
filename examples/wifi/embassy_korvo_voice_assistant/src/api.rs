@@ -1,4 +1,4 @@
-//! The two API calls of a conversation turn: speech to text (Deepgram) and the answer (Claude).
+//! The answer to a question, from Claude.
 
 use alloc::{format, string::String};
 use core::fmt::{self, Write as _};
@@ -31,28 +31,19 @@ use reqwless::{headers::ContentType, request::Method, response::Response};
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::audio::RECORDING_SAMPLE_RATE;
-
-const DEEPGRAM_AUTHORIZATION: &str = concat!("Token ", env!("DEEPGRAM_API_KEY"));
 const ANTHROPIC_API_KEY: &str = env!("ANTHROPIC_API_KEY");
 
-const DEEPGRAM_HOST: &str = "api.deepgram.com";
-/// Raw 16-bit 16 kHz mono speech in, text out.
-const LISTEN_PATH: &str = "/v1/listen?model=nova-3&smart_format=true\
-    &encoding=linear16&sample_rate=16000&channels=1";
-const ANTHROPIC_HOST: &str = "api.anthropic.com";
+const HOST: &str = "api.anthropic.com";
 const MESSAGES_PATH: &str = "/v1/messages";
 
-// The root certificates the servers chain up to, in DER. `embedded-tls` checks the chain the server
-// sends against one certificate: the issuer of the last certificate in the chain. Both servers end
-// their chain with a cross-signed root, so these are the cross-signing roots. They come from the
-// macOS system trust store.
+/// The root certificate the server chains up to, in DER. `embedded-tls` checks the chain the server
+/// sends against one certificate: the issuer of the last certificate in the chain. The server ends
+/// its chain with a cross-signed root, so this is the cross-signing root. It comes from the macOS
+/// system trust store.
+///
 /// GlobalSign Root CA, SHA-256 fingerprint
 /// `EBD41040E4BB3EC742C9E381D31EF2A41A48B6685C96E7CEF3C1DF6CD4331C99`, valid until 2028-01-28.
-const ANTHROPIC_ROOT_CA: &[u8] = include_bytes!("../certs/globalsign-root-ca.der");
-/// ISRG Root X1, SHA-256 fingerprint
-/// `96BCEC06264976F37460779ACF28C5A7CFE8A3C0AAE11A8FFCEE05C0BDDF08C6`, valid until 2035-06-04.
-const DEEPGRAM_ROOT_CA: &[u8] = include_bytes!("../certs/isrg-root-x1.der");
+const ROOT_CA: &[u8] = include_bytes!("../certs/globalsign-root-ca.der");
 
 const CLAUDE_MODEL: &str = "claude-haiku-5-5";
 
@@ -60,12 +51,11 @@ const INSTRUCTIONS: &str = "You are a voice assistant running on an ESP32-S31 mi
     Answer in one to three short sentences of plain text without markdown or emoji, because your \
     answer is shown on a small screen.";
 
-/// The largest response body. A transcript of a 30 s recording, with the timing of every word,
-/// takes about 40 KiB.
-const RESPONSE_BUFFER_SIZE: usize = 128 * 1024;
+/// The largest response body. An answer of 1024 tokens takes about 6 KiB.
+const RESPONSE_BUFFER_SIZE: usize = 16 * 1024;
 /// The response status line and headers.
 const RESPONSE_HEADER_BUFFER_SIZE: usize = 4 * 1024;
-/// The certificate chain of the server. Deepgram's takes about 4.6 KiB.
+/// The certificate chain of the server.
 const CERTIFICATE_CHAIN_SIZE: usize = 8 * 1024;
 /// One received TLS record: up to 16 KiB of data plus its overhead.
 const TLS_READ_BUFFER_SIZE: usize = 16 * 1024 + 256;
@@ -80,11 +70,7 @@ pub enum Error {
     Connect(ConnectError),
     Tls(TlsError),
     Http(reqwless::Error),
-    Api {
-        host: String,
-        status: u16,
-        message: String,
-    },
+    Api { status: u16, message: String },
     Json(serde_json::Error),
 }
 
@@ -95,11 +81,7 @@ impl fmt::Display for Error {
             Error::Connect(error) => write!(f, "TCP connection failed: {error:?}"),
             Error::Tls(error) => write!(f, "TLS failed: {error:?}"),
             Error::Http(error) => write!(f, "HTTP request failed: {error:?}"),
-            Error::Api {
-                host,
-                status,
-                message,
-            } => write!(f, "{host} returned {status}: {message}"),
+            Error::Api { status, message } => write!(f, "Claude returned {status}: {message}"),
             Error::Json(error) => write!(f, "Unexpected response: {error}"),
         }
     }
@@ -158,50 +140,6 @@ impl Api {
         }
     }
 
-    /// Converts 16 kHz mono speech to text.
-    pub async fn transcribe(&mut self, speech: &[i16]) -> Result<String, Error> {
-        const _: () = assert!(RECORDING_SAMPLE_RATE == 16_000, "See `LISTEN_PATH`");
-
-        #[derive(Deserialize)]
-        struct Response {
-            results: Results,
-        }
-        #[derive(Deserialize)]
-        struct Results {
-            channels: [Channel; 1],
-        }
-        #[derive(Deserialize)]
-        struct Channel {
-            alternatives: [Alternative; 1],
-        }
-        #[derive(Deserialize)]
-        struct Alternative {
-            transcript: String,
-        }
-
-        let headers = [
-            ("Authorization", DEEPGRAM_AUTHORIZATION),
-            ("Content-Type", ContentType::ApplicationOctetStream.as_str()),
-        ];
-        // SAFETY: Any initialized memory is valid as bytes. The chip is little-endian, so these are
-        // the samples as little-endian 16-bit values.
-        let speech = unsafe {
-            core::slice::from_raw_parts(speech.as_ptr().cast::<u8>(), size_of_val(speech))
-        };
-        let body = self
-            .post(
-                DEEPGRAM_HOST,
-                LISTEN_PATH,
-                DEEPGRAM_ROOT_CA,
-                &headers,
-                speech,
-            )
-            .await?;
-        let [channel] = serde_json::from_slice::<Response>(body)?.results.channels;
-        let [alternative] = channel.alternatives;
-        Ok(alternative.transcript)
-    }
-
     /// Answers the question.
     pub async fn chat(&mut self, question: &str) -> Result<String, Error> {
         #[derive(Deserialize)]
@@ -228,15 +166,7 @@ impl Api {
             ("anthropic-version", "2023-06-01"),
             ("Content-Type", ContentType::ApplicationJson.as_str()),
         ];
-        let body = self
-            .post(
-                ANTHROPIC_HOST,
-                MESSAGES_PATH,
-                ANTHROPIC_ROOT_CA,
-                &headers,
-                &request,
-            )
-            .await?;
+        let body = self.post(&headers, &request).await?;
         let message = serde_json::from_slice::<Message>(body)?;
         Ok(message
             .content
@@ -247,18 +177,11 @@ impl Api {
 
     /// Sends a POST request over a new TLS connection and returns the response body.
     ///
-    /// The server certificate must chain up to `root_ca` and name `host`. Its validity period is
-    /// not checked, because the board does not know the time.
-    async fn post(
-        &mut self,
-        host: &str,
-        path: &str,
-        root_ca: &[u8],
-        headers: &[(&str, &str)],
-        body: &[u8],
-    ) -> Result<&[u8], Error> {
+    /// The server certificate must chain up to [`ROOT_CA`] and name [`HOST`]. Its validity period
+    /// is not checked, because the board does not know the time.
+    async fn post(&mut self, headers: &[(&str, &str)], body: &[u8]) -> Result<&[u8], Error> {
         let addresses = DnsSocket::new(self.stack)
-            .query(host, DnsQueryType::A)
+            .query(HOST, DnsQueryType::A)
             .await?;
         let Some(&address) = addresses.first() else {
             return Err(Error::Dns(dns::Error::Failed));
@@ -268,8 +191,8 @@ impl Api {
         socket.connect((address, 443)).await?;
 
         let config = TlsConfig::new()
-            .with_server_name(host)
-            .with_ca(Certificate::X509(root_ca));
+            .with_server_name(HOST)
+            .with_ca(Certificate::X509(ROOT_CA));
         let mut tls = TlsConnection::<_, Aes128GcmSha256>::new(
             socket,
             &mut self.tls_read_buffer,
@@ -278,7 +201,7 @@ impl Api {
         tls.open(TlsContext::new(&config, Provider::new())).await?;
 
         let mut head = format!(
-            "POST {path} HTTP/1.1\r\nHost: {host}\r\nContent-Length: {}\r\nConnection: close\r\n",
+            "POST {MESSAGES_PATH} HTTP/1.1\r\nHost: {HOST}\r\nContent-Length: {}\r\nConnection: close\r\n",
             body.len()
         );
         for (name, value) in headers {
@@ -300,7 +223,6 @@ impl Api {
 
         if !(200..300).contains(&status) {
             return Err(Error::Api {
-                host: host.into(),
                 status,
                 message: error_message(body),
             });
@@ -346,12 +268,11 @@ fn zeroed(len: usize) -> Vec<u8, ExternalMemory> {
     buffer
 }
 
-/// Extracts the message from a Claude (`error.message`) or Deepgram (`err_msg`) error response.
+/// Extracts `error.message` from an error response.
 fn error_message(body: &[u8]) -> String {
     #[derive(Deserialize)]
     struct Response {
-        error: Option<Error>,
-        err_msg: Option<String>,
+        error: Error,
     }
     #[derive(Deserialize)]
     struct Error {
@@ -359,13 +280,7 @@ fn error_message(body: &[u8]) -> String {
     }
 
     match serde_json::from_slice::<Response>(body) {
-        Ok(Response {
-            error: Some(error), ..
-        }) => error.message,
-        Ok(Response {
-            err_msg: Some(message),
-            ..
-        }) => message,
-        _ => String::from_utf8_lossy(body).into_owned(),
+        Ok(response) => response.error.message,
+        Err(_) => String::from_utf8_lossy(body).into_owned(),
     }
 }

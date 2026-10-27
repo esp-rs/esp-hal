@@ -1,6 +1,9 @@
-[target.'cfg(target_arch = "riscv32")']
+[target.riscv32imafc-unknown-none-elf]
 runner    = "espflash flash --monitor"
+# The ESP-SR libraries use Espressif relocations that only GNU ld supports.
+linker    = "riscv32-esp-elf-ld"
 rustflags = [
+  "-C", "linker-flavor=ld",
   "-C", "link-arg=-Tlinkall.x",
   "-C", "force-frame-pointers",
 ]
@@ -10,8 +13,8 @@ ESP_LOG = "info"
 ESP_RADIO_CONFIG_WIFI_SOFTAP_SUPPORT = "false"
 SSID = "SSID"
 PASSWORD = "PASSWORD"
-DEEPGRAM_API_KEY = "DEEPGRAM_API_KEY"
 ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
+ESP_SR_COMPONENTS = { value = "managed_components", relative = true }
 
 [unstable]
 build-std = ["alloc", "core"]

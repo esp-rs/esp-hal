@@ -1,14 +1,23 @@
 //! Embassy Voice Assistant Example
 //!
-//! Set SSID, PASSWORD, DEEPGRAM_API_KEY and ANTHROPIC_API_KEY env variables before running this
+//! Set SSID, PASSWORD, ANTHROPIC_API_KEY and ESP_SR_COMPONENTS env variables before running this
 //! example.
 //!
 //! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the button on the screen
-//! and speak, then tap it again. Deepgram transcribes the recording, Claude answers, and the
-//! question and the answer are shown on the screen.
+//! and ask one of the questions on the screen, then tap it again. The second core recognizes the
+//! question with MultiNet from Espressif's ESP-SR, Claude answers, and the question and the answer
+//! are shown on the screen.
 //!
-//! The API keys are stored in the firmware in plain text, and anyone with access to the board can
-//! read them. Use keys with a spending limit.
+//! The API key is stored in the firmware in plain text, and anyone with access to the board can
+//! read it. Use a key with a spending limit.
+//!
+//! Building needs:
+//! - Espressif's RISC-V GCC toolchain (`riscv32-esp-elf-gcc` and `riscv32-esp-elf-ld`, 15.2 or
+//!   later, with picolibc) in `PATH`. The ESP-SR libraries need GNU ld.
+//! - ESP_SR_COMPONENTS set to a directory with the ESP-IDF components `espressif__esp-sr`,
+//!   `espressif__dl_fft` and `espressif__cjson`, for example the `managed_components` directory of
+//!   an ESP-IDF project that depends on `espressif/esp-sr`. `src/speech.rs` mirrors C types of
+//!   esp-sr 2.6.0.
 //!
 //! Hardware setup:
 //! - Connect the LCD sub-board.
@@ -25,9 +34,11 @@ mod api;
 mod audio;
 mod display;
 mod es8389;
+mod idf;
+mod speech;
 mod touch;
 
-use alloc::{format, string::String};
+use alloc::{format, string::String, vec::Vec};
 
 use embassy_executor::Spawner;
 use embassy_net::{Runner, Stack, StackResources};
@@ -50,6 +61,7 @@ use esp_hal::{
     },
     ram,
     rng::Rng,
+    system::{self, CpuControl},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -62,10 +74,11 @@ use esp_radio::wifi::{
     sta::StationConfig,
 };
 use esp_rtos::embassy::InterruptExecutor;
-use static_cell::StaticCell;
+use static_cell::{ConstStaticCell, StaticCell};
 
 use crate::{
     api::Api,
+    audio::Samples,
     display::{Button, Screen},
 };
 
@@ -93,6 +106,14 @@ async fn main(spawner: Spawner) -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
+
+    // Speech recognition gets the second core to itself, see `speech`.
+    static SPEECH_STACK: ConstStaticCell<system::Stack<{ 32 * 1024 }>> =
+        ConstStaticCell::new(system::Stack::new());
+    let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+    let _speech_core = cpu_control
+        .start_app_core(SPEECH_STACK.take(), speech::run)
+        .unwrap();
 
     // Display, with the sub-board timings from Espressif's `esp32_s3_lcd_ev_board` BSP
     // (`SUB_BOARD3_800_480_PANEL_35HZ_RGB_TIMING`).
@@ -212,7 +233,7 @@ async fn assistant(stack: Stack<'static>) -> ! {
         status: String::from("Connecting to Wi-Fi"),
         button: Button::Busy,
         you: String::new(),
-        assistant: String::new(),
+        assistant: questions(),
     };
     display::show(&screen);
     stack.wait_config_up().await;
@@ -234,7 +255,7 @@ async fn assistant(stack: Stack<'static>) -> ! {
         log::info!("Recorded {} samples", speech.len());
 
         screen.button = Button::Busy;
-        if let Err(error) = converse(&mut api, &mut screen, &speech).await {
+        if let Err(error) = converse(&mut api, &mut screen, speech).await {
             log::error!("{error}");
             screen.status = String::from("Error");
             screen.assistant = format!("{error}");
@@ -242,16 +263,17 @@ async fn assistant(stack: Stack<'static>) -> ! {
     }
 }
 
-async fn converse(api: &mut Api, screen: &mut Screen, speech: &[i16]) -> Result<(), api::Error> {
-    screen.status = String::from("Transcribing");
+async fn converse(api: &mut Api, screen: &mut Screen, speech: Samples) -> Result<(), api::Error> {
+    screen.status = String::from("Recognizing");
     display::show(screen);
-    screen.you = api.transcribe(speech).await?;
-    screen.assistant.clear();
-    log::info!("You: {}", screen.you);
-    if screen.you.trim().is_empty() {
-        screen.assistant = String::from("I did not hear anything.");
+    let Some(question) = speech::recognize(speech).await else {
+        screen.you.clear();
+        screen.assistant = format!("I did not recognize a question. {}", questions());
         return Ok(());
-    }
+    };
+    log::info!("You: {question}");
+    screen.you = String::from(question);
+    screen.assistant.clear();
 
     screen.status = String::from("Thinking");
     display::show(screen);
@@ -261,6 +283,15 @@ async fn converse(api: &mut Api, screen: &mut Screen, speech: &[i16]) -> Result<
         screen.assistant = String::from("Claude did not answer.");
     }
     Ok(())
+}
+
+/// The questions the assistant recognizes, for the screen.
+fn questions() -> String {
+    let questions: Vec<&str> = speech::QUESTIONS
+        .iter()
+        .map(|question| question.to_str().unwrap())
+        .collect();
+    format!("Ask one of: {}.", questions.join(", "))
 }
 
 #[embassy_executor::task]
