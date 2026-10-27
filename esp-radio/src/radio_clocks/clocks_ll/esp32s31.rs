@@ -1,7 +1,16 @@
 pub(crate) fn enable_wifi(en: bool) {
-    regs!(MODEM_SYSCON)
-        .clk_conf1()
-        .modify(|_, w| w.clk_wifimac_en().bit(en));
+    regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
+        w.clk_wifi_apb_en().bit(en);
+        w.clk_wifimac_en().bit(en);
+        w.clk_wifibb_22m_en().bit(en);
+        w.clk_wifibb_40m_en().bit(en);
+        w.clk_wifibb_44m_en().bit(en);
+        w.clk_wifibb_80m_en().bit(en);
+        w.clk_wifibb_40x_en().bit(en);
+        w.clk_wifibb_80x_en().bit(en);
+        w.clk_wifibb_40x1_en().bit(en);
+        w.clk_wifibb_160x1_en().bit(en)
+    });
 
     // The radios share the coexistence clock, as in ESP-IDF's `COEXIST_CLOCK_DEPS`, and the other
     // radios can be active while Wi-Fi dozes.
@@ -96,11 +105,20 @@ pub(crate) fn reset_wifi_mac() {
 }
 
 pub(crate) fn init_clocks() {
-    // done in esp-hal
+    // Every radio and the PHY need the modem on the PLL clock and `clk_wifibb_80x1_en`, before
+    // their first register access. Enable the PLL gate, then select it. The values are from
+    // ESP-IDF: https://github.com/espressif/esp-idf/blob/69b860b6b8d51eda8ec68eb820833d569dd796ab/components/hal/esp32s31/modem_clock_hal.c#L120-L136
+    let modem_conf = regs!(HP_SYS_CLKRST).modem_conf();
+    modem_conf.write(|w| unsafe { w.bits(0x15) });
+    modem_conf.write(|w| unsafe { w.bits(0x1d) });
+
+    regs!(MODEM_SYSCON)
+        .clk_conf1()
+        .modify(|_, w| w.clk_wifibb_80x1_en().set_bit());
 }
 
 pub(crate) fn deinit_clocks() {
-    // nothing to do, `init_clocks` is a no-op
+    // The clocks of `init_clocks` stay on.
 }
 
 pub(crate) fn ble_rtc_clk_init() {
