@@ -26,6 +26,7 @@ has_crc_be  = true
 has_md5_bsd = true
 
 [device.soc]
+cpu_watchpoints = 8
 cpu_has_csr_pc = true
 cpu_mcause_mask = 0x1f
 
