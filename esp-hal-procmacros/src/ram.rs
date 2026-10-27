@@ -716,7 +716,6 @@ mod tests {
             },
         };
 
-        #[cfg(not(feature = "uncached"))]
         assert_eq!(result.to_string(), expectation.to_string());
     }
 

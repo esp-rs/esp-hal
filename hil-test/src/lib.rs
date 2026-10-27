@@ -208,13 +208,13 @@ pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
 
-/// Disables every watchdog timer with raw register writes.
+/// Starts the RTT logger and disables every watchdog timer with raw register writes.
 ///
-/// This prevents the firmware reset loop if no debugger is attached. The function must not depend
-/// on esp-hal drivers, because a driver that is broken or half-initialized must not stop the tests
-/// from running.
+/// Disabling the watchdogs prevents the firmware reset loop if no debugger is attached. The
+/// function must not depend on esp-hal drivers, because a driver that is broken or half-initialized
+/// must not stop the tests from running.
 #[embedded_test::setup]
-fn disable_watchdogs_before_semihosting() {
+fn init_rtt_and_disable_watchdogs() {
     #[cfg(feature = "defmt")]
     {
         let channels = cfg_select! {
