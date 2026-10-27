@@ -79,6 +79,9 @@ cfg_select! {
 mod arch;
 pub use arch::*;
 
+#[cfg(feature = "rt")]
+mod isr_stack;
+
 use crate::pac;
 
 unstable_module! {

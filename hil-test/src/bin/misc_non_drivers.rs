@@ -23,6 +23,7 @@
 
 #![no_std]
 #![no_main]
+#![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 
 #[path = "misc_non_drivers/clock_monitor.rs"]
 mod clock_monitor;
