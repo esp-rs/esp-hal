@@ -9,3 +9,8 @@
 pub mod adc;
 #[cfg(dac_driver_supported)]
 pub mod dac;
+
+// DAC channels share SENS control registers. On ESP32-S2, ADC initialization
+// also modifies SAR_AMP_CTRL3.
+#[cfg(dac_driver_supported)]
+static ADC_DAC_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
