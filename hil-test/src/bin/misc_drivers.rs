@@ -3,6 +3,7 @@
 //! MCPWM Tests
 //! PCNT Tests
 //! RNG Tests
+//! SDMMC Tests
 //! System Timer Tests
 //! TWAI Tests
 //! Debug Assist Tests
@@ -1108,5 +1109,173 @@ mod assist_debug {
         da.clear_core1_region0_monitor_interrupt();
 
         assert_pc_in_ram(pc);
+    }
+}
+
+#[cfg(esp32p4)]
+#[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
+mod sdmmc {
+    use block_device_adapters::BufStream;
+    use embassy_time::Delay;
+    use embedded_fatfs::{FileSystem, FsOptions, ReadWriteSeek};
+    use embedded_io_async::{Read, Seek, SeekFrom, Write};
+    use embedded_partitions::mbr::Scheme;
+    use esp_hal::{
+        Async,
+        sdmmc::{Config, DelayPhase, SdHostController, Slot, SlotConfig},
+        timer::timg::TimerGroup,
+    };
+    use hil_test::mk_static;
+    use sdio::{BlockDevice, sd::Card};
+
+    type SdCard = BlockDevice<Card, Slot<'static, 0, Async>, Delay, 512>;
+
+    const CARD_HZ: u32 = 40_000_000;
+
+    // The test writes the file only when it is missing, to limit wear on the card.
+    const TEST_FILE: &str = "ESPHIL.TXT";
+
+    // Spans several 512-byte blocks, so reads use the multi-block path.
+    const FILE_LEN: usize = 2048;
+
+    // The prime modulus keeps the pattern from lining up with block boundaries.
+    const fn pattern_byte(i: usize) -> u8 {
+        (i % 251) as u8
+    }
+
+    fn expected() -> [u8; FILE_LEN] {
+        core::array::from_fn(pattern_byte)
+    }
+
+    #[derive(Clone, Copy)]
+    enum ReadMethod {
+        ReadToEnd,
+        ReadExact,
+        Chunked,
+        Seek,
+    }
+
+    #[init]
+    async fn init() -> SdCard {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        let controller = mk_static!(
+            SdHostController<'static>,
+            SdHostController::new(peripherals.SDHOST, Config::default()).unwrap()
+        );
+        let slot = controller
+            .slot::<0>(SlotConfig::default().with_input_delay_phase(DelayPhase::_0))
+            .unwrap()
+            .with_clk(peripherals.GPIO43)
+            .with_cmd(peripherals.GPIO44)
+            .with_data0(peripherals.GPIO39)
+            .with_data1(peripherals.GPIO40)
+            .with_data2(peripherals.GPIO41)
+            .with_data3(peripherals.GPIO42)
+            .into_async();
+
+        BlockDevice::new_sd_card(slot, CARD_HZ, Delay)
+            .await
+            .unwrap()
+    }
+
+    async fn run_on_volume(card: &mut SdCard, method: ReadMethod) {
+        let stream = BufStream::<_, 512>::new(card);
+        match Scheme::open(stream).await.unwrap() {
+            Scheme::Mbr(mut mbr) => {
+                let idx = mbr
+                    .iter_used()
+                    .find(|(_, p)| p.is_fat())
+                    .map(|(i, _)| i)
+                    .expect("no FAT partition found");
+                check_file(mbr.open_partition(idx).await.unwrap(), method).await;
+            }
+            Scheme::Superfloppy(io) => check_file(io, method).await,
+            Scheme::Unknown(_) => panic!("unrecognised volume layout"),
+        }
+    }
+
+    async fn check_file<IO: ReadWriteSeek>(io: IO, method: ReadMethod) {
+        let expected = expected();
+        let fs = FileSystem::new(io, FsOptions::new()).await.unwrap();
+        {
+            let root = fs.root_dir();
+
+            match root.open_file(TEST_FILE).await {
+                Ok(_) => {}
+                Err(embedded_fatfs::Error::NotFound) => {
+                    let mut file = root.create_file(TEST_FILE).await.unwrap();
+                    file.write_all(&expected).await.unwrap();
+                    file.flush().await.unwrap();
+                }
+                Err(e) => panic!("open_file failed: {:?}", e),
+            }
+
+            let mut file = root.open_file(TEST_FILE).await.unwrap();
+            let mut buf = [0u8; FILE_LEN + 1];
+            match method {
+                ReadMethod::ReadToEnd => {
+                    let mut len = 0;
+                    loop {
+                        match file.read(&mut buf[len..]).await.unwrap() {
+                            0 => break,
+                            n => len += n,
+                        }
+                    }
+                    assert_eq!(len, FILE_LEN);
+                    assert_eq!(&buf[..len], &expected[..]);
+                }
+                ReadMethod::ReadExact => {
+                    file.read_exact(&mut buf[..FILE_LEN]).await.unwrap();
+                    assert_eq!(&buf[..FILE_LEN], &expected[..]);
+                    assert_eq!(file.read(&mut buf).await.unwrap(), 0);
+                }
+                ReadMethod::Chunked => {
+                    // 100 bytes does not divide the block size, so chunks cross block boundaries.
+                    for (i, chunk) in buf[..FILE_LEN].chunks_mut(100).enumerate() {
+                        file.read_exact(chunk).await.unwrap();
+                        let start = i * 100;
+                        assert_eq!(chunk, &expected[start..start + chunk.len()]);
+                    }
+                }
+                ReadMethod::Seek => {
+                    file.seek(SeekFrom::Start(700)).await.unwrap();
+                    file.read_exact(&mut buf[..1000]).await.unwrap();
+                    assert_eq!(&buf[..1000], &expected[700..1700]);
+
+                    file.seek(SeekFrom::End(-10)).await.unwrap();
+                    file.read_exact(&mut buf[..10]).await.unwrap();
+                    assert_eq!(&buf[..10], &expected[FILE_LEN - 10..]);
+
+                    file.seek(SeekFrom::Start(0)).await.unwrap();
+                    file.read_exact(&mut buf[..10]).await.unwrap();
+                    assert_eq!(&buf[..10], &expected[..10]);
+                }
+            }
+        }
+        fs.unmount().await.unwrap();
+    }
+
+    #[test]
+    async fn read_to_end(mut card: SdCard) {
+        run_on_volume(&mut card, ReadMethod::ReadToEnd).await;
+    }
+
+    #[test]
+    async fn read_exact(mut card: SdCard) {
+        run_on_volume(&mut card, ReadMethod::ReadExact).await;
+    }
+
+    #[test]
+    async fn read_in_chunks(mut card: SdCard) {
+        run_on_volume(&mut card, ReadMethod::Chunked).await;
+    }
+
+    #[test]
+    async fn seek_and_read(mut card: SdCard) {
+        run_on_volume(&mut card, ReadMethod::Seek).await;
     }
 }
