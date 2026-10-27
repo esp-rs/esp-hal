@@ -155,6 +155,10 @@ impl<'d> Hmac<'d> {
             return Err(nb::Error::Other(Error::KeyPurposeMismatch));
         }
 
+        if m != HmacPurpose::ToUser {
+            while self.is_busy() {}
+        }
+
         Ok(())
     }
 
