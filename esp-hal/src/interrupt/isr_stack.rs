@@ -28,6 +28,87 @@ cfg_select! {
 /// code change the depth while interrupts that use the interrupt stack are masked.
 static mut NESTING: [u32; Cpu::COUNT] = [0; Cpu::COUNT];
 
+/// The value that fills the unused part of an interrupt stack.
+const FILL_PATTERN: u32 = 0xA5A5_A5A5;
+
+#[cfg(isr_stack_guard_monitoring)]
+const GUARD_OFFSET: usize = esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET");
+
+/// Returns the words of the interrupt stack of `cpu`, from the bottom to the top.
+fn stack_of(cpu: Cpu) -> *mut [u32] {
+    unsafe extern "C" {
+        static mut _isr_stack_bottom_cpu0: u32;
+        static mut _isr_stack_top_cpu0: u32;
+        #[cfg(multi_core)]
+        static mut _isr_stack_bottom_cpu1: u32;
+        #[cfg(multi_core)]
+        static mut _isr_stack_top_cpu1: u32;
+    }
+
+    let (bottom, top) = match cpu {
+        Cpu::ProCpu => (
+            &raw mut _isr_stack_bottom_cpu0,
+            &raw mut _isr_stack_top_cpu0,
+        ),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => (
+            &raw mut _isr_stack_bottom_cpu1,
+            &raw mut _isr_stack_top_cpu1,
+        ),
+    };
+    let words = (top.addr() - bottom.addr()) / size_of::<u32>();
+    core::ptr::slice_from_raw_parts_mut(bottom, words)
+}
+
+/// Prepares the interrupt stack of the current CPU.
+///
+/// The function resets the nesting depth, fills the stack with [`FILL_PATTERN`], and writes the
+/// stack guard.
+///
+/// # Safety
+///
+/// No interrupt handler runs on the interrupt stack of the current CPU, and the CPU does not
+/// enable such interrupts before the function returns.
+pub(crate) unsafe fn init_current_cpu() {
+    let cpu = Cpu::current();
+    unsafe { (&raw mut NESTING[cpu as usize]).write_volatile(0) };
+
+    let stack = stack_of(cpu);
+    let bottom = stack.cast::<u32>();
+    for index in 0..stack.len() {
+        unsafe { bottom.add(index).write_volatile(FILL_PATTERN) };
+    }
+
+    #[cfg(isr_stack_guard_monitoring)]
+    unsafe {
+        let guard = bottom.byte_add(GUARD_OFFSET);
+        guard.write_volatile(esp_config::esp_config_int!(
+            u32,
+            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+        ));
+        crate::debugger::set_isr_stack_watchpoint(guard.addr());
+    }
+}
+
+/// Returns the number of bytes at the bottom of the interrupt stack of `cpu` that still hold the
+/// fill pattern.
+pub(super) fn unused(cpu: Cpu) -> usize {
+    let stack = stack_of(cpu);
+    let bottom = stack.cast::<u32>();
+
+    #[cfg(isr_stack_guard_monitoring)]
+    let guard = GUARD_OFFSET / size_of::<u32>();
+    #[cfg(not(isr_stack_guard_monitoring))]
+    let guard = usize::MAX;
+
+    let unused = (0..stack.len())
+        .take_while(|&index| {
+            index == guard || unsafe { bottom.add(index).read_volatile() } == FILL_PATTERN
+        })
+        .count();
+    unused * size_of::<u32>()
+}
+
 /// Concatenates the assembly on dual-core chips. Expands to an empty string on single-core chips.
 #[cfg(multi_core)]
 macro_rules! multi_core {
@@ -116,15 +197,24 @@ mod riscv {
                         ),
                         "
                     1:
-                        addi sp, sp, -16
+                        addi sp, sp, -32
                         sw   ra, 0(sp)
                         sw   t0, 4(sp)
                         sw   t1, 8(sp)
+
+                        # A frame record that links a frame-pointer backtrace to the interrupted
+                        # code: the interrupted frame pointer, and the interrupted PC as the
+                        # return address.
+                        sw   s0, 24(sp)
+                        csrr t2, mepc
+                        sw   t2, 28(sp)
+                        addi s0, sp, 32
 
                         call {handler}
 
                         lw   t0, 4(sp)
                         lw   t1, 8(sp)
+                        lw   s0, 24(sp)
 
                         # The handler returns with interrupts disabled.
                         lw   t3, 0(t1)

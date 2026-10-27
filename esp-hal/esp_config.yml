@@ -79,6 +79,16 @@ options:
     default:
       - value: true
 
+  - name: isr-stack-guard-monitoring
+    description: "Use a data watchpoint to check if the stack guard of an interrupt stack was
+      overwritten. The guard is `stack-guard-offset` bytes from the end of the interrupt stack. On
+      chips with two watchpoints, this takes the watchpoint that a debugger can use, and on RISC-V
+      it cannot be used together with `write-vec-table-monitoring`."
+    default:
+      - value: false
+        if: 'soc_cpu_watchpoints == "2"'
+      - value: true
+
   - name: write-vec-table-monitoring
     description: Use a data watchpoint to check that the vector table was not unintentionally overwritten.
     default:

@@ -11,6 +11,7 @@ SECTIONS {
     . += ${ESP_HAL_CONFIG_ISR_STACK_SIZE};
     _isr_stack_top_cpu1 = ABSOLUTE(.);
 #ENDIF
+    ASSERT(${ESP_HAL_CONFIG_STACK_GUARD_OFFSET} + 4 <= ${ESP_HAL_CONFIG_ISR_STACK_SIZE}, "The stack guard offset must be inside the interrupt stack.");
 
     _stack_end = ABSOLUTE(.);
     _stack_end_cpu0 = ABSOLUTE(.);

@@ -51,6 +51,61 @@ pub unsafe fn set_stack_watchpoint(addr: usize) {
     }
 }
 
+/// The watchpoint that watches the stack guard of the interrupt stack.
+///
+/// Watchpoint 0 watches the stack guard of the current task. On RISC-V chips with two
+/// watchpoints, `write-vec-table-monitoring` uses watchpoint 1.
+#[cfg(isr_stack_guard_monitoring)]
+pub(crate) const ISR_STACK_WATCHPOINT: u8 = if property!("soc.cpu_watchpoints") >= 3 {
+    2
+} else {
+    1
+};
+
+#[cfg(all(riscv, isr_stack_guard_monitoring, write_vec_table_monitoring))]
+const _: () = core::assert!(
+    ISR_STACK_WATCHPOINT != 1,
+    "`isr-stack-guard-monitoring` and `write-vec-table-monitoring` need the same watchpoint"
+);
+
+/// Sets a word-sized data watchpoint on the stack guard of the interrupt stack at `addr`.
+///
+/// No watchpoint is set when a debugger is currently attached if the
+/// `stack_guard_monitoring_with_debugger_connected` option is false.
+///
+/// # Safety
+///
+/// The address must be word aligned.
+#[cfg(isr_stack_guard_monitoring)]
+pub(crate) unsafe fn set_isr_stack_watchpoint(addr: usize) {
+    assert!(addr.is_multiple_of(4));
+
+    if cfg!(stack_guard_monitoring_with_debugger_connected)
+        || !crate::debugger::debugger_connected()
+    {
+        cfg_select! {
+            xtensa => {
+                const _: () = core::assert!(ISR_STACK_WATCHPOINT == 1);
+                let dbreakc = 0b1111100 | (1 << 31); // bit 31 = STORE
+
+                unsafe {
+                    core::arch::asm!(
+                        "
+                        wsr {addr}, 145 // 145 = dbreaka1
+                        wsr {dbreakc}, 161 // 161 = dbreakc1
+                        ",
+                        addr = in(reg) addr,
+                        dbreakc = in(reg) dbreakc,
+                    );
+                }
+            }
+            _ => unsafe {
+                set_watchpoint(ISR_STACK_WATCHPOINT, addr, 4);
+            },
+        }
+    }
+}
+
 #[cfg(riscv)]
 pub(crate) static DEBUGGER_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 

@@ -759,6 +759,9 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(stack_guard_monitoring)]
     crate::soc::enable_main_stack_guard_monitoring();
 
+    // No peripheral interrupt handler is bound yet, so nothing runs on the interrupt stack.
+    unsafe { crate::interrupt::init_isr_stack() };
+
     #[cfg(all(feature = "rt", enable_pmp, riscv))]
     crate::soc::enable_pmp();
 
