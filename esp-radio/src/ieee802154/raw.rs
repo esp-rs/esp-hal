@@ -118,9 +118,42 @@ impl Drop for RadioClockGuard {
     }
 }
 
+/// Counts the radio as a TRNG entropy source while the PHY is enabled.
+///
+/// Must be dropped before the PHY guards: the count must fall before the entropy source is
+/// disabled.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct EntropySourceGuard;
+
+impl EntropySourceGuard {
+    fn new() -> Self {
+        // The PHY enables the high-speed ADC that feeds the RNG.
+        #[cfg(rng_trng_supported)]
+        unsafe {
+            esp_hal::rng::TrngSource::increase_entropy_source_counter()
+        };
+        Self
+    }
+}
+
+impl Drop for EntropySourceGuard {
+    fn drop(&mut self) {
+        #[cfg(rng_trng_supported)]
+        esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
+            esp_hal::Internal::conjure()
+        });
+    }
+}
+
 pub(crate) fn esp_ieee802154_enable(
     radio: IEEE802154<'_>,
-) -> (PhyClockGuard<'_>, PhyInitGuard<'_>, RadioClockGuard) {
+) -> (
+    EntropySourceGuard,
+    PhyClockGuard<'_>,
+    PhyInitGuard<'_>,
+    RadioClockGuard,
+) {
     // The modem power domain (and, with it, the modem reset) and the BT baseband are shared with
     // BLE: taken here so that a BLE controller created later does not reset the MAC configured
     // below, and so that the baseband is initialized once, by whichever radio comes first.
@@ -129,12 +162,18 @@ pub(crate) fn esp_ieee802154_enable(
     enable_ieee802154(true);
 
     let phy_init_guard = esp_phy::enable_phy();
+    let entropy_source_guard = EntropySourceGuard::new();
 
     crate::btbb_enable();
     ieee802154_mac_init(radio);
 
     info!("date={:x}", mac_date());
-    (phy_clock_guard, phy_init_guard, RadioClockGuard)
+    (
+        entropy_source_guard,
+        phy_clock_guard,
+        phy_init_guard,
+        RadioClockGuard,
+    )
 }
 
 fn ieee802154_mac_init(radio: IEEE802154<'_>) {

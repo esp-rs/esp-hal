@@ -33,6 +33,11 @@ harness           = false
 required-features = ["esp-alloc"]
 
 [[bin]]
+name              = "ieee802154"
+harness           = false
+required-features = ["esp-alloc"]
+
+[[bin]]
 name              = "gpio"
 harness           = false
 
