@@ -994,37 +994,92 @@ mod tests {
         run_test_i2s_rx_half_sample_bits_regression(i2s, dma_channel);
     }
 
-    #[test]
-    #[cfg(all(soc_has_i2s0, pcnt_driver_supported, not(esp32)))]
-    fn test_i2s_mclk_frequency_i2s0() {
+    /// Returns the MCLK frequency in Hz, measured over 20 ms.
+    #[cfg(all(pcnt_driver_supported, not(i2s_version = "1")))]
+    fn measure_mclk_hz(counter: &super::EdgeCounter<'_>) -> u64 {
         use esp_hal::time::{Duration, Instant};
+
+        // The counter resets at the limit. Poll faster than 30000 edges.
+        const LIMIT: i16 = 30000;
+        counter.unit.set_high_limit(Some(LIMIT)).unwrap();
+        counter.unit.clear();
+
+        let mut edges = 0u64;
+        let mut last = 0i16;
+        let start = Instant::now();
+        loop {
+            let value = counter.unit.value();
+            let elapsed = start.elapsed();
+            edges += (value as i32 - last as i32).rem_euclid(LIMIT as i32) as u64;
+            last = value;
+            if elapsed >= Duration::from_millis(20) {
+                return edges * 1_000_000 / elapsed.as_micros();
+            }
+        }
+    }
+
+    /// Configures each sample rate in sequence and checks that MCLK is 256 times the rate.
+    #[cfg(all(pcnt_driver_supported, not(i2s_version = "1")))]
+    fn run_test_i2s_mclk_frequency(sample_rates: &[u32]) {
+        use esp_hal::i2s::master::TdmUnitConfig;
 
         let (i2s, dma_channel, pin): (AnyI2s, AnyI2sDmaChannel, AnyPin) =
             i2s_instance_resources!(I2S0);
         let (input, output) = unsafe { pin.split() };
-        let mut counter = super::EdgeCounter::new(input);
+        let counter = super::EdgeCounter::new(input);
 
-        // 44.1 kHz needs a fractional MCLK divider.
-        let _i2s = I2s::new(
+        let unit_config = |rate| {
+            TdmUnitConfig::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(rate))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO)
+        };
+
+        // MCLK shows the RX clock.
+        let mut i2s_rx = I2s::new(
             i2s,
             dma_channel,
-            TdmConfig::new_tdm_philips()
-                .with_sample_rate(Rate::from_hz(44100))
-                .with_data_format(DataFormat::Data16Channel16)
-                .with_channels(Channels::STEREO),
+            TdmConfig::default()
+                .with_tx_config(unit_config(sample_rates[0]))
+                .with_rx_config(unit_config(sample_rates[0])),
         )
         .unwrap()
-        .with_mclk(output);
+        .with_mclk(output)
+        .i2s_rx
+        .build();
 
-        counter.clear();
-        let start = Instant::now();
-        while start.elapsed() < Duration::from_micros(2000) {}
-        let edges = counter.count() as u64;
-        let elapsed = start.elapsed().as_micros();
+        for (i, &rate) in sample_rates.iter().enumerate() {
+            if i > 0 {
+                i2s_rx.apply_config(&unit_config(rate)).unwrap();
+            }
 
-        // 256 * 44.1 kHz = 11_289_600 Hz, ±0.5 %.
-        let hz = edges * 1_000_000 / elapsed;
-        assert!((11_233_152..=11_346_048).contains(&hz), "MCLK is {} Hz", hz);
+            let expected = rate as u64 * 256;
+            let hz = measure_mclk_hz(&counter);
+            assert!(
+                hz.abs_diff(expected) <= expected / 2000,
+                "MCLK is {} Hz, expected {} Hz",
+                hz,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, pcnt_driver_supported, not(i2s_version = "1")))]
+    fn test_i2s_mclk_frequency_44100_i2s0() {
+        run_test_i2s_mclk_frequency(&[44100]);
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, pcnt_driver_supported, not(i2s_version = "1")))]
+    fn test_i2s_mclk_frequency_48000_i2s0() {
+        run_test_i2s_mclk_frequency(&[48000]);
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, pcnt_driver_supported, not(i2s_version = "1")))]
+    fn test_i2s_mclk_frequency_reconfigure_i2s0() {
+        run_test_i2s_mclk_frequency(&[16000, 48000]);
     }
 
     #[test]
