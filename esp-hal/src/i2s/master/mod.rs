@@ -128,10 +128,10 @@
 //! # use esp_hal::i2s::master::{I2s, Channels, DataFormat, TdmConfig};
 //! # use esp_hal::dma_tx_stream_buffer;
 //! let tx_buffer = dma_tx_stream_buffer!(4 * 4092, 1024);
-//! let samples: &[u8] = [...];
+//! let samples: &[u8] = &[0; 32000]; // Make sure you're handling a slice with actual data
 //!
 //! let i2s = I2s::new(
-//!     peripheral.I2S0,
+//!     peripherals.I2S0,
 //!     peripherals.__dma_channel__,
 //!     TdmConfig::new_tdm_philips()
 //!         .with_sample_rate(Rate::from_hz(44100))
@@ -147,16 +147,22 @@
 //!     .with_dout(peripherals.GPIO5)
 //!     .build();
 //!
-//! let mut transfer = i2s_tx.write(i2s_buffer).unwrap();
+//! let mut transfer = i2s_tx.write(tx_buffer)?;
 //!
 //! let mut written = 0;
-//! let audio_sample_len = audio_sample.iter().len();
-//! while written < audio_sample_len {
+//! let samples_len = samples.iter().len();
+//! while written < samples_len {
 //!     if transfer.available_bytes() > 0 {
 //!         let out_written = transfer.push(&audio_sample[written..]);
 //!         written += out_written;
 //!     }
 //! }
+//!
+//! // Wait for DMA to completely transfer the bytes written above
+//! let (result, _i2s_tx, _tx_buffer) = transfer.wait();
+//! result?;
+//!
+//! # {after_snippet}
 //! ```
 //!
 #![cfg_attr(
