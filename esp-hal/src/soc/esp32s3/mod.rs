@@ -110,11 +110,11 @@ pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
         fn Cache_Resume_DCache_Autoload(value: u32);
     }
     // suspend autoload, avoid load cachelines being written back
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         let autoload = Cache_Suspend_DCache_Autoload();
         rom_Cache_WriteBack_Addr(addr, size);
         Cache_Resume_DCache_Autoload(autoload);
-    }
+    });
 }
 
 /// Invalidate a specific range of addresses in the cache.
@@ -124,9 +124,9 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(addr: u32, size: u32);
     }
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_Addr(addr, size);
-    }
+    });
 }
 
 /// Writes back all dirty data cache lines.
