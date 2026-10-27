@@ -382,6 +382,9 @@ macro_rules! property {
     ("rom.has_md5_mbedtls") => {
         false
     };
+    ("rom.no_libgcc") => {
+        true
+    };
     ("soc.cpu_has_branch_predictor") => {
         true
     };
