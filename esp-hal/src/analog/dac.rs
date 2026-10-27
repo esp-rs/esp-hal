@@ -4,17 +4,11 @@
 //! # Digital to Analog Converter (DAC)
 //!
 //! ## Overview
-//! Espressif devices usually have multiple DAC channels. Each DAC channel can
-//! convert the digital value 0~255 to the analog voltage 0~Vref (The reference
-//! voltage 'Vref' here is input from an input pin)
-//!
-//! The DAC peripheral supports outputting analog signal in the multiple ways.
-//!
-//! Two 8-bit DAC channels are available.
+//! Two 8-bit DAC channels convert digital values from 0 to 255 into analog
+//! voltages from 0 V to the reference supply voltage.
 //!
 //! ## Configuration
-//! Developers can choose the  DAC channel they want to use based on the GPIO
-//! pin assignments for each channel.
+//! Each DAC channel uses a fixed GPIO pin.
 //!
 //! ## Examples
 //! ### Write a value to a DAC channel
@@ -29,7 +23,6 @@
 //!
 //! let mut voltage_dac1 = 200u8;
 //!
-//! // Change voltage on the pins using write function:
 //! loop {
 //!     voltage_dac1 = voltage_dac1.wrapping_add(1);
 //!     dac1.write(voltage_dac1);
@@ -42,9 +35,6 @@
 use super::ADC_DAC_LOCK;
 use crate::gpio::AnalogPin;
 
-// Only specific pins can be used with each DAC peripheral, and of course
-// these pins are different depending on which chip you are using; for this
-// reason, we will type alias the pins for ease of use later in this module:
 cfg_select! {
     esp32 => {
         type Dac1Gpio<'d> = crate::peripherals::GPIO25<'d>;
@@ -112,8 +102,9 @@ where
 
     /// Writes the given value.
     ///
-    /// For each DAC channel, the output analog voltage can be calculated as
-    /// follows: DACn_OUT = VDD3P3_RTC * PDACn_DAC/256
+    /// The nominal output voltage is `Vref * value / 255`.
+    #[cfg_attr(esp32, doc = "The reference supply `Vref` is `VDD3P3_RTC`.")]
+    #[cfg_attr(esp32s2, doc = "The reference supply `Vref` is `VDD3P3_RTC_IO`.")]
     pub fn write(&mut self, value: u8) {
         ADC_DAC_LOCK.lock(|| {
             select_direct_source(T::INDEX);
