@@ -13,12 +13,10 @@ use embassy_sync::{
 use embassy_time::Duration;
 use esp_alloc::ExternalMemory;
 use esp_hal::{
-    Async,
-    dma::{DmaError, DmaRxStreamBuf, DmaTxStreamBuf},
     dma_rx_stream_buffer,
     dma_tx_stream_buffer,
     gpio::AnyPin,
-    i2s::master::{Channels, DataFormat, I2s, I2sRxDmaTransfer, I2sTxDmaTransfer, TdmConfig},
+    i2s::master::{Channels, DataFormat, I2s, TdmConfig},
     peripherals::{DMA_CH0, I2S0},
     time::Rate,
 };
@@ -77,49 +75,31 @@ pub async fn run(
         .with_data_format(DataFormat::Data32Channel16)
         .with_channels(Channels::STEREO);
     let i2s = I2s::new(i2s, dma, config).unwrap().into_async();
-    let mut tx = i2s
+    let tx = i2s
         .i2s_tx
         .with_bclk(bclk)
         .with_ws(ws)
         .with_dout(dout)
         .build();
-    let mut microphones = i2s.i2s_rx.with_din(din).build();
-    let mut tx_buffer = dma_tx_stream_buffer!(16 * 1024, 2048);
-    let mut microphone_buffer = dma_rx_stream_buffer!(16 * 1024, 2048);
+    let microphones = i2s.i2s_rx.with_din(din).build();
+    // About 170 ms each. Starting Wi-Fi blocks interrupts for about 80 ms (the PHY calibration),
+    // and the buffers must bridge that.
+    let Ok(mut tx) = tx.write(dma_tx_stream_buffer!(32 * 1024, 2048)) else {
+        panic!("Failed to start the I2S TX DMA");
+    };
+    let Ok(mut microphones) = microphones.read(dma_rx_stream_buffer!(32 * 1024, 2048)) else {
+        panic!("Failed to start the microphone DMA");
+    };
 
     let mut state = State::Idle;
-    loop {
-        let Ok(mut tx_transfer) = tx.write(tx_buffer) else {
-            panic!("Failed to start the I2S TX DMA");
-        };
-        let Ok(mut microphone_transfer) = microphones.read(microphone_buffer) else {
-            panic!("Failed to start the microphone DMA");
-        };
-
-        let error = stream(&mut tx_transfer, &mut microphone_transfer, &mut state).await;
-        // The DMA stops when Wi-Fi starts.
-        log::warn!("Audio DMA stopped ({error:?}), restarting it");
-
-        (tx, tx_buffer) = tx_transfer.stop();
-        (microphones, microphone_buffer) = microphone_transfer.stop();
-    }
-}
-
-/// Keeps TX fed with silence and hands microphone frames to `state` until the DMA stops.
-async fn stream(
-    tx: &mut I2sTxDmaTransfer<'static, Async, DmaTxStreamBuf>,
-    microphones: &mut I2sRxDmaTransfer<'static, Async, DmaRxStreamBuf>,
-    state: &mut State,
-) -> DmaError {
     let mut frames = [0u8; 2048];
-
     loop {
         if let Err(error) = tx.wait_for_available_async().await {
-            return error;
+            panic!("The I2S DMA stopped: {error:?}");
         }
 
         if let Ok(command) = COMMANDS.try_receive() {
-            *state = match (command, core::mem::replace(state, State::Idle)) {
+            state = match (command, state) {
                 (Command::Record, _) => State::Recording(Decimator::new()),
                 (Command::StopRecording, State::Recording(decimator)) => {
                     RECORDING.signal(decimator.samples);
@@ -139,20 +119,17 @@ async fn stream(
                 break;
             }
             let len = microphones.pop(&mut frames[..len]);
-            if let State::Recording(decimator) = state {
+            if let State::Recording(decimator) = &mut state {
                 decimator.push(&frames[..len]);
             }
         }
 
-        loop {
-            let pushed = tx.push_with(|out| {
-                out.fill(0);
-                out.len()
-            });
-            if pushed == 0 {
-                break;
-            }
-        }
+        // TX only sends silence.
+        while tx.push_with(|out| {
+            out.fill(0);
+            out.len()
+        }) > 0
+        {}
     }
 }
 
