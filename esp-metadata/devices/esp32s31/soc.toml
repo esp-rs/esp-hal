@@ -37,10 +37,10 @@ cpu_pmp_granularity = 128
 
 has_swd_watchdog = true
 
-# SRAM_START = 0x2F000000, SRAM_SEG_END = 0x2F07AFC0 (from esp-idf ld.hp_mem_defs)
+# SOC_DRAM_LOW = 0x2F000000, SOC_DRAM_HIGH = 0x2F080000 (from soc.h)
 # SOC_ROM_STACK_START = 0x2F07CFB0 (from soc.h)
 memory_map = { ranges = [
-    { name = "dram", start = 0x2F00_0000, end = 0x2F07_AFC0 },
+    { name = "dram", start = 0x2F00_0000, end = 0x2F08_0000 },
     # start address from the 2nd stage bootloader's linker script: https://github.com/espressif/esp-idf/blob/383dda6c182/components/bootloader/subproject/main/ld/esp32s31/bootloader.memory.ld.in#L52
     { name = "dram2_uninit", start = 0x2F06_CFB0, end = 0x2F07_CFB0 },
     { name = "irom", start = 0x4000_0000, end = 0x5000_0000 },

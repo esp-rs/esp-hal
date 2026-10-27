@@ -10118,7 +10118,7 @@ impl Chip {
                         (
                             "dram",
                             MemoryRegion {
-                                address_range: 0x2F000000..0x2F07AFC0,
+                                address_range: 0x2F000000..0x2F080000,
                             },
                         ),
                         (
