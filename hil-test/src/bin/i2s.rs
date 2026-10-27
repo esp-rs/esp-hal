@@ -995,6 +995,39 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(soc_has_i2s0, pcnt_driver_supported, not(esp32)))]
+    fn test_i2s_mclk_frequency_i2s0() {
+        use esp_hal::time::{Duration, Instant};
+
+        let (i2s, dma_channel, pin): (AnyI2s, AnyI2sDmaChannel, AnyPin) =
+            i2s_instance_resources!(I2S0);
+        let (input, output) = unsafe { pin.split() };
+        let mut counter = super::EdgeCounter::new(input);
+
+        // 44.1 kHz needs a fractional MCLK divider.
+        let _i2s = I2s::new(
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(44100))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )
+        .unwrap()
+        .with_mclk(output);
+
+        counter.clear();
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_micros(2000) {}
+        let edges = counter.count() as u64;
+        let elapsed = start.elapsed().as_micros();
+
+        // 256 * 44.1 kHz = 11_289_600 Hz, ±0.5 %.
+        let hz = edges * 1_000_000 / elapsed;
+        assert!((11_233_152..=11_346_048).contains(&hz), "MCLK is {} Hz", hz);
+    }
+
+    #[test]
     #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
     async fn test_rx_32() {
         run_test_data_formats_rx(
