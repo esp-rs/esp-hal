@@ -195,6 +195,77 @@ mod tests {
     }
 
     #[test]
+    #[cfg(multi_core)]
+    fn thread_runs_on_the_default_core(ctx: Context) {
+        struct TestContext {
+            ran_on_app_cpu: AtomicBool,
+            ran: SemaphoreHandle,
+        }
+
+        let test_context = TestContext {
+            ran_on_app_cpu: AtomicBool::new(false),
+            ran: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
+        };
+
+        extern "C" fn radio_thread(context: *mut c_void) {
+            let context = unsafe { &*(context as *const TestContext) };
+            context
+                .ran_on_app_cpu
+                .store(Cpu::current() == Cpu::AppCpu, Ordering::SeqCst);
+            context.ran.give();
+        }
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        esp_rtos::set_default_task_core(Some(Cpu::AppCpu));
+
+        // A thread that does not name a core runs on the default core.
+        let (default_cpu, _spawner) = ThreadSpawner::new(4096)
+            .with_priority(2)
+            .spawn(Cpu::current)
+            .join();
+
+        // A thread that names a core ignores the default.
+        let (pinned_cpu, _spawner) = ThreadSpawner::new(4096)
+            .with_pinned_to(Cpu::ProCpu)
+            .with_priority(2)
+            .spawn(Cpu::current)
+            .join();
+
+        // The threads that esp-radio creates without a core follow the default, too.
+        unsafe {
+            preempt::task_create(
+                "radio_thread",
+                radio_thread,
+                (&raw const test_context).cast::<c_void>().cast_mut(),
+                2,
+                None,
+                4096,
+            );
+        }
+        test_context.ran.take(None);
+
+        // The default is global state, restore it before parking the second core.
+        esp_rtos::set_default_task_core(None);
+
+        hil_test::assert_eq!(default_cpu, Cpu::AppCpu);
+        hil_test::assert_eq!(pinned_cpu, Cpu::ProCpu);
+        hil_test::assert!(test_context.ran_on_app_cpu.load(Ordering::SeqCst));
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
+    #[test]
     #[timeout(2)]
     fn time_slicing() {
         struct TestContext {

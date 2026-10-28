@@ -84,6 +84,12 @@ pub(crate) struct SchedulerState {
     /// boot core, because a thread-mode executor can be created before the main task starts the
     /// scheduler. Use `time_driver.is_some()` to tell the two cases apart.
     pub(crate) active_cores: ActiveCores,
+
+    /// The core that tasks are created on when they do not name one.
+    ///
+    /// `None` lets the scheduler run each task on either core.
+    #[cfg(multi_core)]
+    default_task_core: Option<Cpu>,
 }
 
 pub(crate) struct CpuState {
@@ -165,6 +171,9 @@ impl SchedulerState {
             per_cpu: [const { CpuState::new() }; Cpu::COUNT],
 
             active_cores: ActiveCores::Single(Cpu::ProCpu),
+
+            #[cfg(multi_core)]
+            default_task_core: None,
         }
     }
 
@@ -199,18 +208,33 @@ impl SchedulerState {
         }
     }
 
+    /// Sets the core that tasks run on when they do not name one.
+    #[cfg(multi_core)]
+    pub(crate) fn set_default_task_core(&mut self, cpu: Option<Cpu>) {
+        self.default_task_core = cpu;
+    }
+
     /// Adds a task to the scheduler.
     ///
     /// The caller must have initialized the `Task` object, and must keep it alive until the task
     /// is deleted.
     pub(crate) fn register_task(&mut self, mut task_ptr: TaskPtr) {
         #[cfg(multi_core)]
-        if let Some(cpu) = unsafe { task_ptr.as_ref().pinned_to } {
-            assert!(
-                self.active_cores.contains(cpu),
-                "Cannot create a task on {:?}, because the scheduler does not run on it",
-                cpu
-            );
+        {
+            let task = unsafe { task_ptr.as_mut() };
+
+            // A task that does not name a core runs on the default core, if there is one.
+            if task.pinned_to.is_none() {
+                task.pinned_to = self.default_task_core;
+            }
+
+            if let Some(cpu) = task.pinned_to {
+                assert!(
+                    self.active_cores.contains(cpu),
+                    "Cannot create a task on {:?}, because the scheduler does not run on it",
+                    cpu
+                );
+            }
         }
 
         unsafe {

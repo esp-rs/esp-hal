@@ -710,5 +710,27 @@ pub fn rearm_alarm() {
     });
 }
 
+/// Sets the default core that tasks run on when they do not name one.
+///
+/// A thread that names a core with [`thread::ThreadSpawner::with_pinned_to`], and the main tasks of
+/// the scheduler, always run on the core they name. Every other task runs on the default core,
+/// which is `None` until this function changes it. With the default `None`, the scheduler runs each
+/// task on either core.
+///
+/// The default applies to the tasks that are created after this function returns, and this
+/// function can be called before the scheduler starts. The threads that `esp-radio` creates without
+/// naming a core follow the default as well, so set it before starting the driver.
+///
+/// # Panics
+///
+/// Creating a task panics if the default core does not run the scheduler. Call
+/// [`start_second_core`] before setting a default of [`Cpu::AppCpu`]. When the scheduler runs on
+/// the second core only, call this function before [`start_on_second_core_only`], because the first
+/// core must not call esp-rtos functions afterwards.
+#[cfg(multi_core)]
+pub fn set_default_task_core(cpu: Option<Cpu>) {
+    SCHEDULER.with(|scheduler| scheduler.set_default_task_core(cpu));
+}
+
 #[cfg(feature = "embassy")]
 embassy_time_driver::time_driver_impl!(static TIMER_QUEUE: crate::timer::embassy::EmbassyTimeDriver = crate::timer::embassy::EmbassyTimeDriver);
