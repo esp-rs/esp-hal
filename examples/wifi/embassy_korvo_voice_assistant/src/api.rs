@@ -1,4 +1,4 @@
-//! The answer to a question, from Claude.
+//! The answer to a question, from Claude or from OpenAI, whichever has an API key.
 
 use alloc::{format, string::String};
 use core::fmt::{self, Write as _};
@@ -31,21 +31,69 @@ use reqwless::{headers::ContentType, request::Method, response::Response};
 use serde::Deserialize;
 use serde_json::json;
 
-const ANTHROPIC_API_KEY: &str = env!("ANTHROPIC_API_KEY");
+const ANTHROPIC_API_KEY: &str = key(option_env!("ANTHROPIC_API_KEY"));
+const OPENAI_API_KEY: &str = key(option_env!("OPENAI_API_KEY"));
 
-const HOST: &str = "api.anthropic.com";
-const MESSAGES_PATH: &str = "/v1/messages";
+/// An unset key is empty.
+const fn key(key: Option<&'static str>) -> &'static str {
+    match key {
+        Some(key) => key,
+        None => "",
+    }
+}
 
-/// The root certificate the server chains up to, in DER. `embedded-tls` checks the chain the server
-/// sends against one certificate: the issuer of the last certificate in the chain. The server ends
-/// its chain with a cross-signed root, so this is the cross-signing root. It comes from the macOS
-/// system trust store.
+/// The service that answers questions: the one with an API key. Without one, the assistant only
+/// handles the phrases that need no answer.
+pub const SERVICE: Option<Service> = match (ANTHROPIC_API_KEY.is_empty(), OPENAI_API_KEY.is_empty())
+{
+    (false, true) => Some(Service::Anthropic),
+    (true, false) => Some(Service::OpenAi),
+    (true, true) => None,
+    (false, false) => panic!("Set only one of ANTHROPIC_API_KEY and OPENAI_API_KEY"),
+};
+
+#[derive(Clone, Copy, Debug)]
+pub enum Service {
+    Anthropic,
+    OpenAi,
+}
+
+impl Service {
+    const fn host(self) -> &'static str {
+        match self {
+            Service::Anthropic => "api.anthropic.com",
+            Service::OpenAi => "api.openai.com",
+        }
+    }
+
+    const fn path(self) -> &'static str {
+        match self {
+            Service::Anthropic => "/v1/messages",
+            Service::OpenAi => "/v1/chat/completions",
+        }
+    }
+}
+
+impl fmt::Display for Service {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Service::Anthropic => "Claude",
+            Service::OpenAi => "OpenAI",
+        })
+    }
+}
+
+/// The root certificate both servers chain up to, in DER. `embedded-tls` checks the chain the
+/// server sends against one certificate: the issuer of the last certificate in the chain. Both
+/// servers end their chain with GTS Root R4 cross-signed by GlobalSign Root CA, so this is the
+/// cross-signing root. It comes from the macOS system trust store.
 ///
 /// GlobalSign Root CA, SHA-256 fingerprint
 /// `EBD41040E4BB3EC742C9E381D31EF2A41A48B6685C96E7CEF3C1DF6CD4331C99`, valid until 2028-01-28.
 const ROOT_CA: &[u8] = include_bytes!("../certs/globalsign-root-ca.der");
 
 const CLAUDE_MODEL: &str = "claude-haiku-5-5";
+const OPENAI_MODEL: &str = "gpt-5-mini";
 
 const INSTRUCTIONS: &str = "You are a voice assistant running on an ESP32-S31 microcontroller. \
     Answer in one to three short sentences of plain text without markdown or emoji, because your \
@@ -70,7 +118,11 @@ pub enum Error {
     Connect(ConnectError),
     Tls(TlsError),
     Http(reqwless::Error),
-    Api { status: u16, message: String },
+    Api {
+        service: Service,
+        status: u16,
+        message: String,
+    },
     Json(serde_json::Error),
 }
 
@@ -81,7 +133,11 @@ impl fmt::Display for Error {
             Error::Connect(error) => write!(f, "TCP connection failed: {error:?}"),
             Error::Tls(error) => write!(f, "TLS failed: {error:?}"),
             Error::Http(error) => write!(f, "HTTP request failed: {error:?}"),
-            Error::Api { status, message } => write!(f, "Claude returned {status}: {message}"),
+            Error::Api {
+                service,
+                status,
+                message,
+            } => write!(f, "{service} returned {status}: {message}"),
             Error::Json(error) => write!(f, "Unexpected response: {error}"),
         }
     }
@@ -141,7 +197,14 @@ impl Api {
     }
 
     /// Answers the question.
-    pub async fn chat(&mut self, question: &str) -> Result<String, Error> {
+    pub async fn chat(&mut self, service: Service, question: &str) -> Result<String, Error> {
+        match service {
+            Service::Anthropic => self.chat_anthropic(question).await,
+            Service::OpenAi => self.chat_openai(question).await,
+        }
+    }
+
+    async fn chat_anthropic(&mut self, question: &str) -> Result<String, Error> {
         #[derive(Deserialize)]
         struct Message {
             content: alloc::vec::Vec<Block>,
@@ -166,7 +229,7 @@ impl Api {
             ("anthropic-version", "2023-06-01"),
             ("Content-Type", ContentType::ApplicationJson.as_str()),
         ];
-        let body = self.post(&headers, &request).await?;
+        let body = self.post(Service::Anthropic, &headers, &request).await?;
         let message = serde_json::from_slice::<Message>(body)?;
         Ok(message
             .content
@@ -175,13 +238,60 @@ impl Api {
             .collect())
     }
 
+    async fn chat_openai(&mut self, question: &str) -> Result<String, Error> {
+        #[derive(Deserialize)]
+        struct Completion {
+            choices: alloc::vec::Vec<Choice>,
+        }
+        #[derive(Deserialize)]
+        struct Choice {
+            message: Message,
+        }
+        #[derive(Deserialize)]
+        struct Message {
+            /// Missing when the model refuses.
+            #[serde(default)]
+            content: Option<String>,
+        }
+
+        let request = serde_json::to_vec(&json!({
+            "model": OPENAI_MODEL,
+            // Includes the reasoning tokens.
+            "max_completion_tokens": 1024,
+            // More reasoning delays the answer and can use up the tokens before any text.
+            "reasoning_effort": "minimal",
+            "messages": [
+                { "role": "developer", "content": INSTRUCTIONS },
+                { "role": "user", "content": question },
+            ],
+        }))?;
+        let authorization = format!("Bearer {OPENAI_API_KEY}");
+        let headers = [
+            ("Authorization", authorization.as_str()),
+            ("Content-Type", ContentType::ApplicationJson.as_str()),
+        ];
+        let body = self.post(Service::OpenAi, &headers, &request).await?;
+        let completion = serde_json::from_slice::<Completion>(body)?;
+        Ok(completion
+            .choices
+            .into_iter()
+            .filter_map(|choice| choice.message.content)
+            .collect())
+    }
+
     /// Sends a POST request over a new TLS connection and returns the response body.
     ///
-    /// The server certificate must chain up to [`ROOT_CA`] and name [`HOST`]. Its validity period
-    /// is not checked, because the board does not know the time.
-    async fn post(&mut self, headers: &[(&str, &str)], body: &[u8]) -> Result<&[u8], Error> {
+    /// The server certificate must chain up to [`ROOT_CA`] and name the host of `service`. Its
+    /// validity period is not checked, because the board does not know the time.
+    async fn post(
+        &mut self,
+        service: Service,
+        headers: &[(&str, &str)],
+        body: &[u8],
+    ) -> Result<&[u8], Error> {
+        let host = service.host();
         let addresses = DnsSocket::new(self.stack)
-            .query(HOST, DnsQueryType::A)
+            .query(host, DnsQueryType::A)
             .await?;
         let Some(&address) = addresses.first() else {
             return Err(Error::Dns(dns::Error::Failed));
@@ -191,7 +301,7 @@ impl Api {
         socket.connect((address, 443)).await?;
 
         let config = TlsConfig::new()
-            .with_server_name(HOST)
+            .with_server_name(host)
             .with_ca(Certificate::X509(ROOT_CA));
         let mut tls = TlsConnection::<_, Aes128GcmSha256>::new(
             socket,
@@ -201,7 +311,8 @@ impl Api {
         tls.open(TlsContext::new(&config, Provider::new())).await?;
 
         let mut head = format!(
-            "POST {MESSAGES_PATH} HTTP/1.1\r\nHost: {HOST}\r\nContent-Length: {}\r\nConnection: close\r\n",
+            "POST {} HTTP/1.1\r\nHost: {host}\r\nContent-Length: {}\r\nConnection: close\r\n",
+            service.path(),
             body.len()
         );
         for (name, value) in headers {
@@ -223,6 +334,7 @@ impl Api {
 
         if !(200..300).contains(&status) {
             return Err(Error::Api {
+                service,
                 status,
                 message: error_message(body),
             });

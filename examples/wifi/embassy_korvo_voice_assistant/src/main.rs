@@ -1,13 +1,14 @@
 //! Embassy Voice Assistant Example
 //!
-//! Set SSID, PASSWORD, ANTHROPIC_API_KEY and ESP_SR_COMPONENTS env variables before running this
-//! example.
+//! Set SSID, PASSWORD, ESP_SR_COMPONENTS and one of ANTHROPIC_API_KEY or OPENAI_API_KEY env
+//! variables before running this example. Without an API key, the example only recognizes the
+//! light commands and does not use Wi-Fi.
 //!
 //! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the talk button on the
 //! screen, say one of the phrases that the phrases button shows, then tap the talk button again.
-//! The second core recognizes the phrase with MultiNet from Espressif's ESP-SR. Claude answers
-//! questions, and light commands set the color of the board's RGB LED. The phrase and the answer
-//! are shown on the screen.
+//! The second core recognizes the phrase with MultiNet from Espressif's ESP-SR. Claude or OpenAI
+//! answers questions, and light commands set the color of the board's RGB LED. The phrase and the
+//! answer are shown on the screen.
 //!
 //! The API key is stored in the firmware in plain text, and anyone with access to the board can
 //! read it. Use a key with a spending limit.
@@ -80,7 +81,7 @@ use esp_rtos::embassy::InterruptExecutor;
 use static_cell::{ConstStaticCell, StaticCell};
 
 use crate::{
-    api::Api,
+    api::{Api, Service},
     audio::Samples,
     display::{Button, Screen},
     led::{Color, Led},
@@ -92,7 +93,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 /// What the assistant does with a recognized phrase.
 #[derive(Clone, Copy)]
 enum Action {
-    /// Claude answers the phrase.
+    /// Claude or OpenAI answers the phrase.
     Ask,
     /// The RGB LED shows the color.
     Light(Color),
@@ -169,7 +170,10 @@ async fn main(spawner: Spawner) -> ! {
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
     let _speech_core = cpu_control
         .start_app_core(SPEECH_STACK.take(), || {
-            speech::run(PHRASES.iter().map(|(phrase, _)| *phrase), PRONUNCIATIONS)
+            speech::run(
+                available_phrases().map(|(phrase, _)| *phrase),
+                PRONUNCIATIONS,
+            )
         })
         .unwrap();
 
@@ -256,6 +260,14 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(touch::run(i2c).unwrap());
 
+    let mut led = Led::new(peripherals.RMT, peripherals.GPIO37);
+    led.set(Color::OFF).await;
+
+    let Some(service) = api::SERVICE else {
+        log::info!("No API key: only light commands, without Wi-Fi");
+        assistant(None, led).await
+    };
+
     // Wi-Fi
     let station_config = Config::Station(
         StationConfig::default()
@@ -282,24 +294,26 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(connection(controller).unwrap());
     spawner.spawn(net_task(runner).unwrap());
 
-    let mut led = Led::new(peripherals.RMT, peripherals.GPIO37);
-    led.set(Color::OFF).await;
-
-    assistant(stack, led).await
+    assistant(Some((service, stack)), led).await
 }
 
-/// Runs conversation turns, one per tap.
-async fn assistant(stack: Stack<'static>, mut led: Led) -> ! {
+/// Runs conversation turns, one per tap. Without a service and a network stack to reach it, nobody
+/// answers questions.
+async fn assistant(service: Option<(Service, Stack<'static>)>, mut led: Led) -> ! {
     let mut screen = Screen {
         status: String::from("Connecting to Wi-Fi"),
         button: Button::Busy,
         you: String::new(),
         assistant: String::from(PHRASES_HINT),
     };
-    display::show(&screen);
-    stack.wait_config_up().await;
-
-    let mut api = Api::new(stack);
+    let mut api = match service {
+        Some((service, stack)) => {
+            display::show(&screen);
+            stack.wait_config_up().await;
+            Some((service, Api::new(stack)))
+        }
+        None => None,
+    };
 
     loop {
         screen.status = String::from("Ready");
@@ -333,7 +347,7 @@ async fn assistant(stack: Stack<'static>, mut led: Led) -> ! {
 }
 
 async fn converse(
-    api: &mut Api,
+    api: &mut Option<(Service, Api)>,
     led: &mut Led,
     screen: &mut Screen,
     speech: Samples,
@@ -345,7 +359,7 @@ async fn converse(
         screen.assistant = format!("I did not recognize that. {PHRASES_HINT}");
         return Ok(());
     };
-    let (phrase, action) = PHRASES[index];
+    let &(phrase, action) = available_phrases().nth(index).unwrap();
     screen.you = String::from(phrase.to_str().unwrap());
     log::info!("You: {}", screen.you);
     if let Action::Light(color) = action {
@@ -354,30 +368,43 @@ async fn converse(
         return Ok(());
     }
 
+    let Some((service, api)) = api else {
+        unreachable!("Questions are only recognized with an API key");
+    };
     screen.assistant.clear();
     screen.status = String::from("Thinking");
     display::show(screen);
-    screen.assistant = api.chat(&screen.you).await?;
+    screen.assistant = api.chat(*service, &screen.you).await?;
     log::info!("Assistant: {}", screen.assistant);
     if screen.assistant.trim().is_empty() {
-        screen.assistant = String::from("Claude did not answer.");
+        screen.assistant = format!("{service} did not answer.");
     }
     Ok(())
 }
 
 const PHRASES_HINT: &str = "Tap Phrases to see what I understand.";
 
+/// The phrases the assistant handles: all of them with an API key, only light commands without.
+fn available_phrases() -> impl Iterator<Item = &'static (&'static CStr, Action)> {
+    PHRASES
+        .iter()
+        .filter(|(_, action)| api::SERVICE.is_some() || matches!(action, Action::Light(_)))
+}
+
 /// The phrases the assistant recognizes, for the screen.
 fn phrases() -> String {
     let list = |light: bool| {
-        let phrases: Vec<&str> = PHRASES
-            .iter()
+        let phrases: Vec<&str> = available_phrases()
             .filter(|(_, action)| matches!(action, Action::Light(_)) == light)
             .map(|(phrase, _)| phrase.to_str().unwrap())
             .collect();
         phrases.join(", ")
     };
-    format!("Ask one of: {}. Or say: {}.", list(false), list(true))
+    if api::SERVICE.is_some() {
+        format!("Ask one of: {}. Or say: {}.", list(false), list(true))
+    } else {
+        format!("Say one of: {}.", list(true))
+    }
 }
 
 #[embassy_executor::task]
