@@ -493,6 +493,8 @@ mod tests {
 #[embedded_test::tests(default_timeout = 3)]
 mod lp_i2c {
     use esp_hal::i2c::lp_i2c::{Config, Error, LpI2c};
+    #[cfg(lp_i2c_master_version = "lp_i2c")]
+    use esp_hal::{i2c::lp_i2c::ConfigError, peripherals::LP_I2C0, time::Rate};
     #[cfg(lp_i2c_master_version = "rtc_i2c")]
     use esp_hal::{i2c::lp_i2c::Timing, time::Duration};
 
@@ -507,6 +509,18 @@ mod lp_i2c {
             _ => Config::default(),
         };
         LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap()
+    }
+
+    #[cfg(lp_i2c_master_version = "lp_i2c")]
+    fn config_registers() -> [u32; 5] {
+        let regs = LP_I2C0::regs();
+        [
+            regs.scl_low_period().read().bits(),
+            regs.scl_high_period().read().bits(),
+            regs.sda_hold().read().bits(),
+            regs.sda_sample().read().bits(),
+            regs.ctr().read().bits(),
+        ]
     }
 
     #[test]
@@ -543,6 +557,68 @@ mod lp_i2c {
         i2c.read(DUT_ADDRESS, WRITE_COMMAND[0], &mut data).unwrap();
 
         assert_ne!(data, [0u8; 5]);
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "lp_i2c")]
+    fn timing_uses_selected_lp_fast_clock(mut i2c: LpI2c<'static>) {
+        use esp_hal::clock::ll::{self, ClockTree, LpFastClkConfig};
+
+        let sources = cfg_select! {
+            esp32c5 => [
+                LpFastClkConfig::RcFast,
+                LpFastClkConfig::XtalD2,
+                LpFastClkConfig::Xtal,
+            ],
+            esp32c6 => [LpFastClkConfig::RcFastClk, LpFastClkConfig::XtalD2Clk],
+            _ => [LpFastClkConfig::RcFast, LpFastClkConfig::XtalD2],
+        };
+        let original = ClockTree::with(ll::lp_fast_clk_config).unwrap();
+        let regs = LP_I2C0::regs();
+        for source in sources {
+            ClockTree::with(|clocks| ll::configure_lp_fast_clk(clocks, source));
+            let source_hz = ll::lp_fast_clk_source_frequency(source);
+            for hz in [79_999, 80_000] {
+                i2c.apply_config(&Config::default().with_frequency(Rate::from_hz(hz)))
+                    .unwrap();
+                let half_cycle = source_hz / hz / 2;
+                let wait_high = match (hz, source_hz) {
+                    (79_999, _) => half_cycle / 4,
+                    (80_000, 48_000_000) => 75,
+                    _ => half_cycle / 2 - 2,
+                };
+                let high = regs.scl_high_period().read();
+                assert_eq!(
+                    regs.scl_low_period().read().scl_low_period().bits() as u32,
+                    half_cycle - 1
+                );
+                assert_eq!(high.scl_high_period().bits() as u32, half_cycle - wait_high);
+                assert_eq!(high.scl_wait_high_period().bits() as u32, wait_high);
+            }
+        }
+
+        ClockTree::with(|clocks| ll::configure_lp_fast_clk(clocks, original));
+        i2c.apply_config(&Config::default()).unwrap();
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "lp_i2c")]
+    fn validates_frequency_limits(mut i2c: LpI2c<'static>) {
+        let source = esp_hal::clock::ll::lp_fast_clk_frequency();
+        let min_hz = source / 1024 + 1;
+        let max_hz = source / 16;
+        let before = config_registers();
+        for hz in [0, min_hz - 1, max_hz + 1] {
+            assert_eq!(
+                i2c.apply_config(&Config::default().with_frequency(Rate::from_hz(hz))),
+                Err(ConfigError::FrequencyOutOfRange)
+            );
+            assert_eq!(config_registers(), before);
+        }
+        for hz in [min_hz, max_hz] {
+            i2c.apply_config(&Config::default().with_frequency(Rate::from_hz(hz)))
+                .unwrap();
+        }
     }
 
     #[test]
