@@ -322,6 +322,7 @@ where
     tx_channel: ChannelTx<Dm, I2sParallelTxErased<'d>>,
     _guard: PeripheralGuard,
     _clk_guard: crate::i2s::master::I2sDirClkGuard,
+    sample_period_cycles: u32,
 }
 
 impl<'d> I2sParallel<'d, Blocking> {
@@ -355,6 +356,7 @@ impl<'d> I2sParallel<'d, Blocking> {
             tx_channel: channel,
             _guard: guard,
             _clk_guard: clk_guard,
+            sample_period_cycles: sample_period_cycles(frequency),
         }
     }
 
@@ -365,6 +367,7 @@ impl<'d> I2sParallel<'d, Blocking> {
             tx_channel: self.tx_channel.into_async(),
             _guard: self._guard,
             _clk_guard: self._clk_guard,
+            sample_period_cycles: self.sample_period_cycles,
         }
     }
 
@@ -420,6 +423,7 @@ impl<'d> I2sParallel<'d, Async> {
             tx_channel: self.tx_channel.into_blocking(),
             _guard: self._guard,
             _clk_guard: self._clk_guard,
+            sample_period_cycles: self.sample_period_cycles,
         }
     }
 }
@@ -441,7 +445,7 @@ where
         mut self,
         mut data: BUF,
     ) -> Result<I2sParallelTransfer<'d, BUF, Dm>, (DmaError, Self, BUF)> {
-        self.instance.tx_reset();
+        self.instance.tx_reset(self.sample_period_cycles);
         self.instance.tx_fifo_reset();
         let result = unsafe {
             self.tx_channel
@@ -451,7 +455,7 @@ where
         if let Err(err) = result {
             return Err((err, self, data));
         }
-        self.instance.tx_start();
+        self.instance.tx_start(self.sample_period_cycles);
         Ok(I2sParallelTransfer {
             i2s: ManuallyDrop::new(self),
             buf_view: ManuallyDrop::new(data.into_view()),
@@ -606,6 +610,13 @@ pub struct I2sClockDividers {
     pub numerator: u32,
 }
 
+/// The sample period in CPU cycles, rounded up.
+fn sample_period_cycles(sample_rate: Rate) -> u32 {
+    crate::clock::cpu_clock()
+        .as_hz()
+        .div_ceil(sample_rate.as_hz())
+}
+
 fn calculate_clock(
     sample_rate: Rate,
     data_bits: u8,
@@ -653,12 +664,12 @@ pub trait PrivateInstance: crate::private::Sealed {
             .toggle(|w, bit| w.rx_fifo_reset().bit(bit));
     }
 
-    fn tx_reset(&self) {
+    fn tx_reset(&self, sample_period_cycles: u32) {
         self.regs().conf().modify(|_, w| w.tx_reset().set_bit());
-        // without this delay starting a subsequent transfer will hang waiting
-        // for tx_idle to clear (the transfer does not start).
-        // While 20 clocks works for 80MHz cpu but 100 is needed for 240MHz!
-        xtensa_lx::timer::delay(100);
+        // TX takes the reset only if TX_RESET stays set for one I2S module clock period or
+        // more. The module clock runs at two times the sample rate. If TX does not take the
+        // reset, the next transfer sends no data and TX_IDLE stays set.
+        xtensa_lx::timer::delay(sample_period_cycles);
         self.regs().conf().modify(|_, w| w.tx_reset().clear_bit());
     }
 
@@ -679,7 +690,7 @@ pub trait PrivateInstance: crate::private::Sealed {
         });
     }
 
-    fn tx_start(&self) {
+    fn tx_start(&self, sample_period_cycles: u32) {
         // wait for data to show up in the fifo
         while self.regs().int_raw().read().tx_rempty().bit_is_clear() {
             // wait
@@ -690,9 +701,11 @@ pub trait PrivateInstance: crate::private::Sealed {
 
         self.regs().conf().modify(|_, w| w.tx_start().set_bit());
 
-        while self.regs().state().read().tx_idle().bit_is_set() {
-            // wait
-        }
+        // For up to one sample period after TX_START is set, TX_IDLE stays set. After this
+        // time, TX_IDLE is clear while TX sends and set when TX has sent all data. A loop that
+        // waits for TX_IDLE to clear can wait forever: if an interrupt stops this core for
+        // longer than the transfer, TX_IDLE is set again before the loop reads it.
+        xtensa_lx::timer::delay(2 * sample_period_cycles);
     }
 
     fn tx_stop(&self) {
@@ -742,7 +755,7 @@ pub trait PrivateInstance: crate::private::Sealed {
 
         // Initialize I2S dev
         self.rx_reset();
-        self.tx_reset();
+        self.tx_reset(sample_period_cycles(frequency));
         self.rx_fifo_reset();
         self.tx_fifo_reset();
         self.rx_dma_reset();
