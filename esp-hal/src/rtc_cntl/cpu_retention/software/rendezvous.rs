@@ -13,6 +13,7 @@ use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use portable_atomic::{AtomicU8, Ordering};
+use procmacros::ram;
 
 use super::{
     CoreRetentionContext,
@@ -275,8 +276,7 @@ fn helper_entry() {
 ///
 /// This core waits here while the PRO CPU has the caches suspended, and after a wake it restores
 /// itself before they resume.
-#[unsafe(link_section = ".rwtext.caches_suspended.run_helper")]
-#[inline(never)]
+#[ram(unstable(caches_suspended))]
 fn run_helper() {
     let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 

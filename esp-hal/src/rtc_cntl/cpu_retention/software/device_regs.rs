@@ -3,6 +3,8 @@
 //! esp-idf moves these with plain register loops and not with the PAU regdma engine
 //! (`esp32c6/sleep_cpu.c:237-258`).
 
+use procmacros::ram;
+
 /// A run of device registers that the CPU power-down loses.
 pub(crate) struct DeviceRegion {
     start: *const u32,
@@ -18,8 +20,7 @@ impl DeviceRegion {
 /// Reads every region into `frame`, in the order of `regions`.
 ///
 /// Stops at the end of `frame` if the regions hold more words.
-#[unsafe(link_section = ".rwtext.caches_suspended.device_regs_save")]
-#[inline(never)]
+#[ram(unstable(caches_suspended))]
 pub(crate) fn save(regions: &[DeviceRegion], frame: &mut [u32]) {
     let mut slots = frame.iter_mut();
     for region in regions {
@@ -36,8 +37,7 @@ pub(crate) fn save(regions: &[DeviceRegion], frame: &mut [u32]) {
 /// Writes `frame` back to every region, in the order of `regions`.
 ///
 /// Stops at the end of `frame` if the regions hold more words.
-#[unsafe(link_section = ".rwtext.caches_suspended.device_regs_restore")]
-#[inline(never)]
+#[ram(unstable(caches_suspended))]
 pub(crate) fn restore(regions: &[DeviceRegion], frame: &[u32]) {
     let mut slots = frame.iter();
     for region in regions {
