@@ -137,14 +137,14 @@ type PrinterImpl = serial_jtag_printer::Printer;
 #[cfg(feature = "uart")]
 type PrinterImpl = uart_printer::Printer;
 
-#[cfg(feature = "auto")]
+#[cfg(auto_select)]
 type PrinterImpl = auto_printer::Printer;
 
 #[cfg(feature = "no-op")]
 type PrinterImpl = noop::Printer;
 
 #[cfg(all(
-    feature = "auto",
+    auto_select,
     any(
         feature = "esp32c3",
         feature = "esp32c5",
@@ -215,7 +215,7 @@ mod auto_printer {
 }
 
 #[cfg(all(
-    feature = "auto",
+    auto_select,
     not(any(
         feature = "esp32c3",
         feature = "esp32c5",
@@ -234,7 +234,7 @@ mod auto_printer {
 }
 
 #[cfg(all(
-    any(feature = "jtag-serial", feature = "auto"),
+    any(feature = "jtag-serial", auto_select),
     any(
         feature = "esp32c3",
         feature = "esp32c5",
@@ -371,7 +371,7 @@ mod serial_jtag_printer {
     }
 }
 
-#[cfg(any(feature = "uart", feature = "auto"))]
+#[cfg(any(feature = "uart", auto_select))]
 mod uart_printer {
     use super::LockToken;
     trait Functions {
