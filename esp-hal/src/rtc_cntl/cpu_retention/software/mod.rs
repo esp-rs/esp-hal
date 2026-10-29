@@ -6,6 +6,7 @@
 use core::{mem::offset_of, ptr, ptr::NonNull};
 
 use portable_atomic::{AtomicPtr, Ordering};
+use procmacros::ram;
 
 use crate::{
     rtc_cntl::{
@@ -443,8 +444,7 @@ pub(crate) struct CoreRetentionContext {
 }
 
 impl CoreRetentionContext {
-    #[unsafe(link_section = ".rwtext.caches_suspended.retention_context_new")]
-    #[inline(never)]
+    #[ram(unstable(caches_suspended))]
     pub(crate) fn new(buffer: *mut u8, core: usize) -> Self {
         // `install_cpu_retention_memory` checks the buffer size for every block. The arithmetic
         // wraps, because the overflow panic path is in flash.
@@ -452,8 +452,7 @@ impl CoreRetentionContext {
         Self { buffer, core }
     }
 
-    #[unsafe(link_section = ".rwtext.caches_suspended.retention_context_device_frame")]
-    #[inline(never)]
+    #[ram(unstable(caches_suspended))]
     pub(crate) fn device_frame(&mut self) -> &mut [u32] {
         // With debug assertions, `slice::from_raw_parts_mut` checks the pointer, and the panic
         // path is in flash.
@@ -466,22 +465,19 @@ impl CoreRetentionContext {
         }
     }
 
-    #[unsafe(link_section = ".rwtext.caches_suspended.retention_context_non_critical")]
-    #[inline(never)]
+    #[ram(unstable(caches_suspended))]
     pub(crate) fn non_critical(&self) -> *mut NonCriticalSleepFrame {
         self.buffer.wrapping_add(NON_CRITICAL_FRAME_OFFSET) as *mut NonCriticalSleepFrame
     }
 
-    #[unsafe(link_section = ".rwtext.caches_suspended.retention_context_critical")]
-    #[inline(never)]
+    #[ram(unstable(caches_suspended))]
     pub(crate) fn critical(&self) -> *mut CriticalSleepFrame {
         self.buffer.wrapping_add(CRITICAL_FRAME_OFFSET) as *mut CriticalSleepFrame
     }
 }
 
 /// Saves the device registers and the non-critical frame.
-#[unsafe(link_section = ".rwtext.caches_suspended.save_pre_critical")]
-#[inline(never)]
+#[ram(unstable(caches_suspended))]
 pub(crate) fn save_pre_critical(ctx: &mut CoreRetentionContext) {
     device_regs::save(&regions(), ctx.device_frame());
     // SAFETY: the buffer is installed and sized for this chip.
@@ -489,8 +485,7 @@ pub(crate) fn save_pre_critical(ctx: &mut CoreRetentionContext) {
 }
 
 /// Saves the critical frame and returns its pointer.
-#[unsafe(link_section = ".rwtext.caches_suspended.save_critical_frame")]
-#[inline(never)]
+#[ram(unstable(caches_suspended))]
 pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSleepFrame {
     let critical = ctx.critical();
     // The bounds check of an index has a panic path in flash, so the code uses `get`. `ctx.core`
@@ -511,8 +506,7 @@ pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSl
 /// `enter_sleep` requests the sleep. `wait` blocks until the hardware reports the result.
 ///
 /// The caller suspends the caches before the call. This function does not invalidate the caches.
-#[unsafe(link_section = ".rwtext.caches_suspended.sleep_retained")]
-#[inline(never)]
+#[ram(unstable(caches_suspended))]
 pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool {
     let core = system::raw_core();
     let mut ctx = CoreRetentionContext::new(buffer, core);
@@ -680,8 +674,7 @@ pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Optio
 /// predictor stay off from before the sleep request until the end of the restore. In that time,
 /// code must not run from flash or access PSRAM.
 /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L24-L53>.
-#[unsafe(link_section = ".rwtext.caches_suspended.enter_sleep_with_retention")]
-#[inline(never)]
+#[ram(unstable(caches_suspended))]
 pub(crate) fn enter_sleep_with_retention(
     config: &RtcSleepConfig,
     buffer: Option<NonNull<u8>>,
