@@ -328,6 +328,9 @@ macro_rules! property {
     ("bt.controller") => {
         "npl"
     };
+    ("bt.requires_fast_cpu") => {
+        false
+    };
     ("phy.combo_module") => {
         false
     };
@@ -468,6 +471,12 @@ macro_rules! property {
     };
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
+    };
+    ("sleep.pmu_sleep_steps") => {
+        false
+    };
+    ("sleep.idle_frequency_scaling") => {
+        true
     };
     ("assist_debug.has_sp_monitor") => {
         true

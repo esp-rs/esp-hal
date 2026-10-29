@@ -274,6 +274,9 @@ macro_rules! property {
     ("bt.controller") => {
         "btdm2"
     };
+    ("bt.requires_fast_cpu") => {
+        false
+    };
     ("phy.combo_module") => {
         false
     };
@@ -332,6 +335,12 @@ macro_rules! property {
         stringify!(3)
     };
     ("sleep.deep_sleep_needs_gpio_isolation") => {
+        false
+    };
+    ("sleep.pmu_sleep_steps") => {
+        false
+    };
+    ("sleep.idle_frequency_scaling") => {
         false
     };
     ("dma.mem2mem_requires_peripheral") => {

@@ -245,6 +245,17 @@ impl<'d> LowPower<'d> {
     /// hardware rejects the request because a wakeup source is already asserted. It reports
     /// neither case. For the caller, a rejected sleep and a very short sleep have the same
     /// result.
+    #[cfg_attr(
+        cpu_retention = "software",
+        doc = "\n\nPart of the sleep runs with the caches suspended, and that part must not call \
+               code in flash. esp-hal must be built at `opt-level` 2 or 3 in each profile that \
+               uses light sleep. At other levels, the link fails with `prohibited cross \
+               reference from '.rwtext.caches_suspended'` and the name of a helper function. \
+               The `Cargo.toml` of the application can set the level for esp-hal \
+               only:\n\n```toml\n\
+               [profile.dev.package.esp-hal]\nopt-level = 2\n\n\
+               [profile.release.package.esp-hal]\nopt-level = 2\n```"
+    )]
     #[cfg(sleep_light_sleep)]
     #[cfg(feature = "rt")]
     pub fn sleep_light(&mut self, config: RtcSleepConfig) -> LightSleep {
@@ -443,6 +454,16 @@ impl<'d> LowPower<'d> {
             ))]
             if kind == SleepKind::Deep {
                 gpio::wakeup::isolate_pads_for_deep_sleep();
+            }
+
+            // A CPU power-down loses the dirty cache lines, and with them the writes to PSRAM.
+            // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L55-L72>.
+            #[cfg(psram_writeback_before_cpu_power_down)]
+            if retention_buffer.is_some()
+                && config.pd_flags.pd_cpu()
+                && !crate::psram::psram_range().is_empty()
+            {
+                crate::soc::cache_writeback_all();
             }
 
             let rejected = cfg_select! {

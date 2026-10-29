@@ -385,6 +385,7 @@ is_lp_sys = true
 ## Radio
 [device.wifi]
 mac_version = 3
+requires_fast_cpu = true
 has_5g = true
 csi_supported = true
 has_wifi6 = true
@@ -394,6 +395,7 @@ has_ftm = true
 [device.bt]
 support_status = "partial"
 controller = "npl"
+requires_fast_cpu = true
 
 [device.ieee802154]
 
@@ -435,6 +437,7 @@ support_status = { status = "not_supported", issue = 5154 }
 [device.sleep]
 support_status = "partial"
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 ext1_version = 2
 pin_wakeup_version = 3
@@ -491,6 +494,7 @@ instances = [
 
 [device.psram]
 extmem_origin = 0x42000000
+writeback_before_cpu_power_down = true
 
 [device.sd_slave]
 support_status = { status = "not_supported", issue = 5169 }
