@@ -3199,6 +3199,9 @@ impl WifiController<'_> {
             // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
             esp_wifi_result!(unsafe { esp_wifi_start() })?;
 
+            // Requires a started interface.
+            esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(self.max_tx_power) })?;
+
             // Default for all scans, including connect scans. Requires a started station.
             // `wifi_start_scan` only overrides the active or passive time for a single scan and
             // the driver restores these defaults when a scan finishes.
@@ -3213,11 +3216,6 @@ impl WifiController<'_> {
                 };
                 esp_wifi_result!(unsafe { esp_wifi_set_scan_parameters(&params) })?;
             }
-        }
-
-        // Requires a started interface.
-        if mode != wifi_mode_t_WIFI_MODE_NULL {
-            esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(self.max_tx_power) })?;
         }
 
         reset_mode_on_error.defuse();
