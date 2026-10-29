@@ -8,7 +8,11 @@ use crate::gpio::{LpPin, lp_io::LpFunction};
 use crate::peripherals::LPWR;
 use crate::{
     i2c::lp_i2c::{Error, LpI2c},
-    pac::lp_i2c0::RegisterBlock,
+    pac::lp_i2c0::{
+        RegisterBlock,
+        scl_high_period::{SCL_HIGH_PERIOD_SPEC, SCL_WAIT_HIGH_PERIOD_W},
+        scl_low_period::{SCL_LOW_PERIOD_SPEC, SCL_LOW_PERIOD_W},
+    },
     peripherals::LP_PERI,
     time::Rate,
 };
@@ -127,16 +131,6 @@ impl From<Command> for u16 {
     }
 }
 
-// https://github.com/espressif/esp-idf/blob/master/components/ulp/lp_core/lp_core_i2c.c#L122
-// TX/RX RAM size is 16*8 bit
-// TX RX FIFO has 16 bit depth
-// The clock source of APB_CLK in LP_I2C is CLK_AON_FAST.
-// Configure LP_I2C_SCLK_SEL to select the clock source for I2C_SCLK.
-// When LP_I2C_SCLK_SEL is 0, select CLK_ROOT_FAST as clock source,
-// and when LP_I2C_SCLK_SEL is 1, select CLK _XTALD2 as the clock source.
-// Configure LP_EXT_I2C_CK_EN high to enable the clock source of I2C_SCLK.
-// Adjust the timing registers accordingly when the clock frequency changes.
-
 /// Configures an LP pad as an open-drain output with its pull-up enabled, then selects the pad's
 /// LP I2C function.
 #[cfg(not(lp_io_has_gpio_matrix))]
@@ -195,182 +189,102 @@ impl<'d> LpI2c<'d> {
     }
 
     pub(super) fn init(&mut self) {
-        // Initialize LP I2C HAL */
-        self.i2c
-            .register_block()
-            .clk_conf()
-            .modify(|_, w| w.sclk_active().set_bit());
-
-        // Enable LP I2C controller clock
         self.enable(true);
         self.reset();
     }
 
     pub(super) fn configure(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.select_lp_fast_clock();
+        let source_clk = crate::soc::clocks::lp_fast_clk_frequency();
+        let bus_freq = config.frequency.as_hz();
 
-        // Initialize LP I2C Master mode
-        self.i2c.register_block().ctr().write(|w| unsafe {
-            // Clear register
+        // LP I2C uses LP_FAST directly; the HP I2C clock divider does not apply.
+        let half_cycle = source_clk
+            .checked_div(bus_freq)
+            .ok_or(ConfigError::FrequencyOutOfRange)?
+            / 2;
+        if !(4..(1 << SCL_LOW_PERIOD_W::<SCL_LOW_PERIOD_SPEC>::WIDTH)).contains(&half_cycle) {
+            return Err(ConfigError::FrequencyOutOfRange);
+        }
+
+        // Below 80 kHz, a shorter SCL wait period avoids increasing the bus frequency.
+        // See <https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/esp_hal_i2c/esp32c6/include/hal/i2c_ll.h#L122-L133>.
+        let scl_wait_high = if bus_freq >= 80_000 {
+            half_cycle / 2 - 2
+        } else {
+            half_cycle / 4
+        };
+        if scl_wait_high >= (1 << SCL_WAIT_HIGH_PERIOD_W::<SCL_HIGH_PERIOD_SPEC>::WIDTH) {
+            return Err(ConfigError::FrequencyOutOfRange);
+        }
+        let scl_high = half_cycle - scl_wait_high;
+        let sda_hold = half_cycle / 4 - 1;
+        let sda_sample = half_cycle / 2 - 1;
+        // Use a timeout of at least ten bus periods.
+        let time_out_value = (u32::BITS - (5 * half_cycle).leading_zeros()) + 2;
+
+        // SCL high and wait counts do not use the minus-one encoding of the other bus timings.
+        // See <https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/esp_hal_i2c/esp32c6/include/hal/i2c_ll.h#L192-L208>.
+        let period = (half_cycle - 1) as u16;
+
+        self.select_lp_fast_clock();
+        let regs = self.regs();
+
+        regs.ctr().write(|w| unsafe {
             w.bits(0);
-            // Use open drain output for SDA and SCL
+            // Use open-drain output for SDA and SCL.
             #[cfg(not(esp32p4))]
             {
                 w.sda_force_out().set_bit();
                 w.scl_force_out().set_bit();
             }
-            // Ensure that clock is enabled
             w.clk_en().set_bit()
         });
 
-        // First, reset the fifo buffers
-        self.i2c
-            .register_block()
-            .fifo_conf()
-            .modify(|_, w| w.nonfifo_en().clear_bit());
+        regs.fifo_conf().modify(|_, w| w.nonfifo_en().clear_bit());
 
-        self.i2c.register_block().ctr().modify(|_, w| {
+        regs.ctr().modify(|_, w| {
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit()
         });
 
         self.reset_fifo();
 
-        self.select_lp_fast_clock();
-
-        // Configure LP I2C timing parameters. source_clk is ignored for LP_I2C in this
-        // call
-
-        let source_clk = 16_000_000;
-        let bus_freq = config.frequency.as_hz();
-
-        let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
-        let sclk_freq: u32 = source_clk / clkm_div;
-        let half_cycle: u32 = sclk_freq / bus_freq / 2;
-
-        // SCL
-        let scl_low = half_cycle;
-        // default, scl_wait_high < scl_high
-        // Make 80KHz as a boundary here, because when working at lower frequency, too
-        // much scl_wait_high will faster the frequency according to some
-        // hardware behaviors.
-        let scl_wait_high = if bus_freq >= 80 * 1000 {
-            half_cycle / 2 - 2
-        } else {
-            half_cycle / 4
-        };
-        let scl_high = half_cycle - scl_wait_high;
-        let sda_hold = half_cycle / 4;
-        let sda_sample = half_cycle / 2; // TODO + scl_wait_high;
-        let setup = half_cycle;
-        let hold = half_cycle;
-        // default we set the timeout value to about 10 bus cycles
-        // log(20*half_cycle)/log(2) = log(half_cycle)/log(2) +  log(20)/log(2)
-        let tout = (4 * 8 - (5 * half_cycle).leading_zeros()) + 2;
-
-        // According to the Technical Reference Manual, the following timings must be
-        // subtracted by 1. However, according to the practical measurement and
-        // some hardware behaviour, if wait_high_period and scl_high minus one.
-        // The SCL frequency would be a little higher than expected. Therefore, the
-        // solution here is not to minus scl_high as well as scl_wait high, and
-        // the frequency will be absolutely accurate to all frequency
-        // to some extent.
-        let scl_low_period = scl_low - 1;
-        let scl_high_period = scl_high;
-        let scl_wait_high_period = scl_wait_high;
-        // sda sample
-        let sda_hold_time = sda_hold - 1;
-        let sda_sample_time = sda_sample - 1;
-        // setup
-        let scl_rstart_setup_time = setup - 1;
-        let scl_stop_setup_time = setup - 1;
-        // hold
-        let scl_start_hold_time = hold - 1;
-        let scl_stop_hold_time = hold - 1;
-        let time_out_value = tout;
-        let time_out_en = true;
-
-        // Write data to registers
         unsafe {
-            self.i2c.register_block().clk_conf().modify(|_, w| {
-                w.sclk_sel().clear_bit();
-                w.sclk_div_num().bits((clkm_div - 1) as u8)
+            regs.scl_low_period()
+                .write(|w| w.scl_low_period().bits(period));
+
+            regs.scl_high_period().write(|w| {
+                w.scl_high_period().bits(scl_high as u16);
+                w.scl_wait_high_period().bits(scl_wait_high as u8)
             });
+            regs.sda_hold().write(|w| w.time().bits(sda_hold as u16));
+            regs.sda_sample()
+                .write(|w| w.time().bits(sda_sample as u16));
 
-            // scl period
-            self.i2c
-                .register_block()
-                .scl_low_period()
-                .write(|w| w.scl_low_period().bits(scl_low_period as u16));
+            regs.scl_rstart_setup().write(|w| w.time().bits(period));
+            regs.scl_stop_setup().write(|w| w.time().bits(period));
 
-            self.i2c.register_block().scl_high_period().write(|w| {
-                w.scl_high_period().bits(scl_high_period as u16);
-                w.scl_wait_high_period().bits(scl_wait_high_period as u8)
-            });
-            // sda sample
-            self.i2c
-                .register_block()
-                .sda_hold()
-                .write(|w| w.time().bits(sda_hold_time as u16));
-            self.i2c
-                .register_block()
-                .sda_sample()
-                .write(|w| w.time().bits(sda_sample_time as u16));
+            regs.scl_start_hold().write(|w| w.time().bits(period));
+            regs.scl_stop_hold().write(|w| w.time().bits(period));
 
-            // setup
-            self.i2c
-                .register_block()
-                .scl_rstart_setup()
-                .write(|w| w.time().bits(scl_rstart_setup_time as u16));
-            self.i2c
-                .register_block()
-                .scl_stop_setup()
-                .write(|w| w.time().bits(scl_stop_setup_time as u16));
-
-            // hold
-            self.i2c
-                .register_block()
-                .scl_start_hold()
-                .write(|w| w.time().bits(scl_start_hold_time as u16));
-            self.i2c
-                .register_block()
-                .scl_stop_hold()
-                .write(|w| w.time().bits(scl_stop_hold_time as u16));
-
-            self.i2c.register_block().to().write(|w| {
-                w.time_out_en().bit(time_out_en);
+            regs.to().write(|w| {
+                w.time_out_en().set_bit();
                 w.time_out_value().bits(time_out_value.try_into().unwrap())
             });
         }
 
-        // Enable SDA and SCL filtering. This configuration matches the HP I2C filter
-        // config
-
-        self.i2c
-            .register_block()
-            .filter_cfg()
+        regs.filter_cfg()
             .modify(|_, w| unsafe { w.sda_filter_thres().bits(LP_I2C_FILTER_CYC_NUM_DEF) });
-        self.i2c
-            .register_block()
-            .filter_cfg()
+        regs.filter_cfg()
             .modify(|_, w| unsafe { w.scl_filter_thres().bits(LP_I2C_FILTER_CYC_NUM_DEF) });
 
-        self.i2c
-            .register_block()
-            .filter_cfg()
-            .modify(|_, w| w.sda_filter_en().set_bit());
-        self.i2c
-            .register_block()
-            .filter_cfg()
-            .modify(|_, w| w.scl_filter_en().set_bit());
+        regs.filter_cfg().modify(|_, w| w.sda_filter_en().set_bit());
+        regs.filter_cfg().modify(|_, w| w.scl_filter_en().set_bit());
 
-        // Configure the I2C master to send a NACK when the Rx FIFO count is full
-        self.i2c
-            .register_block()
-            .ctr()
-            .modify(|_, w| w.rx_full_ack_level().set_bit());
+        // Send NACK when the RX FIFO is full.
+        regs.ctr().modify(|_, w| w.rx_full_ack_level().set_bit());
 
-        // Synchronize the config register values to the LP I2C peripheral clock
+        // Synchronize configuration to the LP I2C clock.
         self.lp_i2c_update();
 
         Ok(())
@@ -602,15 +516,12 @@ impl<'d> LpI2c<'d> {
 
     /// Updates I2C configuration.
     fn lp_i2c_update(&self) {
-        self.i2c
-            .register_block()
-            .ctr()
-            .modify(|_, w| w.conf_upgate().set_bit());
+        self.regs().ctr().modify(|_, w| w.conf_upgate().set_bit());
     }
 
     /// Resets the transmit and receive FIFO buffers.
     fn reset_fifo(&self) {
-        let fifo_conf = self.i2c.register_block().fifo_conf();
+        let fifo_conf = self.regs().fifo_conf();
 
         fifo_conf.modify(|_, w| w.tx_fifo_rst().set_bit());
         fifo_conf.modify(|_, w| w.tx_fifo_rst().clear_bit());
@@ -665,7 +576,10 @@ impl<'d> LpI2c<'d> {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum ConfigError {}
+pub enum ConfigError {
+    /// The requested frequency cannot be represented by the timing registers.
+    FrequencyOutOfRange,
+}
 
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
