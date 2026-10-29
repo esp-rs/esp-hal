@@ -77,6 +77,11 @@ pub(crate) static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr:
 pub(crate) static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 
 /// Will park the APP (second) core when dropped.
+///
+/// Parking stops the APP core immediately, also when it holds a lock. On the ESP32-S3, ESP32-S31,
+/// ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the APP core is parked during
+/// such an operation, the next cache operation on the PRO core waits forever. Make sure that the
+/// APP core does no DMA or cache operation before you drop this guard.
 #[must_use = "Dropping this guard will park the APP core"]
 #[instability::unstable]
 pub struct AppCoreGuard<'a> {
@@ -157,6 +162,11 @@ impl<'d> CpuControl<'d> {
     }
 
     /// Parks the given core.
+    ///
+    /// Parking stops the core immediately, also when it holds a lock. On the ESP32-S3, ESP32-S31,
+    /// ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the core is parked during
+    /// such an operation, the next cache operation on the other core waits forever. Make sure that
+    /// the parked core does no DMA or cache operation when you call this function.
     ///
     /// # Safety
     ///
