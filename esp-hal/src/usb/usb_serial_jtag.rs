@@ -178,9 +178,7 @@ where
     pub fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         for chunk in data.chunks(64) {
             for byte in chunk {
-                self.regs()
-                    .ep1()
-                    .write(|w| unsafe { w.rdwr_byte().bits(*byte) });
+                nb::block!(self.write_byte_nb(*byte))?;
             }
             self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
@@ -848,9 +846,9 @@ impl UsbSerialJtagTx<'_, Async> {
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(64) {
             for byte in chunk {
-                self.regs()
-                    .ep1()
-                    .write(|w| unsafe { w.rdwr_byte().bits(*byte) });
+                while self.write_byte_nb(*byte).is_err() {
+                    self.wait_tx_ready().await;
+                }
             }
             self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
