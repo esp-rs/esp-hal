@@ -162,6 +162,23 @@ macro_rules! unconnected_pin {
     }};
 }
 
+// The ADC1 GPIO connected to the MCP4725 DAC's VOUT pin.
+#[macro_export]
+macro_rules! adc_pin {
+    ($peripherals:expr) => {{
+        cfg_select! {
+            esp32 => $peripherals.GPIO36,
+            any(esp32c2, esp32c3) => $peripherals.GPIO1,
+            esp32c5 => $peripherals.GPIO6,
+            any(esp32c6, esp32c61, esp32h2) => $peripherals.GPIO4,
+            esp32h4 => $peripherals.GPIO28,
+            esp32p4 => $peripherals.GPIO20,
+            any(esp32s2, esp32s3) => $peripherals.GPIO7,
+            esp32s31 => $peripherals.GPIO47,
+        }
+    }};
+}
+
 #[macro_export]
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{

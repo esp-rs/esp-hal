@@ -74,7 +74,8 @@ mod tests {
 
         let (valid_pin, clock_pin, data_pins) = cfg_select! {
             esp32c5 => {
-                // 27 is RGB, 13 and 14 is USB, 4 is tied to 5, 9 is tied to 10 (only 9 is driven)
+                // 27 is RGB, 13 and 14 is USB, 6 is ADC, 4 is tied to 5, 9 is tied to 10 (only 9 is
+                // driven)
                 (
                     peripherals.GPIO0.degrade(),
                     peripherals.GPIO1.degrade(),
@@ -83,7 +84,7 @@ mod tests {
                         peripherals.GPIO3.degrade(),
                         peripherals.GPIO23.degrade(),
                         peripherals.GPIO24.degrade(),
-                        peripherals.GPIO6.degrade(),
+                        peripherals.GPIO25.degrade(),
                         peripherals.GPIO7.degrade(),
                         peripherals.GPIO8.degrade(),
                         peripherals.GPIO9.degrade(),
@@ -91,13 +92,13 @@ mod tests {
                 )
             }
             esp32c6 => {
-                // 8 is RGB, 12 and 13 is USB, 2 is tied to 3 (only 2 is driven)
+                // 8 is RGB, 12 and 13 is USB, 4 is ADC, 2 is tied to 3 (only 2 is driven)
                 (
                     peripherals.GPIO0.degrade(),
                     peripherals.GPIO1.degrade(),
                     [
                         peripherals.GPIO2.degrade(),
-                        peripherals.GPIO4.degrade(),
+                        peripherals.GPIO14.degrade(),
                         peripherals.GPIO5.degrade(),
                         peripherals.GPIO6.degrade(),
                         peripherals.GPIO7.degrade(),
@@ -108,14 +109,15 @@ mod tests {
                 )
             }
             esp32h2 => {
-                // 8 is RGB, 26 and 27 is USB, 12 and 22 are I2C, 2 is tied to 3, 10 is tied to 11.
-                // 23 is UART0 RX. The 8-bit test does not drive the last pin.
+                // 8 is RGB, 26 and 27 is USB, 12 and 22 are I2C, 4 is ADC, 2 is tied to 3, 10 is
+                // tied to 11. 23 is UART0 RX. The 8-bit test does not drive the
+                // last pin.
                 (
                     peripherals.GPIO0.degrade(),
                     peripherals.GPIO1.degrade(),
                     [
                         peripherals.GPIO2.degrade(),
-                        peripherals.GPIO4.degrade(),
+                        peripherals.GPIO14.degrade(),
                         peripherals.GPIO5.degrade(),
                         peripherals.GPIO8.degrade(),
                         peripherals.GPIO9.degrade(),
