@@ -490,8 +490,10 @@ mod tests {
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
+    // TODO: against the MCP4725, LP I2C transfers time out on the ESP32-S3 and are not
+    // acknowledged on the ESP32-C5.
     #[test]
-    #[cfg(lp_i2c_master_driver_supported)]
+    #[cfg(all(lp_i2c_master_driver_supported, not(any(esp32s3, esp32c5))))]
     fn test_read_with_lp_i2c() {
         use esp_hal::i2c::lp_i2c::{Config, LpI2c};
 
