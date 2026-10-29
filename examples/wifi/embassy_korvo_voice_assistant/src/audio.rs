@@ -133,7 +133,9 @@ pub async fn run(
     }
 }
 
-/// Mixes both microphones down to mono and averages every 3 frames (48 kHz -> 16 kHz).
+/// Mixes both microphones down to mono and averages every 3 frames (48 kHz -> 16 kHz). The two
+/// microphones arrive with opposite polarity, so the mix is their difference: their sum would
+/// cancel most of the speech.
 struct Decimator {
     samples: Samples,
     sum: i32,
@@ -154,7 +156,7 @@ impl Decimator {
         for &[left_low, left_high, right_low, right_high] in frames.as_chunks::<FRAME_BYTES>().0 {
             let left = i16::from_le_bytes([left_low, left_high]);
             let right = i16::from_le_bytes([right_low, right_high]);
-            self.sum += i32::from(left) + i32::from(right);
+            self.sum += i32::from(left) - i32::from(right);
             self.count += 1;
             if self.count == 3 {
                 if self.samples.len() < self.samples.capacity() {
