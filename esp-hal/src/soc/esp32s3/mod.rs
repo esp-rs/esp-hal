@@ -136,9 +136,9 @@ pub unsafe fn cache_writeback_all() {
     unsafe extern "C" {
         fn Cache_WriteBack_All();
     }
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_WriteBack_All();
-    }
+    });
 }
 
 /// Invalidates the entire instruction cache.
@@ -148,9 +148,9 @@ pub unsafe fn cache_invalidate_icache_all() {
     unsafe extern "C" {
         fn Cache_Invalidate_ICache_All();
     }
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_ICache_All();
-    }
+    });
 }
 
 /// Invalidates the entire data cache.
@@ -160,9 +160,9 @@ pub unsafe fn cache_invalidate_dcache_all() {
     unsafe extern "C" {
         fn Cache_Invalidate_DCache_All();
     }
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_DCache_All();
-    }
+    });
 }
 
 pub(crate) fn pre_init() {}
