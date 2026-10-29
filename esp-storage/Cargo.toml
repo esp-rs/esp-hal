@@ -47,18 +47,18 @@ esp-sync         = { version = "0.3.0", path = "../esp-sync", optional = true }
 esp-rom-sys      = { version = "0.1.5", path = "../esp-rom-sys", optional = true }
 defmt  = { version = "1.1", optional = true }
 
-esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32h4 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32p4 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
+esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32h4 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
+esp32p4 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "176f985" }
 
 # Unstable dependencies that are not (strictly) part of the public API
 document-features = "0.2"
@@ -113,5 +113,5 @@ emulation = []
 
 [lints.rust]
 # Starting with 1.85.0, the test cfg is considered to be a "userspace" config despite being also set by rustc and should be managed by the build system itself.
-# CI started to fail with rustc 1.92.0-nightly (f04e3dfc8 2025-10-19), https://github.com/esp-rs/esp-hal/pull/4386#issuecomment-3491320175 
+# CI started to fail with rustc 1.92.0-nightly (f04e3dfc8 2025-10-19), https://github.com/esp-rs/esp-hal/pull/4386#issuecomment-3491320175
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }
