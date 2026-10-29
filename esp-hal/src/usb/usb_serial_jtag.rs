@@ -846,8 +846,12 @@ impl UsbSerialJtagTx<'_, Async> {
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(64) {
             for byte in chunk {
-                while self.write_byte_nb(*byte).is_err() {
-                    self.wait_tx_ready().await;
+                loop {
+                    match self.write_byte_nb(*byte) {
+                        Ok(()) => break,
+                        Err(nb::Error::WouldBlock) => self.wait_tx_ready().await,
+                        Err(nb::Error::Other(error)) => return Err(error),
+                    }
                 }
             }
             self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
