@@ -134,6 +134,8 @@ for_each_lp_function! {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// The device address exceeds the 7-bit address range.
+    AddressInvalid,
     /// The transmission size exceeded the limit.
     TransactionSizeLimitExceeded,
     /// The acknowledgment check failed.
@@ -304,9 +306,14 @@ impl<'d> LpI2c<'d> {
     ///
     /// # Errors
     ///
+    /// [`Error::AddressInvalid`] when `address` exceeds `0x7f`.
+    ///
     /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
     /// can transfer in a single transaction.
     pub fn write(&mut self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
+        if address > 0x7f {
+            return Err(Error::AddressInvalid);
+        }
         self.write_bytes(address, register, data)
     }
 
@@ -346,9 +353,14 @@ impl<'d> LpI2c<'d> {
     ///
     /// # Errors
     ///
+    /// [`Error::AddressInvalid`] when `address` exceeds `0x7f`.
+    ///
     /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
     /// can transfer in a single transaction.
     pub fn read(&mut self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
+        if address > 0x7f {
+            return Err(Error::AddressInvalid);
+        }
         self.read_bytes(address, register, data)
     }
 }

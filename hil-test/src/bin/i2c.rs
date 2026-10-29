@@ -491,18 +491,26 @@ mod tests {
     }
 }
 
-#[cfg(all(lp_i2c_master_driver_supported, lp_i2c_master_version = "lp_i2c"))]
+#[cfg(lp_i2c_master_driver_supported)]
 #[embedded_test::tests(default_timeout = 3)]
 mod lp_i2c {
-    use esp_hal::i2c::lp_i2c::{Config, LpI2c};
+    use esp_hal::i2c::lp_i2c::{Config, Error, LpI2c};
     #[cfg(lp_i2c_master_version = "lp_i2c")]
     use esp_hal::{i2c::lp_i2c::ConfigError, peripherals::LP_I2C0, time::Rate};
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    use esp_hal::{i2c::lp_i2c::Timing, time::Duration};
 
     #[init]
     fn init() -> LpI2c<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
-        LpI2c::new(peripherals.LP_I2C0, Config::default(), sda, scl).unwrap()
+        let config = cfg_select! {
+            lp_i2c_master_version = "rtc_i2c" => Config::default()
+                .with_timing(Timing::standard_mode())
+                .with_timeout(Duration::from_micros(100)),
+            _ => Config::default(),
+        };
+        LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap()
     }
 
     #[cfg(lp_i2c_master_version = "lp_i2c")]
@@ -515,6 +523,28 @@ mod lp_i2c {
             regs.sda_sample().read().bits(),
             regs.ctr().read().bits(),
         ]
+    }
+
+    #[test]
+    fn validates_addresses(mut i2c: LpI2c<'static>) {
+        for address in [0x80, 0xff] {
+            assert_eq!(i2c.write(address, 0x10, &[]), Err(Error::AddressInvalid));
+            assert_eq!(
+                i2c.write(address, 0x10, &[0xa5]),
+                Err(Error::AddressInvalid)
+            );
+            assert_eq!(i2c.read(address, 0x10, &mut []), Err(Error::AddressInvalid));
+            let mut data = [0xa5];
+            assert_eq!(
+                i2c.read(address, 0x10, &mut data),
+                Err(Error::AddressInvalid)
+            );
+            assert_eq!(data, [0xa5]);
+        }
+        assert!(matches!(
+            i2c.write(0x7f, 0x10, &[0xa5]),
+            Err(Error::AckCheckFailed | Error::TimeOut)
+        ));
     }
 
     // TODO: against the MCP4725, LP I2C transfers time out on the ESP32-S3 and are not
