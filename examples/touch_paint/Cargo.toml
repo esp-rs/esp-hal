@@ -1,0 +1,41 @@
+[package]
+name    = "touch-paint"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
+embassy-executor = "0.10.0"
+embassy-time = "0.5.0"
+embedded-graphics = "0.8.1"
+esp-alloc = { path = "../../esp-alloc" }
+esp-backtrace = { path = "../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
+esp-println = { path = "../../esp-println", features = ["log-04"] }
+esp-rtos = { path = "../../esp-rtos", features = ["embassy", "log-04"] }
+libm = "0.2"
+
+[features]
+esp32s31 = [
+    "esp-alloc/esp32s31",
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
+    "esp-println/esp32s31",
+    "esp-rtos/esp32s31",
+]
+
+[profile.dev]
+opt-level = 2
+
+[profile.release]
+codegen-units    = 1
+debug            = true
+debug-assertions = false
+lto              = "fat"
+opt-level        = 3
