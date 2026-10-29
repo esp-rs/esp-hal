@@ -449,10 +449,8 @@ impl<'d> LpI2c<'d> {
 
     /// Resets the peripheral so that it can start a new transaction.
     fn start_transaction(&self) {
-        // A previous transfer may have been interrupted, leaving the bus occupied.
-        if self.regs().sr().read().bus_busy().bit_is_set() {
-            self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
-        }
+        // A state-machine timeout may leave BUS_BUSY clear.
+        self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
 
         self.reset_fifo();
         self.clear_interrupts();
@@ -470,7 +468,10 @@ impl<'d> LpI2c<'d> {
                 break Err(Error::AckCheckFailed);
             } else if interrupts.arbitration_lost().bit_is_set() {
                 break Err(Error::ArbitrationLost);
-            } else if interrupts.time_out().bit_is_set() {
+            } else if interrupts.time_out().bit_is_set()
+                || interrupts.scl_st_to().bit_is_set()
+                || interrupts.scl_main_st_to().bit_is_set()
+            {
                 break Err(Error::TimeOut);
             } else if interrupts.trans_complete().bit_is_set()
                 || interrupts.end_detect().bit_is_set()
@@ -489,6 +490,8 @@ impl<'d> LpI2c<'d> {
             w.nack().clear_bit_by_one();
             w.arbitration_lost().clear_bit_by_one();
             w.time_out().clear_bit_by_one();
+            w.scl_st_to().clear_bit_by_one();
+            w.scl_main_st_to().clear_bit_by_one();
             w.trans_complete().clear_bit_by_one();
             w.end_detect().clear_bit_by_one()
         });

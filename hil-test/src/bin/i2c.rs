@@ -500,6 +500,9 @@ mod lp_i2c {
     #[cfg(lp_i2c_master_version = "rtc_i2c")]
     use esp_hal::{i2c::lp_i2c::Timing, time::Duration};
 
+    #[cfg(esp32c6)]
+    use super::NON_EXISTENT_ADDRESS;
+
     #[init]
     fn init() -> LpI2c<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -619,5 +622,32 @@ mod lp_i2c {
             assert_eq!(high.scl_high_period().bits() as u32, half_cycle - wait_high);
             assert_eq!(high.scl_wait_high_period().bits() as u32, wait_high);
         }
+    }
+
+    #[test]
+    #[cfg(esp32c6)]
+    fn scl_stall_returns_timeout(mut i2c: LpI2c<'static>) {
+        use esp_hal::peripherals::LP_IO;
+
+        let scl = LP_IO::regs().gpio(7);
+        for _ in 0..2 {
+            let saved = scl.read().bits();
+            // Disabling the input makes the controller observe SCL low.
+            scl.modify(|_, w| w.fun_ie().clear_bit().mcu_ie().clear_bit());
+            let result = i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]);
+            scl.write(|w| unsafe { w.bits(saved) });
+            assert_eq!(result, Err(Error::TimeOut));
+            let interrupts = LP_I2C0::regs().int_raw().read();
+            assert!(!interrupts.scl_st_to().bit());
+            assert!(!interrupts.scl_main_st_to().bit());
+        }
+        assert_eq!(
+            i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]),
+            Err(Error::AckCheckFailed)
+        );
+        assert_eq!(
+            i2c.read(NON_EXISTENT_ADDRESS, 0x10, &mut [0]),
+            Err(Error::AckCheckFailed)
+        );
     }
 }
