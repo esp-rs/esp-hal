@@ -7,6 +7,8 @@ mod tests {
     #[test]
     #[cfg(rng_trng_supported)]
     fn test_trng_without_source_is_error() {
+        let _p = esp_hal::init(Default::default());
+
         assert!(Trng::try_new().is_err());
 
         // Rng can be created anyway:
