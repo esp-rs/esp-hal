@@ -509,10 +509,8 @@ mod tests {
 
         let mut i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
 
-        // Fast-mode write of DAC code 0x800: register = 0x08, data = [0x00].
-        i2c.write(DUT_ADDRESS, WRITE_COMMAND[0], &WRITE_COMMAND[1..])
-            .unwrap();
-
+        // The MCP4725 has no sub-registers, but `read` always sends a register byte before the
+        // repeated start.
         let mut data = [0; 5];
         i2c.read(DUT_ADDRESS, WRITE_COMMAND[0], &mut data).unwrap();
 

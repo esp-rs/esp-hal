@@ -181,37 +181,38 @@ impl<'d> LpI2c<'d> {
             w.sar_i2c_start().set_bit()
         });
 
-        // Like ESP-IDF's `ulp_riscv_i2c_master_write_to_device`, wait for TX_DATA after every data
-        // byte, including the last one, instead of waiting for TRANS_COMPLETE.
-        let mut result = Ok(());
-        for (index, &byte) in data.iter().enumerate() {
-            if index > 0 {
-                sens.sar_i2c_ctrl().modify(|r, w| {
-                    let mut value = r.sar_i2c_ctrl().bits();
-                    value &= !(0xFF << 19);
-                    value |= (byte as u32) << 19;
-                    unsafe { w.sar_i2c_ctrl().bits(value) }
-                });
-            }
-
+        for &byte in data.iter().skip(1) {
             match self.wait_for_tx_interrupt() {
                 Ok(true) => {
+                    sens.sar_i2c_ctrl().modify(|r, w| {
+                        let mut value = r.sar_i2c_ctrl().bits();
+                        value &= !(0xFF << 19);
+                        value |= (byte as u32) << 19;
+                        value |= 1 << 27;
+                        unsafe { w.sar_i2c_ctrl().bits(value) }
+                    });
                     self.i2c
                         .register_block()
                         .int_clr()
                         .write(|w| w.tx_data().clear_bit_by_one());
                 }
-                Ok(false) if index == data.len() - 1 => break,
                 Ok(false) => panic!("Peripheral didn't wait for data"),
                 Err(err) => {
-                    result = Err(err);
-                    break;
+                    // Stop transmission.
+                    sens.sar_i2c_ctrl().modify(|_, w| {
+                        w.sar_i2c_start_force().clear_bit();
+                        w.sar_i2c_start().clear_bit()
+                    });
+
+                    return Err(err);
                 }
             }
         }
 
+        let result = self.wait_for_complete_interrupt();
+
         // Stop transmission.
-        sens.sar_i2c_ctrl().modify(|_, w| {
+        sens.sar_i2c_ctrl().write(|w| {
             w.sar_i2c_start_force().clear_bit();
             w.sar_i2c_start().clear_bit()
         });
