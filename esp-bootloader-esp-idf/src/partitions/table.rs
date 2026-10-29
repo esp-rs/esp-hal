@@ -343,7 +343,7 @@ mod tests {
     fn read_custom_types() {
         let pt = PartitionTable::new(CUSTOM).unwrap();
 
-        assert_eq!(6, pt.len());
+        assert_eq!(7, pt.len());
 
         assert_eq!(
             PartitionType::Unknown {
@@ -373,7 +373,7 @@ mod tests {
             .find_partition(PartitionType::App(AppPartitionSubType::Ota1))
             .unwrap()
             .unwrap();
-        assert_eq!(0x120000, ota_1.offset());
+        assert_eq!(0x130000, ota_1.offset());
     }
 
     #[test]
