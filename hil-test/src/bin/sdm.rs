@@ -164,32 +164,50 @@ fn configure_rx_channel<'a>(
 }
 
 fn high_ratio_per_mille(data: &[PulseCode], count: usize) -> u32 {
-    let mut high = 0_u32;
-    let mut low = 0_u32;
-    let mut remaining = SAMPLE_TIME_US;
+    let mut levels = [(Level::Low, 0_u16); 2 * RX_LEN];
+    let mut len = 0;
 
-    'pulses: for code in data.iter().take(count) {
-        for (level, length) in [
+    // The RMT end marker has a zero length. The other half of the end marker is not valid.
+    for (level, length) in data.iter().take(count).flat_map(|code| {
+        [
             (code.level1(), code.length1()),
             (code.level2(), code.length2()),
-        ] {
-            let length = u32::from(length).min(remaining);
-
-            if level == Level::High {
-                high += length;
-            } else {
-                low += length;
-            }
-
-            remaining -= length;
-            if remaining == 0 {
-                break 'pulses;
-            }
+        ]
+    }) {
+        if length == 0 {
+            break;
         }
+        levels[len] = (level, length);
+        len += 1;
     }
 
-    assert!(high + low > 0, "RMT did not capture any SDM pulse duration");
-    high * 1_000 / (high + low)
+    // The first level can be partial, and `set_duty(0)` cuts the last level. The duty change
+    // can also change the last whole SDM period. Do not measure that period.
+    let mut periods = levels.get(1..len.saturating_sub(1)).unwrap_or(&[]);
+    if let [(first, _), ..] = periods {
+        let start_level = *first;
+        while let [.., (last, _)] = periods
+            && *last == start_level
+        {
+            periods = &periods[..periods.len() - 1];
+        }
+    }
+    periods = &periods[..periods.len().saturating_sub(2)];
+
+    let (high, total) = periods
+        .iter()
+        .fold((0_u32, 0_u32), |(high, total), (level, length)| {
+            let length = u32::from(*length);
+            let high = if *level == Level::High {
+                high + length
+            } else {
+                high
+            };
+            (high, total + length)
+        });
+
+    assert!(total > 0, "RMT did not capture a whole SDM period");
+    high * 1_000 / total
 }
 
 fn expected_ratio_per_mille(duty: u8) -> u32 {
