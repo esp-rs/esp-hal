@@ -15,6 +15,7 @@ use crate::{
         wifi_pkt_rx_ctrl_t,
         wifi_promiscuous_pkt_t,
         wifi_promiscuous_pkt_type_t,
+        wifi_promiscuous_pkt_type_t_WIFI_PKT_MISC,
     },
     wifi::esp_wifi_result,
 };
@@ -28,9 +29,11 @@ pub struct PromiscuousPkt<'a> {
     pub rx_cntl: RxControlInfo,
     /// Frame type of the received packet.
     pub frame_type: wifi_promiscuous_pkt_type_t,
-    /// Length of the received packet.
+    /// Length of [`Self::data`].
     pub len: usize,
-    /// Data contained in the received packet.
+    /// Frame bytes without the Frame Check Sequence (FCS).
+    ///
+    /// Empty for miscellaneous or receive-error callbacks.
     pub data: &'a [u8],
 }
 
@@ -38,14 +41,21 @@ pub struct PromiscuousPkt<'a> {
 impl PromiscuousPkt<'_> {
     /// # Safety
     ///
-    /// When calling this, you have to ensure, that `buf` points to a valid
-    /// [wifi_promiscuous_pkt_t].
+    /// `buf` must point to a live vendor promiscuous callback buffer of `frame_type`.
+    /// The returned packet must not outlive that buffer.
     pub(crate) unsafe fn from_raw(
         buf: *const wifi_promiscuous_pkt_t,
         frame_type: wifi_promiscuous_pkt_type_t,
     ) -> Self {
         let rx_cntl = unsafe { RxControlInfo::from_raw(&(*buf).rx_ctrl) };
-        let len = rx_cntl.sig_len as usize;
+        // Match ESP-IDF's sniffer example:
+        // https://github.com/espressif/esp-idf/blob/4dbfecac7e3/examples/network/simple_sniffer/main/cmd_sniffer.c#L135-L148
+        let len =
+            if frame_type == wifi_promiscuous_pkt_type_t_WIFI_PKT_MISC || rx_cntl.rx_state != 0 {
+                0
+            } else {
+                (rx_cntl.sig_len as usize).saturating_sub(4)
+            };
         PromiscuousPkt {
             rx_cntl,
             frame_type,
