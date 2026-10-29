@@ -13,6 +13,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut dcache_reclaimed = false;
     let mut persistent = false;
     let mut zeroed = false;
+    let mut uncached = false;
 
     for attr_arg in &attr_args {
         match attr_arg {
@@ -41,6 +42,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                                 i if i == "persistent" => &mut persistent,
                                 i if i == "dcache_reclaimed" => &mut dcache_reclaimed,
                                 i if i == "zeroed" => &mut zeroed,
+                                i if i == "uncached" => &mut uncached,
                                 i => {
                                     return syn::Error::new(
                                         i.span(),
@@ -143,6 +145,15 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         .into_compile_error();
     }
 
+    #[cfg(not(feature = "uncached"))]
+    if uncached {
+        return syn::Error::new(
+            Span::call_site(),
+            "uncached is not available for this target",
+        )
+        .into_compile_error();
+    }
+
     let is_fn = matches!(item, Item::Fn(_));
 
     // The memory option comes before the initialization option.
@@ -151,6 +162,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         (rtc_slow, "rtc_slow"),
         (dram2_uninit, "reclaimed"),
         (dcache_reclaimed, "dcache_reclaimed"),
+        (uncached, "uncached"),
         (persistent, "persistent"),
         (zeroed, "zeroed"),
     ]
@@ -167,6 +179,9 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         (false, ["reclaimed"]) => Ok(".dram2_uninit"),
         (false, ["reclaimed", "zeroed"]) => Ok(".dram2_uninit.bss"),
         (false, ["dcache_reclaimed"]) => Ok(".dcache_reclaimed_uninit"),
+
+        (false, ["uncached"]) => Ok(".uncached.data"),
+        (false, ["uncached", "zeroed"]) => Ok(".uncached.bss"),
 
         (false, ["rtc_fast"]) => Ok(".rtc_fast.data"),
         (false, ["rtc_fast", "persistent"]) => Ok(".rtc_fast.persistent"),
@@ -673,6 +688,80 @@ mod tests {
                 #[unsafe(link_section = ".rtc_fast.persistent")]
                 struct Foo { }
                 ::core::compile_error!{ "Expected a `static`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_uncached_availablility() {
+        let result = ram(
+            quote::quote! {
+                unstable(uncached)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 4] = [0; 4];
+            }
+            .into(),
+        );
+
+        let expectation = cfg_select! {
+            feature = "uncached" => quote::quote! {
+                #[unsafe(link_section = ".uncached.data")]
+                static mut FOO: [u8; 4] = [0; 4];
+            },
+            _ => quote::quote! {
+                ::core::compile_error!{ "uncached is not available for this target" }
+            },
+        };
+
+        assert_eq!(result.to_string(), expectation.to_string());
+    }
+
+    #[cfg(feature = "uncached")]
+    #[test]
+    fn test_uncached_bss() {
+        let result = ram(
+            quote::quote! {
+                unstable(uncached, zeroed)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 4] = [0; 4];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe(link_section = ".uncached.bss")]
+                static mut FOO: [u8; 4] = [0; 4];
+                const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 4]>();
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(feature = "uncached")]
+    #[test]
+    fn test_uncached_persistent() {
+        let result = ram(
+            quote::quote! {
+                unstable(uncached, persistent)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 4] = [0; 4];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "Invalid combination of ram arguments" }
             }
             .to_string()
         );

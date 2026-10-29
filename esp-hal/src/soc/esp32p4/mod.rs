@@ -42,6 +42,10 @@ fn cache_l2_bus(addr: u32) -> u32 {
 
 /// Writes back a specific range of data in the cache.
 pub(crate) unsafe fn cache_writeback_addr(addr: u32, size: u32) {
+    if crate::soc::is_uncached_ram_address(addr as usize) {
+        return;
+    }
+
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(bus: u32, addr: u32, size: u32);
     }
@@ -53,6 +57,10 @@ pub(crate) unsafe fn cache_writeback_addr(addr: u32, size: u32) {
 
 /// Invalidate a specific range of data in the cache.
 pub(crate) unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    if crate::soc::is_uncached_ram_address(addr as usize) {
+        return;
+    }
+
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(bus: u32, addr: u32, size: u32);
     }

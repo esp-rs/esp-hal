@@ -21,8 +21,12 @@ check-configs = [
     { features = ["rtc-ram"] },
     { features = ["no-mie-mip"] },
     { features = ["rtc-ram", "no-mie-mip"] },
+    { features = ["rtc-ram", "uncached-ram"] },
 ]
-clippy-configs = [{ features = ["rtc-ram"] }]
+clippy-configs = [
+    { features = ["rtc-ram"] },
+    { features = ["rtc-ram", "uncached-ram"] },
+]
 
 [lib]
 bench = false
@@ -40,6 +44,8 @@ riscv-rt          = {version = "0.16.0", features = ["pre-init", "no-exceptions"
 no-mie-mip = ["riscv-rt/no-xie-xip"]
 ## Indicate that the device has RTC RAM.
 rtc-ram = []
+## Indicate that the device can access internal SRAM through an L1-bypass address range.
+uncached-ram = []
 ## CLIC with 48 total interrupt lines
 clic-48 = []
 

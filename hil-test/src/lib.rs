@@ -23,9 +23,6 @@ unsafe impl defmt::Logger for Logger {
 }
 
 #[cfg(feature = "defmt")]
-use defmt_rtt as _;
-
-#[cfg(feature = "defmt")]
 #[macro_export]
 macro_rules! assert {
     ($($t:tt)*) => { defmt::assert!($($t)*) }
@@ -228,13 +225,39 @@ pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
 
-/// Disables every watchdog timer with raw register writes.
+/// Starts the RTT logger and disables every watchdog timer with raw register writes.
 ///
-/// This prevents the firmware reset loop if no debugger is attached. The function must not depend
-/// on esp-hal drivers, because a driver that is broken or half-initialized must not stop the tests
-/// from running.
+/// Disabling the watchdogs prevents the firmware reset loop if no debugger is attached. The
+/// function must not depend on esp-hal drivers, because a driver that is broken or half-initialized
+/// must not stop the tests from running.
 #[embedded_test::setup]
-fn disable_watchdogs_before_semihosting() {
+fn init_rtt_and_disable_watchdogs() {
+    #[cfg(feature = "defmt")]
+    {
+        let channels = cfg_select! {
+            esp32p4 => rtt_target::rtt_init! {
+                up: {
+                    0: {
+                        size: 1024,
+                        name: "defmt",
+                        section: ".uncached.data",
+                    }
+                }
+                section_cb: ".uncached.data"
+            },
+            _ => rtt_target::rtt_init! {
+                up: {
+                    0: {
+                        size: 1024,
+                        name: "defmt",
+                    }
+                }
+            },
+        };
+
+        rtt_target::set_defmt_channel(channels.up.0);
+    }
+
     cfg_select! {
         soc_has_lp_wdt => {
             use esp_hal::peripherals::LP_WDT;

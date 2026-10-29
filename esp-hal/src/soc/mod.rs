@@ -43,11 +43,38 @@ pub(crate) static CACHE_SYNC_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new(
 
 #[allow(unused)]
 pub(crate) fn is_valid_ram_address(address: usize) -> bool {
-    addr_in_range(address, memory_range!("DRAM"))
+    addr_in_range(address, memory_range!("DRAM")) || is_uncached_ram_address(address)
+}
+
+/// Returns whether `address` is in the linked uncached sections.
+pub(crate) fn is_uncached_ram_address(address: usize) -> bool {
+    let range = cfg_select! {
+        esp32p4 => uncached_ram_range(),
+        // Other chips have no uncached RAM.
+        _ => 0..0,
+    };
+    range.contains(&address)
+}
+
+#[cfg(esp32p4)]
+fn uncached_ram_range() -> Range<usize> {
+    unsafe extern "C" {
+        static _uncached_data_start: u8;
+        static _uncached_end: u8;
+    }
+
+    let start = &raw const _uncached_data_start as usize;
+    let end = &raw const _uncached_end as usize;
+    start..end
 }
 
 #[allow(unused)]
 pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
+    #[cfg(esp32p4)]
+    if slice_in_range(slice, uncached_ram_range()) {
+        return true;
+    }
+
     slice_in_range(slice, memory_range!("DRAM"))
 }
 
