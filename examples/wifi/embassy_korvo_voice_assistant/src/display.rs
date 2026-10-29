@@ -1,14 +1,22 @@
 //! The 800x480 RGB panel of the LCD sub-board and the screen drawn on it.
 //!
-//! The panel has no frame memory, so the LCD peripheral sends it the frame buffer in PSRAM over and
-//! over: the DMA descriptors of the frame buffer form a ring. The refresh stops while a new
-//! [`Screen`] is drawn.
+//! The panel has no frame memory, so the LCD peripheral refreshes it all the time from a frame
+//! buffer in PSRAM. Speech recognition on the second core takes so much PSRAM bandwidth that a DMA
+//! reading the frame buffer falls behind, and the picture slips sideways. So, as ESP-IDF's RGB LCD
+//! driver does with bounce buffers, the DMA sends two buffers in internal RAM in turns, and an
+//! interrupt copies the next lines of the frame buffer into each buffer while the DMA sends the
+//! other. The refresh stops while a new [`Screen`] is drawn.
 
 use alloc::string::String;
-use core::convert::Infallible;
+use core::{
+    cell::UnsafeCell,
+    convert::Infallible,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use allocator_api2::vec::Vec;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+use embassy_time::{Duration, with_timeout};
 use embedded_graphics::{
     mono_font::{MonoTextStyle, iso_8859_1::FONT_10X20},
     pixelcolor::{Rgb565, raw::RawU16},
@@ -20,25 +28,57 @@ use embedded_text::{
     TextBox,
     style::{HeightMode, TextBoxStyleBuilder, VerticalOverdraw},
 };
-use esp_alloc::DmaCompatibleExternalMemory;
+use esp_alloc::ExternalMemory;
 use esp_hal::{
     Blocking,
     dma::{
         BurstConfig,
         DmaDescriptor,
         DmaTxBuffer,
-        ExternalBurstConfig,
         Owner,
         Preparation,
-        aligned::DmaAlignedMut,
+        aligned::{DmaAlignedMut, InternalMemory},
     },
     dma_descriptors_impl,
+    handler,
+    interrupt::{self, Priority},
     lcd_cam::lcd::dpi::Dpi,
+    peripherals::Interrupt,
 };
+use static_cell::ConstStaticCell;
 
 pub const WIDTH: u32 = 800;
 pub const HEIGHT: u32 = 480;
-const FRAME_BYTES: usize = (WIDTH * HEIGHT * 2) as usize;
+const LINE_BYTES: usize = WIDTH as usize * 2;
+const FRAME_BYTES: usize = LINE_BYTES * HEIGHT as usize;
+
+/// The lines in a bounce buffer. A refill must be done before the DMA comes back to the buffer,
+/// within about 14 lines of 928 pixel clocks at 18 MHz, about 0.7 ms.
+const BOUNCE_LINES: usize = 16;
+const BOUNCE_BYTES: usize = BOUNCE_LINES * LINE_BYTES;
+const _: () = assert!(
+    (HEIGHT as usize).is_multiple_of(2 * BOUNCE_LINES),
+    "Each frame must start with the first bounce buffer"
+);
+const REFILLS_PER_FRAME: usize = HEIGHT as usize / BOUNCE_LINES;
+/// Two lines per DMA descriptor, which holds at most 4095 bytes.
+const DESCRIPTOR_BYTES: usize = 2 * LINE_BYTES;
+const DESCRIPTORS_PER_BUFFER: usize = BOUNCE_BYTES / DESCRIPTOR_BYTES;
+
+// Registers that esp-hal does not expose. The DMA ones are those of `DMA_AXI_CH0`, which `main`
+// gives the display.
+/// LCD_CAM `LC_DMA_INT_RAW` and `LC_DMA_INT_CLR`.
+const LCD_INT_RAW: *mut u32 = 0x2039_6068 as _;
+const LCD_INT_CLR: *mut u32 = 0x2039_6070 as _;
+/// The LCD finished a frame.
+const LCD_VSYNC: u32 = 1 << 0;
+/// AXI-DMA `OUT_INT_ENA_CH0`, `OUT_INT_CLR_CH0` and `OUT_DSCR_CH0`, the descriptor the DMA reads.
+const DMA_OUT_INT_ENA: *mut u32 = 0x2034_8140 as _;
+const DMA_OUT_INT_CLR: *mut u32 = 0x2034_8144 as _;
+const DMA_OUT_DESCRIPTOR: *mut u32 = 0x2034_816C as _;
+/// The DMA has read a descriptor. Refills do not use the EOF flag of descriptors, because each EOF
+/// makes the LCD pause, and the LCD then gets a third of the pixel data it needs.
+const DMA_OUT_DONE: u32 = 1 << 0;
 
 /// The area of the talk button, for drawing and for touch hit tests.
 pub const BUTTON: Rectangle = Rectangle::new(Point::new(250, 384), Size::new(300, 72));
@@ -73,42 +113,178 @@ pub fn show(screen: &Screen) {
 
 #[embassy_executor::task]
 pub async fn run(mut dpi: Dpi<'static, Blocking>) {
-    let mut frame = FrameRing::new();
+    let mut frame = Vec::with_capacity_in(FRAME_BYTES, ExternalMemory);
+    frame.resize(FRAME_BYTES, 0);
+    let frame = frame.leak();
+    let mut ring = BounceRing::new();
+    interrupt::bind_handler(Interrupt::AXI_PDMA_OUT_CH0, refill);
     loop {
-        let Ok(transfer) = dpi.send(true, frame) else {
+        // SAFETY: The DMA is stopped and the refill interrupt is off.
+        unsafe { REFILL.get().start(frame) };
+        let Ok(transfer) = dpi.send(true, ring) else {
             panic!("Failed to start the display refresh");
         };
-        let screen = SCREEN.wait().await;
-        // Starting Wi-Fi shifts a running picture, for a reason not known yet. Restarting the
-        // refresh realigns it.
-        (dpi, frame) = transfer.stop();
-        draw(&mut FrameBuffer(frame.buffer.as_mut()), &screen);
-        frame.buffer.writeback();
+        listen_for_refills(true);
+        let screen = next_screen().await;
+        listen_for_refills(false);
+        (dpi, ring) = transfer.stop();
+        if let Some(screen) = screen {
+            draw(&mut FrameBuffer(frame), &screen);
+        }
     }
 }
 
-/// A black frame buffer in PSRAM, with DMA descriptors that link back to the start.
-struct FrameRing {
-    descriptors: DmaAlignedMut<'static, [DmaDescriptor]>,
-    buffer: DmaAlignedMut<'static, [u8]>,
+/// Set when a frame had too few refills and the picture is out of step with the bounce buffers.
+/// This happens when the refill interrupt waits longer than a bounce buffer lasts, for example
+/// while Wi-Fi starts.
+static OUT_OF_STEP: AtomicBool = AtomicBool::new(false);
+
+/// Waits for a new screen, or returns `None` when the picture is out of step. Restarting the
+/// refresh realigns it.
+async fn next_screen() -> Option<Screen> {
+    loop {
+        if let Ok(screen) = with_timeout(Duration::from_millis(100), SCREEN.wait()).await {
+            return Some(screen);
+        }
+        if OUT_OF_STEP.load(Ordering::Relaxed) {
+            return None;
+        }
+    }
 }
 
-const BURST: ExternalBurstConfig = ExternalBurstConfig::Size64;
-/// The largest DMA chunk that keeps every chunk aligned to the burst size.
-const CHUNK_SIZE: usize = 4096 - BURST as usize;
+fn listen_for_refills(enable: bool) {
+    // SAFETY: Only the display uses the interrupts of its DMA channel.
+    unsafe {
+        DMA_OUT_INT_CLR.write_volatile(DMA_OUT_DONE);
+        let enabled = DMA_OUT_INT_ENA.read_volatile() & !DMA_OUT_DONE;
+        DMA_OUT_INT_ENA.write_volatile(enabled | if enable { DMA_OUT_DONE } else { 0 });
+    }
+}
 
-impl FrameRing {
+#[handler(priority = Priority::max())]
+fn refill() {
+    // SAFETY: Clears the flags this interrupt handles, and reads the position of the DMA.
+    let (descriptor, vsync) = unsafe {
+        DMA_OUT_INT_CLR.write_volatile(DMA_OUT_DONE);
+        let vsync = LCD_INT_RAW.read_volatile() & LCD_VSYNC != 0;
+        if vsync {
+            LCD_INT_CLR.write_volatile(LCD_VSYNC);
+        }
+        (DMA_OUT_DESCRIPTOR.read_volatile() as usize, vsync)
+    };
+    // SAFETY: The interrupt only runs while the refresh does.
+    unsafe { REFILL.get().advance(descriptor, vsync) };
+}
+
+/// The two bounce buffers and what goes into them next.
+struct Refill {
+    buffers: Option<DmaAlignedMut<'static, [[u8; BOUNCE_BYTES]; 2]>>,
+    first_descriptor: usize,
+    frame: *const u8,
+    /// The frame line that goes into each buffer next.
+    next_lines: [usize; 2],
+    /// The buffer the DMA reads.
+    reading: usize,
+    /// The refills since the last VSYNC, from the first VSYNC on.
+    refills: Option<usize>,
+}
+
+/// The refill state, which the display task uses while the refresh is stopped, and the refill
+/// interrupt while it runs.
+struct RefillCell(UnsafeCell<Refill>);
+
+// SAFETY: See `get`.
+unsafe impl Sync for RefillCell {}
+
+impl RefillCell {
+    /// # Safety
+    ///
+    /// Only the display task while the refresh is stopped, or the refill interrupt, may call this.
+    #[allow(clippy::mut_from_ref)]
+    unsafe fn get(&self) -> &mut Refill {
+        unsafe { &mut *self.0.get() }
+    }
+}
+
+static REFILL: RefillCell = RefillCell(UnsafeCell::new(Refill {
+    buffers: None,
+    first_descriptor: 0,
+    frame: core::ptr::null(),
+    next_lines: [0; 2],
+    reading: 0,
+    refills: None,
+}));
+
+impl Refill {
+    /// Fills both buffers with the first lines of `frame`.
+    fn start(&mut self, frame: &[u8]) {
+        self.frame = frame.as_ptr();
+        self.next_lines = [0, BOUNCE_LINES];
+        self.fill(0);
+        self.fill(1);
+        self.reading = 0;
+        self.refills = None;
+        OUT_OF_STEP.store(false, Ordering::Relaxed);
+        // SAFETY: Clears a stale VSYNC flag of the previous refresh.
+        unsafe { LCD_INT_CLR.write_volatile(LCD_VSYNC) };
+    }
+
+    /// Refills the buffer the DMA has left, once the DMA reads `descriptor`.
+    fn advance(&mut self, descriptor: usize, vsync: bool) {
+        if vsync {
+            if self
+                .refills
+                .is_some_and(|refills| refills < REFILLS_PER_FRAME)
+            {
+                OUT_OF_STEP.store(true, Ordering::Relaxed);
+            }
+            self.refills = Some(0);
+        }
+
+        let index = descriptor.wrapping_sub(self.first_descriptor) / size_of::<DmaDescriptor>();
+        let buffer = index / DESCRIPTORS_PER_BUFFER;
+        // The DMA may still read the descriptor before the one it reports, so a buffer is free once
+        // the DMA reads the second descriptor of the other buffer.
+        if buffer < 2 && buffer != self.reading && index % DESCRIPTORS_PER_BUFFER >= 1 {
+            self.fill(self.reading);
+            self.reading = buffer;
+            if let Some(refills) = &mut self.refills {
+                *refills += 1;
+            }
+        }
+    }
+
+    fn fill(&mut self, buffer: usize) {
+        let Some(buffers) = &mut self.buffers else {
+            return;
+        };
+        let line = self.next_lines[buffer];
+        // SAFETY: `frame` points to a whole frame, which is not drawn into while the refresh runs.
+        let lines =
+            unsafe { core::slice::from_raw_parts(self.frame.add(line * LINE_BYTES), BOUNCE_BYTES) };
+        buffers[buffer].copy_from_slice(lines);
+        buffers.writeback();
+        self.next_lines[buffer] = (line + 2 * BOUNCE_LINES) % HEIGHT as usize;
+    }
+}
+
+/// The DMA descriptors of the two bounce buffers, which link into a ring.
+struct BounceRing {
+    descriptors: DmaAlignedMut<'static, [DmaDescriptor]>,
+}
+
+impl BounceRing {
     fn new() -> Self {
-        let mut buffer = Vec::with_capacity_in(FRAME_BYTES, DmaCompatibleExternalMemory);
-        buffer.resize(FRAME_BYTES, 0);
-        let mut buffer = DmaAlignedMut::new(buffer.leak()).unwrap();
-        let mut descriptors = dma_descriptors_impl!(FRAME_BYTES, CHUNK_SIZE);
+        static BUFFERS: ConstStaticCell<InternalMemory<[[u8; BOUNCE_BYTES]; 2]>> =
+            ConstStaticCell::new(InternalMemory::new([[0; BOUNCE_BYTES]; 2]));
+        let mut buffers = BUFFERS.take().get_mut();
+        let mut descriptors = dma_descriptors_impl!(2 * BOUNCE_BYTES, DESCRIPTOR_BYTES);
 
         let first: *mut DmaDescriptor = &mut descriptors[0];
         let count = descriptors.len();
         for (index, (descriptor, chunk)) in descriptors
             .iter_mut()
-            .zip(buffer.chunks_mut(CHUNK_SIZE))
+            .zip(buffers.as_flattened_mut().chunks_mut(DESCRIPTOR_BYTES))
             .enumerate()
         {
             descriptor.set_owner(Owner::Dma);
@@ -122,35 +298,35 @@ impl FrameRing {
                 (descriptor as *mut DmaDescriptor).wrapping_add(1)
             };
         }
-        buffer.writeback();
 
-        Self {
-            descriptors,
-            buffer,
-        }
+        // SAFETY: The refresh has not started yet.
+        let state = unsafe { REFILL.get() };
+        state.buffers = Some(buffers);
+        state.first_descriptor = first as usize;
+        Self { descriptors }
     }
 }
 
-unsafe impl DmaTxBuffer for FrameRing {
-    type View = FrameRing;
-    type Final = FrameRing;
+unsafe impl DmaTxBuffer for BounceRing {
+    type View = BounceRing;
+    type Final = BounceRing;
 
     fn prepare(&mut self) -> Preparation {
         Preparation {
             start: self.descriptors.as_mut_ptr(),
-            accesses_psram: true,
-            burst_transfer: BurstConfig::from(BURST),
+            accesses_psram: false,
+            burst_transfer: BurstConfig::default(),
             // The DMA never hands the descriptors back, so it must not check their owner.
             check_owner: Some(false),
             auto_write_back: false,
         }
     }
 
-    fn into_view(self) -> FrameRing {
+    fn into_view(self) -> BounceRing {
         self
     }
 
-    fn from_view(view: FrameRing) -> FrameRing {
+    fn from_view(view: BounceRing) -> BounceRing {
         view
     }
 }
