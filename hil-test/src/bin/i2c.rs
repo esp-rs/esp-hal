@@ -622,6 +622,30 @@ mod lp_i2c {
     }
 
     #[test]
+    #[cfg(esp32c6)]
+    fn fifo_recovers_after_scl_stall(mut i2c: LpI2c<'static>) {
+        use esp_hal::peripherals::LP_IO;
+
+        use super::{DUT_ADDRESS, WRITE_COMMAND};
+
+        let scl = LP_IO::regs().gpio(7);
+        let saved = scl.read().bits();
+        // Disabling the input makes the controller observe SCL low.
+        scl.modify(|_, w| {
+            w.fun_ie().clear_bit();
+            w.mcu_ie().clear_bit()
+        });
+        let result = i2c.write(DUT_ADDRESS, WRITE_COMMAND[0], &WRITE_COMMAND[1..]);
+        scl.write(|w| unsafe { w.bits(saved) });
+        assert_eq!(result, Err(Error::TimeOut));
+        let interrupts = LP_I2C0::regs().int_raw().read();
+        assert!(!interrupts.scl_st_to().bit());
+        assert!(!interrupts.scl_main_st_to().bit());
+        i2c.write(DUT_ADDRESS, WRITE_COMMAND[0], &WRITE_COMMAND[1..])
+            .unwrap();
+    }
+
+    #[test]
     #[cfg(lp_i2c_master_version = "rtc_i2c")]
     fn empty_write_reaches_bus(mut i2c: LpI2c<'static>) {
         assert_eq!(
