@@ -71,7 +71,16 @@ impl<'d, Dm: DriverMode> Lcd<'d, Dm> {
         let clock_config =
             LcdCamLcdClockConfig::new(sources[i], divider.div_num, divider.div_a, divider.div_b);
 
-        self.regs().lcd_clock().write(|w| unsafe {
+        ClockTree::with(|clocks| {
+            LcdCamInstance::LcdCam.configure_lcd_clock(clocks, clock_config);
+            if !self.inner.clock_requested {
+                LcdCamInstance::LcdCam.request_lcd_clock(clocks);
+                self.inner.clock_requested = true;
+            }
+        });
+
+        // On the ESP32-S31, this register ignores writes until the LCD clock is enabled.
+        self.regs().lcd_clock().modify(|_, w| unsafe {
             // Force enable the clock for all configuration registers.
             w.clk_en().set_bit();
             if cfg!(esp32s3) {
@@ -86,13 +95,6 @@ impl<'d, Dm: DriverMode> Lcd<'d, Dm> {
                 .bit(config.clock_mode.polarity == Polarity::IdleHigh);
             w.lcd_ck_out_edge()
                 .bit(config.clock_mode.phase == Phase::ShiftHigh)
-        });
-        ClockTree::with(|clocks| {
-            LcdCamInstance::LcdCam.configure_lcd_clock(clocks, clock_config);
-            if !self.inner.clock_requested {
-                LcdCamInstance::LcdCam.request_lcd_clock(clocks);
-                self.inner.clock_requested = true;
-            }
         });
 
         Ok(())
