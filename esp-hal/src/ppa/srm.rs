@@ -550,6 +550,9 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
 
         writeback(input.data);
         writeback(output.data);
+        // The caller's stack may be in PSRAM.
+        writeback(core::slice::from_ref(&tx));
+        writeback(core::slice::from_ref(&rx));
         compiler_fence(Ordering::SeqCst);
         dma.out_link_addr_ch(DMA_CHANNEL)
             .write(|w| unsafe { w.outlink_addr_ch().bits(tx_address) });
@@ -675,10 +678,10 @@ impl<Dm: DriverMode> Drop for Srm<'_, Dm> {
     }
 }
 
-fn writeback(data: &[u8]) {
+fn writeback<T>(data: &[T]) {
     if is_slice_in_psram(data) {
         let start = data.as_ptr() as usize & !(ALIGNMENT - 1);
-        let end = (data.as_ptr() as usize + data.len()).next_multiple_of(ALIGNMENT);
+        let end = (data.as_ptr_range().end as usize).next_multiple_of(ALIGNMENT);
         unsafe {
             crate::soc::cache_writeback_addr(start as u32, (end - start) as u32);
         }

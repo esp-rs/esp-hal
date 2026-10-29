@@ -1,7 +1,7 @@
 //! PPA SRM tests. No external wiring is required.
 
 //% CHIP_FILTER: pixel_accelerator_driver_supported
-//% FEATURES: unstable psram
+//% FEATURES: unstable psram esp-rtos
 
 #![no_std]
 #![no_main]
@@ -11,9 +11,11 @@ use esp_alloc::ExternalMemory;
 use esp_hal::{
     Blocking,
     dma::aligned::DmaAlignedMut,
-    peripherals::{DMA2D, PPA},
+    peripherals::{DMA2D, PPA, TIMG0},
     ppa::srm::{Config, Error, Input, Offset, Output, PixelFormat, Rotation, Size, Srm},
+    timer::timg::TimerGroup,
 };
+use esp_rtos::thread::{Stack, ThreadSpawner};
 use hil_test as _;
 use static_cell::ConstStaticCell;
 
@@ -38,6 +40,7 @@ struct Buffer<const N: usize>([u8; N]);
 struct Context {
     ppa: PPA<'static>,
     dma: DMA2D<'static>,
+    timg0: TIMG0<'static>,
     source: &'static mut [u8; SOURCE_BYTES],
     destination: &'static mut [u8; DESTINATION_BYTES],
 }
@@ -160,6 +163,7 @@ mod tests {
         Context {
             ppa: peripherals.PPA,
             dma: peripherals.DMA2D,
+            timg0: peripherals.TIMG0,
             source: &mut SOURCE.take().0,
             destination: &mut DESTINATION.take().0,
         }
@@ -932,6 +936,55 @@ mod tests {
                 .iter()
                 .all(|&byte| byte == 0x5a)
         );
+    }
+
+    #[test]
+    fn test_psram_stack(mut ctx: Context) {
+        let stack = Box::new_in(Stack::<8192>::new(), ExternalMemory);
+        let start = core::ptr::from_ref(&*stack) as usize;
+        let stack_range = start..start + size_of_val(&*stack);
+        let timg0 = TimerGroup::new(ctx.timg0);
+        esp_rtos::start(timg0.timer0);
+
+        ThreadSpawner::from_static(Box::leak(stack))
+            .spawn(move || {
+                let mut guard = core::hint::black_box(Buffer([0x5a; 64]));
+                assert!(stack_range.contains(&(guard.0.as_ptr() as usize)));
+                let mut guard = DmaAlignedMut::new(&mut guard.0).unwrap();
+                guard.writeback();
+                let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
+                for (size, offset) in [
+                    (SOURCE_SIZE, OFFSET),
+                    (
+                        Size {
+                            width: 32,
+                            height: 24,
+                        },
+                        Offset::default(),
+                    ),
+                    (SOURCE_SIZE, OFFSET),
+                ] {
+                    fill_source(ctx.source, size, PixelFormat::Rgb565);
+                    check_unscaled(
+                        &mut srm,
+                        Input {
+                            data: ctx.source,
+                            size,
+                            format: PixelFormat::Rgb565,
+                        },
+                        ctx.destination,
+                        offset,
+                        Config::default(),
+                    );
+                    guard.invalidate();
+                    assert!(
+                        guard
+                            .iter()
+                            .all(|byte| unsafe { core::ptr::read_volatile(byte) } == 0x5a)
+                    );
+                }
+            })
+            .join();
     }
 
     #[test]
