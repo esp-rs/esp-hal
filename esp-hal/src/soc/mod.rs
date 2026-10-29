@@ -36,6 +36,11 @@ cfg_select! {
     }
 }
 
+/// The cores share the cache sync registers. A cache operation from one core while the other
+/// core's operation runs can discard either one.
+#[cfg(all(multi_core, not(esp32)))]
+pub(crate) static CACHE_SYNC_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+
 #[allow(unused)]
 pub(crate) fn is_valid_ram_address(address: usize) -> bool {
     addr_in_range(address, memory_range!("DRAM"))

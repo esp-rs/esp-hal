@@ -46,9 +46,9 @@ pub(crate) unsafe fn cache_writeback_addr(addr: u32, size: u32) {
         fn Cache_WriteBack_Addr(bus: u32, addr: u32, size: u32);
     }
 
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_WriteBack_Addr(CACHE_MAP_L1_DCACHE | cache_l2_bus(addr), addr, size);
-    }
+    });
 }
 
 /// Invalidate a specific range of data in the cache.
@@ -57,9 +57,9 @@ pub(crate) unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
         fn Cache_Invalidate_Addr(bus: u32, addr: u32, size: u32);
     }
 
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE | cache_l2_bus(addr), addr, size);
-    }
+    });
 }
 
 pub(crate) unsafe fn cache_invalidate_icache_addr(addr: u32, size: u32) {
@@ -67,11 +67,11 @@ pub(crate) unsafe fn cache_invalidate_icache_addr(addr: u32, size: u32) {
         fn Cache_Invalidate_Addr(bus: u32, addr: u32, size: u32);
     }
 
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_Addr(
             CACHE_MAP_L1_ICACHE_0 | CACHE_MAP_L1_ICACHE_1 | cache_l2_bus(addr),
             addr,
             size,
         );
-    }
+    });
 }

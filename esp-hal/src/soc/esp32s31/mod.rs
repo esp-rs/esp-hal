@@ -88,9 +88,9 @@ pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(map: u32, addr: u32, size: u32);
     }
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_WriteBack_Addr(CACHE_MAP_L1_DCACHE, addr, size);
-    }
+    });
 }
 
 /// Invalidate a specific range of addresses in the cache.
@@ -100,7 +100,7 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
     }
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE, addr, size);
-    }
+    });
 }
