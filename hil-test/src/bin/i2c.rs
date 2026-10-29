@@ -487,27 +487,55 @@ mod tests {
             .expect("bus should work normally after releasing SDA");
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
+}
 
-    // TODO: against the MCP4725, LP I2C transfers time out on the ESP32-S3 and are not
-    // acknowledged on the ESP32-C5.
-    #[test]
-    #[cfg(all(lp_i2c_master_driver_supported, not(any(esp32s3, esp32c5))))]
-    fn test_read_with_lp_i2c() {
-        use esp_hal::i2c::lp_i2c::{Config, LpI2c};
+#[cfg(lp_i2c_master_driver_supported)]
+#[embedded_test::tests(default_timeout = 3)]
+mod lp_i2c {
+    use esp_hal::i2c::lp_i2c::{Config, Error, LpI2c};
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    use esp_hal::{i2c::lp_i2c::Timing, time::Duration};
 
-        let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
-
+    #[init]
+    fn init() -> LpI2c<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
-
-        // RTC_I2C has no usable default timing, it has to be spelled out.
         let config = cfg_select! {
             lp_i2c_master_version = "rtc_i2c" => Config::default()
-                .with_timing(esp_hal::i2c::lp_i2c::Timing::standard_mode())
-                .with_timeout(esp_hal::time::Duration::from_micros(100)),
+                .with_timing(Timing::standard_mode())
+                .with_timeout(Duration::from_micros(100)),
             _ => Config::default(),
         };
+        LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap()
+    }
 
-        let mut i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
+    #[test]
+    fn validates_addresses(mut i2c: LpI2c<'static>) {
+        assert_eq!(i2c.write(0x80, 0x10, &[]), Err(Error::AddressInvalid));
+        assert_eq!(i2c.write(0x80, 0x10, &[0xa5]), Err(Error::AddressInvalid));
+        assert_eq!(i2c.read(0x80, 0x10, &mut []), Err(Error::AddressInvalid));
+        assert_eq!(i2c.read(0x80, 0x10, &mut [0]), Err(Error::AddressInvalid));
+    }
+
+    #[test]
+    fn empty_read_is_a_noop(mut i2c: LpI2c<'static>) {
+        let regs = esp_hal::peripherals::LP_I2C0::regs();
+        let read_setup_command = || {
+            cfg_select! {
+                lp_i2c_master_version = "rtc_i2c" => regs.cmd(2).read().bits(),
+                _ => regs.comd(1).read().bits(),
+            }
+        };
+        let before = read_setup_command();
+        assert_eq!(i2c.read(0x7f, 0x10, &mut []), Ok(()));
+        assert_eq!(read_setup_command(), before);
+    }
+
+    // The MCP4725 read times out on ESP32-S3 and gets a NACK on ESP32-C5.
+    #[test]
+    #[cfg(not(any(esp32s3, esp32c5)))]
+    fn read_from_mcp4725(mut i2c: LpI2c<'static>) {
+        use super::{DUT_ADDRESS, WRITE_COMMAND};
 
         // The MCP4725 has no sub-registers, but `read` always sends a register byte before the
         // repeated start.
@@ -515,6 +543,15 @@ mod tests {
         i2c.read(DUT_ADDRESS, WRITE_COMMAND[0], &mut data).unwrap();
 
         assert_ne!(data, [0u8; 5]);
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn empty_write_reaches_bus(mut i2c: LpI2c<'static>) {
+        assert_eq!(
+            i2c.write(super::NON_EXISTENT_ADDRESS, 0x10, &[]),
+            Err(Error::AckCheckFailed)
+        );
     }
 }
 

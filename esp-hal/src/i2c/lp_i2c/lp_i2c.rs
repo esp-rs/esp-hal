@@ -452,10 +452,6 @@ impl<'d> LpI2c<'d> {
         register: u8,
         data: &mut [u8],
     ) -> Result<(), Error> {
-        if data.is_empty() {
-            return Ok(());
-        }
-
         self.start_transaction();
 
         let mut slot = 0;

@@ -131,9 +131,11 @@ for_each_lp_function! {
 }
 
 /// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// The device address exceeds the 7-bit address range.
+    AddressInvalid,
     /// The transmission size exceeded the limit.
     TransactionSizeLimitExceeded,
     /// The acknowledgment check failed.
@@ -143,6 +145,24 @@ pub enum Error {
     /// The arbitration for the bus was lost.
     ArbitrationLost,
 }
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::AddressInvalid => {
+                f.write_str("The device address exceeds the 7-bit address range")
+            }
+            Self::TransactionSizeLimitExceeded => {
+                f.write_str("The transmission size exceeds the limit")
+            }
+            Self::AckCheckFailed => f.write_str("The acknowledgment check failed"),
+            Self::TimeOut => f.write_str("A timeout occurred during transmission"),
+            Self::ArbitrationLost => f.write_str("The arbitration for the bus was lost"),
+        }
+    }
+}
+
+impl core::error::Error for Error {}
 
 #[procmacros::doc_replace(
     "sda" => {
@@ -283,7 +303,8 @@ impl<'d> LpI2c<'d> {
     /// Writes `data` to the `register` of the slave with the given `address`.
     ///
     /// The transfer consists of a single write transaction that sends the device address, the
-    /// register address, then `data`.
+    /// register address, then `data`. If `data` is empty, the transfer sends only the device
+    /// address and register address.
     ///
     /// # Examples
     ///
@@ -304,9 +325,18 @@ impl<'d> LpI2c<'d> {
     ///
     /// # Errors
     ///
-    /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
-    /// can transfer in a single transaction.
+    /// - [`Error::AddressInvalid`] when `address` exceeds `0x7f`.
+    #[cfg_attr(
+        lp_i2c_master_version = "rtc_i2c",
+        doc = "- [`Error::TransactionSizeLimitExceeded`] when `data` is longer than 253 bytes."
+    )]
+    /// - A NACK returns [`Error::AckCheckFailed`].
+    /// - A timeout or arbitration loss returns [`Error::TimeOut`] or [`Error::ArbitrationLost`],
+    ///   respectively.
     pub fn write(&mut self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
+        if address > 0x7f {
+            return Err(Error::AddressInvalid);
+        }
         self.write_bytes(address, register, data)
     }
 
@@ -324,7 +354,7 @@ impl<'d> LpI2c<'d> {
     /// `data`.
     ///
     /// The transfer writes the device address and the register address, then repeats the start
-    /// condition to read `data` back.
+    /// condition to read `data` back. An empty buffer skips the transfer after address validation.
     ///
     /// # Examples
     ///
@@ -346,9 +376,21 @@ impl<'d> LpI2c<'d> {
     ///
     /// # Errors
     ///
-    /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
-    /// can transfer in a single transaction.
+    /// - [`Error::AddressInvalid`] when `address` exceeds `0x7f`.
+    #[cfg_attr(
+        lp_i2c_master_version = "rtc_i2c",
+        doc = "- [`Error::TransactionSizeLimitExceeded`] when `data` is longer than 255 bytes."
+    )]
+    /// - A NACK returns [`Error::AckCheckFailed`].
+    /// - A timeout or arbitration loss returns [`Error::TimeOut`] or [`Error::ArbitrationLost`],
+    ///   respectively.
     pub fn read(&mut self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
+        if address > 0x7f {
+            return Err(Error::AddressInvalid);
+        }
+        if data.is_empty() {
+            return Ok(());
+        }
         self.read_bytes(address, register, data)
     }
 }
