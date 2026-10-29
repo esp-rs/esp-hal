@@ -80,8 +80,9 @@ const DMA_OUT_DESCRIPTOR: *mut u32 = 0x2034_816C as _;
 /// makes the LCD pause, and the LCD then gets a third of the pixel data it needs.
 const DMA_OUT_DONE: u32 = 1 << 0;
 
-/// The area of the talk button, for drawing and for touch hit tests.
-pub const BUTTON: Rectangle = Rectangle::new(Point::new(250, 384), Size::new(300, 72));
+// The areas of the buttons, for drawing and for touch hit tests.
+pub const TALK_BUTTON: Rectangle = Rectangle::new(Point::new(250, 384), Size::new(300, 72));
+pub const PHRASES_BUTTON: Rectangle = Rectangle::new(Point::new(590, 384), Size::new(186, 72));
 
 const BACKGROUND: Rgb565 = Rgb565::new(2, 4, 6);
 const FOREGROUND: Rgb565 = Rgb565::WHITE;
@@ -96,7 +97,7 @@ pub struct Screen {
     pub assistant: String,
 }
 
-/// The state of the talk button.
+/// The state of the talk button. The phrases button is only shown with [`Button::Talk`].
 #[derive(Clone, Copy)]
 pub enum Button {
     Talk,
@@ -352,14 +353,21 @@ fn draw(frame: &mut FrameBuffer<'_>, screen: &Screen) {
         Button::Stop => ("Tap to stop", Rgb565::new(28, 8, 4)),
         Button::Busy => ("Please wait", Rgb565::new(10, 20, 10)),
     };
-    RoundedRectangle::with_equal_corners(BUTTON, Size::new(24, 24))
+    draw_button(frame, TALK_BUTTON, label, color);
+    if let Button::Talk = screen.button {
+        draw_button(frame, PHRASES_BUTTON, "Phrases", Rgb565::new(6, 16, 20));
+    }
+}
+
+fn draw_button(frame: &mut FrameBuffer<'_>, area: Rectangle, label: &str, color: Rgb565) {
+    RoundedRectangle::with_equal_corners(area, Size::new(24, 24))
         .into_styled(PrimitiveStyle::with_fill(color))
         .draw(frame)
         .unwrap();
     Text::with_alignment(
         label,
-        BUTTON.center() + Point::new(0, 6),
-        text,
+        area.center() + Point::new(0, 6),
+        MonoTextStyle::new(&FONT_10X20, FOREGROUND),
         Alignment::Center,
     )
     .draw(frame)

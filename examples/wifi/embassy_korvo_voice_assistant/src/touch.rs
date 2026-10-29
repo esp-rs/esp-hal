@@ -1,4 +1,4 @@
-//! Polls the Goodix touch controller of the LCD sub-board and reports taps on the talk button.
+//! Polls the Goodix touch controller of the LCD sub-board and reports taps on the buttons.
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::Timer;
@@ -8,7 +8,7 @@ use esp_hal::{
     i2c::master::{Error, I2c},
 };
 
-use crate::display::BUTTON;
+use crate::display::{PHRASES_BUTTON, TALK_BUTTON};
 
 /// The I2C address of the touch controller on the LCD sub-board.
 const ADDRESS: u8 = 0x14;
@@ -17,12 +17,19 @@ const STATUS: u16 = 0x814E;
 /// X and Y of the first touch point, little-endian.
 const POINT_1: u16 = 0x8150;
 
-static TAPS: Signal<CriticalSectionRawMutex, ()> = Signal::new();
+/// A tapped button.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Tap {
+    Talk,
+    Phrases,
+}
 
-/// Waits for the next tap on the talk button.
-pub async fn wait_for_tap() {
+static TAPS: Signal<CriticalSectionRawMutex, Tap> = Signal::new();
+
+/// Waits for the next tap on a button.
+pub async fn wait_for_tap() -> Tap {
     TAPS.reset();
-    TAPS.wait().await;
+    TAPS.wait().await
 }
 
 enum Report {
@@ -40,8 +47,12 @@ pub async fn run(mut i2c: I2c<'static, Async>) {
             Ok(Report::Unchanged) => {}
             Ok(Report::Released) => touching = false,
             Ok(Report::Touched(point)) => {
-                if !touching && BUTTON.contains(point) {
-                    TAPS.signal(());
+                if !touching {
+                    if TALK_BUTTON.contains(point) {
+                        TAPS.signal(Tap::Talk);
+                    } else if PHRASES_BUTTON.contains(point) {
+                        TAPS.signal(Tap::Phrases);
+                    }
                 }
                 touching = true;
             }

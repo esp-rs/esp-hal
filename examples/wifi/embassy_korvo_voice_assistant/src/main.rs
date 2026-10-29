@@ -3,10 +3,11 @@
 //! Set SSID, PASSWORD, ANTHROPIC_API_KEY and ESP_SR_COMPONENTS env variables before running this
 //! example.
 //!
-//! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the button on the screen,
-//! say one of the phrases on the screen, then tap it again. The second core recognizes the phrase
-//! with MultiNet from Espressif's ESP-SR. Claude answers questions, and light commands set the
-//! color of the board's RGB LED. The phrase and the answer are shown on the screen.
+//! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the talk button on the
+//! screen, say one of the phrases that the phrases button shows, then tap the talk button again.
+//! The second core recognizes the phrase with MultiNet from Espressif's ESP-SR. Claude answers
+//! questions, and light commands set the color of the board's RGB LED. The phrase and the answer
+//! are shown on the screen.
 //!
 //! The API key is stored in the firmware in plain text, and anyone with access to the board can
 //! read it. Use a key with a spending limit.
@@ -83,6 +84,7 @@ use crate::{
     audio::Samples,
     display::{Button, Screen},
     led::{Color, Led},
+    touch::Tap,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -292,7 +294,7 @@ async fn assistant(stack: Stack<'static>, mut led: Led) -> ! {
         status: String::from("Connecting to Wi-Fi"),
         button: Button::Busy,
         you: String::new(),
-        assistant: phrases(),
+        assistant: String::from(PHRASES_HINT),
     };
     display::show(&screen);
     stack.wait_config_up().await;
@@ -303,13 +305,18 @@ async fn assistant(stack: Stack<'static>, mut led: Led) -> ! {
         screen.status = String::from("Ready");
         screen.button = Button::Talk;
         display::show(&screen);
-        touch::wait_for_tap().await;
+        if touch::wait_for_tap().await == Tap::Phrases {
+            screen.you.clear();
+            screen.assistant = phrases();
+            continue;
+        }
 
         audio::start_recording().await;
         screen.status = String::from("Listening");
         screen.button = Button::Stop;
         display::show(&screen);
-        let _ = with_timeout(audio::MAX_RECORDING, touch::wait_for_tap()).await;
+        let stop = async { while touch::wait_for_tap().await != Tap::Talk {} };
+        let _ = with_timeout(audio::MAX_RECORDING, stop).await;
         // The tap often comes while the last word still ends, and MultiNet misses a phrase whose
         // final consonant is cut off.
         Timer::after(RECORDING_TAIL).await;
@@ -335,7 +342,7 @@ async fn converse(
     display::show(screen);
     let Some(index) = speech::recognize(speech).await else {
         screen.you.clear();
-        screen.assistant = format!("I did not recognize that. {}", phrases());
+        screen.assistant = format!("I did not recognize that. {PHRASES_HINT}");
         return Ok(());
     };
     let (phrase, action) = PHRASES[index];
@@ -357,6 +364,8 @@ async fn converse(
     }
     Ok(())
 }
+
+const PHRASES_HINT: &str = "Tap Phrases to see what I understand.";
 
 /// The phrases the assistant recognizes, for the screen.
 fn phrases() -> String {
