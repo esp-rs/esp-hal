@@ -227,6 +227,11 @@ impl ExternalBurstConfig {
         // to obtain the length of valid data received
         if matches!(direction, TransferDirection::In) {
             self as usize
+        } else if cfg!(esp32s31) {
+            // AXI-GDMA accesses Octal PSRAM in fixed-size bursts. Keep each
+            // descriptor buffer address and length aligned to that burst so a
+            // descriptor boundary cannot split a PSRAM transaction.
+            self as usize
         } else {
             // S2 TRM: Size, length and buffer address pointer in transmit descriptors are
             // not necessarily aligned with block size.
