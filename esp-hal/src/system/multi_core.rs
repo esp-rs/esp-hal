@@ -250,6 +250,12 @@ impl<'d> CpuControl<'d> {
 
         self.unpark_core(Cpu::AppCpu);
 
+        // The APP core can hold a lock during startup. The flash driver must not park the APP
+        // core before startup ends.
+        while !app_core_takes_ipc() {
+            core::hint::spin_loop();
+        }
+
         Ok(AppCoreGuard {
             phantom: PhantomData,
         })
