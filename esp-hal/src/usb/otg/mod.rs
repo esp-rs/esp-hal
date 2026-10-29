@@ -255,7 +255,7 @@ impl<'d> USB_HS<'d> {
             peripheral: Peripheral::UsbHs,
             fifo_depth_words: property!("usb_otg_hs.fifo_depth_words"),
             phy_type: PhyType::InternalHighSpeed,
-            rx_fifo_extra_words: if cfg!(esp32s31) { 15 + 2 * 16 } else { 31 },
+            rx_fifo_extra_words: 15 + 2 * 16,
             device_interrupt: otg_hs_device_interrupt,
             host_interrupt: otg_hs_host_interrupt,
             enable_device_mode: ll::hs_enable_device_mode,
