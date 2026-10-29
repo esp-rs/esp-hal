@@ -116,7 +116,7 @@ ufmt-write               = { version = "0.1", optional = true }
 esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
 esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
 esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
-esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
+esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/JurajSadel/esp-pacs.git", branch = "c5-efuse" }
 esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
 esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }
 esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "5cb8c50" }

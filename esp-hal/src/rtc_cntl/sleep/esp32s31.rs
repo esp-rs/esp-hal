@@ -751,5 +751,7 @@ impl RtcSleepConfig {
 
     /// Cleans up after sleep.
     #[inline(always)]
-    pub(crate) fn finish_sleep(&self) {}
+    pub(crate) fn finish_sleep(&self) {
+        super::pmu_common::wait_for_efuse_idle();
+    }
 }

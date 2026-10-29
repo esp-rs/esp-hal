@@ -462,6 +462,8 @@ impl<'d> LowPower<'d> {
                 }
             }
 
+            config.finish_sleep();
+
             rejected
         };
 
@@ -474,8 +476,6 @@ impl<'d> LowPower<'d> {
 
             cpu_retention::finish_cpu_retention(rejected);
         }
-
-        config.finish_sleep();
 
         #[cfg(multi_core)]
         unpark_cores(parked);
