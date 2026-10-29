@@ -13,7 +13,7 @@ use core::{
 };
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-use esp_hal::delay::Delay;
+use esp_hal::{delay::Delay, time::Instant};
 
 use crate::audio::{RECORDING_SAMPLE_RATE, Samples};
 
@@ -168,6 +168,7 @@ impl Recognizer {
             .chunks(self.chunk.len())
             .chain(core::iter::repeat_n(&[][..], silent_chunks));
 
+        let start = Instant::now();
         // SAFETY: The model is valid, and every chunk has the size MultiNet asked for.
         unsafe { (self.multinet.clean)(self.model) };
         for samples in chunks {
@@ -176,13 +177,19 @@ impl Recognizer {
             match unsafe { (self.multinet.detect)(self.model, self.chunk.as_mut_ptr()) } {
                 DETECTED => {
                     let results = unsafe { &*(self.multinet.get_results)(self.model) };
-                    log::info!("MultiNet: {:?} ({})", results.phrase(), results.prob[0]);
+                    log::info!(
+                        "MultiNet: {:?} ({}) in {}",
+                        results.phrase(),
+                        results.prob[0],
+                        start.elapsed()
+                    );
                     return (results.num > 0).then_some(results.command_id[0] as usize);
                 }
-                TIMEOUT => return None,
+                TIMEOUT => break,
                 _ => {}
             }
         }
+        log::info!("MultiNet: nothing recognized in {}", start.elapsed());
         None
     }
 }
