@@ -4,6 +4,8 @@ use core::{
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 
+use procmacros::ram;
+
 use crate::{
     peripherals::{
         EFUSE,
@@ -879,11 +881,9 @@ fn disable_bbpll() {
 /// Ports the PSRAM and MPLL steps of esp-idf's `pmu_sleep_start`, and requests a light sleep, see
 /// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L355-L398>.
 ///
-/// Returns `true` if the hardware rejected the request. This function runs from RAM, because the
-/// caches are suspended. A wake from a CPU power-down does not return here. The retention code
-/// calls [`pmu_sleep_finish`] instead.
-#[unsafe(link_section = ".rwtext.caches_suspended.pmu_sleep_start")]
-#[inline(never)]
+/// Returns `true` if the hardware rejected the request. A wake from a CPU power-down does not
+/// return here. The retention code calls [`pmu_sleep_finish`] instead.
+#[ram(unstable(caches_suspended))]
 pub(crate) fn pmu_sleep_start() -> bool {
     let psram = !crate::psram::psram_range().is_empty();
     PSRAM_IN_SLEEP.store(psram, Ordering::Relaxed);
@@ -931,8 +931,7 @@ pub(crate) fn pmu_sleep_start() -> bool {
 ///
 /// esp-idf asserts that the modem's PLL clock gate and its clock source agree. This port does not
 /// assert, because a panic cannot print while the caches are suspended.
-#[unsafe(link_section = ".rwtext.caches_suspended.pmu_sleep_finish")]
-#[inline(never)]
+#[ram(unstable(caches_suspended))]
 pub(crate) fn pmu_sleep_finish() {
     // The eFuse controller reloads after a wake.
     while EFUSE::regs().status().read().state().bits() != 1 {}
