@@ -389,16 +389,24 @@ mod tests {
     fn test_read_with_different_clock_sources(mut ctx: Context) {
         use esp_hal::i2c::master::ClockSource;
 
+        // Bus frequency in kHz for each clock source.
         let configs = cfg_select! {
             any(i2c_master_version = "3", i2c_master_version = "4") => {
-                [ClockSource::Xtal, ClockSource::RcFast]
+                [(ClockSource::Xtal, 100), (ClockSource::RcFast, 100)]
             }
-            _ => [ClockSource::Apb, ClockSource::RefTick],
+            // At 100 kHz the 1 MHz REF_TICK leaves 5 ticks per half SCL cycle, which
+            // puts the SDA sample point no later than the end of the SCL
+            // wait-high period.
+            _ => [(ClockSource::Apb, 100), (ClockSource::RefTick, 50)],
         };
 
-        for clock_source in configs {
+        for (clock_source, khz) in configs {
             ctx.i2c
-                .apply_config(&Config::default().with_clock_source(clock_source))
+                .apply_config(
+                    &Config::default()
+                        .with_clock_source(clock_source)
+                        .with_frequency(time::Rate::from_khz(khz)),
+                )
                 .unwrap_or_else(|e| panic!("{:?}: failed to apply {:?}", e, clock_source));
 
             let mut read_data = [0u8; 5];
@@ -406,8 +414,14 @@ mod tests {
                 .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
                 .unwrap_or_else(|e| panic!("{:?}: failed to read with {:?}", e, clock_source));
 
-            assert_ne!(read_data, [0u8; 5]);
-            assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
+            assert_ne!(read_data, [0u8; 5], "{:?}: read all zeros", clock_source);
+            assert_eq!(
+                (read_data[1], read_data[2] & 0xf0),
+                (0x80, 0x00),
+                "{:?}: read {:?}",
+                clock_source,
+                read_data
+            );
         }
     }
 

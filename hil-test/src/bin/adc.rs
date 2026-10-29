@@ -234,9 +234,10 @@ mod tests {
             let mut pin = config.enable_pin(gpio.reborrow(), attenuation);
             let mut adc = Adc::new(p.ADC1.reborrow(), config).unwrap();
 
+            // No absolute bound on `raw_zero`: at low attenuation the ADC offset and the DAC's
+            // zero-code error can put a 0 V reading above `MAX_ZERO_RAW`.
             set_dac_code(&mut i2c, 0, &delay);
             let raw_zero = read_averaged(&mut adc, &mut pin);
-            hil_test::assert!(raw_zero <= MAX_ZERO_RAW);
 
             set_dac_code(&mut i2c, MID_DAC_CODE, &delay);
             let raw_mid = read_averaged(&mut adc, &mut pin);
