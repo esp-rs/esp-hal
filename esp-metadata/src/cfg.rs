@@ -1158,6 +1158,8 @@ driver_configs![
                 has_md5_bsd: bool,
                 #[serde(default)]
                 has_md5_mbedtls: bool,
+                #[serde(default)]
+                no_libgcc: bool,
             }
         },
         SocProperties {

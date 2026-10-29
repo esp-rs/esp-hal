@@ -25,6 +25,7 @@ support_status = "partial"
 has_crc_le  = true
 has_crc_be  = true
 has_md5_bsd = true
+no_libgcc   = true # since ECO2 (v0.2)
 
 [device.soc]
 multi_core_enabled = true
