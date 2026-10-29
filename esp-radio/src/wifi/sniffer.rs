@@ -48,7 +48,8 @@ impl PromiscuousPkt<'_> {
         frame_type: wifi_promiscuous_pkt_type_t,
     ) -> Self {
         let rx_cntl = unsafe { RxControlInfo::from_raw(&(*buf).rx_ctrl) };
-        // Match ESP-IDF's sniffer example:
+        // `sig_len` includes FCS bytes beyond the valid buffer length.
+        // Only successful non-MISC frames have valid payloads.
         // https://github.com/espressif/esp-idf/blob/4dbfecac7e3/examples/network/simple_sniffer/main/cmd_sniffer.c#L135-L148
         let len =
             if frame_type == wifi_promiscuous_pkt_type_t_WIFI_PKT_MISC || rx_cntl.rx_state != 0 {
