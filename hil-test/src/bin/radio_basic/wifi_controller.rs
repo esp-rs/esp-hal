@@ -60,12 +60,16 @@ mod tests {
         controller.set_config(&station).unwrap();
         assert_eq!(max_tx_power(), 20);
         controller.set_max_tx_power(8).unwrap();
-        let power = max_tx_power();
-        assert!(power < 20);
+        assert!(max_tx_power() < 20);
         controller.set_config(&Config::None).unwrap();
         assert_eq!(controller.rssi(), Err(WifiError::Unsupported));
+        controller.set_max_tx_power(44).unwrap();
+        assert_eq!(
+            controller.set_max_tx_power(85),
+            Err(WifiError::InvalidArguments)
+        );
         controller.set_config(&station).unwrap();
-        assert_eq!(max_tx_power(), power);
+        assert_eq!(max_tx_power(), 44);
     }
 
     // If this turns out to be too flaky or time-consuming,
