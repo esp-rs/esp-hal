@@ -1,7 +1,8 @@
 //! Speech recognition on the second core with MultiNet7 from Espressif's ESP-SR.
 //!
-//! MultiNet does not transcribe arbitrary speech: it recognizes the fixed English phrases in
-//! [`QUESTIONS`]. It runs on the second core, which nothing else uses, because the prebuilt ESP-SR
+//! MultiNet does not transcribe arbitrary speech: it recognizes a fixed list of English phrases.
+//! ESP-SR converts them to phonemes, so they must be plain English words, at most 63 characters
+//! each. MultiNet runs on the second core, which nothing else uses, because the prebuilt ESP-SR
 //! libraries use picolibc, and picolibc keeps `errno` and similar state in thread-local storage
 //! that the `tp` register points to. On the first core, esp-rtos keeps the current task in `tp`.
 
@@ -17,47 +18,35 @@ use esp_hal::{delay::Delay, time::Instant};
 
 use crate::audio::{RECORDING_SAMPLE_RATE, Samples};
 
-/// The phrases MultiNet recognizes. ESP-SR converts them to phonemes, so they must be plain
-/// English words. A phrase has at most 63 characters.
-pub const QUESTIONS: &[&CStr] = &[
-    c"tell me a joke",
-    c"tell me a fun fact",
-    c"tell me a short story",
-    c"say something nice",
-    c"who are you",
-    c"what can you do",
-    c"why is the sky blue",
-    c"how do airplanes fly",
-    c"how far away is the moon",
-    c"how hot is the sun",
-    c"what is the speed of light",
-    c"what is the tallest mountain",
-    c"what is the capital of france",
-    c"who invented the telephone",
-    c"how many people live on earth",
-    c"recommend a good book",
-    c"give me a recipe for pancakes",
-    c"what is a microcontroller",
-];
-
 /// The model name, which is also the directory of the model files in ESP-SR.
 const MODEL: &CStr = c"mn7_en";
 /// MultiNet gives up when it has not recognized a phrase this long after it started listening.
 const TIMEOUT_MS: c_int = 6000;
 /// Silence after the recording, so that MultiNet can finish a phrase at the very end.
 const TRAILING_SILENCE_MS: u32 = 1000;
+/// The peak of a recording after [`gain`], about -4 dBFS. MultiNet recognizes quiet speech
+/// poorly, and the microphones pick up speech at about -25 dBFS from half a meter.
+const TARGET_PEAK: i32 = 20_000;
+/// The highest gain, +18 dB, so that a recording without speech does not become loud noise.
+const MAX_GAIN: i32 = 8;
 
 static REQUEST: Signal<CriticalSectionRawMutex, Samples> = Signal::new();
-static RESULT: Signal<CriticalSectionRawMutex, Option<&'static str>> = Signal::new();
+static RESULT: Signal<CriticalSectionRawMutex, Option<usize>> = Signal::new();
 
-/// Returns the phrase from [`QUESTIONS`] in 16 kHz mono speech, if any.
-pub async fn recognize(speech: Samples) -> Option<&'static str> {
+/// Returns the index of the phrase in 16 kHz mono speech, if any.
+pub async fn recognize(speech: Samples) -> Option<usize> {
     REQUEST.signal(speech);
     RESULT.wait().await
 }
 
-/// Runs the recognizer. This is the entry point of the second core.
-pub fn run() {
+/// Runs the recognizer of `phrases`. This is the entry point of the second core.
+///
+/// `pronunciations` are extra ways to say a phrase, in ESP-SR's phonemes, for words that run
+/// together so that MultiNet does not hear the phonemes ESP-SR derives from the text.
+pub fn run(
+    phrases: impl IntoIterator<Item = &'static CStr>,
+    pronunciations: &'static [(&'static CStr, &'static CStr)],
+) {
     // esp-rtos's interrupt entry code reads `tp`. Nothing on this core needs interrupts, except
     // esp-hal's flash driver to park it during flash writes, which this example does not do.
     // SAFETY: Clears MIE in `mstatus`.
@@ -65,14 +54,13 @@ pub fn run() {
     enable_pie();
     let tls = Tls::new();
 
-    let mut recognizer = tls.run(Recognizer::new);
+    let mut recognizer = tls.run(|| Recognizer::new(phrases, pronunciations));
     log::info!("Speech recognizer ready");
     let delay = Delay::new();
     loop {
         match REQUEST.try_take() {
             Some(speech) => {
-                let phrase = tls.run(|| recognizer.recognize(&speech));
-                RESULT.signal(phrase.map(|index| QUESTIONS[index].to_str().unwrap()));
+                RESULT.signal(tls.run(|| recognizer.recognize(&speech)));
             }
             None => delay.delay_millis(10),
         }
@@ -131,9 +119,12 @@ struct Recognizer {
 }
 
 impl Recognizer {
-    fn new() -> Self {
+    fn new(
+        phrases: impl IntoIterator<Item = &'static CStr>,
+        pronunciations: &[(&CStr, &CStr)],
+    ) -> Self {
         install_models();
-        // SAFETY: The model is installed, and `QUESTIONS` are NUL-terminated.
+        // SAFETY: The model is installed, and the phrases are NUL-terminated.
         unsafe {
             let multinet = &*esp_mn_handle_from_name(MODEL.as_ptr());
             let model = (multinet.create)(MODEL.as_ptr(), TIMEOUT_MS);
@@ -142,9 +133,19 @@ impl Recognizer {
             assert_eq!(rate as u32, RECORDING_SAMPLE_RATE, "MultiNet sample rate");
 
             assert_eq!(esp_mn_commands_alloc(multinet, model), 0);
-            for (id, question) in QUESTIONS.iter().enumerate() {
-                let result = esp_mn_commands_add(id as c_int, question.as_ptr());
-                assert_eq!(result, 0, "MultiNet rejected {question:?}");
+            for (id, phrase) in phrases.into_iter().enumerate() {
+                let result = esp_mn_commands_add(id as c_int, phrase.as_ptr());
+                assert_eq!(result, 0, "MultiNet rejected {phrase:?}");
+                for (_, phonemes) in pronunciations.iter().filter(|(text, _)| *text == phrase) {
+                    // ESP-SR ignores a phrase whose text it already has, so the phonemes stand in
+                    // for the text.
+                    let result = esp_mn_commands_phoneme_add(
+                        id as c_int,
+                        phonemes.as_ptr(),
+                        phonemes.as_ptr(),
+                    );
+                    assert_eq!(result, 0, "MultiNet rejected {phonemes:?}");
+                }
             }
             assert!(
                 esp_mn_commands_update().is_null(),
@@ -160,7 +161,7 @@ impl Recognizer {
         }
     }
 
-    /// Returns the index in [`QUESTIONS`] of the phrase in the speech.
+    /// Returns the index of the phrase in the speech.
     fn recognize(&mut self, speech: &[i16]) -> Option<usize> {
         let silence = (RECORDING_SAMPLE_RATE * TRAILING_SILENCE_MS / 1000) as usize;
         let silent_chunks = silence.div_ceil(self.chunk.len());
@@ -168,17 +169,20 @@ impl Recognizer {
             .chunks(self.chunk.len())
             .chain(core::iter::repeat_n(&[][..], silent_chunks));
 
+        let gain = gain(speech);
         let start = Instant::now();
         // SAFETY: The model is valid, and every chunk has the size MultiNet asked for.
         unsafe { (self.multinet.clean)(self.model) };
         for samples in chunks {
-            self.chunk[..samples.len()].copy_from_slice(samples);
+            for (sample, &input) in self.chunk.iter_mut().zip(samples) {
+                *sample = (i32::from(input) * gain).clamp(i16::MIN.into(), i16::MAX.into()) as i16;
+            }
             self.chunk[samples.len()..].fill(0);
             match unsafe { (self.multinet.detect)(self.model, self.chunk.as_mut_ptr()) } {
                 DETECTED => {
                     let results = unsafe { &*(self.multinet.get_results)(self.model) };
                     log::info!(
-                        "MultiNet: {:?} ({}) in {}",
+                        "MultiNet: {:?} ({}) at gain {gain} in {}",
                         results.phrase(),
                         results.prob[0],
                         start.elapsed()
@@ -189,9 +193,26 @@ impl Recognizer {
                 _ => {}
             }
         }
-        log::info!("MultiNet: nothing recognized in {}", start.elapsed());
+        // SAFETY: The model is valid.
+        let results = unsafe { &*(self.multinet.get_results)(self.model) };
+        // The phonemes MultiNet heard, which help to find extra pronunciations of a phrase.
+        log::info!(
+            "MultiNet: nothing recognized at gain {gain} in {}, heard {:?}",
+            start.elapsed(),
+            results.heard()
+        );
         None
     }
+}
+
+/// The gain that brings the peak of the speech to [`TARGET_PEAK`], at most [`MAX_GAIN`].
+fn gain(speech: &[i16]) -> i32 {
+    let peak = speech
+        .iter()
+        .map(|sample| i32::from(*sample).abs())
+        .max()
+        .unwrap_or(0);
+    (TARGET_PEAK / peak.max(1)).clamp(1, MAX_GAIN)
 }
 
 /// The model files, which MultiNet looks up by model and file name.
@@ -220,7 +241,7 @@ const MODELS: [Model; 2] = [
             (c"vocab", model_file!("mn7_en/vocab")),
         ],
     },
-    // The default phrases, which MultiNet loads before `QUESTIONS` replace them.
+    // The default phrases, which MultiNet loads before ours replace them.
     Model {
         name: c"fst",
         files: &[(c"commands_en.txt", model_file!("fst/commands_en.txt"))],
@@ -341,11 +362,21 @@ impl Results {
     fn phrase(&self) -> &CStr {
         CStr::from_bytes_until_nul(&self.string).unwrap_or_default()
     }
+
+    /// The phonemes heard so far, whether or not they belong to a phrase.
+    fn heard(&self) -> &CStr {
+        CStr::from_bytes_until_nul(&self.raw_string).unwrap_or_default()
+    }
 }
 
 unsafe extern "C" {
     fn esp_mn_handle_from_name(name: *const c_char) -> *const MultiNet;
     fn esp_mn_commands_alloc(multinet: *const MultiNet, model: *mut c_void) -> c_int;
     fn esp_mn_commands_add(id: c_int, phrase: *const c_char) -> c_int;
+    fn esp_mn_commands_phoneme_add(
+        id: c_int,
+        phrase: *const c_char,
+        phonemes: *const c_char,
+    ) -> c_int;
     fn esp_mn_commands_update() -> *const c_void;
 }

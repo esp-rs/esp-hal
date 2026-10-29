@@ -3,10 +3,10 @@
 //! Set SSID, PASSWORD, ANTHROPIC_API_KEY and ESP_SR_COMPONENTS env variables before running this
 //! example.
 //!
-//! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the button on the screen
-//! and ask one of the questions on the screen, then tap it again. The second core recognizes the
-//! question with MultiNet from Espressif's ESP-SR, Claude answers, and the question and the answer
-//! are shown on the screen.
+//! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the button on the screen,
+//! say one of the phrases on the screen, then tap it again. The second core recognizes the phrase
+//! with MultiNet from Espressif's ESP-SR. Claude answers questions, and light commands set the
+//! color of the board's RGB LED. The phrase and the answer are shown on the screen.
 //!
 //! The API key is stored in the firmware in plain text, and anyone with access to the board can
 //! read it. Use a key with a spending limit.
@@ -35,10 +35,12 @@ mod audio;
 mod display;
 mod es8389;
 mod idf;
+mod led;
 mod speech;
 mod touch;
 
 use alloc::{format, string::String, vec::Vec};
+use core::ffi::CStr;
 
 use embassy_executor::Spawner;
 use embassy_net::{Runner, Stack, StackResources};
@@ -80,9 +82,61 @@ use crate::{
     api::Api,
     audio::Samples,
     display::{Button, Screen},
+    led::{Color, Led},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
+
+/// What the assistant does with a recognized phrase.
+#[derive(Clone, Copy)]
+enum Action {
+    /// Claude answers the phrase.
+    Ask,
+    /// The RGB LED shows the color.
+    Light(Color),
+}
+
+/// The phrases the assistant recognizes, see `speech`.
+const PHRASES: &[(&CStr, Action)] = &[
+    (c"tell me a joke", Action::Ask),
+    (c"tell me a fun fact", Action::Ask),
+    (c"tell me a short story", Action::Ask),
+    (c"say something nice", Action::Ask),
+    (c"who are you", Action::Ask),
+    (c"what can you do", Action::Ask),
+    (c"why is the sky blue", Action::Ask),
+    (c"how do airplanes fly", Action::Ask),
+    (c"how far away is the moon", Action::Ask),
+    (c"how hot is the sun", Action::Ask),
+    (c"what is the speed of light", Action::Ask),
+    (c"what is the tallest mountain", Action::Ask),
+    (c"what is the capital of france", Action::Ask),
+    (c"who invented the telephone", Action::Ask),
+    (c"how many people live on earth", Action::Ask),
+    (c"recommend a good book", Action::Ask),
+    (c"give me a recipe for pancakes", Action::Ask),
+    (c"what is a microcontroller", Action::Ask),
+    (c"turn the light red", Action::Light(Color::RED)),
+    (c"turn the light green", Action::Light(Color::GREEN)),
+    (c"turn the light blue", Action::Light(Color::BLUE)),
+    (c"turn the light yellow", Action::Light(Color::YELLOW)),
+    (c"turn the light purple", Action::Light(Color::PURPLE)),
+    (c"turn the light white", Action::Light(Color::WHITE)),
+    (c"turn off the light", Action::Light(Color::OFF)),
+];
+
+/// Extra pronunciations of phrases in ESP-SR's phonemes, see `speech::run`. The t of "light" runs
+/// into the next word, and a final consonant is often barely released, so MultiNet hears `Li Wi`
+/// instead of `LiT WiT`, or `Li Rf` instead of `LiT RfD`.
+const PRONUNCIATIONS: &[(&CStr, &CStr)] = &[
+    (c"turn the light red", c"TkN jc Li RfD"),
+    (c"turn the light red", c"TkN jc Li Rf"),
+    (c"turn the light white", c"TkN jc Li WiT"),
+    (c"turn the light white", c"TkN jc Li Wi"),
+];
+
+/// How long the recording goes on after the tap that stops it.
+const RECORDING_TAIL: Duration = Duration::from_millis(300);
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -112,7 +166,9 @@ async fn main(spawner: Spawner) -> ! {
         ConstStaticCell::new(system::Stack::new());
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
     let _speech_core = cpu_control
-        .start_app_core(SPEECH_STACK.take(), speech::run)
+        .start_app_core(SPEECH_STACK.take(), || {
+            speech::run(PHRASES.iter().map(|(phrase, _)| *phrase), PRONUNCIATIONS)
+        })
         .unwrap();
 
     // Display, with the sub-board timings from Espressif's `esp32_s3_lcd_ev_board` BSP
@@ -224,16 +280,19 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(connection(controller).unwrap());
     spawner.spawn(net_task(runner).unwrap());
 
-    assistant(stack).await
+    let mut led = Led::new(peripherals.RMT, peripherals.GPIO37);
+    led.set(Color::OFF).await;
+
+    assistant(stack, led).await
 }
 
 /// Runs conversation turns, one per tap.
-async fn assistant(stack: Stack<'static>) -> ! {
+async fn assistant(stack: Stack<'static>, mut led: Led) -> ! {
     let mut screen = Screen {
         status: String::from("Connecting to Wi-Fi"),
         button: Button::Busy,
         you: String::new(),
-        assistant: questions(),
+        assistant: phrases(),
     };
     display::show(&screen);
     stack.wait_config_up().await;
@@ -251,11 +310,14 @@ async fn assistant(stack: Stack<'static>) -> ! {
         screen.button = Button::Stop;
         display::show(&screen);
         let _ = with_timeout(audio::MAX_RECORDING, touch::wait_for_tap()).await;
+        // The tap often comes while the last word still ends, and MultiNet misses a phrase whose
+        // final consonant is cut off.
+        Timer::after(RECORDING_TAIL).await;
         let speech = audio::stop_recording().await;
         log::info!("Recorded {} samples", speech.len());
 
         screen.button = Button::Busy;
-        if let Err(error) = converse(&mut api, &mut screen, speech).await {
+        if let Err(error) = converse(&mut api, &mut led, &mut screen, speech).await {
             log::error!("{error}");
             screen.status = String::from("Error");
             screen.assistant = format!("{error}");
@@ -263,18 +325,29 @@ async fn assistant(stack: Stack<'static>) -> ! {
     }
 }
 
-async fn converse(api: &mut Api, screen: &mut Screen, speech: Samples) -> Result<(), api::Error> {
+async fn converse(
+    api: &mut Api,
+    led: &mut Led,
+    screen: &mut Screen,
+    speech: Samples,
+) -> Result<(), api::Error> {
     screen.status = String::from("Recognizing");
     display::show(screen);
-    let Some(question) = speech::recognize(speech).await else {
+    let Some(index) = speech::recognize(speech).await else {
         screen.you.clear();
-        screen.assistant = format!("I did not recognize a question. {}", questions());
+        screen.assistant = format!("I did not recognize that. {}", phrases());
         return Ok(());
     };
-    log::info!("You: {question}");
-    screen.you = String::from(question);
-    screen.assistant.clear();
+    let (phrase, action) = PHRASES[index];
+    screen.you = String::from(phrase.to_str().unwrap());
+    log::info!("You: {}", screen.you);
+    if let Action::Light(color) = action {
+        led.set(color).await;
+        screen.assistant = String::from("Done.");
+        return Ok(());
+    }
 
+    screen.assistant.clear();
     screen.status = String::from("Thinking");
     display::show(screen);
     screen.assistant = api.chat(&screen.you).await?;
@@ -285,13 +358,17 @@ async fn converse(api: &mut Api, screen: &mut Screen, speech: Samples) -> Result
     Ok(())
 }
 
-/// The questions the assistant recognizes, for the screen.
-fn questions() -> String {
-    let questions: Vec<&str> = speech::QUESTIONS
-        .iter()
-        .map(|question| question.to_str().unwrap())
-        .collect();
-    format!("Ask one of: {}.", questions.join(", "))
+/// The phrases the assistant recognizes, for the screen.
+fn phrases() -> String {
+    let list = |light: bool| {
+        let phrases: Vec<&str> = PHRASES
+            .iter()
+            .filter(|(_, action)| matches!(action, Action::Light(_)) == light)
+            .map(|(phrase, _)| phrase.to_str().unwrap())
+            .collect();
+        phrases.join(", ")
+    };
+    format!("Ask one of: {}. Or say: {}.", list(false), list(true))
 }
 
 #[embassy_executor::task]
