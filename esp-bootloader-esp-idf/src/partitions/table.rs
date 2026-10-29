@@ -208,6 +208,7 @@ mod tests {
 
     static SIMPLE: &[u8] = include_bytes!("../../testdata/single_factory_no_ota.bin");
     static OTA: &[u8] = include_bytes!("../../testdata/factory_app_two_ota.bin");
+    static CUSTOM: &[u8] = include_bytes!("../../testdata/custom_types.bin");
 
     #[test]
     fn read_simple() {
@@ -336,6 +337,43 @@ mod tests {
         assert_eq!(false, pt.get_partition(3).unwrap().is_encrypted());
         assert_eq!(false, pt.get_partition(4).unwrap().is_encrypted());
         assert_eq!(false, pt.get_partition(5).unwrap().is_encrypted());
+    }
+
+    #[test]
+    fn read_custom_types() {
+        let pt = PartitionTable::new(CUSTOM).unwrap();
+
+        assert_eq!(6, pt.len());
+
+        assert_eq!(
+            PartitionType::Unknown {
+                raw_type: 0x40,
+                raw_subtype: 0x30
+            },
+            pt.get_partition(2).unwrap().partition_type()
+        );
+        assert_eq!(
+            PartitionType::Unknown {
+                raw_type: 1,
+                raw_subtype: 0x40
+            },
+            pt.get_partition(3).unwrap().partition_type()
+        );
+
+        let custom = pt
+            .find_partition(PartitionType::Unknown {
+                raw_type: 0x40,
+                raw_subtype: 0x30,
+            })
+            .unwrap()
+            .unwrap();
+        assert_eq!("custom", custom.label_as_str());
+
+        let ota_1 = pt
+            .find_partition(PartitionType::App(AppPartitionSubType::Ota1))
+            .unwrap()
+            .unwrap();
+        assert_eq!(0x120000, ota_1.offset());
     }
 
     #[test]

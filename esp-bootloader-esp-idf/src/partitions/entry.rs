@@ -1,4 +1,4 @@
-use super::{DataPartitionSubType, PartitionType, RAW_ENTRY_LEN};
+use super::{DataPartitionSubType, Error, PartitionType, RAW_ENTRY_LEN};
 
 /// Represents a single partition entry.
 #[derive(Clone, Copy)]
@@ -104,18 +104,29 @@ impl PartitionEntry {
                         | PartitionType::PartitionTable(_)
                         | PartitionType::Data(DataPartitionSubType::NvsKeys)
                         | PartitionType::Data(DataPartitionSubType::Ota)
+                        | PartitionType::Unknown {
+                            raw_type: 0 | 2 | 3,
+                            ..
+                        }
                 ))
     }
 
     /// Returns the partition type (type and sub-type).
+    ///
+    /// Returns [`PartitionType::Unknown`] if this crate does not know the type or the sub-type.
     pub fn partition_type(&self) -> PartitionType {
-        match self.raw_type() {
-            0 => PartitionType::App(unwrap!(self.raw_subtype().try_into())),
-            1 => PartitionType::Data(unwrap!(self.raw_subtype().try_into())),
-            2 => PartitionType::Bootloader(unwrap!(self.raw_subtype().try_into())),
-            3 => PartitionType::PartitionTable(unwrap!(self.raw_subtype().try_into())),
-            _ => unreachable!(),
-        }
+        let (raw_type, raw_subtype) = (self.raw_type(), self.raw_subtype());
+        let known = match raw_type {
+            0 => raw_subtype.try_into().map(PartitionType::App),
+            1 => raw_subtype.try_into().map(PartitionType::Data),
+            2 => raw_subtype.try_into().map(PartitionType::Bootloader),
+            3 => raw_subtype.try_into().map(PartitionType::PartitionTable),
+            _ => Err(Error::Invalid),
+        };
+        known.unwrap_or(PartitionType::Unknown {
+            raw_type,
+            raw_subtype,
+        })
     }
 }
 
