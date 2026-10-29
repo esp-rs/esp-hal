@@ -129,8 +129,12 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, en| w.out_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+        let size = burst_mode.external_memory as u8;
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| unsafe { w.out_burst_size_sel().bits(size.trailing_zeros() as u8 - 3) });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
@@ -319,8 +323,12 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, en| w.in_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+        let size = burst_mode.external_memory as u8;
+        self.ch()
+            .in_conf0()
+            .modify(|_, w| unsafe { w.in_burst_size_sel().bits(size.trailing_zeros() as u8 - 3) });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
