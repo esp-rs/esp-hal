@@ -162,9 +162,11 @@ impl<'d> TemperatureSensor<'d> {
                     .modify(|_, w| w.pu().set_bit());
             }
             temp_sensor_register_block_sens => {
-                SENS::regs()
-                    .sar_tsens_ctrl()
-                    .modify(|_, w| w.sar_tsens_power_up_force().set_bit());
+                // The request bit can survive a digital-system reset.
+                SENS::regs().sar_tsens_ctrl().modify(|_, w| {
+                    w.sar_tsens_dump_out().clear_bit();
+                    w.sar_tsens_power_up_force().set_bit()
+                });
                 SENS::regs()
                     .sar_tsens_ctrl2()
                     .modify(|_, w| unsafe { w.sar_tsens_xpd_force().bits(1) });
