@@ -213,6 +213,8 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
             clocks::McpwmInstance::Mcpwm1.configure_function_clock(clocks, Default::default());
         }
         // Until we have every clock consumer modelled, we should manually keep clocks alive
+        #[cfg(esp32s31)]
+        clocks::request_flash_clock_source(clocks);
         #[cfg(soc_has_clock_node_rc_fast_clk)]
         clocks::request_rc_fast_clk(clocks);
         #[cfg(soc_has_clock_node_rc_slow_clk)]
