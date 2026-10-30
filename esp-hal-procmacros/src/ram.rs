@@ -194,12 +194,27 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         _ => Err(()),
     };
 
-    let section = match (is_fn, section_name) {
-        (true, Ok(section_name)) => quote::quote! {
-            #[unsafe(link_section = #section_name)]
-            #[inline(never)] // make certain function is not inlined
-        },
-        (false, Ok(section_name)) => quote::quote! {
+    // Items with the same `link_section` share one input section. The linker keeps or drops an
+    // input section whole, so each item gets a separate section. The module path tells two items
+    // of one name apart. The `.ram.` part prevents a clash with named sections, such as
+    // `.rwtext.interrupt`.
+    let section = match (&item, section_name) {
+        (Item::Fn(function), Ok(section_name)) => {
+            let base = format!("{section_name}.ram.");
+            let name = function.sig.ident.to_string();
+            quote::quote! {
+                #[unsafe(link_section = ::core::concat!(#base, ::core::module_path!(), ".", #name))]
+                #[inline(never)] // make certain function is not inlined
+            }
+        }
+        (Item::Static(static_item), Ok(section_name)) => {
+            let base = format!("{section_name}.");
+            let name = static_item.ident.to_string();
+            quote::quote! {
+                #[unsafe(link_section = ::core::concat!(#base, ::core::module_path!(), ".", #name))]
+            }
+        }
+        (_, Ok(section_name)) => quote::quote! {
             #[unsafe(link_section = #section_name)]
         },
         (_, Err(_)) => {
@@ -262,7 +277,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rwtext")]
+                #[unsafe (link_section = ::core::concat!(".rwtext.ram.", ::core::module_path!(), ".", "foo"))]
                 #[inline (never)]
                 fn foo () { }
             }
@@ -287,7 +302,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_fast.text")]
+                #[unsafe (link_section = ::core::concat!(".rtc_fast.text.ram.", ::core::module_path!(), ".", "foo"))]
                 #[inline (never)]
                 fn foo () { }
             }
@@ -312,7 +327,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_slow.text")]
+                #[unsafe (link_section = ::core::concat!(".rtc_slow.text.ram.", ::core::module_path!(), ".", "foo"))]
                 #[inline (never)]
                 fn foo () { }
             }
@@ -333,7 +348,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".data")]
+                #[unsafe (link_section = ::core::concat!(".data.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
             }
             .to_string()
@@ -357,7 +372,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_fast.data")]
+                #[unsafe (link_section = ::core::concat!(".rtc_fast.data.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
             }
             .to_string()
@@ -381,7 +396,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_slow.data")]
+                #[unsafe (link_section = ::core::concat!(".rtc_slow.data.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
             }
             .to_string()
@@ -404,7 +419,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe(link_section = ".dram2_uninit")]
+                #[unsafe(link_section = ::core::concat!(".dram2_uninit.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO: [u8;10] = [0;10];
                 const _ : () = crate::__macro_implementation::assert_is_uninit::<[u8;10]>();
             }
@@ -429,7 +444,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_fast.bss")]
+                #[unsafe (link_section = ::core::concat!(".rtc_fast.bss.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
                 const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 10]>();
             }
@@ -454,7 +469,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_fast.persistent")]
+                #[unsafe (link_section = ::core::concat!(".rtc_fast.persistent.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
                 const _: () = crate::__macro_implementation::assert_is_persistable::<[u8; 10]>();
             }
@@ -479,7 +494,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_slow.bss")]
+                #[unsafe (link_section = ::core::concat!(".rtc_slow.bss.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
                 const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 10]>();
             }
@@ -504,7 +519,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_slow.persistent")]
+                #[unsafe (link_section = ::core::concat!(".rtc_slow.persistent.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
                 const _: () = crate::__macro_implementation::assert_is_persistable::<[u8; 10]>();
             }
@@ -708,7 +723,7 @@ mod tests {
 
         let expectation = cfg_select! {
             feature = "uncached" => quote::quote! {
-                #[unsafe(link_section = ".uncached.data")]
+                #[unsafe(link_section = ::core::concat!(".uncached.data.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO: [u8; 4] = [0; 4];
             },
             _ => quote::quote! {
@@ -736,7 +751,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe(link_section = ".uncached.bss")]
+                #[unsafe(link_section = ::core::concat!(".uncached.bss.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO: [u8; 4] = [0; 4];
                 const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 4]>();
             }
