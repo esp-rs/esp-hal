@@ -22,7 +22,12 @@ impl PartitionEntry {
 
         if matches!(
             self.partition_type(),
-            PartitionType::App(_) | PartitionType::Bootloader(_)
+            PartitionType::App(_)
+                | PartitionType::Bootloader(_)
+                | PartitionType::Unknown {
+                    raw_type: 0 | 2,
+                    ..
+                }
         ) {
             let data = get_image_metadata(flash, address, size, encrypted)?;
             if data.hash_appended {
@@ -192,10 +197,13 @@ mod tests {
     ];
 
     fn test_flash() -> FlashStorage<'static> {
+        test_flash_with(include_bytes!("../../testdata/single_factory_no_ota.bin"))
+    }
+
+    fn test_flash_with(table: &[u8; PARTITION_TABLE_MAX_LEN]) -> FlashStorage<'static> {
         let mut flash = FlashStorage::new();
         let mut data = [0xffu8; 0x10000];
-        data[PARTITION_TABLE_OFFSET as usize..][..PARTITION_TABLE_MAX_LEN]
-            .copy_from_slice(include_bytes!("../../testdata/single_factory_no_ota.bin"));
+        data[PARTITION_TABLE_OFFSET as usize..][..PARTITION_TABLE_MAX_LEN].copy_from_slice(table);
         flash.write(0, &data).unwrap();
         flash
     }
@@ -271,6 +279,28 @@ mod tests {
 
         assert_eq!(
             factory.sha256(&mut flash).unwrap(),
+            IMAGE_DIGEST_WITHOUT_HASH_FLAG
+        );
+    }
+
+    #[test]
+    fn sha256_of_app_with_unknown_subtype_hashes_image() {
+        let mut flash = test_flash_with(include_bytes!("../../testdata/custom_types.bin"));
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut flash, &mut buffer).unwrap();
+        let tee_0 = pt
+            .find_partition(PartitionType::Unknown {
+                raw_type: 0,
+                raw_subtype: 0x30,
+            })
+            .unwrap()
+            .unwrap();
+
+        write_minimal_app_image(&mut flash, tee_0.offset(), false);
+
+        assert_eq!(
+            tee_0.sha256(&mut flash).unwrap(),
             IMAGE_DIGEST_WITHOUT_HASH_FLAG
         );
     }
