@@ -10,7 +10,7 @@ use crate::{
     },
     i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
     peripherals::{RTC_IO, SENS},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 fn bind_pin(pin: &impl LpPin, function: LpFunction) {
@@ -57,48 +57,38 @@ for_each_lp_function! {
 }
 
 impl<'d> LpI2c<'d> {
-    pub(super) fn init(&mut self) {
-        // Clear any stale config registers
-        self.i2c.register_block().ctrl().reset();
-        SENS::regs().sar_i2c_ctrl().reset();
+    fn regs(&self) -> &crate::pac::rtc_i2c::RegisterBlock {
+        self.i2c.register_block()
+    }
 
-        // Reset RTC I2C
-        SENS::regs()
-            .sar_peri_reset_conf()
+    pub(super) fn init(&mut self) {
+        let regs = self.regs();
+        let sens = SENS::regs();
+
+        regs.ctrl().reset();
+        sens.sar_i2c_ctrl().reset();
+
+        sens.sar_peri_reset_conf()
             .modify(|_, w| w.sar_rtc_i2c_reset().set_bit());
-        self.i2c
-            .register_block()
-            .ctrl()
-            .modify(|_, w| w.i2c_reset().set_bit());
-        // The state machine does not always come out of reset when the pulse is shorter than this.
+        regs.ctrl().modify(|_, w| w.i2c_reset().set_bit());
+        // Allow the RTC I2C reset to propagate before releasing it.
+        // See <https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/ulp/ulp_riscv/ulp_riscv_i2c.c#L503-L513>.
         crate::rom::ets_delay_us(20);
-        self.i2c
-            .register_block()
-            .ctrl()
-            .modify(|_, w| w.i2c_reset().clear_bit());
-        SENS::regs()
-            .sar_peri_reset_conf()
+        regs.ctrl().modify(|_, w| w.i2c_reset().clear_bit());
+        sens.sar_peri_reset_conf()
             .modify(|_, w| w.sar_rtc_i2c_reset().clear_bit());
 
         // Enable internal open-drain for SDA and SCL
-        self.i2c.register_block().ctrl().modify(|_, w| {
+        regs.ctrl().modify(|_, w| {
             w.sda_force_out().clear_bit();
             w.scl_force_out().clear_bit()
         });
 
-        // Enable clock gate.
-        SENS::regs()
-            .sar_peri_clk_gate_conf()
+        sens.sar_peri_clk_gate_conf()
             .modify(|_, w| w.rtc_i2c_clk_en().set_bit());
 
-        // Configure the RTC I2C controller into master mode.
-        self.i2c
-            .register_block()
-            .ctrl()
-            .modify(|_, w| w.ms_mode().set_bit());
-        self.i2c
-            .register_block()
-            .ctrl()
+        regs.ctrl().modify(|_, w| w.ms_mode().set_bit());
+        regs.ctrl()
             .modify(|_, w| w.i2c_ctrl_clk_gate_en().set_bit());
     }
 
@@ -129,33 +119,24 @@ impl<'d> LpI2c<'d> {
             return Err(ConfigError::TimeoutTooLong);
         }
 
-        self.i2c
-            .register_block()
-            .scl_low()
-            .write(|w| unsafe { w.period().bits(config.timing.scl_low_period) });
-        self.i2c
-            .register_block()
-            .scl_high()
-            .write(|w| unsafe { w.period().bits(config.timing.scl_high_period) });
-        self.i2c
-            .register_block()
-            .sda_duty()
-            .write(|w| unsafe { w.num().bits(config.timing.sda_duty) });
-        self.i2c
-            .register_block()
-            .scl_start_period()
-            .write(|w| unsafe { w.scl_start_period().bits(config.timing.scl_start_period) });
-        self.i2c
-            .register_block()
-            .scl_stop_period()
-            .write(|w| unsafe { w.scl_stop_period().bits(config.timing.scl_stop_period) });
-
-        self.i2c
-            .register_block()
-            .to()
-            .write(|w| unsafe { w.time_out().bits(ticks as u32) });
-
+        self.write_config(timing, ticks as u32);
         Ok(())
+    }
+
+    fn write_config(&self, timing: &Timing, ticks: u32) {
+        let regs = self.regs();
+        regs.scl_low()
+            .write(|w| unsafe { w.period().bits(timing.scl_low_period) });
+        regs.scl_high()
+            .write(|w| unsafe { w.period().bits(timing.scl_high_period) });
+        regs.sda_duty()
+            .write(|w| unsafe { w.num().bits(timing.sda_duty) });
+        regs.scl_start_period()
+            .write(|w| unsafe { w.scl_start_period().bits(timing.scl_start_period) });
+        regs.scl_stop_period()
+            .write(|w| unsafe { w.scl_stop_period().bits(timing.scl_stop_period) });
+
+        regs.to().write(|w| unsafe { w.time_out().bits(ticks) });
     }
 
     pub(super) fn write_bytes(
@@ -164,12 +145,13 @@ impl<'d> LpI2c<'d> {
         register: u8,
         data: &[u8],
     ) -> Result<(), Error> {
-        let sens = unsafe { crate::pac::SENS::steal() };
+        let sens = SENS::regs();
 
         if data.len() > u8::MAX as usize - 2 {
             return Err(Error::TransactionSizeLimitExceeded);
         }
 
+        self.prepare_transaction();
         self.write_cmd(
             0,
             Command::Write {
@@ -212,33 +194,18 @@ impl<'d> LpI2c<'d> {
                         value |= 1 << 27;
                         unsafe { w.sar_i2c_ctrl().bits(value) }
                     });
-                    self.i2c
-                        .register_block()
+                    self.regs()
                         .int_clr()
                         .write(|w| w.tx_data().clear_bit_by_one());
                 }
                 Ok(false) => panic!("Peripheral didn't wait for data"),
-                Err(err) => {
-                    // Stop transmission.
-                    sens.sar_i2c_ctrl().modify(|_, w| {
-                        w.sar_i2c_start_force().clear_bit();
-                        w.sar_i2c_start().clear_bit()
-                    });
-
-                    return Err(err);
-                }
+                Err(err) => return self.finish_transaction(Err(err)),
             }
         }
 
         let result = self.wait_for_complete_interrupt();
 
-        // Stop transmission.
-        sens.sar_i2c_ctrl().write(|w| {
-            w.sar_i2c_start_force().clear_bit();
-            w.sar_i2c_start().clear_bit()
-        });
-
-        result
+        self.finish_transaction(result)
     }
 
     pub(super) fn read_bytes(
@@ -247,7 +214,7 @@ impl<'d> LpI2c<'d> {
         register: u8,
         data: &mut [u8],
     ) -> Result<(), Error> {
-        let sens = unsafe { crate::pac::SENS::steal() };
+        let sens = SENS::regs();
 
         if data.is_empty() {
             return Ok(());
@@ -257,6 +224,7 @@ impl<'d> LpI2c<'d> {
             return Err(Error::TransactionSizeLimitExceeded);
         }
 
+        self.prepare_transaction();
         // Slave addr + Reg addr
         self.write_cmd(
             2,
@@ -323,38 +291,50 @@ impl<'d> LpI2c<'d> {
         for byte in data {
             match self.wait_for_rx_interrupt() {
                 Ok(true) => {
-                    *byte = self.i2c.register_block().data().read().i2c_rdata().bits();
-                    self.i2c
-                        .register_block()
+                    *byte = self.regs().data().read().i2c_rdata().bits();
+                    self.regs()
                         .int_clr()
                         .write(|w| w.rx_data().clear_bit_by_one());
                 }
                 Ok(false) => panic!("Peripheral didn't wait for data to be read"),
-                Err(err) => {
-                    // Stop transmission.
-                    sens.sar_i2c_ctrl().modify(|_, w| {
-                        w.sar_i2c_start_force().clear_bit();
-                        w.sar_i2c_start().clear_bit()
-                    });
-
-                    return Err(err);
-                }
+                Err(err) => return self.finish_transaction(Err(err)),
             }
         }
 
         let result = self.wait_for_complete_interrupt();
 
-        // Stop transmission.
-        sens.sar_i2c_ctrl().modify(|_, w| {
+        self.finish_transaction(result)
+    }
+
+    fn finish_transaction(&mut self, result: Result<(), Error>) -> Result<(), Error> {
+        SENS::regs().sar_i2c_ctrl().modify(|_, w| {
             w.sar_i2c_start_force().clear_bit();
             w.sar_i2c_start().clear_bit()
         });
-
+        self.needs_reset = result.is_err();
         result
     }
 
+    fn prepare_transaction(&mut self) {
+        if self.needs_reset {
+            let regs = self.regs();
+            let timing = Timing {
+                scl_low_period: regs.scl_low().read().period().bits(),
+                scl_high_period: regs.scl_high().read().period().bits(),
+                sda_duty: regs.sda_duty().read().num().bits(),
+                scl_start_period: regs.scl_start_period().read().scl_start_period().bits(),
+                scl_stop_period: regs.scl_stop_period().read().scl_stop_period().bits(),
+            };
+            let timeout = regs.to().read().time_out().bits();
+            // Defer reset until retry so a held-low line can be released first.
+            self.init();
+            self.write_config(&timing, timeout);
+            self.needs_reset = false;
+        }
+    }
+
     fn clear_interrupts(&self) {
-        self.i2c.register_block().int_clr().write(|w| {
+        self.regs().int_clr().write(|w| {
             w.trans_complete().clear_bit_by_one();
             w.tx_data().clear_bit_by_one();
             w.rx_data().clear_bit_by_one();
@@ -365,26 +345,31 @@ impl<'d> LpI2c<'d> {
     }
 
     fn wait_for_tx_interrupt(&self) -> Result<bool, Error> {
-        loop {
-            let int_raw = self.i2c.register_block().int_raw().read();
-            if int_raw.tx_data().bit_is_set() {
-                break Ok(true);
-            } else if int_raw.trans_complete().bit_is_set() {
-                break Ok(false);
-            } else if int_raw.time_out().bit_is_set() {
-                break Err(Error::TimeOut);
-            } else if int_raw.ack_err().bit_is_set() {
-                break Err(Error::AckCheckFailed);
-            } else if int_raw.arbitration_lost().bit_is_set() {
-                break Err(Error::ArbitrationLost);
-            }
-        }
+        self.wait_for_interrupt(|r| r.tx_data().bit_is_set())
     }
 
     fn wait_for_rx_interrupt(&self) -> Result<bool, Error> {
+        self.wait_for_interrupt(|r| r.rx_data().bit_is_set())
+    }
+
+    fn wait_for_complete_interrupt(&self) -> Result<(), Error> {
+        self.wait_for_interrupt(|r| r.trans_complete().bit_is_set())
+            .map(|_| ())
+    }
+
+    fn wait_for_interrupt(
+        &self,
+        ready: impl Fn(&crate::pac::rtc_i2c::int_raw::R) -> bool,
+    ) -> Result<bool, Error> {
+        let regs = self.regs();
+        let ticks = regs.to().read().time_out().bits() as u64;
+        let timeout = Duration::from_micros(
+            (ticks * 1_000_000).div_ceil(crate::soc::clocks::rc_fast_clk_frequency() as u64),
+        );
+        let start = Instant::now();
         loop {
-            let int_raw = self.i2c.register_block().int_raw().read();
-            if int_raw.rx_data().bit_is_set() {
+            let int_raw = regs.int_raw().read();
+            if ready(&int_raw) {
                 break Ok(true);
             } else if int_raw.trans_complete().bit_is_set() {
                 break Ok(false);
@@ -395,28 +380,16 @@ impl<'d> LpI2c<'d> {
             } else if int_raw.arbitration_lost().bit_is_set() {
                 break Err(Error::ArbitrationLost);
             }
-        }
-    }
-
-    fn wait_for_complete_interrupt(&self) -> Result<(), Error> {
-        loop {
-            let int_raw = self.i2c.register_block().int_raw().read();
-            if int_raw.trans_complete().bit_is_set() {
-                break Ok(());
-            } else if int_raw.time_out().bit_is_set() {
+            // The hardware timeout does not cover waiting for an idle bus.
+            if start.elapsed() >= timeout {
                 break Err(Error::TimeOut);
-            } else if int_raw.ack_err().bit_is_set() {
-                break Err(Error::AckCheckFailed);
-            } else if int_raw.arbitration_lost().bit_is_set() {
-                break Err(Error::ArbitrationLost);
             }
         }
     }
 
     fn write_cmd(&self, idx: usize, command: Command) {
         let cmd = command.into();
-        self.i2c
-            .register_block()
+        self.regs()
             .cmd(idx)
             .write(|w| unsafe { w.command().bits(cmd) });
     }

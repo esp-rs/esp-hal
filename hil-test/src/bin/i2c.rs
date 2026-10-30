@@ -757,4 +757,56 @@ mod lp_i2c {
             Err(Error::AckCheckFailed | Error::TimeOut)
         ));
     }
+
+    #[test]
+    #[cfg(esp32s3)]
+    fn rtc_recovers_after_scl_stall(mut i2c: LpI2c<'static>) {
+        let before = config_registers();
+        let scl = RTC_IO::regs().touch_pad(2);
+        let saved = scl.read().bits();
+        // Disabling the input makes the controller observe SCL low.
+        scl.modify(|_, w| w.fun_ie().clear_bit());
+        let result = i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]);
+        scl.write(|w| unsafe { w.bits(saved) });
+        assert_eq!(result, Err(Error::TimeOut));
+        assert_eq!(
+            i2c.read(NON_EXISTENT_ADDRESS, 0x10, &mut [0]),
+            Err(Error::AckCheckFailed)
+        );
+        assert_eq!(config_registers(), before);
+    }
+
+    #[test]
+    #[cfg(esp32s3)]
+    fn rtc_recovers_after_sda_stall(mut i2c: LpI2c<'static>) {
+        use esp_hal::time::Instant;
+
+        let timeout = Duration::from_millis(10);
+        i2c.apply_config(
+            &Config::default()
+                .with_timing(Timing::standard_mode())
+                .with_timeout(timeout),
+        )
+        .unwrap();
+        let before = config_registers();
+        let sda = RTC_IO::regs().touch_pad(3);
+        let saved = sda.read().bits();
+        // Disabling the input makes the controller observe SDA low.
+        sda.modify(|_, w| w.fun_ie().clear_bit());
+        let start = Instant::now();
+        let result = i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]);
+        let elapsed = start.elapsed();
+        sda.write(|w| unsafe { w.bits(saved) });
+        assert_eq!(result, Err(Error::TimeOut));
+        assert!((timeout..Duration::from_millis(100)).contains(&elapsed));
+        assert_eq!(
+            i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]),
+            Err(Error::AckCheckFailed)
+        );
+        assert_eq!(
+            i2c.read(NON_EXISTENT_ADDRESS, 0x10, &mut [0]),
+            Err(Error::AckCheckFailed)
+        );
+        assert_eq!(config_registers(), before);
+    }
 }

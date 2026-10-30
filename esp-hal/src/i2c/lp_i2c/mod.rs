@@ -180,6 +180,8 @@ pub struct LpI2c<'d> {
     /// LP pin numbers, kept so that the pads can be released when the driver is dropped.
     sda: u8,
     scl: u8,
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    needs_reset: bool,
 }
 
 impl<'d> LpI2c<'d> {
@@ -222,6 +224,8 @@ impl<'d> LpI2c<'d> {
             i2c,
             sda: sda.lp_number(),
             scl: scl.lp_number(),
+            #[cfg(lp_i2c_master_version = "rtc_i2c")]
+            needs_reset: false,
         };
 
         me.init();
