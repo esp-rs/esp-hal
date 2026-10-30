@@ -13,12 +13,13 @@ pub(crate) mod os_adapter_chip_specific;
 use core::ptr::NonNull;
 
 use allocator_api2::boxed::Box;
+use esp_hal::system::Cpu;
 use esp_sync::RawMutex;
 
 use super::event::WifiEvent;
 use crate::{
     compat::{
-        common::{str_from_c, thread_sem_get},
+        common::{str_from_c, task_core, thread_sem_get},
         malloc::{InternalMemory, calloc_internal},
     },
     sys::c_types::*,
@@ -414,7 +415,7 @@ fn common_task_create(
     param: *mut c_void,
     prio: u32,
     task_handle: *mut c_void,
-    core_id: Option<u32>,
+    core_id: u32,
 ) -> i32 {
     let task_name = unsafe { str_from_c(name as _) };
     trace!(
@@ -430,7 +431,7 @@ fn common_task_create(
             task_func,
             param,
             prio,
-            core_id,
+            Some(task_core(core_id)),
             stack_depth as usize,
         );
         *(task_handle as *mut usize) = task.as_ptr() as usize;
@@ -476,7 +477,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
         param,
         prio,
         task_handle,
-        if core_id < 2 { Some(core_id) } else { None },
+        core_id,
     )
 }
 
@@ -507,7 +508,15 @@ pub unsafe extern "C" fn task_create(
     prio: u32,
     task_handle: *mut c_void,
 ) -> i32 {
-    common_task_create(task_func, name, stack_depth, param, prio, task_handle, None)
+    common_task_create(
+        task_func,
+        name,
+        stack_depth,
+        param,
+        prio,
+        task_handle,
+        Cpu::ProCpu as u32,
+    )
 }
 
 /// **************************************************************************
