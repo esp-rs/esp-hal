@@ -38,7 +38,7 @@ mod tests {
         )
         .unwrap();
 
-        let esp_now = controller.esp_now();
+        let esp_now = controller.esp_now(Default::default());
         esp_now.set_pmk(&PMK).unwrap();
 
         esp_now.add_peer(peer(1, true)).unwrap();
@@ -66,7 +66,7 @@ mod tests {
         )
         .unwrap();
 
-        let esp_now = controller.esp_now();
+        let esp_now = controller.esp_now(Default::default());
         esp_now.set_pmk(&PMK).unwrap();
 
         for index in 1..=4 {
@@ -83,7 +83,7 @@ mod tests {
 
         let mut wifi = p.WIFI;
         let controller = WifiController::new(wifi.reborrow(), Default::default()).unwrap();
-        let mut esp_now = controller.esp_now();
+        let mut esp_now = controller.esp_now(Default::default());
         drop(controller);
 
         esp_now.set_channel(1).unwrap();
