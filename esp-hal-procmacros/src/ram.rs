@@ -9,6 +9,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let mut rtc_fast = false;
     let mut rtc_slow = false;
+    let mut caches_suspended = false;
     let mut dram2_uninit = false;
     let mut dcache_reclaimed = false;
     let mut persistent = false;
@@ -39,6 +40,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                             let arg = match ident {
                                 i if i == "rtc_fast" => &mut rtc_fast,
                                 i if i == "rtc_slow" => &mut rtc_slow,
+                                i if i == "caches_suspended" => &mut caches_suspended,
                                 i if i == "persistent" => &mut persistent,
                                 i if i == "dcache_reclaimed" => &mut dcache_reclaimed,
                                 i if i == "zeroed" => &mut zeroed,
@@ -160,6 +162,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let options = [
         (rtc_fast, "rtc_fast"),
         (rtc_slow, "rtc_slow"),
+        (caches_suspended, "caches_suspended"),
         (dram2_uninit, "reclaimed"),
         (dcache_reclaimed, "dcache_reclaimed"),
         (uncached, "uncached"),
@@ -170,10 +173,12 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     .filter_map(|(set, name)| set.then_some(name))
     .collect::<Vec<_>>();
 
+    // The `.ram.` part prevents a clash with named sections, such as `.rwtext.interrupt`.
     let section_name = match (is_fn, options.as_slice()) {
-        (true, []) => Ok(".rwtext"),
-        (true, ["rtc_fast"]) => Ok(".rtc_fast.text"),
-        (true, ["rtc_slow"]) => Ok(".rtc_slow.text"),
+        (true, []) => Ok(".rwtext.ram"),
+        (true, ["rtc_fast"]) => Ok(".rtc_fast.text.ram"),
+        (true, ["rtc_slow"]) => Ok(".rtc_slow.text.ram"),
+        (true, ["caches_suspended"]) => Ok(".rwtext.caches_suspended"),
 
         (false, []) => Ok(".data"),
         (false, ["reclaimed"]) => Ok(".dram2_uninit"),
@@ -194,12 +199,26 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         _ => Err(()),
     };
 
-    let section = match (is_fn, section_name) {
-        (true, Ok(section_name)) => quote::quote! {
-            #[unsafe(link_section = #section_name)]
-            #[inline(never)] // make certain function is not inlined
-        },
-        (false, Ok(section_name)) => quote::quote! {
+    // Items with the same `link_section` share one input section. The linker keeps or drops an
+    // input section whole, so each item gets a separate section. The module path tells two items
+    // of one name apart.
+    let section = match (&item, section_name) {
+        (Item::Fn(function), Ok(section_name)) => {
+            let base = format!("{section_name}.");
+            let name = function.sig.ident.to_string();
+            quote::quote! {
+                #[unsafe(link_section = ::core::concat!(#base, ::core::module_path!(), ".", #name))]
+                #[inline(never)] // make certain function is not inlined
+            }
+        }
+        (Item::Static(static_item), Ok(section_name)) => {
+            let base = format!("{section_name}.");
+            let name = static_item.ident.to_string();
+            quote::quote! {
+                #[unsafe(link_section = ::core::concat!(#base, ::core::module_path!(), ".", #name))]
+            }
+        }
+        (_, Ok(section_name)) => quote::quote! {
             #[unsafe(link_section = #section_name)]
         },
         (_, Err(_)) => {
@@ -262,7 +281,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rwtext")]
+                #[unsafe (link_section = ::core::concat!(".rwtext.ram.", ::core::module_path!(), ".", "foo"))]
                 #[inline (never)]
                 fn foo () { }
             }
@@ -287,7 +306,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_fast.text")]
+                #[unsafe (link_section = ::core::concat!(".rtc_fast.text.ram.", ::core::module_path!(), ".", "foo"))]
                 #[inline (never)]
                 fn foo () { }
             }
@@ -312,9 +331,55 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_slow.text")]
+                #[unsafe (link_section = ::core::concat!(".rtc_slow.text.ram.", ::core::module_path!(), ".", "foo"))]
                 #[inline (never)]
                 fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_caches_suspended_text() {
+        let result = ram(
+            quote::quote! {
+                unstable(caches_suspended)
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ::core::concat!(".rwtext.caches_suspended.", ::core::module_path!(), ".", "foo"))]
+                #[inline (never)]
+                fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_caches_suspended_static() {
+        let result = ram(
+            quote::quote! {
+                unstable(caches_suspended)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "Invalid combination of ram arguments" }
             }
             .to_string()
         );
@@ -333,7 +398,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".data")]
+                #[unsafe (link_section = ::core::concat!(".data.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
             }
             .to_string()
@@ -357,7 +422,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_fast.data")]
+                #[unsafe (link_section = ::core::concat!(".rtc_fast.data.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
             }
             .to_string()
@@ -381,7 +446,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_slow.data")]
+                #[unsafe (link_section = ::core::concat!(".rtc_slow.data.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
             }
             .to_string()
@@ -404,7 +469,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe(link_section = ".dram2_uninit")]
+                #[unsafe(link_section = ::core::concat!(".dram2_uninit.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO: [u8;10] = [0;10];
                 const _ : () = crate::__macro_implementation::assert_is_uninit::<[u8;10]>();
             }
@@ -429,7 +494,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_fast.bss")]
+                #[unsafe (link_section = ::core::concat!(".rtc_fast.bss.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
                 const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 10]>();
             }
@@ -454,7 +519,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_fast.persistent")]
+                #[unsafe (link_section = ::core::concat!(".rtc_fast.persistent.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
                 const _: () = crate::__macro_implementation::assert_is_persistable::<[u8; 10]>();
             }
@@ -479,7 +544,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_slow.bss")]
+                #[unsafe (link_section = ::core::concat!(".rtc_slow.bss.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
                 const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 10]>();
             }
@@ -504,7 +569,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ".rtc_slow.persistent")]
+                #[unsafe (link_section = ::core::concat!(".rtc_slow.persistent.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
                 const _: () = crate::__macro_implementation::assert_is_persistable::<[u8; 10]>();
             }
@@ -708,7 +773,7 @@ mod tests {
 
         let expectation = cfg_select! {
             feature = "uncached" => quote::quote! {
-                #[unsafe(link_section = ".uncached.data")]
+                #[unsafe(link_section = ::core::concat!(".uncached.data.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO: [u8; 4] = [0; 4];
             },
             _ => quote::quote! {
@@ -736,7 +801,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe(link_section = ".uncached.bss")]
+                #[unsafe(link_section = ::core::concat!(".uncached.bss.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO: [u8; 4] = [0; 4];
                 const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 4]>();
             }

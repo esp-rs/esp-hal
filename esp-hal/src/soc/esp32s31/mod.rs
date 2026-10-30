@@ -29,15 +29,7 @@ pub(crate) fn pre_init() {
     // masters except the HP CPU boot in REE mode, so AXI GDMA cannot fetch
     // descriptors or touch SRAM until these filters are disabled. Mirrors
     // ESP-IDF `bootloader_init_mem` / esp32c6 `pre_init`.
-    crate::peripherals::LP_APM::regs()
-        .func_ctrl()
-        .write(|w| unsafe { w.bits(0) });
-    crate::peripherals::HP_APM::regs()
-        .func_ctrl()
-        .write(|w| unsafe { w.bits(0) });
-    crate::peripherals::HP_MEM_APM::regs()
-        .func_ctrl()
-        .write(|w| unsafe { w.bits(0) });
+    disable_apm_filters();
 
     // TODO: [ESP32S31] IDF-14620 — temp. bring-up fix from ESP-IDF: open all LP/HP
     // peripheral PMS control registers for every security mode.
@@ -55,6 +47,27 @@ pub(crate) fn pre_init() {
 
     // Mirrors ESP-IDF's `init_rng`, see <https://github.com/espressif/esp-idf/blob/8d7d8aef588/components/esp_hw_support/hw_random.c#L114-L120>
     trng::rng_ll_enable();
+}
+
+/// Turns off every APM access-path filter. Mirrors ESP-IDF's
+/// `apm_hal_enable_ctrl_filter_all(false)` on this chip, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_security/include/hal/apm_hal.h#L499-L506>.
+///
+/// The S31 does not keep the APM settings across light sleep, so ESP-IDF also calls this function
+/// after every wake, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L458-L462>.
+/// This function is inlined, because the wake code runs from RAM.
+#[inline(always)]
+pub(crate) fn disable_apm_filters() {
+    crate::peripherals::LP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0) });
+    crate::peripherals::HP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0) });
+    crate::peripherals::HP_MEM_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0) });
 }
 
 /// Opens LP/HP peripheral PMS regions for all security modes.
@@ -81,6 +94,59 @@ fn write_pms_ctrl_range(base: usize, start: usize, end: usize) {
 
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 
+// The ROM cache function table, up to the freeze functions. See `cache_internal_stub_table` in
+// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_rom/esp32s31/include/esp32s31/rom/cache.h#L168-L188>.
+#[repr(C)]
+struct CacheInternalStubTable {
+    _unused: [usize; 11],
+    freeze_l1_icache0_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l1_icache0_disable: unsafe extern "C" fn(),
+    freeze_l1_icache1_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l1_icache1_disable: unsafe extern "C" fn(),
+    freeze_l1_dcache_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l1_dcache_disable: unsafe extern "C" fn(),
+}
+
+unsafe extern "C" {
+    static rom_cache_internal_table_ptr: *const CacheInternalStubTable;
+}
+
+/// Freezes the L1 caches, which cache the external memory. An access to flash or PSRAM stalls
+/// until [`unfreeze_ext_mem_cache`].
+///
+/// This function ports ESP-IDF's `esp_cache_freeze_ext_mem_cache`, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_mm/esp_cache_utils.c#L48-L79>,
+/// and its `cache_ll_l1_freeze_icache` and `cache_ll_l1_freeze_dcache`, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_cache/esp32s31/include/hal/cache_ll.h#L564-L587>.
+///
+/// The caller must run from RAM. The other core stalls at its next cache miss until the unfreeze.
+#[inline(always)]
+pub(crate) fn freeze_ext_mem_cache() {
+    // `CACHE_FREEZE_ACK_BUSY`: a cache miss stalls the requester.
+    const ACK_BUSY: u32 = 0;
+    unsafe {
+        let table = &*rom_cache_internal_table_ptr;
+        (table.freeze_l1_icache0_enable)(ACK_BUSY);
+        (table.freeze_l1_icache1_enable)(ACK_BUSY);
+        (table.freeze_l1_dcache_enable)(ACK_BUSY);
+    }
+}
+
+/// Releases the freeze of [`freeze_ext_mem_cache`].
+///
+/// This function ports ESP-IDF's `cache_ll_l1_unfreeze_icache` and `cache_ll_l1_unfreeze_dcache`,
+/// in the order of `esp_cache_unfreeze_ext_mem_cache`, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_cache/esp32s31/include/hal/cache_ll.h#L625-L676>.
+#[inline(always)]
+pub(crate) fn unfreeze_ext_mem_cache() {
+    unsafe {
+        let table = &*rom_cache_internal_table_ptr;
+        (table.freeze_l1_dcache_disable)();
+        (table.freeze_l1_icache1_disable)();
+        (table.freeze_l1_icache0_disable)();
+    }
+}
+
 /// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[crate::ram]
@@ -91,6 +157,30 @@ pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_WriteBack_Addr(CACHE_MAP_L1_DCACHE, addr, size);
     });
+}
+
+/// Writes back every dirty line of the data cache.
+///
+/// Mirrors ESP-IDF's patch of the ROM's `Cache_WriteBack_All`, see
+/// <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_rom/patches/esp_rom_cache_writeback_esp32p4_esp32s31.c#L56-L77>.
+/// Like that patch, this function writes back twice.
+#[crate::ram]
+pub(crate) fn cache_writeback_all() {
+    let cache = crate::peripherals::CACHE::regs();
+    cache
+        .sync_map()
+        .write(|w| unsafe { w.bits(CACHE_MAP_L1_DCACHE) });
+    cache.sync_addr().write(|w| unsafe { w.bits(0) });
+    cache.sync_size().write(|w| unsafe { w.bits(0) });
+    for _ in 0..2 {
+        // The register resets with `INVALIDATE_ENA` set, and an invalidate drops the dirty lines.
+        unsafe {
+            cache
+                .sync_ctrl()
+                .write_with_zero(|w| w.writeback_ena().set_bit())
+        };
+        while cache.sync_ctrl().read().sync_done().bit_is_clear() {}
+    }
 }
 
 /// Invalidate a specific range of addresses in the cache.

@@ -457,6 +457,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         true
     };
+    ("sleep.pmu_sleep_steps") => {
+        false
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -484,6 +487,9 @@ macro_rules! property {
     ("mmu.entry_num", str) => {
         stringify!(256)
     };
+    ("psram.writeback_before_cpu_power_down") => {
+        false
+    };
     ("psram.octal_spi") => {
         false
     };
@@ -495,6 +501,9 @@ macro_rules! property {
     };
     ("psram.extmem_origin", str) => {
         stringify!(1062207488)
+    };
+    ("psram.idle_low_speed_switch") => {
+        false
     };
     ("rom.has_crc_le") => {
         true
