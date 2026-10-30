@@ -23,8 +23,7 @@ pub(crate) unsafe fn internal_park_core(core: Cpu, park: bool) {
     }
 }
 
-#[instability::unstable]
-pub fn is_running(core: Cpu) -> bool {
+pub(crate) fn is_running(core: Cpu) -> bool {
     let stall = LP_AON::regs().cpucore_cfg().read();
     let code = match core {
         Cpu::ProCpu => stall.cpu_core0_sw_stall().bits(),

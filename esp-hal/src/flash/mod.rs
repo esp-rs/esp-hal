@@ -120,14 +120,12 @@ pub enum MultiCoreStrategy {
     /// Returns [`Error::OtherCoreRunning`] if the other core is running.
     #[cfg_attr(not(feature = "rt"), default)]
     Error,
-    /// Posts an IPC function on the other core for the operation.
+    /// Parks the other core for the operation, the way [`crate::system::CpuControl::park_core`]
+    /// does.
     ///
-    /// The function runs from RAM. The function masks interrupts on that core and waits until
-    /// the operation finishes. The operation waits until that core enters the function. A core
-    /// that does not take the IPC interrupt delays the operation.
-    ///
-    /// If [`crate::system::CpuControl`] did not start the APP core, the CPU-control registers
-    /// stall that core instead.
+    /// The operation waits until that core parks. A core that does not take the IPC interrupt
+    /// delays the operation. If the other core runs no code of this program, see
+    /// [`crate::system::is_running`], the operation leaves it alone.
     #[cfg(feature = "rt")]
     #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
     #[default]
@@ -834,17 +832,9 @@ impl Flash<'_, Blocking> {
 
 /// Stops the other core according to [`MultiCoreStrategy`]. [`Drop`] releases that core.
 struct ParkGuard {
+    /// The core that the guard parked.
     #[cfg(all(multi_core, feature = "rt"))]
-    release: Release,
-}
-
-#[cfg(multi_core)]
-#[cfg_attr(not(feature = "rt"), expect(dead_code))]
-#[derive(Clone, Copy)]
-enum Release {
-    None,
-    Ipc,
-    Unpark(crate::system::Cpu),
+    parked: Option<crate::system::Cpu>,
 }
 
 impl ParkGuard {
@@ -853,44 +843,23 @@ impl ParkGuard {
         cfg_select! {
             multi_core => {
                 #[cfg_attr(not(feature = "rt"), expect(unused_variables))]
-                let release = match _flash.multi_core_strategy {
+                let parked: Option<crate::system::Cpu> = match _flash.multi_core_strategy {
                     MultiCoreStrategy::Error => {
                         for other in crate::system::Cpu::other() {
                             if crate::system::is_running(other) {
                                 return Err(Error::OtherCoreRunning);
                             }
                         }
-                        Release::None
+                        None
                     }
                     #[cfg(feature = "rt")]
-                    MultiCoreStrategy::AutoPark => {
-                        let mut release = Release::None;
-                        for other in crate::system::Cpu::other() {
-                            if !crate::system::is_running(other) {
-                                continue;
-                            }
-                            // A core that `CpuControl` did not start has no IPC handler. It can
-                            // run ROM code, which a CPU-control stall does not break.
-                            if other == crate::system::Cpu::ProCpu
-                                || crate::system::multi_core::app_core_takes_ipc()
-                            {
-                                ipc_stall::enter(other);
-                                release = Release::Ipc;
-                            } else {
-                                let mut cpu_ctrl = crate::system::CpuControl::new(unsafe {
-                                    crate::peripherals::CPU_CTRL::steal()
-                                });
-                                unsafe { cpu_ctrl.park_core(other) };
-                                release = Release::Unpark(other);
-                            }
-                        }
-                        release
-                    }
-                    MultiCoreStrategy::Ignore(_) => Release::None,
+                    MultiCoreStrategy::AutoPark => crate::system::Cpu::other()
+                        .find(|&other| crate::system::multi_core::park::park(other)),
+                    MultiCoreStrategy::Ignore(_) => None,
                 };
                 Ok(Self {
                     #[cfg(feature = "rt")]
-                    release,
+                    parked,
                 })
             }
             _ => Ok(Self {}),
@@ -902,72 +871,8 @@ impl Drop for ParkGuard {
     #[ram]
     fn drop(&mut self) {
         #[cfg(all(multi_core, feature = "rt"))]
-        match self.release {
-            Release::None => {}
-            Release::Ipc => ipc_stall::leave(),
-            Release::Unpark(core) => {
-                let mut cpu_ctrl = crate::system::CpuControl::new(unsafe {
-                    crate::peripherals::CPU_CTRL::steal()
-                });
-                cpu_ctrl.unpark_core(core);
-            }
+        if let Some(core) = self.parked {
+            crate::system::multi_core::park::unpark(core);
         }
-    }
-}
-
-/// RAM loop posted to the other core for [`MultiCoreStrategy::AutoPark`].
-#[cfg(all(multi_core, feature = "rt"))]
-mod ipc_stall {
-    use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
-    use portable_atomic::Ordering;
-    use portable_atomic_enum::atomic_enum;
-    use procmacros::ram;
-
-    use crate::private::DropGuard;
-
-    #[atomic_enum]
-    #[derive(PartialEq, Debug, Clone, Copy)]
-    enum Phase {
-        /// The other core is outside the loop.
-        Idle,
-        /// The other core is inside the loop. Interrupts on that core are masked.
-        Ack,
-        /// The operation has finished. The caches are on. The other core leaves the loop.
-        Release,
-    }
-
-    static PHASE: AtomicPhase = AtomicPhase::new(Phase::Idle);
-
-    pub(super) fn enter(core: crate::system::Cpu) {
-        crate::interrupt::ipc::Ipc.call_function(core, stall);
-        while PHASE.load(Ordering::Acquire) != Phase::Ack {
-            core::hint::spin_loop();
-        }
-    }
-
-    pub(super) fn leave() {
-        PHASE.store(Phase::Release, Ordering::Release);
-        while PHASE.load(Ordering::Acquire) != Phase::Idle {
-            core::hint::spin_loop();
-        }
-    }
-
-    #[ram]
-    fn stall() {
-        {
-            // The mask is taken before `Phase::Ack`. The guards drop after the cache is on again.
-            let token = unsafe { SingleCoreInterruptLock.enter() };
-            let _mask = DropGuard::new(token, |token| unsafe {
-                SingleCoreInterruptLock.exit(token)
-            });
-            #[cfg(soc_cpu_has_branch_predictor)]
-            let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
-
-            PHASE.store(Phase::Ack, Ordering::Release);
-            while PHASE.load(Ordering::Acquire) == Phase::Ack {
-                core::hint::spin_loop();
-            }
-        }
-        PHASE.store(Phase::Idle, Ordering::Release);
     }
 }

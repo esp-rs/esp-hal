@@ -147,26 +147,34 @@ impl Ipc {
     ///
     /// In debug builds, panics if `core` is the APP CPU and that CPU is not running.
     pub fn call_function(self, core: Cpu, handler: fn()) {
-        let handler = handler as *mut ();
-        assert_target_runs(core);
-
-        while let Err(pending) = STATE[core as usize].callback.compare_exchange(
-            core::ptr::null_mut(),
-            handler,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            // The IPC handler takes the callback before it runs it, so a pending copy of `handler`
-            // has not run yet. It runs after this call, which covers this call, too.
-            if pending == handler {
-                break;
-            }
-
+        while !try_call_function(core, handler) {
             core::hint::spin_loop();
         }
-
-        raise(core);
     }
+}
+
+/// Posts `handler` to `core` as [`Ipc::call_function`] does, but returns `false` instead of
+/// waiting if `core` holds a different function.
+#[inline(always)]
+pub(crate) fn try_call_function(core: Cpu, handler: fn()) -> bool {
+    let handler = handler as *mut ();
+    assert_target_runs(core);
+
+    if let Err(pending) = STATE[core as usize].callback.compare_exchange(
+        core::ptr::null_mut(),
+        handler,
+        Ordering::AcqRel,
+        Ordering::Acquire,
+    ) {
+        // The IPC handler takes the callback before it runs it, so a pending copy of `handler`
+        // has not run yet. It runs after this call, which covers this call, too.
+        if pending != handler {
+            return false;
+        }
+    }
+
+    raise(core);
+    true
 }
 
 /// Registers the context-switch handler of `core`.

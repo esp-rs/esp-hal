@@ -224,6 +224,120 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    fn park_does_not_stop_a_core_in_a_critical_section(p: Peripherals) {
+        use esp_hal::system::{Cpu, CpuControl, Stack};
+        use hil_test::mk_static;
+
+        static IN_SECTION: AtomicU32 = AtomicU32::new(0);
+
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+
+        // The APP core spends nearly all of its time in a critical section, so a park that stops
+        // it wherever it stands stops it there, and the critical section below waits forever.
+        let _guard = cpu_control
+            .start_app_core(app_core_stack, || {
+                loop {
+                    critical_section::with(|_| {
+                        IN_SECTION.fetch_add(1, Ordering::Relaxed);
+                        for _ in 0..1000 {
+                            core::hint::spin_loop();
+                        }
+                    });
+                }
+            })
+            .unwrap();
+
+        while IN_SECTION.load(Ordering::Relaxed) == 0 {}
+
+        for _ in 0..1000 {
+            let parked = cpu_control.park_core(Cpu::AppCpu);
+            critical_section::with(|_| {});
+            drop(parked);
+        }
+
+        let before = IN_SECTION.load(Ordering::Relaxed);
+        while IN_SECTION.load(Ordering::Relaxed) == before {}
+    }
+
+    #[test]
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    fn parks_add_up(p: Peripherals) {
+        use esp_hal::system::{Cpu, CpuControl, Stack, is_running};
+        use hil_test::mk_static;
+
+        static TICKS: AtomicU32 = AtomicU32::new(0);
+
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(app_core_stack, || {
+                loop {
+                    TICKS.fetch_add(1, Ordering::Relaxed);
+                }
+            })
+            .unwrap();
+
+        while TICKS.load(Ordering::Relaxed) == 0 {}
+        hil_test::assert!(is_running(Cpu::AppCpu));
+
+        let first = cpu_control.park_core(Cpu::AppCpu);
+        let second = cpu_control.park_core(Cpu::AppCpu);
+        hil_test::assert!(!is_running(Cpu::AppCpu));
+
+        drop(first);
+        hil_test::assert!(!is_running(Cpu::AppCpu));
+        let ticks = TICKS.load(Ordering::Relaxed);
+        for _ in 0..10_000 {
+            core::hint::spin_loop();
+        }
+        hil_test::assert_eq!(TICKS.load(Ordering::Relaxed), ticks);
+
+        drop(second);
+        hil_test::assert!(is_running(Cpu::AppCpu));
+        while TICKS.load(Ordering::Relaxed) == ticks {}
+    }
+
+    #[test]
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    fn cores_can_park_each_other_at_the_same_time(p: Peripherals) {
+        use core::sync::atomic::AtomicBool;
+
+        use esp_hal::{
+            peripherals::CPU_CTRL,
+            system::{Cpu, CpuControl, Stack},
+        };
+        use hil_test::mk_static;
+
+        static START: AtomicBool = AtomicBool::new(false);
+        static DONE: AtomicBool = AtomicBool::new(false);
+
+        const ROUNDS: u32 = 1000;
+
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(app_core_stack, || {
+                let cpu_control = CpuControl::new(unsafe { CPU_CTRL::steal() });
+                while !START.load(Ordering::Relaxed) {}
+                for _ in 0..ROUNDS {
+                    drop(cpu_control.park_core(Cpu::ProCpu));
+                }
+                DONE.store(true, Ordering::Release);
+                loop {}
+            })
+            .unwrap();
+
+        START.store(true, Ordering::Relaxed);
+        for _ in 0..ROUNDS {
+            drop(cpu_control.park_core(Cpu::AppCpu));
+        }
+
+        while !DONE.load(Ordering::Acquire) {}
+    }
+
+    #[test]
     fn software_interrupts_fire_immediately(p: Peripherals) {
         software_interrupt_fires_before_returning(p);
     }
