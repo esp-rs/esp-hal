@@ -1,0 +1,60 @@
+[package]
+name    = "embassy-https-speedtest"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+embassy-executor = "0.10.0"
+embassy-net = { version = "0.9.0", features = [
+    "dhcpv4",
+    "medium-ethernet",
+    "tcp",
+    "dns",
+] }
+embassy-time = "0.5.0"
+embedded-io = "0.7.0"
+embedded-io-async = "0.7.0"
+embedded-tls = { version = "0.19.0", default-features = false, features = [
+    "rsa",
+    "log",
+    "p384",
+] }
+heapless = "0.9.0"
+rand_core = { version = "0.6", default-features = false }
+static_cell = "2.1.0"
+
+esp-alloc = { path = "../../../esp-alloc" }
+esp-backtrace = { path = "../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-println = { path = "../../../esp-println", features = ["log-04"] }
+esp-radio = { path = "../../../esp-radio", features = [
+    "log-04",
+    "unstable",
+    "wifi",
+] }
+esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
+
+[features]
+esp32s3 = [
+    "esp-alloc/esp32s3",
+    "esp-backtrace/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-hal/esp32s3",
+    "esp-radio/esp32s3",
+    "esp-rtos/esp32s3",
+]
+
+# Disable TLS entirely: both directions run over plain HTTP so the result
+# measures the wifi link without the encryption overhead.
+plain-http = []
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1
