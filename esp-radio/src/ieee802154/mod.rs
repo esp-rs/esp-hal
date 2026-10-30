@@ -177,6 +177,13 @@ impl<'a> Ieee802154<'a> {
         ieee802154_receive();
     }
 
+    /// Put the radio to sleep: stop whatever it is doing, stop receiving frames, and close the RF
+    /// unless another radio still uses it.
+    #[instability::unstable]
+    pub fn sleep(&mut self) {
+        ieee802154_sleep();
+    }
+
     /// Return the raw data of a received frame
     #[instability::unstable]
     pub fn raw_received(&mut self) -> Option<RawReceived> {
@@ -374,6 +381,7 @@ impl Drop for Ieee802154<'_> {
         self.clear_rx_available_callback_fn();
         self.clear_tx_failed_callback();
         self.clear_tx_failed_callback_fn();
+        raw::ieee802154_rf_restore();
     }
 }
 
