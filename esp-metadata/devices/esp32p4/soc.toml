@@ -441,7 +441,7 @@ delay_phase_num = 8
 has_iomux = true
 has_gpio_matrix = true
 psram_dma = true
-uhs = false
+uhs = true
 # Slot 0's bus signals (clock/command/data) are wired to fixed IO_MUX pads
 # (SD1_*); only its auxiliary signals reach the GPIO matrix. Slot 1 is routed
 # entirely through the GPIO matrix.

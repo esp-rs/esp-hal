@@ -335,7 +335,7 @@ macro_rules! property {
         true
     };
     ("sdmmc.uhs") => {
-        false
+        true
     };
     ("usb_otg.fifo_depth_words") => {
         200
