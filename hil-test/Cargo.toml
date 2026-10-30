@@ -78,6 +78,11 @@ name              = "parl_io"
 harness           = false
 
 [[bin]]
+name              = "ppa"
+harness           = false
+required-features = ["unstable", "psram", "esp-rtos"]
+
+[[bin]]
 name              = "rmt"
 harness           = false
 required-features = ["embassy", "esp-alloc"]
@@ -159,6 +164,7 @@ esp-metadata-generated = { path = "../esp-metadata-generated", features = ["buil
 [features]
 default = []
 unstable = ["esp-hal/unstable"]
+esp-rtos = ["dep:esp-rtos"]
 
 # Add the `embedded-test/defmt` feature for more verbose testing
 defmt = ["dep:rtt-target", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt", "esp-radio-rtos-driver?/defmt"]
