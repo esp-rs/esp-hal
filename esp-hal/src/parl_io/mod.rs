@@ -29,7 +29,7 @@
 //!
 //! // Initialize DMA buffer and descriptors for data reception
 //! let mut dma_rx_buf = dma_rx_buffer!(32000)?;
-//! let dma_channel = peripherals.{dma_channel};
+//! let dma_channel = peripherals.__dma_channel__;
 //!
 //! // Configure the 4-bit input pins and clock pin
 //! let mut rx_pins = RxFourBits::new(
@@ -74,7 +74,7 @@
 //!
 //! // Initialize DMA buffer and descriptors for data transmission
 //! let mut dma_tx_buf = dma_tx_buffer!(32000).unwrap();
-//! let dma_channel = peripherals.{dma_channel};
+//! let dma_channel = peripherals.__dma_channel__;
 //!
 //! // Configure the 4-bit input pins and clock pin
 //! let tx_pins = TxFourBits::new(
