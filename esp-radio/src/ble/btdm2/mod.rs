@@ -20,7 +20,7 @@ use super::{Config, ReceivedPacket, in_isr};
 use crate::{
     compat::{
         self,
-        common::str_from_c,
+        common::{str_from_c, task_core},
         mutex,
         queue::{
             queue_create,
@@ -37,7 +37,7 @@ use crate::{
         semaphore,
     },
     drop_guard::DropGuard,
-    hal::{ram, system::Cpu},
+    hal::ram,
     sys::{
         c_types::{c_char, c_void},
         include::*,
@@ -1519,11 +1519,7 @@ extern "C" fn wr_btdm_osal_task_create(
             task_func,
             arg,
             priority.min(crate::preempt::max_task_priority()),
-            if core_id < Cpu::COUNT as u32 {
-                Some(core_id)
-            } else {
-                None
-            },
+            Some(task_core(core_id)),
             stack_size as usize,
         );
         if !task_handle.is_null() {

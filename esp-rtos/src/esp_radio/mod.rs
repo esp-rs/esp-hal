@@ -185,6 +185,7 @@ register_semaphore_implementation!(CompatSemaphore);
 register_timer_implementation!(
     CompatTimer<
         { esp_config::esp_config_int!(u32, "ESP_RTOS_CONFIG_RADIO_TIMER_THREAD_PRIORITY") },
+        { Cpu::ProCpu as u32 },
     >
 );
 register_queue_implementation!(CompatQueue);
