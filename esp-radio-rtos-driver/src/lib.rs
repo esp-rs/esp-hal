@@ -449,6 +449,9 @@ pub fn max_task_priority() -> u32 {
 
 /// Creates a new task with the given initial parameter and stack size.
 ///
+/// `pin_to_core` names the core that the task runs on, where core `0` is the first core. A task
+/// that names no core runs on the first core.
+///
 /// ## Safety
 ///
 /// The `param` parameter must be valid for the lifetime of the task. The data
@@ -463,6 +466,8 @@ pub unsafe fn task_create(
     task_stack_size: usize,
 ) -> ThreadPtr {
     let priority = priority.min(max_task_priority());
+    // The threads that esp-radio creates without a core run on the first core.
+    let pin_to_core = pin_to_core.or(Some(0));
     unsafe { esp_rtos_task_create(name, task, param, priority, pin_to_core, task_stack_size) }
 }
 
