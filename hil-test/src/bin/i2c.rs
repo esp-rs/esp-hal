@@ -500,7 +500,6 @@ mod lp_i2c {
     #[cfg(lp_i2c_master_version = "rtc_i2c")]
     use esp_hal::{i2c::lp_i2c::Timing, peripherals::RTC_IO, time::Duration};
 
-    #[cfg(esp32c6)]
     use super::NON_EXISTENT_ADDRESS;
 
     #[init]
@@ -563,6 +562,13 @@ mod lp_i2c {
             i2c.write(0x7f, 0x10, &[0xa5]),
             Err(Error::AckCheckFailed | Error::TimeOut)
         ));
+    }
+
+    #[test]
+    fn empty_read_is_a_noop(mut i2c: LpI2c<'static>) {
+        for address in [NON_EXISTENT_ADDRESS, 0x7f] {
+            assert_eq!(i2c.read(address, 0x10, &mut []), Ok(()));
+        }
     }
 
     // TODO: against the MCP4725, LP I2C transfers time out on the ESP32-S3 and are not
@@ -664,5 +670,14 @@ mod lp_i2c {
             i2c.read(NON_EXISTENT_ADDRESS, 0x10, &mut [0]),
             Err(Error::AckCheckFailed)
         );
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn empty_write_does_not_panic(mut i2c: LpI2c<'static>) {
+        assert!(matches!(
+            i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[]),
+            Err(Error::AckCheckFailed | Error::TimeOut)
+        ));
     }
 }

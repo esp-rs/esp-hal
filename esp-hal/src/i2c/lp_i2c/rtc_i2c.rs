@@ -170,8 +170,7 @@ impl<'d> LpI2c<'d> {
             result |= address as u32;
             // Set slave register.
             result |= (register as u32) << 11;
-            // Set first data
-            result |= (data[0] as u32) << 19;
+            result |= (data.first().copied().unwrap_or(0) as u32) << 19;
             result |= 1u32 << 27; // Write
             result
         };
@@ -230,6 +229,10 @@ impl<'d> LpI2c<'d> {
         data: &mut [u8],
     ) -> Result<(), Error> {
         let sens = unsafe { crate::pac::SENS::steal() };
+
+        if data.is_empty() {
+            return Ok(());
+        }
 
         if data.len() > u8::MAX as usize {
             return Err(Error::TransactionSizeLimitExceeded);

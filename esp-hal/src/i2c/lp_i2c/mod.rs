@@ -285,7 +285,8 @@ impl<'d> LpI2c<'d> {
     /// Writes `data` to the `register` of the slave with the given `address`.
     ///
     /// The transfer consists of a single write transaction that sends the device address, the
-    /// register address, then `data`.
+    /// register address, then `data`. If `data` is empty, the transfer sends only the device
+    /// address and register address.
     ///
     /// # Examples
     ///
@@ -331,7 +332,7 @@ impl<'d> LpI2c<'d> {
     /// `data`.
     ///
     /// The transfer writes the device address and the register address, then repeats the start
-    /// condition to read `data` back.
+    /// condition to read `data` back. If `data` is empty, no transfer starts.
     ///
     /// # Examples
     ///
