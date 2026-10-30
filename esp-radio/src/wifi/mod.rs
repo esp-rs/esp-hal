@@ -47,6 +47,22 @@
 //! `WifiController::set_max_tx_power` (requires the `unstable` feature) using a value in the
 //! range [8, 84]. Note that values above roughly 65 (~16dBm) have been reported to cause
 //! authentication failures on some hardware, so setting it to the maximum is not always better.
+#![cfg_attr(
+    feature = "unstable",
+    doc = "## Power saving
+
+The following options are available to reduce Wi-Fi power consumption:
+
+**Power Save Mode (PSM)** -- Using [`WifiController::set_power_saving`] to activate a
+[`PowerSaveMode`] allows the modem to turn off between beacon intervals. This is also known as
+modem sleep. Applications that send packets frequently may not see any benefit from this
+however."
+)]
+#![cfg_attr(
+    all(feature = "unstable", wifi_has_wifi6),
+    doc = "**Target Wake Time (TWT)** -- On Wi-Fi 6 (802.11ax) networks using [`WifiController::itwt_setup`] to negotiate
+an individual TWT can significantly lower power consumption, even at high transmit rates."
+)]
 
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
@@ -111,6 +127,8 @@ unstable_module!(
     #[cfg(feature = "sniffer")]
     #[cfg_attr(docsrs, doc(cfg(feature = "sniffer")))]
     pub mod sniffer;
+    #[cfg(wifi_has_wifi6)]
+    pub mod twt;
 );
 
 pub mod scan;
@@ -1115,6 +1133,14 @@ pub enum WifiError {
 
     /// Station still in disconnect status.
     NotConnected,
+
+    /// A Target Wake Time (TWT) operation failed.
+    ///
+    /// The inner [`twt::TwtError`] type is only nameable with the `unstable`
+    /// feature enabled.
+    #[cfg(wifi_has_wifi6)]
+    #[allow(private_interfaces)]
+    Twt(twt::TwtError),
 }
 
 impl WifiError {
@@ -1132,9 +1158,18 @@ impl WifiError {
             // are returned without any logging.
             ESP_ERR_NO_MEM => WifiError::OutOfMemory,
             ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
+            ESP_ERR_NOT_SUPPORTED => WifiError::Unsupported,
             ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
             ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
             ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
+            #[cfg(wifi_has_wifi6)]
+            ESP_ERR_WIFI_TWT_FULL => WifiError::Twt(twt::TwtError::Full),
+            #[cfg(wifi_has_wifi6)]
+            ESP_ERR_WIFI_TWT_SETUP_TIMEOUT => WifiError::Twt(twt::TwtError::SetupTimeout),
+            #[cfg(wifi_has_wifi6)]
+            ESP_ERR_WIFI_TWT_SETUP_TXFAIL => WifiError::Twt(twt::TwtError::SetupTxFail),
+            #[cfg(wifi_has_wifi6)]
+            ESP_ERR_WIFI_TWT_SETUP_REJECT => WifiError::Twt(twt::TwtError::SetupRejected),
 
             // Known driver state-machine and timeout codes. These occur in
             // perfectly normal operation.
