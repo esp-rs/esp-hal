@@ -557,7 +557,7 @@ fn apply_clock_divider(is_tx: bool, frequency: Rate) -> Result<(), ConfigError> 
         ParlIoInstance::ParlIo.rx_clock_frequency()
     };
     // The unit clock is the source clock divided by `div_num + 1`.
-    let divider = source_hz / frequency.as_hz();
+    let divider = source_hz.div_ceil(frequency.as_hz());
     if divider == 0 || divider - 1 > unit_clock::MAX_DIV_NUM {
         return Err(ConfigError::UnreachableClockRate);
     }
