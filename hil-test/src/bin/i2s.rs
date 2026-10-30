@@ -999,6 +999,98 @@ mod tests {
         run_test_i2s_rx_half_sample_bits_regression(i2s, dma_channel);
     }
 
+    /// Returns the MCLK frequency in Hz, measured over 20 ms.
+    #[cfg(all(pcnt_driver_supported, not(i2s_version = "1")))]
+    fn measure_mclk_hz(counter: &super::EdgeCounter<'_>) -> u64 {
+        use esp_hal::time::{Duration, Instant};
+
+        // The counter resets at the limit. Poll faster than 30000 edges.
+        const LIMIT: i16 = 30000;
+        counter.unit.set_high_limit(Some(LIMIT)).unwrap();
+        counter.unit.clear();
+
+        let mut edges = 0u64;
+        let mut last = 0i16;
+        let start = Instant::now();
+        loop {
+            let value = counter.unit.value();
+            let elapsed = start.elapsed();
+            edges += (value as i32 - last as i32).rem_euclid(LIMIT as i32) as u64;
+            last = value;
+            if elapsed >= Duration::from_millis(20) {
+                return edges * 1_000_000 / elapsed.as_micros();
+            }
+        }
+    }
+
+    /// Configures each sample rate in sequence and checks that MCLK is 256 times the rate.
+    #[cfg(all(pcnt_driver_supported, not(i2s_version = "1")))]
+    fn run_test_i2s_mclk_frequency(sample_rates: &[u32]) {
+        use esp_hal::i2s::master::TdmUnitConfig;
+
+        let (i2s, dma_channel, pin): (AnyI2s, AnyI2sDmaChannel, AnyPin) =
+            i2s_instance_resources!(I2S0);
+        let (input, output) = unsafe { pin.split() };
+        let counter = super::EdgeCounter::new(input);
+
+        let unit_config = |rate| {
+            TdmUnitConfig::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(rate))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO)
+        };
+
+        // MCLK shows the RX clock.
+        let mut i2s_rx = I2s::new(
+            i2s,
+            dma_channel,
+            TdmConfig::default()
+                .with_tx_config(unit_config(sample_rates[0]))
+                .with_rx_config(unit_config(sample_rates[0])),
+        )
+        .unwrap()
+        .with_mclk(output)
+        .i2s_rx
+        .build();
+
+        for (i, &rate) in sample_rates.iter().enumerate() {
+            if i > 0 {
+                i2s_rx.apply_config(&unit_config(rate)).unwrap();
+            }
+
+            let expected = rate as u64 * 256;
+            let hz = measure_mclk_hz(&counter);
+            assert!(
+                hz.abs_diff(expected) <= expected / 2000,
+                "MCLK is {} Hz, expected {} Hz",
+                hz,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, pcnt_driver_supported, not(i2s_version = "1")))]
+    fn test_i2s_mclk_frequency_44100_i2s0() {
+        run_test_i2s_mclk_frequency(&[44100]);
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, pcnt_driver_supported, not(i2s_version = "1")))]
+    fn test_i2s_mclk_frequency_48000_i2s0() {
+        run_test_i2s_mclk_frequency(&[48000]);
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, pcnt_driver_supported, not(i2s_version = "1")))]
+    fn test_i2s_mclk_frequency_reconfigure_i2s0() {
+        // The MCLK divider changes from 39 + 1/16 to 13 + 1/48.
+        cfg_select! {
+            any(esp32h2, esp32h4) => run_test_i2s_mclk_frequency(&[9600, 28800]),
+            _ => run_test_i2s_mclk_frequency(&[16000, 48000]),
+        }
+    }
+
     #[test]
     #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
     async fn test_rx_32() {
