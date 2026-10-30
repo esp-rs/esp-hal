@@ -1423,6 +1423,9 @@ mod i2s_parallel_tests {
                 .unwrap();
             (i2s, tx_buf) = xfer.wait();
 
+            // `wait` returns when TX has sent everything, so all edges are out already.
+            counter.check(STALL_TEST_BYTES as i32);
+
             // Count the edges after the interrupt has ended.
             Delay::new().delay_micros(60);
             counter.check(STALL_TEST_BYTES as i32);
