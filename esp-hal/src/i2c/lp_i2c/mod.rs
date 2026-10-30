@@ -140,10 +140,13 @@ pub enum Error {
     TransactionSizeLimitExceeded,
     /// The acknowledgment check failed.
     AckCheckFailed,
-    /// A timeout occurred during transmission.
+    /// A timeout occurred while waiting for the transfer.
     TimeOut,
     /// The arbitration for the bus was lost.
     ArbitrationLost,
+    /// The transfer ended before all bytes were transferred.
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    ExecutionIncomplete,
 }
 
 impl core::fmt::Display for Error {
@@ -156,8 +159,12 @@ impl core::fmt::Display for Error {
                 f.write_str("The transmission size exceeds the limit")
             }
             Self::AckCheckFailed => f.write_str("The acknowledgment check failed"),
-            Self::TimeOut => f.write_str("A timeout occurred during transmission"),
+            Self::TimeOut => f.write_str("A timeout occurred while waiting for the transfer"),
             Self::ArbitrationLost => f.write_str("The arbitration for the bus was lost"),
+            #[cfg(lp_i2c_master_version = "rtc_i2c")]
+            Self::ExecutionIncomplete => {
+                f.write_str("The transfer ended before all bytes were transferred")
+            }
         }
     }
 }
@@ -198,6 +205,10 @@ pub struct LpI2c<'d> {
     /// LP pin numbers, kept so that the pads can be released when the driver is dropped.
     sda: u8,
     scl: u8,
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    needs_reset: bool,
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    software_timeout: Option<crate::time::Duration>,
 }
 
 impl<'d> LpI2c<'d> {
@@ -240,6 +251,10 @@ impl<'d> LpI2c<'d> {
             i2c,
             sda: sda.lp_number(),
             scl: scl.lp_number(),
+            #[cfg(lp_i2c_master_version = "rtc_i2c")]
+            needs_reset: false,
+            #[cfg(lp_i2c_master_version = "rtc_i2c")]
+            software_timeout: None,
         };
 
         me.init();
@@ -331,6 +346,10 @@ impl<'d> LpI2c<'d> {
     /// - A NACK returns [`Error::AckCheckFailed`].
     /// - A timeout or arbitration loss returns [`Error::TimeOut`] or [`Error::ArbitrationLost`],
     ///   respectively.
+    #[cfg_attr(
+        lp_i2c_master_version = "rtc_i2c",
+        doc = "- [`Error::ExecutionIncomplete`] when the controller stops before sending all bytes."
+    )]
     pub fn write(&mut self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
         if address > 0x7f {
             return Err(Error::AddressInvalid);
@@ -382,6 +401,10 @@ impl<'d> LpI2c<'d> {
     /// - A NACK returns [`Error::AckCheckFailed`].
     /// - A timeout or arbitration loss returns [`Error::TimeOut`] or [`Error::ArbitrationLost`],
     ///   respectively.
+    #[cfg_attr(
+        lp_i2c_master_version = "rtc_i2c",
+        doc = "- [`Error::ExecutionIncomplete`] when the controller stops before receiving all bytes."
+    )]
     pub fn read(&mut self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
         if address > 0x7f {
             return Err(Error::AddressInvalid);

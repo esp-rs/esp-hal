@@ -501,6 +501,9 @@ mod lp_i2c {
         peripherals::LP_I2C0,
     };
 
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    use super::NON_EXISTENT_ADDRESS;
+
     fn init_peripherals() -> esp_hal::peripherals::Peripherals {
         esp_hal::init(esp_hal::Config::default())
     }
@@ -805,6 +808,84 @@ mod lp_i2c {
         }
 
         ClockTree::with(|clocks| ll::configure_rc_fast_clk_div_n(clocks, original));
+    }
+
+    #[test]
+    #[cfg(esp32s3)]
+    fn rtc_scl_timeout_applies_during_transfer(mut i2c: LpI2c<'static>) {
+        for (micros, error) in [(1, Error::TimeOut), (50, Error::AckCheckFailed)] {
+            i2c.apply_config(&Config::default().with_timeout(Duration::from_micros(micros)))
+                .unwrap();
+            assert_eq!(i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]), Err(error));
+        }
+    }
+
+    #[test]
+    #[cfg(esp32s3)]
+    fn rtc_recovers_after_scl_stall(mut i2c: LpI2c<'static>) {
+        use super::{DUT_ADDRESS, WRITE_COMMAND};
+
+        i2c.apply_config(
+            &Config::default()
+                .with_timeout(Duration::from_micros(100))
+                .with_software_timeout(Duration::from_millis(10)),
+        )
+        .unwrap();
+        let scl = RTC_IO::regs().touch_pad(2);
+        let saved = scl.read().bits();
+        // Disabling the input makes the controller observe SCL low.
+        scl.modify(|_, w| w.fun_ie().clear_bit());
+        let result = i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5, 0x5a]);
+        scl.write(|w| unsafe { w.bits(saved) });
+        assert_eq!(result, Err(Error::TimeOut));
+        i2c.write(DUT_ADDRESS, WRITE_COMMAND[0], &WRITE_COMMAND[1..])
+            .unwrap();
+    }
+
+    #[test]
+    #[cfg(esp32s3)]
+    fn rtc_recovers_after_sda_stall(mut i2c: LpI2c<'static>) {
+        use esp_hal::{peripherals::SENS, time::Instant};
+
+        use super::{DUT_ADDRESS, WRITE_COMMAND};
+
+        let config = Config::default().with_timeout(Duration::from_millis(30));
+        let sens = SENS::regs();
+        let sda = RTC_IO::regs().touch_pad(3);
+        let saved = sda.read().bits();
+        for timeout in [Duration::ZERO, Duration::from_millis(10)] {
+            i2c.apply_config(&config.with_software_timeout(timeout))
+                .unwrap();
+            let before = config_registers();
+            // Disabling the input makes the controller observe SDA low.
+            sda.modify(|_, w| w.fun_ie().clear_bit());
+            let start = Instant::now();
+            let result = i2c.read(NON_EXISTENT_ADDRESS, 0x10, &mut [0]);
+            let elapsed = start.elapsed();
+            sda.write(|w| unsafe { w.bits(saved) });
+            assert_eq!(result, Err(Error::TimeOut));
+            let ctrl = sens.sar_i2c_ctrl().read();
+            assert!(!ctrl.sar_i2c_start().bit());
+            assert!(!ctrl.sar_i2c_start_force().bit());
+            assert!(
+                (timeout..timeout + Duration::from_millis(5)).contains(&elapsed),
+                "{elapsed:?}"
+            );
+            if timeout == Duration::ZERO {
+                i2c.apply_config(&config).unwrap();
+            }
+            i2c.write(DUT_ADDRESS, WRITE_COMMAND[0], &WRITE_COMMAND[1..])
+                .unwrap();
+            assert_eq!(config_registers(), before);
+        }
+
+        let clock_gate = sens.sar_peri_clk_gate_conf();
+        let reset = sens.sar_peri_reset_conf();
+        assert!(clock_gate.read().rtc_i2c_clk_en().bit_is_set());
+        assert!(reset.read().sar_rtc_i2c_reset().bit_is_clear());
+        drop(i2c);
+        assert!(clock_gate.read().rtc_i2c_clk_en().bit_is_clear());
+        assert!(reset.read().sar_rtc_i2c_reset().bit_is_set());
     }
 }
 
