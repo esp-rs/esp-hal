@@ -21,7 +21,7 @@ mod low_level;
 use core::{marker::PhantomData, ptr::NonNull, task::Poll};
 
 #[cfg(rsa_version = "1")]
-use portable_atomic::{AtomicBool, Ordering};
+use esp_sync::NonReentrantMutex;
 use procmacros::{handler, ram};
 
 use crate::{
@@ -244,17 +244,27 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Starts the modular exponentiation operation.
     fn start_modexp(&self) {
-        low_level::start_modexp(self.regs());
+        self.start_operation(low_level::start_modexp);
     }
 
     /// Starts the multiplication operation.
     fn start_multi(&self) {
-        low_level::start_multi(self.regs());
+        self.start_operation(low_level::start_multi);
     }
 
     /// Starts the modular multiplication operation.
     fn start_modmulti(&self) {
-        low_level::start_modmulti(self.regs());
+        self.start_operation(low_level::start_modmulti);
+    }
+
+    fn start_operation(&self, start: impl FnOnce(&pac::rsa::RegisterBlock)) {
+        cfg_select! {
+            rsa_version = "1" => SIGNALED.with(|signaled| {
+                *signaled = false;
+                start(self.regs());
+            }),
+            _ => start(self.regs()),
+        }
     }
 
     /// Clears the RSA interrupt flag.
@@ -264,7 +274,12 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Returns whether the RSA peripheral is idle.
     fn is_idle(&self) -> bool {
-        low_level::is_idle(self.regs())
+        cfg_select! {
+            rsa_version = "1" => {
+                SIGNALED.with(|signaled| *signaled || low_level::is_idle(self.regs()))
+            }
+            _ => low_level::is_idle(self.regs()),
+        }
     }
 
     fn wait_for_idle(&mut self) {
@@ -644,7 +659,7 @@ where
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 #[cfg(rsa_version = "1")]
-static SIGNALED: AtomicBool = AtomicBool::new(false);
+static SIGNALED: NonReentrantMutex<bool> = NonReentrantMutex::new(false);
 
 /// `Future` that waits for the RSA operation to complete.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -655,9 +670,6 @@ struct RsaFuture<'a, 'd> {
 
 impl<'a, 'd> RsaFuture<'a, 'd> {
     fn new(driver: &'a Rsa<'d, Async>) -> Self {
-        #[cfg(rsa_version = "1")]
-        SIGNALED.store(false, Ordering::Relaxed);
-
         driver.internal_enable_disable_interrupt(true);
 
         Self {
@@ -668,7 +680,7 @@ impl<'a, 'd> RsaFuture<'a, 'd> {
 
     fn is_done(&self) -> bool {
         cfg_select! {
-            rsa_version = "1" => SIGNALED.load(Ordering::Acquire),
+            rsa_version = "1" => SIGNALED.with(|signaled| *signaled),
             _ => self.driver.is_idle(),
         }
     }
@@ -767,10 +779,16 @@ where
 pub(super) fn rsa_interrupt_handler() {
     let rsa = RSA::regs();
 
-    #[cfg(rsa_version = "1")]
-    SIGNALED.store(true, Ordering::Release);
-
-    low_level::clear_interrupt(rsa);
+    cfg_select! {
+        rsa_version = "1" => SIGNALED.with(|signaled| {
+            // A blocking read may have already acknowledged this interrupt.
+            if low_level::is_idle(rsa) {
+                *signaled = true;
+                low_level::clear_interrupt(rsa);
+            }
+        }),
+        _ => low_level::clear_interrupt(rsa),
+    }
 
     WAKER.wake();
 }
@@ -891,6 +909,7 @@ impl<'d> RsaBackend<'d> {
     }
 
     fn process_item(&mut self, item: &mut RsaWorkItem) -> work_queue::Poll {
+        // The queue has its own interrupt handler and does not use SIGNALED.
         match core::mem::take(&mut self.state) {
             RsaBackendState::Idle => {
                 let driver = Rsa {
@@ -906,6 +925,7 @@ impl<'d> RsaBackend<'d> {
                 // instruct the work queue to wake the polling task immediately.
                 self.state = if rsa.ready() {
                     rsa.set_interrupt_handler(rsa_work_queue_handler);
+                    low_level::clear_interrupt(rsa.regs());
                     rsa.enable_disable_interrupt(true);
                     RsaBackendState::Ready(rsa)
                 } else {
@@ -924,7 +944,7 @@ impl<'d> RsaBackend<'d> {
                         // Non-modular multiplication result is twice as wide as its operands.
                         rsa.write_multi_mode(2 * n / WORDS_PER_INCREMENT - 1, false);
                         rsa.write_multi_operand_b(unsafe { y.as_ref() });
-                        rsa.start_multi();
+                        low_level::start_multi(rsa.regs());
                     }
 
                     RsaOperation::ModularMultiplication {
@@ -948,7 +968,7 @@ impl<'d> RsaBackend<'d> {
                         rsa.write_mprime(m_prime);
                         rsa.write_r(unsafe { r_inv.as_ref() });
 
-                        rsa.start_modmulti();
+                        low_level::start_modmulti(rsa.regs());
 
                         #[cfg(rsa_version = "1")]
                         {
@@ -991,7 +1011,7 @@ impl<'d> RsaBackend<'d> {
                             rsa.write_search_position(find_search_pos(unsafe { y.as_ref() }));
                         }
 
-                        rsa.start_modexp();
+                        low_level::start_modexp(rsa.regs());
                     }
                 }
 
@@ -1002,14 +1022,16 @@ impl<'d> RsaBackend<'d> {
 
             #[cfg(rsa_version = "1")]
             RsaBackendState::ModularMultiplicationRoundOne(mut rsa) => {
-                if rsa.is_idle() {
+                if low_level::is_idle(rsa.regs()) {
                     let RsaOperation::ModularMultiplication { y, .. } = item.operation else {
                         unreachable!();
                     };
 
+                    low_level::clear_interrupt(rsa.regs());
+
                     // Y needs to be written to the X memory.
                     rsa.write_operand_a(unsafe { y.as_ref() });
-                    rsa.start_modmulti();
+                    low_level::start_modmulti(rsa.regs());
 
                     self.state = RsaBackendState::Processing(rsa);
                 } else {
@@ -1020,7 +1042,8 @@ impl<'d> RsaBackend<'d> {
             }
 
             RsaBackendState::Processing(rsa) => {
-                if rsa.is_idle() {
+                if low_level::is_idle(rsa.regs()) {
+                    low_level::clear_interrupt(rsa.regs());
                     rsa.read_out(unsafe { item.result.as_mut() });
 
                     self.state = RsaBackendState::Ready(rsa);
@@ -1101,11 +1124,8 @@ enum RsaOperation {
 #[handler]
 #[ram]
 fn rsa_work_queue_handler() {
-    if !RSA_WORK_QUEUE.process() {
-        // The queue may indicate that it needs to be polled again. In this case, we do not clear
-        // the interrupt bit, which causes the interrupt to be re-handled.
-        low_level::clear_interrupt(RSA::regs());
-    }
+    // Clearing the interrupt after processing can lose the next operation's completion event.
+    RSA_WORK_QUEUE.process();
 }
 
 /// An RSA work queue user.
