@@ -9,20 +9,23 @@ use crate::{
         lp_io::{LpFunction, low_level},
     },
     i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
-    peripherals::{GPIO, RTC_IO, SENS},
+    peripherals::{RTC_IO, SENS},
     time::Duration,
 };
 
 fn bind_pin(pin: &impl LpPin, function: LpFunction) {
     let lp = pin.lp_number();
+    let rtc_io = RTC_IO::regs();
 
-    GPIO::regs()
-        .pin(pin.number() as usize)
-        .modify(|_, w| w.pad_driver().bit(true));
-    RTC_IO::regs()
+    // RTC pads use RTC_IO for open-drain control.
+    // See <https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/esp_hal_gpio/esp32s3/include/hal/rtc_io_ll.h#L197-L200>.
+    rtc_io
+        .pin(lp as usize)
+        .modify(|_, w| w.pad_driver().set_bit());
+    rtc_io
         .touch_pad(lp as usize)
-        .modify(|_, w| w.rue().bit(true).rde().bit(false));
-    RTC_IO::regs()
+        .modify(|_, w| w.rue().set_bit().rde().clear_bit());
+    rtc_io
         .rtc_gpio_enable_w1ts()
         .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << lp) });
     low_level::set_config(lp, true, true, function);

@@ -498,7 +498,7 @@ mod lp_i2c {
     #[cfg(lp_i2c_master_version = "lp_i2c")]
     use esp_hal::{i2c::lp_i2c::ConfigError, peripherals::LP_I2C0, time::Rate};
     #[cfg(lp_i2c_master_version = "rtc_i2c")]
-    use esp_hal::{i2c::lp_i2c::Timing, time::Duration};
+    use esp_hal::{i2c::lp_i2c::Timing, peripherals::RTC_IO, time::Duration};
 
     #[cfg(esp32c6)]
     use super::NON_EXISTENT_ADDRESS;
@@ -507,13 +507,28 @@ mod lp_i2c {
     fn init() -> LpI2c<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
+        #[cfg(lp_i2c_master_version = "rtc_i2c")]
+        let pins = {
+            use esp_hal::gpio::LpPin;
+            let pins =
+                [sda.lp_number(), scl.lp_number()].map(|pin| RTC_IO::regs().pin(pin as usize));
+            for pin in pins {
+                pin.modify(|_, w| w.pad_driver().clear_bit());
+            }
+            pins
+        };
         let config = cfg_select! {
             lp_i2c_master_version = "rtc_i2c" => Config::default()
                 .with_timing(Timing::standard_mode())
                 .with_timeout(Duration::from_micros(100)),
             _ => Config::default(),
         };
-        LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap()
+        let i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
+        #[cfg(lp_i2c_master_version = "rtc_i2c")]
+        for pin in pins {
+            assert!(pin.read().pad_driver().bit());
+        }
+        i2c
     }
 
     #[cfg(lp_i2c_master_version = "lp_i2c")]
