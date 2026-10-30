@@ -671,6 +671,7 @@ driver_configs![
             name: "USB OTG FS",
             properties: {
                 fifo_depth_words: u32,
+                tx_fifo_count: u32,
             }
         },
         UsbOtgHsProperties {
@@ -678,6 +679,7 @@ driver_configs![
             name: "USB OTG HS",
             properties: {
                 fifo_depth_words: u32,
+                tx_fifo_count: u32,
             }
         },
         UsbSerialJtagProperties {

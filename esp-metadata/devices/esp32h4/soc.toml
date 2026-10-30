@@ -294,6 +294,7 @@ support_status = "not_supported"
 [device.usb_otg]
 support_status = "not_supported"
 fifo_depth_words = 256
+tx_fifo_count = 5
 
 [device.usb_serial_jtag]
 

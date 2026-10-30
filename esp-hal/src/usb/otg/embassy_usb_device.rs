@@ -13,11 +13,11 @@ use embassy_usb_synopsys_otg::{
     otg_v1::Otg,
 };
 
-use crate::usb::otg::Usb;
+use crate::usb::otg::{Usb, UsbMutex};
 
 /// Asynchronous USB driver.
 pub struct Driver<'d> {
-    inner: OtgDriver<'d>,
+    inner: OtgDriver<'d, UsbMutex>,
     _usb: Usb<'d>,
 }
 
@@ -34,6 +34,7 @@ impl<'d> Driver<'d> {
             regs: unsafe { Otg::from_ptr(info.register_ptr.cast_mut()) },
             state: peri.embassy_device_state(),
             fifo_depth_words: info.fifo_depth_words as u16,
+            tx_fifo_count: info.tx_fifo_count,
             extra_rx_fifo_words: info.rx_fifo_extra_words,
             phy_type: info.phy_type,
             calculate_trdt_fn: |_| 5,
@@ -46,9 +47,9 @@ impl<'d> Driver<'d> {
 }
 
 impl<'d> embassy_usb_driver::Driver<'d> for Driver<'d> {
-    type EndpointOut = Endpoint<'d, Out>;
-    type EndpointIn = Endpoint<'d, In>;
-    type ControlPipe = ControlPipe<'d>;
+    type EndpointOut = Endpoint<'d, Out, UsbMutex>;
+    type EndpointIn = Endpoint<'d, In, UsbMutex>;
+    type ControlPipe = ControlPipe<'d, UsbMutex>;
     type Bus = Bus<'d>;
 
     fn alloc_endpoint_in(
@@ -89,7 +90,7 @@ impl<'d> embassy_usb_driver::Driver<'d> for Driver<'d> {
 
 /// Asynchronous USB bus used internally by embassy-usb.
 pub struct Bus<'d> {
-    inner: OtgBus<'d>,
+    inner: OtgBus<'d, UsbMutex>,
     inited: bool,
     _usb: Usb<'d>,
 }

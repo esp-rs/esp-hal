@@ -334,6 +334,12 @@ macro_rules! property {
     ("usb_otg_hs.fifo_depth_words", str) => {
         stringify!(896)
     };
+    ("usb_otg_hs.tx_fifo_count") => {
+        8
+    };
+    ("usb_otg_hs.tx_fifo_count", str) => {
+        stringify!(8)
+    };
     ("bt.controller") => {
         "btdm2"
     };

@@ -6,11 +6,11 @@ use embassy_usb_synopsys_otg::{
     otg_v1::Otg,
 };
 
-use crate::usb::otg::Usb;
+use crate::usb::otg::{Usb, UsbMutex};
 
 /// Asynchronous USB host controller.
 pub struct Driver<'d> {
-    inner: OtgHostDriver<'d>,
+    inner: OtgHostDriver<'d, UsbMutex>,
     _usb: Usb<'d>,
 }
 
@@ -36,7 +36,7 @@ impl<'d> Driver<'d> {
 }
 
 impl<'d> UsbHostController<'d> for Driver<'d> {
-    type Allocator = <OtgHostDriver<'d> as UsbHostController<'d>>::Allocator;
+    type Allocator = <OtgHostDriver<'d, UsbMutex> as UsbHostController<'d>>::Allocator;
 
     fn allocator(&self) -> Self::Allocator {
         self.inner.allocator()

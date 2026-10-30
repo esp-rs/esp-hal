@@ -398,6 +398,13 @@ unstable = [
 ## For development you can enable the `unstable` and the chip feature by adding esp-hal as a dev-dependency.
 requires-unstable = []
 
+[patch.crates-io]
+embassy-sync              = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-time              = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-time-driver       = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-usb-driver        = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-usb-synopsys-otg  = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+
 [lints.clippy]
 mixed_attributes_style = "allow"
 

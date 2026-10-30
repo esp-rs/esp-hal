@@ -250,6 +250,7 @@ supports_top_power_down = true
 
 [device.usb_otg_hs]
 fifo_depth_words = 896
+tx_fifo_count = 8
 
 [device.spi_master]
 version = 3
