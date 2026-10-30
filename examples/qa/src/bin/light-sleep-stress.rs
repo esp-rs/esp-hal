@@ -49,11 +49,9 @@ macro_rules! report {
 /// Whether the loop powers the CPU domain down in each light sleep.
 ///
 /// The retention memory cannot be removed after installation, so one run tests one setting.
-#[cfg(supports_cpu_power_down)]
-const CPU_POWER_DOWN: bool = false;
-/// Always `false` on a chip without CPU power-down.
-#[cfg(not(supports_cpu_power_down))]
-const CPU_POWER_DOWN: bool = false;
+/// Change `false` to `true` to power the CPU domain down. A chip without CPU power-down ignores
+/// the setting.
+const CPU_POWER_DOWN: bool = cfg!(supports_cpu_power_down) && false;
 
 /// The duration of the run. Each flash write erases a sector, so the run stops to limit flash wear.
 const RUN_FOR: Duration = Duration::from_secs(2 * 60 * 60);
