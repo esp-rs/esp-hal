@@ -347,7 +347,7 @@ macro_rules! property {
         true
     };
     ("sleep.rejectable_mask") => {
-        1852
+        1068
     };
     ("sleep.pin_wakeup_version") => {
         2
@@ -620,14 +620,11 @@ macro_rules! for_each_wakeup_source {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
         tt) => {} } _for_each_inner_wakeup_source!((Gpio, 2));
-        _for_each_inner_wakeup_source!((Timer, 3)); _for_each_inner_wakeup_source!((Sdio,
-        4)); _for_each_inner_wakeup_source!((Wifi, 5));
-        _for_each_inner_wakeup_source!((Uart0, 6));
-        _for_each_inner_wakeup_source!((Uart1, 7));
-        _for_each_inner_wakeup_source!((Touch, 8)); _for_each_inner_wakeup_source!((Ulp,
-        9)); _for_each_inner_wakeup_source!((Bt, 10));
-        _for_each_inner_wakeup_source!((all(Gpio, 2), (Timer, 3), (Sdio, 4), (Wifi, 5),
-        (Uart0, 6), (Uart1, 7), (Touch, 8), (Ulp, 9), (Bt, 10)));
+        _for_each_inner_wakeup_source!((Timer, 3)); _for_each_inner_wakeup_source!((Wifi,
+        5)); _for_each_inner_wakeup_source!((Uart0, 6));
+        _for_each_inner_wakeup_source!((Uart1, 7)); _for_each_inner_wakeup_source!((Bt,
+        10)); _for_each_inner_wakeup_source!((all(Gpio, 2), (Timer, 3), (Wifi, 5),
+        (Uart0, 6), (Uart1, 7), (Bt, 10)));
     };
 }
 #[macro_export]
