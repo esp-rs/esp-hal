@@ -466,7 +466,7 @@ mod tests {
                 tx_pins,
                 clock_out_pin,
                 TxConfig::default()
-                    .with_frequency(Rate::from_khz(100))
+                    .with_frequency(Rate::from_mhz(10))
                     .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Msb),
             )
@@ -477,7 +477,7 @@ mod tests {
                 rx_pins,
                 clock_in_pin,
                 RxConfig::default()
-                    .with_frequency(Rate::from_khz(100))
+                    .with_frequency(Rate::from_mhz(10))
                     .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap();
