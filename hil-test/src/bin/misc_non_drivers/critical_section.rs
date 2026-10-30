@@ -234,8 +234,8 @@ mod tests {
         let mut cpu_control = CpuControl::new(p.CPU_CTRL);
         let app_core_stack = mk_static!(Stack<8192>, Stack::new());
 
-        // The APP core spends nearly all of its time in a critical section, so a park that stops
-        // it wherever it stands stops it there, and the critical section below waits forever.
+        // The APP core is in a critical section nearly all the time. A raw stall thus stops the APP
+        // core in the critical section, and the critical section below waits forever.
         let _guard = cpu_control
             .start_app_core(app_core_stack, || {
                 loop {

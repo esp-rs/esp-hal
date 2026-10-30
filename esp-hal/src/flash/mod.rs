@@ -120,12 +120,11 @@ pub enum MultiCoreStrategy {
     /// Returns [`Error::OtherCoreRunning`] if the other core is running.
     #[cfg_attr(not(feature = "rt"), default)]
     Error,
-    /// Parks the other core for the operation, the way [`crate::system::CpuControl::park_core`]
-    /// does.
+    /// Parks the other core for the operation, as [`crate::system::CpuControl::park_core`] does.
     ///
-    /// The operation waits until that core parks. A core that does not take the IPC interrupt
-    /// delays the operation. If the other core runs no code of this program, see
-    /// [`crate::system::is_running`], the operation leaves it alone.
+    /// The operation waits until the other core parks. A core that does not take the IPC interrupt
+    /// delays the operation. If the other core runs no code of this program, the operation does
+    /// not park the other core. See [`crate::system::is_running`].
     #[cfg(feature = "rt")]
     #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
     #[default]

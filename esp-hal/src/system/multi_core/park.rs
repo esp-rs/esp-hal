@@ -1,18 +1,18 @@
-//! Parks a core at a point where it holds no lock.
+//! Parks a core at a point where the core holds no lock.
 //!
-//! A hardware stall freezes a core wherever it stands, which can be inside a critical section or
-//! a cache operation. The other core then waits for ever for what the frozen core holds. This
-//! module therefore asks the core to park itself first: the core takes a request in its IPC
-//! interrupt, masks its interrupts, and waits in a RAM loop. Only then does the requesting core
-//! stall it. The IPC interrupt runs at the lowest priority, so a core that takes it holds no lock
-//! that a critical section guards.
+//! A hardware stall stops a core at any instruction, also in a critical section or a cache
+//! operation. The other core then waits forever for the lock of the stopped core.
 //!
-//! A core that waits for a park answers the parks of the other core, so a park request never
-//! waits for a core that waits for it. A core that requests a park must not hold a lock that the
-//! other core can wait for with its interrupts masked, because that core would never answer.
+//! A park request therefore goes to the target core through the IPC interrupt. The target core
+//! masks its interrupts and waits in a RAM loop. Then the requesting core stalls the target core.
+//! The IPC interrupt has the lowest priority, so the IPC handler holds no critical-section lock.
 //!
-//! Every park adds one to the count of the parked core, and every [`unpark`] removes one. The core
-//! runs again when the count reaches zero.
+//! A core that waits for the claim answers the park requests of the other core. Two park requests
+//! thus never wait for each other. The requesting core must not hold a lock that the target core
+//! can wait for with masked interrupts. The target core then never answers.
+//!
+//! Each park adds one to the count of the parked core. Each [`unpark`] removes one. The core runs
+//! again when the count is zero.
 
 use esp_sync::{
     RestoreState,
@@ -27,18 +27,20 @@ use crate::{interrupt::ipc, ram, soc::cpu_control::internal_park_core, system::C
 #[atomic_enum]
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum Phase {
-    /// The core runs, or a park stalled it in [`serve`].
+    /// The core runs, or a park stalled the core in [`serve`].
     Idle,
-    /// The other core asks this core to park.
+    /// The other core asks the core to park.
     Requested,
-    /// The core masked its interrupts and waits in [`serve`].
+    /// The core masked its interrupts, and waits in [`serve`].
     Parked,
-    /// The other core lets this core leave [`serve`].
+    /// The other core lets the core leave [`serve`].
     Released,
 }
 
-/// The park phase of each core. Only the other core writes `Requested` and `Released`, and only
-/// the core itself writes `Parked` and `Idle`.
+/// The park phase of each core.
+///
+/// Only the other core writes `Requested` and `Released`. Only the core itself writes `Parked`
+/// and `Idle`.
 static PHASE: [AtomicPhase; Cpu::COUNT] = [const { AtomicPhase::new(Phase::Idle) }; Cpu::COUNT];
 
 /// The number of parks that hold each core.
@@ -48,13 +50,12 @@ const NO_CLAIM: u8 = u8::MAX;
 
 /// The core that parks, unparks or stops the other core, or [`NO_CLAIM`].
 ///
-/// The claim makes sure that two cores never park each other at the same time, which would stall
-/// both.
+/// Two cores that park each other at the same time stall each other. The claim prevents that case.
 static CLAIM: AtomicU8 = AtomicU8::new(NO_CLAIM);
 
 /// Parks `core`, and returns whether the call took a park that [`unpark`] must release.
 ///
-/// Returns `false` if `core` runs no code of this program, which leaves nothing to park.
+/// Returns `false` if `core` runs no code of this program. Such a core has nothing to park.
 ///
 /// # Panics
 ///
@@ -75,7 +76,7 @@ pub(crate) fn park(core: Cpu) -> bool {
     true
 }
 
-/// Releases a park that [`park`] took. `core` runs again if no other park holds it.
+/// Releases a park that [`park`] took. `core` runs again if no other park holds `core`.
 #[ram]
 pub(crate) fn unpark(core: Cpu) {
     let _claim = Claim::take();
@@ -93,8 +94,8 @@ pub(crate) fn unpark(core: Cpu) {
 
 /// Parks the APP core for good.
 ///
-/// The parks that hold the core keep working, and the core stays parked after the last of them
-/// ends. [`super::CpuControl`] can start the core again.
+/// The parks that hold the APP core keep working. The APP core stays parked after the last park
+/// ends. [`super::CpuControl`] can start the APP core again.
 #[ram]
 pub(crate) fn stop_app_core() {
     if Cpu::current() == Cpu::AppCpu {
@@ -119,12 +120,12 @@ pub(crate) fn stop_app_core() {
 pub(crate) fn stop_current_core() -> ! {
     debug_assert_eq!(Cpu::current(), Cpu::AppCpu);
 
-    // The interrupts stay masked after the claim ends, because this core never runs code of this
-    // program again.
+    // The interrupts stay masked after the claim ends. The APP core runs no code of this program
+    // again.
     let _mask = unsafe { SingleCoreInterruptLock.enter() };
 
-    // The claim orders this against a park from the other core. That park either finished
-    // before this, or sees that this core runs no code of this program.
+    // The claim orders the stop against a park from the PRO core. That park ends before the stop,
+    // or sees that the APP core runs no code of this program.
     let claim = Claim::take();
     APP_CORE_TAKES_IPC.store(false, Ordering::Release);
     drop(claim);
@@ -134,19 +135,19 @@ pub(crate) fn stop_current_core() -> ! {
     }
 }
 
-/// Resets the park state of the APP core, which is not running, before it starts.
+/// Resets the park state of the APP core before the APP core starts.
 pub(crate) fn reset_app_core() {
     COUNT[Cpu::AppCpu as usize].store(0, Ordering::Relaxed);
     PHASE[Cpu::AppCpu as usize].store(Phase::Idle, Ordering::Relaxed);
 }
 
-/// Returns whether `core` runs code of this program, and therefore takes park requests.
+/// Returns whether `core` runs code of this program. Only such a core takes park requests.
 #[inline(always)]
 fn takes_ipc(core: Cpu) -> bool {
     core == Cpu::ProCpu || APP_CORE_TAKES_IPC.load(Ordering::Acquire)
 }
 
-/// Asks `core` to park, waits until it does, then stalls it.
+/// Asks `core` to park, waits for the answer, then stalls `core`.
 ///
 /// The caller holds the claim.
 #[inline(always)]
@@ -155,9 +156,8 @@ fn request(core: Cpu) {
     debug_assert!(phase.load(Ordering::Relaxed) == Phase::Idle);
     phase.store(Phase::Requested, Ordering::Release);
 
-    // `core` can hold a different IPC function. It can also answer this request without the IPC
-    // interrupt, while it waits for the claim, and then never take that function. The post
-    // therefore must not wait.
+    // `core` can hold a different IPC function. `core` can also answer the request while it
+    // waits for the claim, and then never take that IPC function. The post must not wait.
     let mut posted = false;
     while phase.load(Ordering::Acquire) != Phase::Parked {
         if !posted {
@@ -166,7 +166,7 @@ fn request(core: Cpu) {
         core::hint::spin_loop();
     }
 
-    // `core` waits in a RAM loop with its interrupts masked, so the stall freezes it there.
+    // `core` waits in a RAM loop with masked interrupts. The stall stops `core` in that loop.
     unsafe { internal_park_core(core, true) };
 }
 
@@ -175,10 +175,10 @@ fn serve_ipc() {
     serve(Cpu::current());
 }
 
-/// Parks the current core if the other core asks for it, and returns when that core releases it.
+/// Parks the current core if the other core asks for a park. Returns after the other core
+/// releases the current core.
 ///
-/// A request that the core already answered finds the phase moved on, so the IPC function of an
-/// answered request does nothing.
+/// The IPC function of an answered request finds a different phase, and does nothing.
 #[ram]
 fn serve(current: Cpu) {
     let phase = &PHASE[current as usize];
@@ -186,8 +186,8 @@ fn serve(current: Cpu) {
         return;
     }
 
-    // The mask and the branch predictor change come before `Parked`, because the other core can
-    // turn the cache off right after it reads `Parked`. Both end after `Idle`.
+    // The other core can turn off the cache after it reads `Parked`. The mask and the branch
+    // predictor change must thus come before `Parked`, and end after `Idle`.
     let token = unsafe { SingleCoreInterruptLock.enter() };
     {
         #[cfg(soc_cpu_has_branch_predictor)]
@@ -204,8 +204,8 @@ fn serve(current: Cpu) {
 
 /// The [`CLAIM`] of the current core.
 ///
-/// The current core keeps its interrupts masked while it holds the claim, so that an interrupt
-/// handler on this core cannot park while the core parks.
+/// The current core keeps its interrupts masked while the core holds the claim. An interrupt
+/// handler thus cannot start a park while the core parks.
 struct Claim(RestoreState);
 
 impl Claim {
@@ -218,7 +218,7 @@ impl Claim {
                 Ok(_) => return Self(token),
                 Err(owner) => {
                     debug_assert_ne!(owner, current, "A park cannot nest in a park");
-                    // The other core holds the claim, and can wait for this core to park.
+                    // The other core holds the claim, and can wait for the current core to park.
                     serve(Cpu::current());
                     unsafe { SingleCoreInterruptLock.exit(token) };
                     core::hint::spin_loop();

@@ -90,9 +90,9 @@ pub(crate) static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::pt
     feature = "rt",
     doc = "Stops the APP (second) core when dropped.
 
-The drop parks the APP core the way [`CpuControl::park_core`] does, and waits for the core in the
-same way. The core then stays parked, also after every [`ParkGuard`] of it drops.
-[`CpuControl::start_app_core`] can start it again."
+The drop parks the APP core as [`CpuControl::park_core`] does, and waits in the same way. The APP
+core then stays parked, also after the last [`ParkGuard`] drops. [`CpuControl::start_app_core`] can
+start the APP core again."
 )]
 #[cfg_attr(
     not(feature = "rt"),
@@ -119,7 +119,7 @@ impl Drop for AppCoreGuard<'_> {
     }
 }
 
-/// Keeps a core parked. The core runs again when the last guard of it drops.
+/// Keeps a core parked. The core runs again when the last guard for the core drops.
 ///
 /// [`CpuControl::park_core`] returns this guard.
 #[cfg(feature = "rt")]
@@ -209,17 +209,16 @@ impl<'d> CpuControl<'d> {
 
     /// Parks `core` until the returned guard drops.
     ///
-    /// `core` parks itself when it takes the IPC interrupt, which runs at the lowest priority, so
-    /// it holds no lock when it stops. The parked core keeps its interrupts masked, so it handles
-    /// none of them, the tick of a scheduler included.
+    /// `core` parks in the IPC interrupt, which has the lowest priority. `core` thus holds no lock
+    /// when it stops. The parked core keeps its interrupts masked. The parked core thus handles no
+    /// interrupt, also not the tick of a scheduler.
     ///
-    /// This call waits until `core` parks. If `core` never takes the IPC interrupt, for example
-    /// because it keeps its interrupts masked, the call waits forever. The caller must therefore
-    /// not hold a lock that `core` can wait for with its interrupts masked, such as a
-    /// `critical_section` or an `esp_sync` lock.
+    /// The call waits until `core` parks. If `core` never takes the IPC interrupt, the call waits
+    /// forever. For example, `core` can keep its interrupts masked. Do not hold a lock that `core`
+    /// can wait for with masked interrupts, for example a `critical_section` or an `esp_sync` lock.
     ///
-    /// Parks add up: the core runs again when the last [`ParkGuard`] of it drops. If `core` runs no
-    /// code of this program, see [`is_running`], the call does nothing.
+    /// Parks add up. `core` runs again when the last [`ParkGuard`] for `core` drops. If `core` runs
+    /// no code of this program, the call does nothing. See [`is_running`].
     ///
     /// # Panics
     ///
@@ -309,7 +308,8 @@ impl<'d> CpuControl<'d> {
         setup_second_core_stack(stack, stack_guard_offset, entry);
 
         APP_CORE_TAKES_IPC.store(false, Ordering::Release);
-        // `&mut self` rules out a `ParkGuard` of this `CpuControl`, so no park holds the core.
+        // A `ParkGuard` borrows the `CpuControl`. `&mut self` thus makes sure that no park holds
+        // the APP core.
         #[cfg(feature = "rt")]
         park::reset_app_core();
         crate::soc::cpu_control::start_core1(start_core1_init::<F> as *const u32);

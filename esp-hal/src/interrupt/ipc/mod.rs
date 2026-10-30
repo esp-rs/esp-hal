@@ -153,8 +153,8 @@ impl Ipc {
     }
 }
 
-/// Posts `handler` to `core` as [`Ipc::call_function`] does, but returns `false` instead of
-/// waiting if `core` holds a different function.
+/// Posts `handler` to `core` as [`Ipc::call_function`] does. Returns `false` if `core` holds a
+/// different function, and does not wait.
 #[inline(always)]
 pub(crate) fn try_call_function(core: Cpu, handler: fn()) -> bool {
     let handler = handler as *mut ();

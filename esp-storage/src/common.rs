@@ -255,7 +255,7 @@ impl<'d> FlashStorage<'d> {
     /// Enable auto parking of the second core before writing to flash.
     /// The other core will be automatically un-parked when the write is complete.
     ///
-    /// Parking needs the `rt` feature of esp-hal. Without it, writes fail while the other core
+    /// Parking needs the `rt` feature of esp-hal. Without `rt`, writes fail while the other core
     /// runs, as with the default strategy.
     pub fn multicore_auto_park(mut self) -> FlashStorage<'d> {
         self.multi_core_strategy = MultiCoreStrategy::AutoPark;
@@ -285,8 +285,8 @@ impl MultiCoreStrategy {
     ) -> Result<R, FlashStorageError> {
         #[cfg(multi_core)]
         esp_hal::if_unstable_hal! {
-            // Parking needs the IPC interrupt, which needs the runtime of esp-hal. Without it, the
-            // check below reports the other core instead.
+            // Parking needs the IPC interrupt, and the IPC interrupt needs the `rt` feature of
+            // esp-hal. Without `rt`, the check below reports the running core.
             esp_hal::if_rt_hal! {
                 let cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
                 let _parked = (self == MultiCoreStrategy::AutoPark)
