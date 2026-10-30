@@ -494,11 +494,14 @@ mod tests {
 #[cfg(lp_i2c_master_driver_supported)]
 #[embedded_test::tests(default_timeout = 3)]
 mod lp_i2c {
-    use esp_hal::i2c::lp_i2c::{Config, Error, LpI2c};
     #[cfg(lp_i2c_master_version = "lp_i2c")]
-    use esp_hal::{i2c::lp_i2c::ConfigError, peripherals::LP_I2C0, time::Rate};
+    use esp_hal::time::Rate;
     #[cfg(lp_i2c_master_version = "rtc_i2c")]
     use esp_hal::{i2c::lp_i2c::Timing, peripherals::RTC_IO, time::Duration};
+    use esp_hal::{
+        i2c::lp_i2c::{Config, ConfigError, Error, LpI2c},
+        peripherals::LP_I2C0,
+    };
 
     use super::NON_EXISTENT_ADDRESS;
 
@@ -539,6 +542,19 @@ mod lp_i2c {
             regs.sda_hold().read().bits(),
             regs.sda_sample().read().bits(),
             regs.ctr().read().bits(),
+        ]
+    }
+
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn config_registers() -> [u32; 6] {
+        let regs = LP_I2C0::regs();
+        [
+            regs.scl_low().read().bits(),
+            regs.scl_high().read().bits(),
+            regs.sda_duty().read().bits(),
+            regs.scl_start_period().read().bits(),
+            regs.scl_stop_period().read().bits(),
+            regs.to().read().bits(),
         ]
     }
 
@@ -670,6 +686,67 @@ mod lp_i2c {
             i2c.read(NON_EXISTENT_ADDRESS, 0x10, &mut [0]),
             Err(Error::AckCheckFailed)
         );
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn rejects_rtc_timeout_before_truncation(mut i2c: LpI2c<'static>) {
+        use esp_hal::clock::ll;
+
+        let source = ll::rc_fast_clk_frequency() as u64;
+        let wrap_us = ((1u64 << 32) * 1_000_000).div_ceil(source);
+        let limit_us = ((1u64 << 20) * 1_000_000).div_ceil(source);
+        i2c.apply_config(
+            &Config::default()
+                .with_timing(Timing::standard_mode())
+                .with_timeout(Duration::from_micros(limit_us - 1)),
+        )
+        .unwrap();
+        let before = config_registers();
+        assert_eq!(before[5] as u64, (limit_us - 1) * source / 1_000_000);
+        for micros in [limit_us, wrap_us, u64::MAX] {
+            assert_eq!(
+                i2c.apply_config(&Config::default().with_timeout(Duration::from_micros(micros))),
+                Err(ConfigError::TimeoutTooLong)
+            );
+            assert_eq!(config_registers(), before);
+        }
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn rejects_oversized_rtc_timings(mut i2c: LpI2c<'static>) {
+        let max = (1 << 20) - 1;
+        let timing = Timing::default()
+            .with_scl_low_period(max)
+            .with_scl_high_period(max)
+            .with_sda_duty(max)
+            .with_scl_start_period(max)
+            .with_scl_stop_period(max);
+        i2c.apply_config(&Config::default().with_timing(timing))
+            .unwrap();
+        let before = config_registers();
+        assert_eq!(before, [max, max, max, max, max, 0]);
+        let timing = Timing::standard_mode();
+        for value in [1 << 20, u32::MAX] {
+            for timing in [
+                timing.with_scl_low_period(value),
+                timing.with_scl_high_period(value),
+                timing.with_sda_duty(value),
+                timing.with_scl_start_period(value),
+                timing.with_scl_stop_period(value),
+            ] {
+                assert_eq!(
+                    i2c.apply_config(
+                        &Config::default()
+                            .with_timing(timing)
+                            .with_timeout(Duration::from_micros(100)),
+                    ),
+                    Err(ConfigError::TimingOutOfRange)
+                );
+                assert_eq!(config_registers(), before);
+            }
+        }
     }
 
     #[test]

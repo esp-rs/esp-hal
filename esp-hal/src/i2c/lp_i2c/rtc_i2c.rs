@@ -103,10 +103,29 @@ impl<'d> LpI2c<'d> {
     }
 
     pub(super) fn configure(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let ticks = nanos_to_clock(config.timeout.as_micros().saturating_mul(1_000));
+        use crate::pac::rtc_i2c::{
+            scl_high::{PERIOD_W as HIGH_W, SCL_HIGH_SPEC},
+            scl_low::{PERIOD_W as LOW_W, SCL_LOW_SPEC},
+            scl_start_period::{SCL_START_PERIOD_SPEC, SCL_START_PERIOD_W},
+            scl_stop_period::{SCL_STOP_PERIOD_SPEC, SCL_STOP_PERIOD_W},
+            sda_duty::{NUM_W, SDA_DUTY_SPEC},
+            to::{TIME_OUT_W, TO_SPEC},
+        };
 
-        // The register field is 20 bits wide.
-        if ticks > (1 << 20) - 1 {
+        let timing = &config.timing;
+        if timing.scl_low_period >= (1 << LOW_W::<SCL_LOW_SPEC>::WIDTH)
+            || timing.scl_high_period >= (1 << HIGH_W::<SCL_HIGH_SPEC>::WIDTH)
+            || timing.sda_duty >= (1 << NUM_W::<SDA_DUTY_SPEC>::WIDTH)
+            || timing.scl_start_period >= (1 << SCL_START_PERIOD_W::<SCL_START_PERIOD_SPEC>::WIDTH)
+            || timing.scl_stop_period >= (1 << SCL_STOP_PERIOD_W::<SCL_STOP_PERIOD_SPEC>::WIDTH)
+        {
+            return Err(ConfigError::TimingOutOfRange);
+        }
+
+        let ticks = config.timeout.as_micros() as u128
+            * crate::soc::clocks::rc_fast_clk_frequency() as u128
+            / 1_000_000;
+        if ticks >= (1 << TIME_OUT_W::<TO_SPEC>::WIDTH) {
             return Err(ConfigError::TimeoutTooLong);
         }
 
@@ -134,7 +153,7 @@ impl<'d> LpI2c<'d> {
         self.i2c
             .register_block()
             .to()
-            .write(|w| unsafe { w.time_out().bits(ticks) });
+            .write(|w| unsafe { w.time_out().bits(ticks as u32) });
 
         Ok(())
     }
@@ -419,6 +438,8 @@ impl<'d> LpI2c<'d> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
+    /// A timing value exceeds its configuration register field.
+    TimingOutOfRange,
     /// The timeout period is longer than the configuration register allows.
     TimeoutTooLong,
 }
@@ -439,15 +460,15 @@ pub struct Config {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Timing {
-    /// SCL low period
+    /// SCL low period, in RTC_FAST clock cycles.
     scl_low_period: u32,
-    /// SCL high period
+    /// SCL high period, in RTC_FAST clock cycles.
     scl_high_period: u32,
-    /// Period between the SDA switch and the falling edge of SCL
+    /// Period between the SDA switch and the falling edge of SCL, in RTC_FAST clock cycles.
     sda_duty: u32,
-    /// Waiting time after the START condition in micro seconds
+    /// Waiting time after the START condition, in RTC_FAST clock cycles.
     scl_start_period: u32,
-    /// Waiting time before the END condition in micro seconds
+    /// Waiting time before the STOP condition, in RTC_FAST clock cycles.
     scl_stop_period: u32,
 }
 
