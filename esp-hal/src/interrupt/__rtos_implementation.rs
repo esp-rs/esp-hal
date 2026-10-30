@@ -1,51 +1,107 @@
 //! Private implementation details of the RTOS that owns context switching.
 //!
-//! A context switch runs at [`Priority::min`][super::Priority::min]. It is the last action of a
-//! CPU before the CPU returns to the interrupted context. An RTOS registers its context-switch
-//! handler here, then asks a CPU to run the handler.
+//! A CPU switches tasks when it leaves the outermost interrupt handler of
+//! [`Priority::min`][super::Priority::min], if a context switch is pending on it. The CPU runs on
+//! its interrupt stack, with interrupts masked, and calls the context-switch handler of the RTOS.
+//! The handler chooses the context that the CPU resumes. An RTOS registers its context-switch
+//! handler here, then asks a CPU to switch tasks.
 //!
 //! These functions are not part of the application API.
 #![cfg_attr(
     context_switch_source = "software0",
-    doc = "\nA CPU switches its own tasks through the `Software0` CPU-internal interrupt. The HAL
+    doc = "\nA CPU asks itself to switch tasks through the `Software0` CPU-internal interrupt. The HAL
     defines the handler of that interrupt."
 )]
 #![cfg_attr(
     context_switch_source = "clint",
-    doc = "\nA CPU switches its own tasks through the machine software interrupt of the CLINT."
+    doc = "\nA CPU asks itself to switch tasks through the machine software interrupt of the CLINT."
 )]
 #![cfg_attr(
     context_switch_source = "from_cpu",
-    doc = "\nA CPU switches its own tasks through the `FROM_CPU_INTR0` interrupt. The HAL reserves
-    that interrupt."
+    doc = "\nA CPU asks itself to switch tasks through the `FROM_CPU_INTR0` interrupt. The HAL
+    reserves that interrupt."
 )]
 #![cfg_attr(
     multi_core,
-    doc = "\nA CPU switches the tasks of the other CPU through [`Ipc`][super::ipc::Ipc]."
+    doc = "\nA CPU asks the other CPU to switch tasks through [`Ipc`][super::ipc::Ipc]."
 )]
 
-use crate::system::Cpu;
+use portable_atomic::{AtomicBool, AtomicPtr, Ordering};
+
+use crate::{ram, system::Cpu};
+
+/// The saved context of an interrupted task, on the stack of that task.
+///
+/// The interrupted stack pointer is the address of the frame plus [`TASK_FRAME_SIZE`].
+#[cfg(riscv)]
+#[derive(Debug, Default, Clone)]
+#[repr(C)]
+#[allow(missing_docs)]
+pub struct TaskFrame {
+    pub s0: usize,
+    pub s1: usize,
+    pub s2: usize,
+    pub s3: usize,
+    pub s4: usize,
+    pub s5: usize,
+    pub s6: usize,
+    pub s7: usize,
+    pub s8: usize,
+    pub s9: usize,
+    pub s10: usize,
+    pub s11: usize,
+    pub tp: usize,
+    /// The address that the task resumes at.
+    pub pc: usize,
+    _reserved: [usize; 2],
+
+    // The part that the interrupt entry of esp-riscv-rt saves.
+    pub ra: usize,
+    pub t0: usize,
+    pub t1: usize,
+    pub t2: usize,
+    pub t3: usize,
+    pub t4: usize,
+    pub t5: usize,
+    pub t6: usize,
+    pub a0: usize,
+    pub a1: usize,
+    pub a2: usize,
+    pub a3: usize,
+    pub a4: usize,
+    pub a5: usize,
+    pub a6: usize,
+    pub a7: usize,
+}
+
+/// The saved context of an interrupted task, on the stack of that task.
+///
+/// `A1` holds the interrupted stack pointer.
 #[cfg(xtensa)]
-use crate::trapframe::TrapFrame;
+pub use crate::trapframe::TrapFrame as TaskFrame;
+
+/// The number of bytes that the interrupt entry reserves on the interrupted stack for a
+/// [`TaskFrame`].
+///
+/// The frame starts at the interrupted stack pointer minus this value.
+pub const TASK_FRAME_SIZE: usize = super::isr_stack::TASK_FRAME_SIZE;
 
 /// The signature of a context-switch handler.
 ///
-/// On RISC-V, the handler runs as a direct-bound interrupt handler, and returns from the
-/// interrupt itself. On Xtensa, the vectored dispatcher calls the handler with the trap frame,
-/// and the interrupt returns to the context in that trap frame.
-pub type ContextSwitchHandler = cfg_select! {
-    riscv => {
-        unsafe extern "C" fn()
-    }
-    xtensa => {
-        extern "C" fn(&mut TrapFrame)
-    }
-};
+/// `saved` points to the complete frame of the interrupted context. The handler returns the frame
+/// of the context to resume, which can be `saved`.
+pub type ContextSwitchHandler = extern "C" fn(saved: *mut TaskFrame) -> *mut TaskFrame;
+
+static HANDLERS: [AtomicPtr<()>; Cpu::COUNT] =
+    [const { AtomicPtr::new(core::ptr::null_mut()) }; Cpu::COUNT];
+
+/// Set while a context switch is pending on the CPU. The interrupt exit code reads it.
+pub(super) static SWITCH_PENDING: [AtomicBool; Cpu::COUNT] =
+    [const { AtomicBool::new(false) }; Cpu::COUNT];
 
 /// Registers the context-switch handler of `core`.
 ///
-/// A CPU accepts one context-switch handler. [`request_context_switch`] therefore takes no
-/// handler of its own, and never waits.
+/// A CPU accepts one context-switch handler.
 ///
 /// # Panics
 ///
@@ -53,36 +109,35 @@ pub type ContextSwitchHandler = cfg_select! {
 #[cfg_attr(
     not(context_switch_source = "ipc"),
     doc = "\nIn debug builds, panics if `core` is not the current CPU. A CPU-local interrupt
-    carries the context switch, and only that CPU can enable the interrupt.\n"
+    carries the request, and only that CPU can enable the interrupt.\n"
 )]
 /// # Safety
 ///
-/// On RISC-V, the interrupt jumps to `handler` with the interrupted `t0` in `mscratch`.
-/// `handler` must restore `t0` from that CSR, save and restore every other register it
-/// modifies, and return with `mret`.
-///
-/// On Xtensa, the interrupt returns to the context in the trap frame. `handler` must leave a
-/// context that the CPU can run.
+/// The handler runs on the interrupt stack, with interrupts masked, and must not enable them. It
+/// must return a frame that no other CPU resumes. After the handler returns, the CPU reads only
+/// that frame and its interrupt stack.
 pub unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitchHandler) {
-    cfg_select! {
-        context_switch_source = "ipc" => {}
-        _ => {
-            debug_assert_eq!(core, Cpu::current(), "A CPU installs its own handler");
-            unsafe { local::install(handler) };
-        }
-    }
+    unwrap!(
+        HANDLERS[core as usize].compare_exchange(
+            core::ptr::null_mut(),
+            handler as *mut (),
+            Ordering::Release,
+            Ordering::Relaxed,
+        ),
+        "A CPU accepts one context switch handler"
+    );
 
-    // A CPU-local interrupt cannot reach the other CPU. Dual-core chips that keep
-    // that interrupt for a local switch still register the same handler with IPC.
-    #[cfg(multi_core)]
-    unsafe {
-        super::ipc::set_context_switch_handler(core, handler);
+    #[cfg(not(context_switch_source = "ipc"))]
+    {
+        debug_assert_eq!(core, Cpu::current(), "A CPU installs its own handler");
+        local::install();
     }
 }
 
-/// Asks `core` to run its context-switch handler.
+/// Asks `core` to switch tasks.
 ///
-/// The handler runs at [`Priority::min`][super::Priority::min]. The call does not wait.
+/// The CPU switches when it leaves its next interrupt handler of
+/// [`Priority::min`][super::Priority::min]. The call does not wait.
 ///
 /// # Panics
 ///
@@ -93,15 +148,23 @@ pub unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitchHandle
 )]
 #[inline]
 pub fn request_context_switch(core: Cpu) {
+    debug_assert!(
+        !HANDLERS[core as usize].load(Ordering::Relaxed).is_null(),
+        "The CPU has no context switch handler"
+    );
+
+    // The exit code takes the request after the interrupt that this call raises.
+    SWITCH_PENDING[core as usize].store(true, Ordering::Release);
+
     cfg_select! {
         context_switch_source = "ipc" => {
-            super::ipc::request_context_switch(core);
+            super::ipc::raise(core);
         }
         multi_core => {
             if core == Cpu::current() {
                 local::trigger();
             } else {
-                super::ipc::request_context_switch(core);
+                super::ipc::raise(core);
             }
         }
         _ => {
@@ -111,21 +174,36 @@ pub fn request_context_switch(core: Cpu) {
     }
 }
 
-/// The `Software0` context-switch path.
+/// Runs the context-switch handler of the current CPU, if a switch is pending.
+///
+/// The interrupt exit code calls this function on the interrupt stack, with interrupts masked,
+/// when it leaves the outermost handler of [`Priority::min`][super::Priority::min]. `saved` is the
+/// complete frame of the interrupted context. Returns the frame to resume.
+#[ram]
+pub(super) extern "C" fn switch_context(saved: *mut TaskFrame) -> *mut TaskFrame {
+    let core = Cpu::current() as usize;
+    if !SWITCH_PENDING[core].swap(false, Ordering::Acquire) {
+        return saved;
+    }
+
+    let handler = HANDLERS[core].load(Ordering::Acquire);
+    if handler.is_null() {
+        return saved;
+    }
+
+    let handler = unsafe { core::mem::transmute::<*mut (), ContextSwitchHandler>(handler) };
+    handler(saved)
+}
+
+/// The `Software0` request path.
 #[cfg(context_switch_source = "software0")]
 mod local {
-    use portable_atomic::{AtomicPtr, Ordering};
-
-    use super::*;
-    use crate::ram;
+    use crate::{ram, trapframe::TrapFrame};
 
     /// `Software0` is CPU interrupt 7, which runs at the minimum priority.
     const SW_INTERRUPT: u32 = 1 << 7;
 
-    static HANDLER: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
-
-    pub(super) unsafe fn install(handler: ContextSwitchHandler) {
-        HANDLER.store(handler as *mut (), Ordering::Release);
+    pub(super) fn install() {
         unsafe { xtensa_lx::interrupt::enable_mask(SW_INTERRUPT) };
     }
 
@@ -134,119 +212,71 @@ mod local {
         unsafe { xtensa_lx::interrupt::set(SW_INTERRUPT) };
     }
 
-    /// The vectored dispatcher clears the request before it calls this handler.
+    /// The vectored dispatcher clears the request before it calls this handler. The switch runs
+    /// when the interrupt exits.
     #[ram]
     #[unsafe(export_name = "Software0")]
-    extern "C" fn context_switch(context: &mut TrapFrame) {
-        let handler = HANDLER.load(Ordering::Acquire);
-        debug_assert!(!handler.is_null(), "The CPU has no context switch handler");
-
-        let handler = unsafe { core::mem::transmute::<*mut (), ContextSwitchHandler>(handler) };
-        handler(context);
-    }
+    extern "C" fn context_switch_request(_context: &mut TrapFrame) {}
 }
 
-/// The RISC-V context-switch path.
-///
-/// A CPU takes the context switch in a handler that this module binds directly to the
-/// interrupt. The handler borrows `t0` only, and keeps the interrupted value in `mscratch`.
-/// That CSR is free, because the hardware clears `mstatus.MIE` on trap entry, and nothing here
-/// enables interrupts again.
-#[cfg(any(context_switch_source = "from_cpu", context_switch_source = "clint"))]
+/// The machine software interrupt request path of the CLINT.
+#[cfg(context_switch_source = "clint")]
 mod local {
-    use portable_atomic::{AtomicPtr, Ordering};
+    use crate::{
+        interrupt::{self, CpuInterrupt},
+        peripherals::CLINT,
+    };
 
-    use super::*;
-    use crate::interrupt;
-
-    cfg_select! {
-        context_switch_source = "clint" => {
-            use crate::{interrupt::CpuInterrupt, peripherals::CLINT};
-        }
-        _ => {
-            use crate::{
-                interrupt::software::SoftwareInterrupt,
-                peripherals::{FROM_CPU_INTR0, Interrupt},
-            };
-        }
-    }
-
-    /// The address of the register that clears the request.
-    static REQUEST: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
-    static HANDLER: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
-
-    pub(super) unsafe fn install(handler: ContextSwitchHandler) {
-        HANDLER.store(handler as *mut (), Ordering::Release);
-
-        cfg_select! {
-            context_switch_source = "clint" => {
-                REQUEST.store(CLINT::regs().msip().as_ptr(), Ordering::Release);
-
-                // Both controllers serve the machine software interrupt as interrupt 3. The
-                // CLIC applies the priority of that line to it, and needs the line enabled.
-                // The PLIC does not serve the interrupt at all: `mie` enables it, and the run
-                // level masks it.
-                interrupt::bind_cpu_interrupt(CpuInterrupt::Interrupt3, stub);
-                #[cfg(interrupt_controller = "clic")]
-                interrupt::enable_cpu_interrupt(
-                    CpuInterrupt::Interrupt3,
-                    interrupt::Priority::min(),
-                );
-            }
-            _ => {
-                let regs = cfg_select! {
-                    soc_has_intpri => crate::peripherals::INTPRI::regs(),
-                    _ => crate::peripherals::SYSTEM::regs(),
-                };
-                REQUEST.store(regs.cpu_intr_from_cpu(0).as_ptr(), Ordering::Release);
-
-                interrupt::enable_direct_inner(
-                    Interrupt::FROM_CPU_INTR0,
-                    interrupt::Priority::min(),
-                    interrupt::IPC_INTERRUPT,
-                    stub,
-                );
-            }
-        }
+    pub(super) fn install() {
+        // Both controllers serve the machine software interrupt as interrupt 3. The CLIC applies
+        // the priority of that line to it, and needs the line enabled. The PLIC does not serve
+        // the interrupt at all: `mie` enables it, and the run level masks it.
+        interrupt::bind_cpu_interrupt(
+            CpuInterrupt::Interrupt3,
+            interrupt::isr_stack::machine_software_interrupt_entry,
+        );
+        #[cfg(interrupt_controller = "clic")]
+        interrupt::enable_cpu_interrupt(CpuInterrupt::Interrupt3, interrupt::Priority::min());
     }
 
     #[inline]
     pub(super) fn trigger() {
-        cfg_select! {
-            context_switch_source = "clint" => {
-                CLINT::regs().msip().write(|w| w.msip().set_bit());
-            }
-            _ => {
-                SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).raise();
-            }
-        }
+        CLINT::regs().msip().write(|w| w.msip().set_bit());
     }
 
-    /// Clears the request, then jumps to the context-switch handler.
-    #[cfg_attr(
-        not(interrupt_controller = "clic"),
-        unsafe(link_section = ".trap.rust")
-    )]
-    #[cfg_attr(interrupt_controller = "clic", unsafe(link_section = ".rwtext"))]
-    #[unsafe(naked)]
-    unsafe extern "C" fn stub() {
-        core::arch::naked_asm!(
-            "
-            csrw mscratch, t0
+    /// Clears the request. The switch runs when the interrupt exits.
+    #[crate::ram]
+    pub(crate) extern "C" fn machine_software_interrupt() {
+        CLINT::regs().msip().write(|w| w.msip().clear_bit());
+    }
+}
 
-            # Clear the request before the switch, so that a request raised for the next
-            # switch survives.
-            la   t0, {request}
-            lw   t0, 0(t0)
-            sw   zero, 0(t0)
+#[cfg(context_switch_source = "clint")]
+pub(super) use local::machine_software_interrupt;
 
-            # The handler restores t0 from mscratch and returns with mret.
-            la   t0, {handler}
-            lw   t0, 0(t0)
-            jr   t0
-            ",
-            request = sym REQUEST,
-            handler = sym HANDLER,
-        )
+/// The `FROM_CPU_INTR0` request path.
+#[cfg(context_switch_source = "from_cpu")]
+mod local {
+    use crate::{
+        interrupt::{self, InterruptHandler, Priority, software::SoftwareInterrupt},
+        peripherals::{FROM_CPU_INTR0, Interrupt},
+    };
+
+    pub(super) fn install() {
+        interrupt::bind_handler(
+            Interrupt::FROM_CPU_INTR0,
+            InterruptHandler::new(context_switch_request, Priority::min()),
+        );
+    }
+
+    #[inline]
+    pub(super) fn trigger() {
+        SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).raise();
+    }
+
+    /// Clears the request. The switch runs when the interrupt exits.
+    #[crate::ram]
+    extern "C" fn context_switch_request() {
+        SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset();
     }
 }

@@ -585,7 +585,11 @@ pub(crate) mod rt {
     #[ram]
     unsafe fn __level_6_interrupt(save_frame: &mut Context) {
         cfg_select! {
-            all(feature = "rt", feature = "exception-handler", stack_guard_monitoring) => {
+            all(
+                feature = "rt",
+                feature = "exception-handler",
+                any(stack_guard_monitoring, isr_stack_guard_monitoring)
+            ) => {
                 crate::exception_handler::breakpoint_interrupt(save_frame);
             }
             _ => unsafe { level6_interrupt(save_frame) },

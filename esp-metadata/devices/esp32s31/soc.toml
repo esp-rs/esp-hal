@@ -27,6 +27,7 @@ has_crc_be  = true
 has_md5_bsd = true
 
 [device.soc]
+cpu_watchpoints = 4
 multi_core_enabled = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false

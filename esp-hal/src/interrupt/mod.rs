@@ -79,7 +79,38 @@ cfg_select! {
 mod arch;
 pub use arch::*;
 
+#[cfg(feature = "rt")]
+mod isr_stack;
+
+#[cfg(feature = "rt")]
+pub(crate) use isr_stack::init_current_cpu as init_isr_stack;
+
 use crate::pac;
+
+/// Returns the number of bytes of the interrupt stack of `cpu` that interrupt handlers have not
+/// used.
+///
+/// Interrupt handlers run on an interrupt stack of their own on each CPU. The size of each stack
+/// is `ESP_HAL_CONFIG_ISR_STACK_SIZE`. When a CPU starts, the HAL fills its interrupt stack with
+/// a pattern. This function counts the bytes at the end of the stack that still hold the
+/// pattern. The value helps to choose the size of the stack.
+///
+/// The value is only valid after `cpu` has started.
+///
+/// # Examples
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::{interrupt::unused_isr_stack, system::Cpu};
+///
+/// let unused = unused_isr_stack(Cpu::ProCpu);
+/// # {after_snippet}
+/// ```
+#[cfg(feature = "rt")]
+#[instability::unstable]
+pub fn unused_isr_stack(cpu: Cpu) -> usize {
+    isr_stack::unused(cpu)
+}
 
 unstable_module! {
     pub mod software;

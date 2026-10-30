@@ -28,6 +28,7 @@ has_md5_bsd = true
 no_libgcc   = true # since ECO2 (v0.2)
 
 [device.soc]
+cpu_watchpoints = 3
 multi_core_enabled = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false

@@ -556,16 +556,16 @@ pub(crate) fn enable_pmp() {
         }
     }
 
-    // protect .stack
+    // protect .stack, which starts with the interrupt stacks
     unsafe {
         unsafe extern "C" {
-            static _stack_end_cpu0: u32;
+            static _isr_stack_bottom_cpu0: u32;
             static _stack_start_cpu0: u32;
         }
 
         #[allow(clippy::if_same_then_else, reason = "False positive")]
         if pmp_add_tor_region(
-            &_stack_end_cpu0 as *const _ as u32,
+            &_isr_stack_bottom_cpu0 as *const _ as u32,
             &_stack_start_cpu0 as *const _ as u32,
             0b011, // -WR
         )

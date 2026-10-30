@@ -27,6 +27,7 @@ has_crc_be  = true
 has_md5_bsd = true
 
 [device.soc]
+cpu_watchpoints = 2
 multi_core_enabled = true
 
 memory_map = { ranges = [
