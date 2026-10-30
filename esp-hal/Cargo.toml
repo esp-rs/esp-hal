@@ -27,6 +27,7 @@ check-configs = [
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_ENABLE_PMP = "false" }, if = 'riscv && !esp32c2 && !esp32c3' },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_INIT_STACK_PTR_RANGE_CHECK = "false" } },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_USE_XTAL32K = "true" }, if = 'soc_has_clock_node_xtal32k_clk' },
+    { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_D0WD_PSRAM_CLK_IO = "6", ESP_HAL_CONFIG_D0WD_PSRAM_CS_IO = "5" }, if = 'esp32' },
     { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
     { features = ["unstable", "rt", "__sdmmc"],     if = 'sdmmc_driver_supported' },

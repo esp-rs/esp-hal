@@ -39,6 +39,33 @@ options:
       - value: true
     active: "esp32"
 
+  - name: d0wd-psram-clk-io
+    description: "The GPIO for the PSRAM clock on ESP32-D0WD chips, which have no PSRAM in the
+      package. The default is the pin of the ESP32-WROVER module. If the PSRAM uses the clock
+      pin of the flash, set this to 6."
+    default:
+      - value: 17
+    constraints:
+      - type:
+          validator: integer_in_range
+          value:
+            start: 0
+            end: 34
+    active: "esp32"
+
+  - name: d0wd-psram-cs-io
+    description: "The GPIO for the PSRAM chip select on ESP32-D0WD chips, which have no PSRAM in
+      the package. The default is the pin of the ESP32-WROVER module."
+    default:
+      - value: 16
+    constraints:
+      - type:
+          validator: integer_in_range
+          value:
+            start: 0
+            end: 34
+    active: "esp32"
+
   - name: stack-guard-offset
     description: The stack guard variable will be placed this many bytes from the stack's end. Needs to be a multiple of 4.
     default:
