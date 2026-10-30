@@ -8,7 +8,7 @@ use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 use allocator_api2::boxed::Box;
 pub(crate) use arch_specific::*;
 use esp_hal::{
-    interrupt::__rtos_implementation::request_context_switch,
+    interrupt::__rtos_implementation::{request_context_switch, set_context_switch_handler},
     system::Cpu,
     time::{Duration, Instant},
 };
@@ -338,7 +338,9 @@ impl Drop for ThreadLocalData {
 
 #[repr(C)]
 pub(crate) struct Task {
-    pub cpu_context: CpuContext,
+    /// The saved context of the task, on the stack of the task. Valid while the task does not
+    /// run.
+    pub saved_sp: *mut TaskFrame,
 
     pub thread_local: ThreadLocalData,
 
@@ -386,13 +388,9 @@ pub(crate) struct Task {
 
 pub(crate) trait ContextExt {
     fn set_tp(&mut self, tp: u32);
-
-    fn sp(&self) -> u32;
-
-    fn set_sp(&mut self, sp: u32);
 }
 
-impl ContextExt for CpuContext {
+impl ContextExt for TaskFrame {
     fn set_tp(&mut self, tp: u32) {
         cfg_select! {
             xtensa => {
@@ -402,24 +400,6 @@ impl ContextExt for CpuContext {
                 self.tp = tp as usize;
             }
             _ => {}
-        }
-    }
-
-    fn sp(&self) -> u32 {
-        cfg_select! {
-            xtensa => self.A1,
-            _ => self.sp as u32,
-        }
-    }
-
-    fn set_sp(&mut self, sp: u32) {
-        cfg_select! {
-            xtensa => {
-                self.A1 = sp;
-            }
-            _ => {
-                self.sp = sp as usize;
-            }
         }
     }
 }
@@ -453,7 +433,7 @@ impl Task {
         let stack_top = unsafe { stack_bottom.add(stack.len()).cast() };
 
         let mut task = Task {
-            cpu_context: new_task_context(entry, param, stack_top),
+            saved_sp: new_task_context(entry, param, stack_top),
             thread_local: ThreadLocalData::new(),
             name: options.name,
             state: TaskState::Ready,
@@ -506,6 +486,7 @@ impl Task {
     /// Returns the address range of the task's stack, as `(bottom, top)`.
     ///
     /// The stack grows down from `top`, so `bottom` itself is not a valid stack pointer.
+    #[cfg(stack_pointer_range_check)]
     fn stack_range(&self) -> (usize, usize) {
         let bottom = self.stack.cast::<MaybeUninit<u32>>();
         let top = bottom.wrapping_add(self.stack.len());
@@ -513,7 +494,8 @@ impl Task {
     }
 
     /// Returns whether `sp` points into this task's stack.
-    pub(crate) fn owns_stack_pointer(&self, sp: usize) -> bool {
+    #[cfg(stack_pointer_range_check)]
+    fn owns_stack_pointer(&self, sp: usize) -> bool {
         let (bottom, top) = self.stack_range();
         sp > bottom && sp <= top
     }
@@ -583,11 +565,9 @@ pub(super) fn allocate_main_task(
     // part of a static object so taking the pointer is fine.
     let main_task_ptr = NonNull::from(&scheduler.per_cpu[current_cpu].main_task);
 
-    scheduler.per_cpu[current_cpu]
-        .main_task
-        .cpu_context
-        .set_tp(main_task_ptr.as_ptr() as u32);
-
+    // The main task runs, so it has no saved context. The first switch away from it saves the
+    // thread pointer with the rest of its context.
+    scheduler.per_cpu[current_cpu].main_task.saved_sp = core::ptr::null_mut();
     write_thread_pointer(main_task_ptr.as_ptr());
 
     debug!("Main task created: {:?}", main_task_ptr);
@@ -659,6 +639,16 @@ pub(super) fn schedule_task_deletion(task: Option<NonNull<Task>>) {
             yield_task();
         }
     }
+}
+
+pub(crate) fn setup_multitasking() {
+    // The HAL runs this handler when the CPU leaves a minimum-priority interrupt.
+    unsafe { set_context_switch_handler(Cpu::current(), context_switch) };
+}
+
+#[esp_hal::ram]
+extern "C" fn context_switch(saved: *mut TaskFrame) -> *mut TaskFrame {
+    SCHEDULER.with(|scheduler| scheduler.switch_task(saved))
 }
 
 pub(crate) fn trigger_scheduler(run_scheduler: RunSchedulerOn) {
