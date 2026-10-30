@@ -6,9 +6,19 @@ use core::{
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
-#[instability::unstable]
-pub use crate::soc::cpu_control::is_running;
 use crate::{peripherals::CPU_CTRL, soc::cpu_control::internal_park_core, system::Cpu};
+
+#[cfg(feature = "rt")]
+pub(crate) mod park;
+
+/// Returns whether `core` runs code of this program.
+///
+/// The APP core runs code of this program after [`CpuControl`] started it, until it is parked or
+/// stopped.
+#[instability::unstable]
+pub fn is_running(core: Cpu) -> bool {
+    (core == Cpu::ProCpu || app_core_takes_ipc()) && crate::soc::cpu_control::is_running(core)
+}
 
 /// Data type for a properly aligned stack of N bytes
 // Xtensa ISA 10.5: [B]y default, the
@@ -76,13 +86,25 @@ pub(crate) static START_CORE1_FUNCTION: AtomicPtr<()> = AtomicPtr::new(core::ptr
 pub(crate) static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 pub(crate) static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 
-/// Will park the APP (second) core when dropped.
-///
-/// Parking stops the APP core immediately, also when it holds a lock. On the ESP32-S3, ESP32-S31,
-/// ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the APP core is parked during
-/// such an operation, the next cache operation on the PRO core waits forever. Make sure that the
-/// APP core does no DMA or cache operation before you drop this guard.
-#[must_use = "Dropping this guard will park the APP core"]
+#[cfg_attr(
+    feature = "rt",
+    doc = "Stops the APP (second) core when dropped.
+
+The drop parks the APP core as [`CpuControl::park_core`] does, and waits in the same way. The APP
+core then stays parked, also after the last [`ParkGuard`] drops. [`CpuControl::start_app_core`] can
+start the APP core again."
+)]
+#[cfg_attr(
+    not(feature = "rt"),
+    doc = "Stops the APP (second) core when dropped.
+
+The drop stops the APP core immediately, also when it holds a lock. On the ESP32-S3, ESP32-S31,
+ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the APP core stops during such an
+operation, the next cache operation on the PRO core waits forever. Make sure that the APP core does
+no DMA or cache operation before you drop this guard. With the `rt` feature, the drop waits until
+the core holds no lock instead."
+)]
+#[must_use = "Dropping this guard will stop the APP core"]
 #[instability::unstable]
 pub struct AppCoreGuard<'a> {
     phantom: PhantomData<&'a ()>,
@@ -90,7 +112,31 @@ pub struct AppCoreGuard<'a> {
 
 impl Drop for AppCoreGuard<'_> {
     fn drop(&mut self) {
-        unsafe { internal_park_core(Cpu::AppCpu, true) };
+        cfg_select! {
+            feature = "rt" => park::stop_app_core(),
+            _ => unsafe { internal_park_core(Cpu::AppCpu, true) },
+        }
+    }
+}
+
+/// Keeps a core parked. The core runs again when the last guard for the core drops.
+///
+/// [`CpuControl::park_core`] returns this guard.
+#[cfg(feature = "rt")]
+#[must_use = "Dropping this guard unparks the core"]
+#[instability::unstable]
+pub struct ParkGuard<'a> {
+    core: Option<Cpu>,
+    // The guard must drop on the core that parked, because only that core runs.
+    phantom: PhantomData<(&'a (), *const ())>,
+}
+
+#[cfg(feature = "rt")]
+impl Drop for ParkGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(core) = self.core {
+            park::unpark(core);
+        }
     }
 }
 
@@ -161,26 +207,29 @@ impl<'d> CpuControl<'d> {
         }
     }
 
-    /// Parks the given core.
+    /// Parks `core` until the returned guard drops.
     ///
-    /// Parking stops the core immediately, also when it holds a lock. On the ESP32-S3, ESP32-S31,
-    /// ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the core is parked during
-    /// such an operation, the next cache operation on the other core waits forever. Make sure that
-    /// the parked core does no DMA or cache operation when you call this function.
+    /// `core` parks in the IPC interrupt, which has the lowest priority. `core` thus holds no lock
+    /// when it stops. The parked core keeps its interrupts masked. The parked core thus handles no
+    /// interrupt, also not the tick of a scheduler.
     ///
-    /// # Safety
+    /// The call waits until `core` parks. If `core` never takes the IPC interrupt, the call waits
+    /// forever. For example, `core` can keep its interrupts masked. Do not hold a lock that `core`
+    /// can wait for with masked interrupts, for example a `critical_section` or an `esp_sync` lock.
     ///
-    /// The caller must ensure that the core being parked is not the core which is
-    /// currently executing this code.
+    /// Parks add up. `core` runs again when the last [`ParkGuard`] for `core` drops. If `core` runs
+    /// no code of this program, the call does nothing. See [`is_running`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `core` is the current core.
+    #[cfg(feature = "rt")]
     #[instability::unstable]
-    pub unsafe fn park_core(&mut self, core: Cpu) {
-        unsafe { internal_park_core(core, true) };
-    }
-
-    /// Unparks the given core.
-    #[instability::unstable]
-    pub fn unpark_core(&mut self, core: Cpu) {
-        unsafe { internal_park_core(core, false) };
+    pub fn park_core(&self, core: Cpu) -> ParkGuard<'_> {
+        ParkGuard {
+            core: park::park(core).then_some(core),
+            phantom: PhantomData,
+        }
     }
 
     /// Runs the core1 closure.
@@ -195,8 +244,11 @@ impl<'d> CpuControl<'d> {
         unsafe {
             let entry = ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>());
             entry();
-            loop {
-                internal_park_core(Cpu::current(), true);
+            cfg_select! {
+                feature = "rt" => park::stop_current_core(),
+                _ => loop {
+                    internal_park_core(Cpu::current(), true);
+                },
             }
         }
     }
@@ -256,9 +308,13 @@ impl<'d> CpuControl<'d> {
         setup_second_core_stack(stack, stack_guard_offset, entry);
 
         APP_CORE_TAKES_IPC.store(false, Ordering::Release);
+        // A `ParkGuard` borrows the `CpuControl`. `&mut self` thus makes sure that no park holds
+        // the APP core.
+        #[cfg(feature = "rt")]
+        park::reset_app_core();
         crate::soc::cpu_control::start_core1(start_core1_init::<F> as *const u32);
 
-        self.unpark_core(Cpu::AppCpu);
+        unsafe { internal_park_core(Cpu::AppCpu, false) };
 
         // The APP core can hold a lock during startup. The flash driver must not park the APP
         // core before startup ends.
@@ -466,8 +522,8 @@ fn enable_app_core_interrupts() {
 
 static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
 
-/// Returns `true` if [`CpuControl`] started the APP core in this boot. That core takes IPC
-/// interrupts unless it masks them.
+/// Returns `true` if [`CpuControl`] started the APP core in this boot, and the core has not stopped
+/// since. That core takes IPC interrupts unless it masks them.
 pub(crate) fn app_core_takes_ipc() -> bool {
     APP_CORE_TAKES_IPC.load(Ordering::Acquire)
 }
