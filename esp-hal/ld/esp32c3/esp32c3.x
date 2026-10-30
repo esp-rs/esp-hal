@@ -34,7 +34,7 @@ INSERT BEFORE .text;
 SECTIONS {
   .rwdata_dummy (NOLOAD) : ALIGN(4)
   {
-    . = . + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.trap);
+    . = . + SIZEOF(.rwtext.cache_suspend_safe) + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.trap);
   } > RWDATA
 }
 INSERT BEFORE .data;
@@ -55,4 +55,4 @@ INCLUDE "metadata.x"
 INCLUDE "eh_frame.x"
 /* End of Shared sections */
 
-_dram_data_start = ORIGIN( DRAM ) + SIZEOF(.trap) + SIZEOF(.rwtext);
+_dram_data_start = ORIGIN( DRAM ) + SIZEOF(.trap) + SIZEOF(.rwtext.cache_suspend_safe) + SIZEOF(.rwtext);

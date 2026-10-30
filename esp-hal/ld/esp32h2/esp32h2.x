@@ -32,4 +32,4 @@ INCLUDE "metadata.x"
 INCLUDE "eh_frame.x"
 /* End of Shared sections #2 */
 
-_dram_data_start = ORIGIN( RAM ) + SIZEOF(.trap) + SIZEOF(.rwtext);
+_dram_data_start = ORIGIN( RAM ) + SIZEOF(.trap) + SIZEOF(.rwtext.cache_suspend_safe) + SIZEOF(.rwtext);

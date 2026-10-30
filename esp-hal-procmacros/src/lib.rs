@@ -73,6 +73,9 @@ mod unified_main;
 ///
 /// - `rtc_fast`: Use RTC fast RAM.
 /// - `rtc_slow`: Use RTC slow RAM. **Note**: not available on all targets.
+/// - `cache_suspend_safe`: Place a function in the RAM section for code that runs while the caches
+///   are suspended. The link fails if the function refers to code or constants in flash, or to
+///   RAM code without `cache_suspend_safe`.
 /// - `persistent`: Persist the contents of the `static` across resets. See [the section
 ///   below](#persistent) for details.
 /// - `zeroed`: Initialize the memory of the `static` to zero. The initializer expression will be
@@ -81,8 +84,8 @@ mod unified_main;
 /// - `uncached`: Use internal SRAM through the L1-bypass address range. The CPU does not cache this
 ///   memory. Only available on ESP32-P4.
 ///
-/// Using both `rtc_fast` and `rtc_slow` or `persistent` and `zeroed` together
-/// is an error.
+/// Using both `rtc_fast` and `rtc_slow`, or `persistent` and `zeroed`, together is an error.
+/// `cache_suspend_safe` on a `static`, or with `rtc_fast` or `rtc_slow`, is also an error.
 ///
 /// ## `persistent`
 ///

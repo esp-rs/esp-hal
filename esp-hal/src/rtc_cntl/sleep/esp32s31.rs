@@ -83,7 +83,10 @@ impl AnalogSleepConfig {
             },
         };
 
-        if !pd_flags.pd_xtal() {
+        // Without the reference current, PSRAM loses its data and its mode register settings in
+        // light sleep.
+        // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L223-L229>.
+        if !pd_flags.pd_xtal() || !crate::psram::psram_range().is_empty() {
             this.hp_sys.bias.set_pd_cur(false);
             this.lp_sys_sleep.bias.set_pd_cur(false);
         }
