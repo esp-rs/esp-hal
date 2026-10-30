@@ -532,9 +532,9 @@ impl core::fmt::Display for ConfigError {
 }
 
 // The clock and reset registers of the TX and RX units are outside of the PARL_IO register block.
-#[cfg_attr(soc_has_pcr, path = "parl_io/unit_clock/pcr.rs")]
-#[cfg_attr(esp32p4, path = "parl_io/unit_clock/esp32p4.rs")]
-#[cfg_attr(esp32s31, path = "parl_io/unit_clock/esp32s31.rs")]
+#[cfg_attr(soc_has_pcr, path = "unit_clock/pcr.rs")]
+#[cfg_attr(esp32p4, path = "unit_clock/esp32p4.rs")]
+#[cfg_attr(esp32s31, path = "unit_clock/esp32s31.rs")]
 mod unit_clock;
 
 /// Clock source value that selects the clock from the GPIO pad.
