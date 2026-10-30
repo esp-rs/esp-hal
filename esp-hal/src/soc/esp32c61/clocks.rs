@@ -298,6 +298,11 @@ fn configure_hp_root_clk_impl(
 
 /// Applies the new `soc_clk_sel`, `cpu_div_num` and `ahb_div_num` values.
 fn bus_clock_update() {
+    #[cfg(idle_frequency_scaling)]
+    if BUS_CLOCK_UPDATE_DEFERRED.load(core::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+
     PCR::regs()
         .bus_clk_update()
         .write(|w| w.bus_clock_update().set_bit());
@@ -307,6 +312,55 @@ fn bus_clock_update() {
         .bus_clock_update()
         .bit_is_set()
     {}
+}
+
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+//
+// One bus clock update applies the root clock and both dividers together, so that CPU_CLK stays
+// an integer multiple of AHB_CLK, and AHB_CLK does not exceed XTAL_CLK.
+
+#[cfg(idle_frequency_scaling)]
+static BUS_CLOCK_UPDATE_DEFERRED: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
+#[cfg(idle_frequency_scaling)]
+fn with_single_bus_clock_update(f: impl FnOnce()) {
+    use core::sync::atomic::Ordering;
+
+    BUS_CLOCK_UPDATE_DEFERRED.store(true, Ordering::Relaxed);
+    f();
+    BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
+    bus_clock_update();
+}
+
+/// Returns whether the CPU clock comes from the PLL, with configured dividers that
+/// [`restore_cpu_clock`] can restore.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn cpu_clock_from_pll(clocks: &mut ClockTree) -> bool {
+    clocks.hp_root_clk() == Some(HpRootClkConfig::PllF160m)
+        && clocks.cpu_clk().is_some()
+        && clocks.ahb_clk().is_some()
+}
+
+/// Switches the CPU clock to XTAL_CLK.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) {
+    with_single_bus_clock_update(|| {
+        configure_hp_root_clk_impl(clocks, None, HpRootClkConfig::Xtal);
+        configure_cpu_clk_impl(clocks, None, CpuClkConfig::new(0));
+        configure_ahb_clk_impl(clocks, None, AhbClkConfig::new(0));
+    });
+}
+
+/// Restores the CPU clock that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    with_single_bus_clock_update(|| {
+        configure_ahb_clk_impl(clocks, None, unwrap!(clocks.ahb_clk()));
+        configure_cpu_clk_impl(clocks, None, unwrap!(clocks.cpu_clk()));
+        configure_hp_root_clk_impl(clocks, None, unwrap!(clocks.hp_root_clk()));
+    });
 }
 
 // CPU_CLK
