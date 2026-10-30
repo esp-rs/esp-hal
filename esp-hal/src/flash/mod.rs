@@ -62,6 +62,10 @@
 //!   stays off for the whole transfer. Split a large transfer when latency matters.
 //! - On a dual-core chip, the multi-core strategy controls the other core for every operation,
 //!   including a read.
+//! - Each operation runs with the caches suspended, and that part must not call code in flash.
+//!   esp-hal must be built at `opt-level` 2 or 3 in each profile that uses [`Flash`]. At other
+//!   levels, the link fails with `prohibited cross reference from '.rwtext.cache_suspend_safe'`.
+//!   The application can set the level for esp-hal only, with `[profile.dev.package.esp-hal]`.
 
 use core::marker::PhantomData;
 
@@ -423,7 +427,7 @@ impl<'d> Flash<'d, Blocking> {
         self.check_word_offset(offset)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
-        self.with_guard(None, |_| rom::read(offset, data))
+        self.with_guard(None, || rom::read(offset, data))
     }
 
     /// Writes `data` starting at byte address `offset`.
@@ -463,7 +467,7 @@ impl<'d> Flash<'d, Blocking> {
         self.check_word_offset(offset)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
-        self.with_guard(Some((offset, len as u32)), |_| rom::write(offset, data))
+        self.with_guard(Some((offset, len as u32)), || rom::write(offset, data))
     }
 
     /// Erases flash sectors in the range `[from, to)`.
@@ -598,17 +602,22 @@ impl<'d> Flash<'d, Blocking> {
 
         #[cfg(esp32)]
         let neighbors = self.esp32_row_neighbors(offset, len)?;
-        // On ESP32 the programmed range can extend one 16-byte block past each
-        // end; `with_guard` flushes the whole cache there, so the range only
-        // needs to cover the request.
-        self.with_guard(Some((offset, len as u32)), |_| {
-            write_encrypted_rows(
-                offset,
-                words_as_bytes(data),
-                #[cfg(esp32)]
-                &neighbors,
-            )
-        })
+        let data = words_as_bytes(data);
+        let mut row = EncryptRow([0; XTS_AES_BLOCK_MAX]);
+        let mut i = 0;
+        while i < data.len() {
+            let row_addr = offset + i as u32;
+            let (program_addr, program_len, consumed) = cfg_select! {
+                esp32 => prepare_esp32_row(&mut row.0, row_addr, &data[i..], &neighbors),
+                _ => prepare_xts_row(&mut row.0, row_addr, &data[i..]),
+            };
+            let row_ptr = row.0.as_mut_ptr().cast();
+            self.with_guard(Some((program_addr, program_len)), || {
+                rom::write_encrypted(program_addr, row_ptr, program_len)
+            })?;
+            i += consumed;
+        }
+        Ok(())
     }
 }
 
@@ -635,26 +644,6 @@ fn check_buffer(buf: &[u32]) -> Result<(), Error> {
 #[repr(C, align(4))]
 struct EncryptRow([u8; XTS_AES_BLOCK_MAX]);
 
-#[ram]
-fn write_encrypted_rows(
-    offset: u32,
-    data: &[u8],
-    #[cfg(esp32)] neighbors: &Esp32Neighbors,
-) -> Result<(), Error> {
-    let mut row = EncryptRow([0; XTS_AES_BLOCK_MAX]);
-    let mut i = 0;
-    while i < data.len() {
-        let row_addr = offset + i as u32;
-        let (program_addr, program_len, consumed) = cfg_select! {
-            esp32 => prepare_esp32_row(&mut row.0, row_addr, &data[i..], neighbors),
-            _ => prepare_xts_row(&mut row.0, row_addr, &data[i..]),
-        };
-        rom::write_encrypted(program_addr, row.0.as_mut_ptr().cast(), program_len)?;
-        i += consumed;
-    }
-    Ok(())
-}
-
 #[cfg(esp32)]
 struct Esp32Neighbors {
     pre: [u32; 4],
@@ -667,7 +656,6 @@ struct Esp32Neighbors {
 /// AES blocks sharing an address-derived tweak, so a 16-byte write must carry
 /// the decrypted neighbor block along and re-encrypt it to the same ciphertext.
 #[cfg(esp32)]
-#[ram]
 fn prepare_esp32_row(
     buf: &mut [u8; XTS_AES_BLOCK_MAX],
     row_addr: u32,
@@ -700,7 +688,6 @@ const XTS_AES_BLOCK_MAX: usize = 64;
 
 /// Pick the largest aligned row, as ESP-IDF does for ESP32-S2 and later.
 #[cfg(not(esp32))]
-#[ram]
 fn prepare_xts_row(
     buf: &mut [u8; XTS_AES_BLOCK_MAX],
     row_addr: u32,
@@ -783,28 +770,16 @@ impl Flash<'_, Blocking> {
     fn with_guard<R>(
         &mut self,
         invalidate: Option<(u32, u32)>,
-        f: impl FnOnce(&mut Self) -> Result<R, Error>,
+        f: impl FnOnce() -> Result<R, rom::RomError>,
     ) -> Result<R, Error> {
         free(|| {
             let _park = ParkGuard::enter(self)?;
-            let cache = cache::CacheGuard::suspend();
-            let result = f(self);
-            cfg_select! {
-                esp32 => {
-                    // Address-based invalidate is unavailable; flush while still off.
-                    if invalidate.is_some() {
-                        cache.flush_while_off();
-                    }
-                    drop(cache);
-                }
-                _ => {
-                    drop(cache);
-                    if let Some((start, len)) = invalidate {
-                        mmu::invalidate_mapped(start, len);
-                    }
-                }
+            let result = with_caches_suspended(invalidate.is_some(), f);
+            #[cfg(not(esp32))]
+            if let Some((start, len)) = invalidate {
+                mmu::invalidate_mapped(start, len);
             }
-            result
+            Ok(result?)
         })
     }
 
@@ -812,21 +787,21 @@ impl Flash<'_, Blocking> {
     fn erase_range(&mut self, from: u32, to: u32) -> Result<(), Error> {
         let mut address = from;
         while address < to && !address.is_multiple_of(BLOCK_SIZE) {
-            self.with_guard(Some((address, SECTOR_SIZE)), |_| {
+            self.with_guard(Some((address, SECTOR_SIZE)), || {
                 rom::erase_sector(address / SECTOR_SIZE)
             })?;
             address += SECTOR_SIZE;
         }
 
         while (to - address) >= BLOCK_SIZE {
-            self.with_guard(Some((address, BLOCK_SIZE)), |_| {
+            self.with_guard(Some((address, BLOCK_SIZE)), || {
                 rom::erase_block(address / BLOCK_SIZE)
             })?;
             address += BLOCK_SIZE;
         }
 
         while address < to {
-            self.with_guard(Some((address, SECTOR_SIZE)), |_| {
+            self.with_guard(Some((address, SECTOR_SIZE)), || {
                 rom::erase_sector(address / SECTOR_SIZE)
             })?;
             address += SECTOR_SIZE;
@@ -834,6 +809,25 @@ impl Flash<'_, Blocking> {
 
         Ok(())
     }
+}
+
+/// Runs `f` with the caches suspended.
+///
+/// On ESP32, `flush` flushes every cache line before the caches resume. An invalidate by
+/// address is not available on ESP32.
+#[ram(unstable(cache_suspend_safe))]
+fn with_caches_suspended<R>(
+    #[cfg_attr(not(esp32), expect(unused_variables))] flush: bool,
+    f: impl FnOnce() -> Result<R, rom::RomError>,
+) -> Result<R, rom::RomError> {
+    let cache = cache::CacheGuard::suspend();
+    let result = f();
+    #[cfg(esp32)]
+    if flush {
+        cache.flush_while_off();
+    }
+    drop(cache);
+    result
 }
 
 /// Stops the other core according to [`MultiCoreStrategy`]. [`Drop`] releases that core.
@@ -923,14 +917,15 @@ impl Drop for ParkGuard {
 #[cfg(all(multi_core, feature = "rt"))]
 mod ipc_stall {
     use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
-    use portable_atomic::Ordering;
-    use portable_atomic_enum::atomic_enum;
+    use portable_atomic::{AtomicU8, Ordering};
     use procmacros::ram;
 
     use crate::private::DropGuard;
 
-    #[atomic_enum]
-    #[derive(PartialEq, Debug, Clone, Copy)]
+    // `stall` runs with the caches suspended. An `atomic_enum` load can panic, and the panic code
+    // is in flash, so the phase is a plain `u8`.
+    #[derive(Clone, Copy)]
+    #[repr(u8)]
     enum Phase {
         /// The other core is outside the loop.
         Idle,
@@ -940,23 +935,23 @@ mod ipc_stall {
         Release,
     }
 
-    static PHASE: AtomicPhase = AtomicPhase::new(Phase::Idle);
+    static PHASE: AtomicU8 = AtomicU8::new(Phase::Idle as u8);
 
     pub(super) fn enter(core: crate::system::Cpu) {
         crate::interrupt::ipc::Ipc.call_function(core, stall);
-        while PHASE.load(Ordering::Acquire) != Phase::Ack {
+        while PHASE.load(Ordering::Acquire) != Phase::Ack as u8 {
             core::hint::spin_loop();
         }
     }
 
     pub(super) fn leave() {
-        PHASE.store(Phase::Release, Ordering::Release);
-        while PHASE.load(Ordering::Acquire) != Phase::Idle {
+        PHASE.store(Phase::Release as u8, Ordering::Release);
+        while PHASE.load(Ordering::Acquire) != Phase::Idle as u8 {
             core::hint::spin_loop();
         }
     }
 
-    #[ram]
+    #[ram(unstable(cache_suspend_safe))]
     fn stall() {
         {
             // The mask is taken before `Phase::Ack`. The guards drop after the cache is on again.
@@ -967,11 +962,11 @@ mod ipc_stall {
             #[cfg(soc_cpu_has_branch_predictor)]
             let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 
-            PHASE.store(Phase::Ack, Ordering::Release);
-            while PHASE.load(Ordering::Acquire) == Phase::Ack {
+            PHASE.store(Phase::Ack as u8, Ordering::Release);
+            while PHASE.load(Ordering::Acquire) == Phase::Ack as u8 {
                 core::hint::spin_loop();
             }
         }
-        PHASE.store(Phase::Idle, Ordering::Release);
+        PHASE.store(Phase::Idle as u8, Ordering::Release);
     }
 }

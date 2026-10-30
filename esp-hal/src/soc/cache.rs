@@ -50,8 +50,7 @@ cfg_select! {
 impl CacheGuard {
     /// Disable the branch predictor (it issues cache requests) and suspend the
     /// external-memory caches.
-    #[cfg_attr(cpu_retention = "software", ram(unstable(caches_suspended)))]
-    #[cfg_attr(not(cpu_retention = "software"), ram)]
+    #[ram(unstable(cache_suspend_safe))]
     pub(crate) fn suspend() -> Self {
         #[cfg(soc_cpu_has_branch_predictor)]
         let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
@@ -66,7 +65,7 @@ impl CacheGuard {
 
     /// Flush every line. Must run while the caches are still off.
     #[cfg(esp32)]
-    #[ram]
+    #[ram(unstable(cache_suspend_safe))]
     pub(crate) fn flush_while_off(&self) {
         unsafe {
             if self.inner.pro {
@@ -80,8 +79,7 @@ impl CacheGuard {
 }
 
 impl Drop for CacheGuard {
-    #[cfg_attr(cpu_retention = "software", ram(unstable(caches_suspended)))]
-    #[cfg_attr(not(cpu_retention = "software"), ram)]
+    #[ram(unstable(cache_suspend_safe))]
     fn drop(&mut self) {
         resume_caches(&self.inner);
     }
@@ -130,8 +128,7 @@ unsafe extern "C" {
     }
 }
 
-#[cfg_attr(cpu_retention = "software", ram(unstable(caches_suspended)))]
-#[cfg_attr(not(cpu_retention = "software"), ram)]
+#[ram(unstable(cache_suspend_safe))]
 fn suspend_caches() -> Inner {
     cfg_select! {
         esp32 => {
@@ -205,8 +202,7 @@ fn suspend_caches() -> Inner {
     }
 }
 
-#[cfg_attr(cpu_retention = "software", ram(unstable(caches_suspended)))]
-#[cfg_attr(not(cpu_retention = "software"), ram)]
+#[ram(unstable(cache_suspend_safe))]
 fn resume_caches(inner: &Inner) {
     cfg_select! {
         esp32 => {

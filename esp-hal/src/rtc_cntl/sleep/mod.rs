@@ -250,7 +250,7 @@ impl<'d> LowPower<'d> {
         doc = "\n\nPart of the sleep runs with the caches suspended, and that part must not call \
                code in flash. esp-hal must be built at `opt-level` 2 or 3 in each profile that \
                uses light sleep. At other levels, the link fails with `prohibited cross \
-               reference from '.rwtext.caches_suspended'` and the name of a helper function. \
+               reference from '.rwtext.cache_suspend_safe'` and the name of a helper function. \
                The `Cargo.toml` of the application can set the level for esp-hal \
                only:\n\n```toml\n\
                [profile.dev.package.esp-hal]\nopt-level = 2\n\n\

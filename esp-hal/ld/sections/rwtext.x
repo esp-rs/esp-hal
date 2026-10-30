@@ -9,30 +9,24 @@
 } > RWTEXT
 #ENDIF
 
-#IF cpu_retention == "software"
-/* Code that runs while light sleep suspends the caches. `text.x` forbids references from this
-   section to flash. This section must come before `.rwtext`, or `.rwtext` takes the input
-   sections. */
-.rwtext.caches_suspended : ALIGN(4)
+/* Code that runs while the caches are suspended. `text.x` forbids references from this section
+   to flash and to `.rwtext`. This section must come before `.rwtext`, or `.rwtext` takes the
+   input sections. */
+.rwtext.cache_suspend_safe : ALIGN(4)
 {
   _rwtext_start = .;
-  *(.rwtext.caches_suspended.*)
+  *(.rwtext.cache_suspend_safe.*)
+  /* unconditionally add patched SPI-flash ROM functions (from esp-rom-sys) - the linker is still happy if there are none */
+  *:esp_rom_spiflash.*(.literal .text .literal.* .text.*)
   . = ALIGN(4);
 } > RWTEXT
-#ENDIF
 
 .rwtext : ALIGN(4)
 {
   . = ALIGN (4);
 
-  #IF cpu_retention != "software"
-  _rwtext_start = .;
-  #ENDIF
-
   /* Keep each object's literal pool adjacent to its code (see comment in `text.x`). */
   *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
-  /* unconditionally add patched SPI-flash ROM functions (from esp-rom-sys) - the linker is still happy if there are none */
-  *:esp_rom_spiflash.*(.literal .text .literal.* .text.*)
 
   #IF rom_no_libgcc
     /* Without libgcc in ROM, compiler intrinsics must stay callable while the flash cache is disabled. */

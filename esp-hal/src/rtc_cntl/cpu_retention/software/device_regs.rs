@@ -20,7 +20,7 @@ impl DeviceRegion {
 /// Reads every region into `frame`, in the order of `regions`.
 ///
 /// Stops at the end of `frame` if the regions hold more words.
-#[ram(unstable(caches_suspended))]
+#[ram(unstable(cache_suspend_safe))]
 pub(crate) fn save(regions: &[DeviceRegion], frame: &mut [u32]) {
     let mut slots = frame.iter_mut();
     for region in regions {
@@ -37,7 +37,7 @@ pub(crate) fn save(regions: &[DeviceRegion], frame: &mut [u32]) {
 /// Writes `frame` back to every region, in the order of `regions`.
 ///
 /// Stops at the end of `frame` if the regions hold more words.
-#[ram(unstable(caches_suspended))]
+#[ram(unstable(cache_suspend_safe))]
 pub(crate) fn restore(regions: &[DeviceRegion], frame: &[u32]) {
     let mut slots = frame.iter();
     for region in regions {

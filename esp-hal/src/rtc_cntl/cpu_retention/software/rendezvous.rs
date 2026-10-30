@@ -276,7 +276,7 @@ fn helper_entry() {
 ///
 /// The APP CPU waits here while the PRO CPU suspends the caches. After a wake, the APP CPU
 /// restores its state before the caches resume.
-#[ram(unstable(caches_suspended))]
+#[ram(unstable(cache_suspend_safe))]
 fn run_helper() {
     let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 
