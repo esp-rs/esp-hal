@@ -490,6 +490,10 @@ fn cpu_wait_mode_on() -> bool {
 ///
 /// Returns immediately when a debugger is attached; intended to be called in a
 /// loop.
+///
+/// When the `ESP_HAL_CONFIG_IDLE_FREQUENCY_SCALING` option is enabled, the CPU
+/// clock comes from XTAL_CLK while the CPU waits. See
+/// [`CpuFrequencyLock`](crate::clock::CpuFrequencyLock).
 #[inline(always)]
 #[instability::unstable]
 pub fn wait_for_interrupt() {
@@ -499,7 +503,10 @@ pub fn wait_for_interrupt() {
         // https://github.com/espressif/esp-idf/blob/b9a308a47ca4128d018495662b009a7c461b6780/components/esp_hw_support/cpu.c#L57-L60
         return;
     }
-    unsafe { core::arch::asm!("wfi") };
+    cfg_select! {
+        idle_frequency_scaling => crate::clock::wait_for_interrupt(),
+        _ => unsafe { core::arch::asm!("wfi") },
+    }
 }
 
 pub(crate) fn priority_to_cpu_interrupt(_interrupt: Interrupt, level: Priority) -> CpuInterrupt {

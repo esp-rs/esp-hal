@@ -243,5 +243,13 @@ options:
       - value: true
     active: "riscv && !esp32c2 && !esp32c3"
 
+  - name: idle-frequency-scaling
+    description: "Switches the CPU clock to XTAL_CLK while `wait_for_interrupt` waits, to decrease
+      the current consumption of an idle CPU. The PLL continues to run. The switch back to the PLL
+      increases the interrupt latency. Hold a `CpuFrequencyLock` to keep the CPU clock unchanged."
+    default:
+      - value: false
+    active: "sleep_idle_frequency_scaling"
+
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"
