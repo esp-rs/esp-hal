@@ -119,6 +119,51 @@
 //! }
 //! # }
 //! ```
+//!
+//! ### I2S Write
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! # use esp_hal::time::Rate;
+//! # use esp_hal::i2s::master::{I2s, Channels, DataFormat, TdmConfig};
+//! # use esp_hal::dma_tx_stream_buffer;
+//! let tx_buffer = dma_tx_stream_buffer!(4 * 4092, 1024);
+//! let samples: &[u8] = &[0; 32000]; // Make sure you're handling a slice with actual data
+//!
+//! let i2s = I2s::new(
+//!     peripherals.I2S0,
+//!     peripherals.__dma_channel__,
+//!     TdmConfig::new_tdm_philips()
+//!         .with_sample_rate(Rate::from_hz(44100))
+//!         .with_data_format(DataFormat::Data16Channel16)
+//!         .with_channels(Channels::STEREO),
+//! )?;
+//! # {mclk}
+//!
+//! let i2s_tx = i2s
+//!     .i2s_tx
+//!     .with_bclk(peripherals.GPIO2)
+//!     .with_ws(peripherals.GPIO4)
+//!     .with_dout(peripherals.GPIO5)
+//!     .build();
+//!
+//! let mut transfer = i2s_tx.write(tx_buffer)?;
+//!
+//! let mut written = 0;
+//! let samples_len = samples.iter().len();
+//! while written < samples_len {
+//!     if transfer.available_bytes() > 0 {
+//!         let out_written = transfer.push(&samples[written..]);
+//!         written += out_written;
+//!     }
+//! }
+//!
+//! // Wait for DMA to completely transfer the bytes written above
+//! let (result, _i2s_tx, _tx_buffer) = transfer.wait();
+//! result?;
+//!
+//! # {after_snippet}
+//! ```
 #![cfg_attr(
     any(i2s_supports_pdm_tx, i2s_supports_pdm_rx),
     doc = r"## PDM mode
@@ -158,13 +203,7 @@ pub use low_level::Info;
 
 #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
 pub use super::pdm::{
-    PdmConfig,
-    PdmDataFormat,
-    PdmError,
-    PdmInstance,
-    PdmRxConfig,
-    PdmSlotMode,
-    PdmTxConfig,
+    PdmConfig, PdmDataFormat, PdmError, PdmInstance, PdmRxConfig, PdmSlotMode, PdmTxConfig,
 };
 /// Clock source for the I2S TX/RX module clocks (after the source mux and MCLK divider).
 #[cfg(not(i2s_version = "1"))]
@@ -176,28 +215,15 @@ pub use crate::clock::ll::I2sMclkOutConfig as MclkOut;
 #[cfg(i2s_version = "1")]
 pub use crate::clock::ll::I2sMclkSclk as I2sClockSource;
 use crate::{
-    Async,
-    Blocking,
-    DriverMode,
+    Async, Blocking, DriverMode,
     clock::dividers::FractionalDivider,
     dma::{
-        Channel,
-        ChannelRx,
-        ChannelTx,
-        DmaChannel,
-        DmaEligiblePeripheral,
-        DmaError,
-        DmaRxBuffer,
-        DmaRxInterrupt,
-        DmaTxBuffer,
-        DmaTxInterrupt,
+        Channel, ChannelRx, ChannelTx, DmaChannel, DmaEligiblePeripheral, DmaError, DmaRxBuffer,
+        DmaRxInterrupt, DmaTxBuffer, DmaTxInterrupt,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     gpio::{
-        InputConfig,
-        InputSignal,
-        OutputConfig,
-        OutputSignal,
+        InputConfig, InputSignal, OutputConfig, OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     i2s::{AnyI2s, any::Inner as AnyI2sInner},
