@@ -10,6 +10,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   RUSTDOCFLAGS: -Dwarnings
   DEFMT_LOG: trace
+  ESP_GENERATE_VERSION: v2.0.0
 
 jobs:
   chips:
@@ -17,6 +18,7 @@ jobs:
     outputs:
       riscv: ${{ steps.resolve.outputs.riscv }}
       xtensa: ${{ steps.resolve.outputs.xtensa }}
+      template: ${{ steps.resolve.outputs.template }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -28,6 +30,9 @@ jobs:
             echo "$arch=$(jq -c --arg a "$arch" \
               '[.[] | select(.arch == $a) | .soc]' .github/chips.json)" >> "$GITHUB_OUTPUT"
           done
+          echo "template=$(jq -c \
+            '[.[] | select(.soc != "esp32h4") | {soc, arch}]' \
+            .github/chips.json)" >> "$GITHUB_OUTPUT"
 
   esp-hal-riscv-nightly:
     name: esp-hal | nightly (${{ matrix.device }})
@@ -84,6 +89,35 @@ jobs:
       - name: Lint esp-hal on Xtensa chip
         run: cargo xtask lint ${{ matrix.device }} --toolchain esp
 
+  template:
+    name: esp-generate template (${{ matrix.chip.soc }})
+    needs: chips
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chip: ${{ fromJSON(needs.chips.outputs.template) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-toolchains
+        with:
+          xtensa: ${{ matrix.chip.arch == 'xtensa' }}
+          xtensa-buildtargets: ${{ matrix.chip.arch == 'xtensa' && matrix.chip.soc || '' }}
+          riscv: ${{ matrix.chip.arch == 'riscv' }}
+
+      - name: Install esp-generate
+        run: |
+          mkdir -p "$RUNNER_TEMP/esp-generate"
+          gh release download "$ESP_GENERATE_VERSION" --repo esp-rs/esp-generate \
+            --pattern esp-generate-x86_64-unknown-linux-gnu \
+            --output "$RUNNER_TEMP/esp-generate/esp-generate"
+          chmod +x "$RUNNER_TEMP/esp-generate/esp-generate"
+          echo "$RUNNER_TEMP/esp-generate" >> "$GITHUB_PATH"
+
+      - name: Build the esp-generate template
+        run: esp-generate --template template check -o ${{ matrix.chip.soc }} --all-combinations --build
+
   check-global-symbols:
     name: Check Global Symbols in esp-hal
     runs-on: ubuntu-latest
@@ -106,6 +140,7 @@ jobs:
         chips,
         esp-hal-riscv-nightly,
         esp-hal-xtensa-clippy,
+        template,
         check-global-symbols,
       ]
     if: ${{ failure() }}

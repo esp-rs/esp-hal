@@ -1,0 +1,39 @@
+required:
+  - chip
+
+options:
+  - !Include plugin:chip
+
+  - !Option
+    name: unstable-hal
+    display_name: Enable unstable esp-hal features.
+
+  - !Option
+    name: alloc
+    display_name: Enable allocations via esp-alloc.
+
+  - !Option
+    name: embassy
+    display_name: Add embassy framework support.
+    requires:
+      - unstable-hal
+
+  - !Option
+    name: wifi
+    display_name: Enable Wi-Fi via esp-radio.
+    requires:
+      - alloc
+      - unstable-hal
+      - embassy
+    requires_capabilities:
+      - chip.soc_has_wifi
+
+  - !Option
+    name: ble-trouble
+    display_name: Enable BLE via esp-radio (embassy-trouble).
+    requires:
+      - alloc
+      - unstable-hal
+      - embassy
+    requires_capabilities:
+      - chip.soc_has_bt
