@@ -492,11 +492,14 @@ mod tests {
 #[cfg(lp_i2c_master_driver_supported)]
 #[embedded_test::tests(default_timeout = 3)]
 mod lp_i2c {
-    use esp_hal::i2c::lp_i2c::{Config, Error, LpI2c};
     #[cfg(lp_i2c_master_version = "lp_i2c")]
-    use esp_hal::{i2c::lp_i2c::ConfigError, peripherals::LP_I2C0, time::Rate};
+    use esp_hal::time::Rate;
     #[cfg(lp_i2c_master_version = "rtc_i2c")]
     use esp_hal::{i2c::lp_i2c::Timing, peripherals::RTC_IO, time::Duration};
+    use esp_hal::{
+        i2c::lp_i2c::{Config, ConfigError, Error, LpI2c},
+        peripherals::LP_I2C0,
+    };
 
     fn init_peripherals() -> esp_hal::peripherals::Peripherals {
         esp_hal::init(esp_hal::Config::default())
@@ -506,13 +509,7 @@ mod lp_i2c {
     fn init() -> LpI2c<'static> {
         let peripherals = init_peripherals();
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
-        let config = cfg_select! {
-            lp_i2c_master_version = "rtc_i2c" => Config::default()
-                .with_timing(Timing::standard_mode())
-                .with_timeout(Duration::from_micros(100)),
-            _ => Config::default(),
-        };
-        LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap()
+        LpI2c::new(peripherals.LP_I2C0, Config::default(), sda, scl).unwrap()
     }
 
     #[test(init = init_peripherals)]
@@ -539,8 +536,7 @@ mod lp_i2c {
             digital.modify(|_, w| w.pad_driver().set_bit());
         }
 
-        let config = Config::default().with_timing(Timing::standard_mode());
-        let i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
+        let i2c = LpI2c::new(peripherals.LP_I2C0, Config::default(), sda, scl).unwrap();
         for (rtc, _) in pads {
             assert!(rtc.read().pad_driver().bit_is_set());
         }
@@ -561,6 +557,19 @@ mod lp_i2c {
             regs.sda_hold().read().bits(),
             regs.sda_sample().read().bits(),
             regs.ctr().read().bits(),
+        ]
+    }
+
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn config_registers() -> [u32; 6] {
+        let regs = LP_I2C0::regs();
+        [
+            regs.scl_low().read().bits(),
+            regs.scl_high().read().bits(),
+            regs.sda_duty().read().bits(),
+            regs.scl_start_period().read().bits(),
+            regs.scl_stop_period().read().bits(),
+            regs.to().read().bits(),
         ]
     }
 
@@ -691,6 +700,9 @@ mod lp_i2c {
     fn rtc_empty_write_sends_register_address(mut i2c: LpI2c<'static>) {
         use super::{DUT_ADDRESS, WRITE_COMMAND};
 
+        // Leave time for targets that stretch SCL before acknowledging.
+        i2c.apply_config(&Config::default().with_timeout(Duration::from_millis(1)))
+            .unwrap();
         i2c.write(DUT_ADDRESS, WRITE_COMMAND[0], &[]).unwrap();
 
         let regs = esp_hal::peripherals::LP_I2C0::regs();
@@ -700,6 +712,99 @@ mod lp_i2c {
         assert_eq!(write.command().bits() as u8, 2);
         assert!(stop.command_done().bit_is_set());
         assert_eq!(stop.command().bits() >> 11, 3);
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn rejects_rtc_timeout_before_truncation(mut i2c: LpI2c<'static>) {
+        use esp_hal::clock::ll;
+
+        let source = ll::rtc_fast_clk_frequency() as u64;
+        let wrap_us = ((1u64 << 32) * 1_000_000).div_ceil(source);
+        let limit_us = ((1u64 << 20) * 1_000_000).div_ceil(source);
+        let config = Config::default();
+        i2c.apply_config(&config.with_timeout(Duration::from_micros(limit_us - 1)))
+            .unwrap();
+        let before = config_registers();
+        let timeout_ticks = LP_I2C0::regs().to().read().time_out().bits();
+        assert_eq!(
+            u64::from(timeout_ticks),
+            (limit_us - 1) * source / 1_000_000
+        );
+
+        let timing = config.timing();
+        let timing = timing.with_scl_start_period(timing.scl_start_period() + 1);
+        let config = config.with_timing(timing);
+        for micros in [limit_us, wrap_us] {
+            assert_eq!(
+                i2c.apply_config(&config.with_timeout(Duration::from_micros(micros))),
+                Err(ConfigError::TimeoutTooLong)
+            );
+            assert_eq!(config_registers(), before);
+        }
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn validates_rtc_timing_limits(mut i2c: LpI2c<'static>) {
+        let max = (1 << 20) - 1;
+        let timing = Timing::default()
+            .with_scl_low_period(max)
+            .with_scl_high_period(max - 1)
+            .with_sda_duty(max - 1)
+            .with_scl_start_period(max)
+            .with_scl_stop_period(max);
+        i2c.apply_config(
+            &Config::default()
+                .with_timing(timing)
+                .with_timeout(Duration::ZERO),
+        )
+        .unwrap();
+        let before = config_registers();
+        assert_eq!(before, [max, max - 1, max - 1, max, max, 0]);
+        let timing = Timing::standard_mode();
+        let overflow = 1 << 20;
+        for timing in [
+            timing.with_scl_low_period(timing.scl_low_period() + overflow),
+            timing.with_scl_start_period(timing.scl_start_period() + overflow),
+            timing.with_scl_stop_period(timing.scl_stop_period() + overflow),
+            timing.with_scl_stop_period(timing.scl_high_period()),
+            timing.with_sda_duty(timing.scl_low_period()),
+            timing.with_scl_start_period(8),
+            timing
+                .with_scl_low_period(21)
+                .with_scl_high_period(2)
+                .with_sda_duty(15),
+            timing.with_sda_duty(14),
+        ] {
+            assert_eq!(
+                i2c.apply_config(&Config::default().with_timing(timing)),
+                Err(ConfigError::TimingOutOfRange)
+            );
+            assert_eq!(config_registers(), before);
+        }
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn rtc_timing_presets_with_divided_clock(mut i2c: LpI2c<'static>) {
+        use esp_hal::clock::ll::{self, ClockTree, RcFastClkDivNConfig};
+
+        let original = ClockTree::with(|clocks| {
+            let original = ll::rc_fast_clk_div_n_config(clocks).unwrap();
+            ll::configure_rc_fast_clk_div_n(clocks, RcFastClkDivNConfig::new(3));
+            original
+        });
+        let regs = LP_I2C0::regs();
+        let config = Config::default();
+        let timeout_ticks = ll::rtc_fast_clk_frequency() * 20 / 1_000_000;
+        for config in [config, config.with_timing(Timing::fast_mode())] {
+            i2c.apply_config(&config).unwrap();
+            assert_eq!(regs.sda_duty().read().num().bits(), 15);
+            assert_eq!(regs.to().read().time_out().bits(), timeout_ticks);
+        }
+
+        ClockTree::with(|clocks| ll::configure_rc_fast_clk_div_n(clocks, original));
     }
 }
 

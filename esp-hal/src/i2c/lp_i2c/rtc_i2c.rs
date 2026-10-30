@@ -89,10 +89,37 @@ impl<'d> LpI2c<'d> {
     }
 
     pub(super) fn configure(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let ticks = nanos_to_clock(config.timeout.as_micros().saturating_mul(1_000));
+        use crate::pac::rtc_i2c::{
+            scl_low::{PERIOD_W as LOW_W, SCL_LOW_SPEC},
+            scl_start_period::{SCL_START_PERIOD_SPEC, SCL_START_PERIOD_W},
+            scl_stop_period::{SCL_STOP_PERIOD_SPEC, SCL_STOP_PERIOD_W},
+            to::{TIME_OUT_W, TO_SPEC},
+        };
 
-        // The register field is 20 bits wide.
-        if ticks > (1 << 20) - 1 {
+        let timing = &config.timing;
+        // SDA duty and SCL high have the same width as their upper bounds below.
+        if timing.scl_low_period >= (1 << LOW_W::<SCL_LOW_SPEC>::WIDTH)
+            || timing.scl_start_period >= (1 << SCL_START_PERIOD_W::<SCL_START_PERIOD_SPEC>::WIDTH)
+            || timing.scl_stop_period >= (1 << SCL_STOP_PERIOD_W::<SCL_STOP_PERIOD_SPEC>::WIDTH)
+        {
+            return Err(ConfigError::TimingOutOfRange);
+        }
+
+        // The RTC input filters require minimum sample windows and ordered timing edges.
+        // See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/ulp/ulp_riscv/ulp_riscv_i2c.c#L174-L180>.
+        if timing.scl_stop_period <= timing.scl_high_period
+            || timing.sda_duty >= timing.scl_low_period
+            || timing.scl_start_period <= 8
+            || timing.sda_duty <= 14
+            || timing.scl_low_period - timing.sda_duty + timing.scl_high_period <= 8
+        {
+            return Err(ConfigError::TimingOutOfRange);
+        }
+
+        let ticks = config.timeout.as_micros() as u128
+            * crate::soc::clocks::rtc_fast_clk_frequency() as u128
+            / 1_000_000;
+        if ticks >= (1 << TIME_OUT_W::<TO_SPEC>::WIDTH) {
             return Err(ConfigError::TimeoutTooLong);
         }
 
@@ -120,7 +147,7 @@ impl<'d> LpI2c<'d> {
         self.i2c
             .register_block()
             .to()
-            .write(|w| unsafe { w.time_out().bits(ticks) });
+            .write(|w| unsafe { w.time_out().bits(ticks as u32) });
 
         Ok(())
     }
@@ -391,74 +418,118 @@ impl<'d> LpI2c<'d> {
 }
 
 /// I2C-specific configuration errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
+    /// A timing value exceeds a register field or violates a hardware timing constraint.
+    TimingOutOfRange,
     /// The timeout period is longer than the configuration register allows.
     TimeoutTooLong,
 }
 
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::TimingOutOfRange => f.write_str(
+                "The timing values exceed a register field or violate a hardware constraint",
+            ),
+            Self::TimeoutTooLong => {
+                f.write_str("The timeout exceeds its configuration register field")
+            }
+        }
+    }
+}
+
+impl core::error::Error for ConfigError {}
+
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, procmacros::BuilderLite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
-    /// The I2C timings (clock frequency).
+    /// The I2C timings. Defaults to the standard-mode preset.
     timing: Timing,
 
-    /// I2C SCL timeout period.
+    /// I2C SCL timeout period. Defaults to 20 microseconds.
     timeout: Duration,
 }
 
-/// I2C timings
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, procmacros::BuilderLite)]
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            timing: Timing::default(),
+            timeout: Duration::from_micros(20),
+        }
+    }
+}
+
+/// I2C timings. Defaults to the standard-mode preset.
+///
+/// Presets use the RTC_FAST clock frequency when they are constructed.
+/// At low frequencies, the presets lengthen their periods to
+/// keep SDA duty at or above the hardware minimum of 15 cycles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Timing {
-    /// SCL low period
+    /// SCL low period, in RTC_FAST clock cycles.
     scl_low_period: u32,
-    /// SCL high period
+    /// SCL high period, in RTC_FAST clock cycles.
     scl_high_period: u32,
-    /// Period between the SDA switch and the falling edge of SCL
+    /// Period between the SDA switch and the falling edge of SCL, in RTC_FAST clock cycles.
     sda_duty: u32,
-    /// Waiting time after the START condition in micro seconds
+    /// Waiting time after the START condition, in RTC_FAST clock cycles.
     scl_start_period: u32,
-    /// Waiting time before the END condition in micro seconds
+    /// Waiting time before the STOP condition, in RTC_FAST clock cycles.
     scl_stop_period: u32,
 }
 
+impl Default for Timing {
+    fn default() -> Self {
+        Self::standard_mode()
+    }
+}
+
 impl Timing {
-    /// I2C timings for standard mode (100 kHz).
+    /// Returns I2C timings for nominal standard mode (100 kHz).
     pub fn standard_mode() -> Self {
-        Self::default()
-            .with_scl_low_period(clock_from_micros(5))
-            .with_scl_high_period(clock_from_micros(5))
-            .with_sda_duty(clock_from_micros(2))
-            .with_scl_start_period(clock_from_micros(3))
-            .with_scl_stop_period(clock_from_micros(6))
+        let frequency = preset_clock_frequency().max(7_500_000);
+        Self {
+            scl_low_period: clock_from_nanos(5_000, frequency),
+            scl_high_period: clock_from_nanos(5_000, frequency),
+            sda_duty: clock_from_nanos(2_000, frequency),
+            scl_start_period: clock_from_nanos(3_000, frequency),
+            scl_stop_period: clock_from_nanos(6_000, frequency),
+        }
     }
 
-    /// I2C timings for fast mode (400 kHz).
+    /// Returns a timing preset targeting 400 kHz.
+    ///
+    /// With an RTC_FAST clock of 15 MHz or higher, the configured SCL high
+    /// period is about 0.3 µs, below the Fast-mode minimum of 0.6 µs.
+    /// The actual SCL timing depends on the RTC_FAST clock and the bus rise time.
     pub fn fast_mode() -> Self {
-        Self::default()
-            .with_scl_low_period(clock_from_nanos(1_400))
-            .with_scl_high_period(clock_from_nanos(300))
-            .with_sda_duty(clock_from_nanos(1_000))
-            .with_scl_start_period(clock_from_nanos(2_000))
-            .with_scl_stop_period(clock_from_nanos(1_300))
+        let frequency = preset_clock_frequency().max(15_000_000);
+        Self {
+            scl_low_period: clock_from_nanos(1_400, frequency),
+            scl_high_period: clock_from_nanos(300, frequency),
+            sda_duty: clock_from_nanos(1_000, frequency),
+            scl_start_period: clock_from_nanos(2_000, frequency),
+            scl_stop_period: clock_from_nanos(1_300, frequency),
+        }
     }
 }
 
-fn clock_from_micros(micros: u64) -> u32 {
-    nanos_to_clock(micros * 1_000)
+fn preset_clock_frequency() -> u32 {
+    match crate::soc::clocks::rtc_fast_clk_frequency() {
+        // RTC_FAST has no configured frequency before HAL initialization.
+        0 => crate::soc::clocks::rc_fast_clk_frequency(),
+        frequency => frequency,
+    }
 }
 
-fn clock_from_nanos(nanos: u64) -> u32 {
-    nanos_to_clock(nanos)
-}
-
-fn nanos_to_clock(nanos: u64) -> u32 {
-    ((nanos as u128 * crate::soc::clocks::rc_fast_clk_frequency() as u128) / 1_000_000_000) as u32
+fn clock_from_nanos(nanos: u32, frequency: u32) -> u32 {
+    (u64::from(nanos) * u64::from(frequency) / 1_000_000_000) as u32
 }
 
 /// A generic I2C Command.
