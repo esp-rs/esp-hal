@@ -1,7 +1,9 @@
 use super::PAD_CLK_SEL;
-use crate::peripherals::PCR;
+use crate::{peripherals::PCR, time::Rate};
 
 pub(super) const MAX_DIV_NUM: u32 = 0xFFFF;
+
+pub(super) const DEFAULT_FREQUENCY: Rate = Rate::from_khz(100);
 
 pub(super) fn uses_pad_clock(tx: bool) -> bool {
     let pcr = PCR::regs();

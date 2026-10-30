@@ -452,7 +452,7 @@ pub struct RxConfig {
 impl Default for RxConfig {
     fn default() -> Self {
         Self {
-            frequency: Rate::from_khz(100),
+            frequency: unit_clock::DEFAULT_FREQUENCY,
             bit_order: BitPackOrder::Msb,
             timeout_ticks: None,
         }
@@ -500,7 +500,7 @@ pub struct TxConfig {
 impl Default for TxConfig {
     fn default() -> Self {
         Self {
-            frequency: Rate::from_khz(100),
+            frequency: unit_clock::DEFAULT_FREQUENCY,
             idle_value: 0,
             sample_edge: SampleEdge::Normal,
             bit_order: BitPackOrder::Msb,

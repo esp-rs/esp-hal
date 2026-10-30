@@ -1,7 +1,13 @@
 use super::PAD_CLK_SEL;
-use crate::peripherals::{HP_ALIVE_SYS, HP_SYS_CLKRST};
+use crate::{
+    peripherals::{HP_ALIVE_SYS, HP_SYS_CLKRST},
+    time::Rate,
+};
 
 pub(super) const MAX_DIV_NUM: u32 = 0xFF;
+
+// The 8-bit divider cannot make 100 kHz from the default 160 MHz source.
+pub(super) const DEFAULT_FREQUENCY: Rate = Rate::from_mhz(1);
 
 pub(super) fn uses_pad_clock(tx: bool) -> bool {
     let clkrst = HP_SYS_CLKRST::regs();
