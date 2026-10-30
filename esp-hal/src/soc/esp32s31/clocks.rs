@@ -188,6 +188,26 @@ fn enable_bbpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
         .modify(|_, w| w.hp_spll_480m_clk_en().bit(en));
 }
 
+/// Requests the clock source of the flash controller for the life of the program.
+///
+/// The bootloader selects the clock source of the flash controller: XTAL_CLK, the BBPLL or the
+/// CPLL. The flash controller must keep that clock while the program runs. The clock tree does
+/// not count the flash controller as a user of that clock, so a reference that nothing releases
+/// keeps the PLL on when the CPU moves to another clock.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/esp_clk_tree.c#L412-L413>.
+pub(crate) fn request_flash_clock_source(clocks: &mut ClockTree) {
+    match HP_SYS_CLKRST::regs()
+        .flash_ctrl0()
+        .read()
+        .clk_src_sel()
+        .bits()
+    {
+        1 => request_bbpll_clk(clocks),
+        2 => request_cpll_clk(clocks),
+        _ => {}
+    }
+}
+
 // CPLL_CLK
 
 fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
