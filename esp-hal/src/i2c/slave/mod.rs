@@ -8,9 +8,8 @@
 //!
 //! ## Implementation
 //!
-//! This driver supports both Blocking and Async modes, using hardware SCL clock stretching
-//! to handle flow control. The async implementation runs a callback-free waker model, waking
-//! the task waker when stretching or transaction completeness interrupts occur.
+//! This driver uses SCL clock stretching for flow control in [`Blocking`] and [`Async`] modes.
+//! Writes stretch SCL at each data byte's ACK until the driver consumes that byte.
 
 use core::{
     future::Future,
@@ -26,6 +25,7 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
+    clock::ll::{ClockTree, I2cFunctionClockConfig, I2cInstance},
     gpio::{
         DriveMode,
         InputSignal,
@@ -39,7 +39,7 @@ use crate::{
     i2c::master::I2cAddress,
     interrupt::InterruptHandler,
     pac::i2c0::RegisterBlock,
-    private,
+    private::{self, DropGuard},
     ram,
     rtc_cntl::WakeLock,
     system::PeripheralGuard,
@@ -57,12 +57,20 @@ pub enum Error {
     Timeout,
     /// The arbitration for the bus was lost.
     ArbitrationLost,
+    /// The receive buffer is too small, or the RX FIFO overflowed.
+    Overflow,
+    /// The response buffer exceeds 65,535 bytes.
+    ResponseTooLong,
+    /// The master ended a read without a NACK.
+    ReadAborted,
 }
 
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
         match self {
             Self::ArbitrationLost => embedded_hal::i2c::ErrorKind::ArbitrationLoss,
+            Self::Overflow => embedded_hal::i2c::ErrorKind::Overrun,
+            Self::ReadAborted => embedded_hal::i2c::ErrorKind::Bus,
             _ => embedded_hal::i2c::ErrorKind::Other,
         }
     }
@@ -115,15 +123,15 @@ pub enum Command {
     Write(usize),
 }
 
-/// Possible responses to responding to a read request
+/// Result of a response to a master read request.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ReadStatus {
-    /// Transaction Complete; master completed reading all provided bytes.
+    /// The master read exactly the provided number of bytes.
     Done,
-    /// Transaction Incomplete; master is trying to read more bytes than were provided.
+    /// The master read beyond the provided data and received `0xff` padding.
     NeedMoreBytes,
-    /// Transaction Complete, but master stopped reading before all bytes were consumed.
+    /// The number of provided bytes the master did not read.
     LeftoverBytes(u16),
 }
 
@@ -133,16 +141,38 @@ pub enum ReadStatus {
 pub struct I2cSlave<'d, Dm: DriverMode> {
     i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
+    // Release the function clock before disabling peripheral register access.
+    clock_guard: I2cClockGuard,
     guard: PeripheralGuard,
-    config: DriverConfig,
+    sda_pin: PinGuard,
+    scl_pin: PinGuard,
 }
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-struct DriverConfig {
-    config: Config,
-    sda_pin: PinGuard,
-    scl_pin: PinGuard,
+struct I2cClockGuard {
+    clock: I2cInstance,
+}
+
+impl I2cClockGuard {
+    fn new(clock: I2cInstance) -> Self {
+        ClockTree::with(|clocks| {
+            let config = I2cFunctionClockConfig::new(
+                Default::default(),
+                #[cfg(any(i2c_master_version = "3", i2c_master_version = "4"))]
+                0,
+            );
+            clock.configure_function_clock(clocks, config);
+            clock.request_function_clock(clocks);
+        });
+        Self { clock }
+    }
+}
+
+impl Drop for I2cClockGuard {
+    fn drop(&mut self) {
+        ClockTree::with(|clocks| self.clock.release_function_clock(clocks));
+    }
 }
 
 impl<Dm: DriverMode> embedded_hal::i2c::ErrorType for I2cSlave<'_, Dm> {
@@ -150,9 +180,14 @@ impl<Dm: DriverMode> embedded_hal::i2c::ErrorType for I2cSlave<'_, Dm> {
 }
 
 impl<'d> I2cSlave<'d, Blocking> {
-    /// Creates a new I2C slave instance.
+    /// Creates a new I2C slave instance in [`Blocking`] mode.
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::AddressInvalid`] when the address is not a valid 7-bit address.
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
+        let clock_guard = I2cClockGuard::new(i2c.info().clock_instance);
 
         let sda_pin = PinGuard::new_unconnected();
         let scl_pin = PinGuard::new_unconnected();
@@ -160,12 +195,10 @@ impl<'d> I2cSlave<'d, Blocking> {
         let mut slave = I2cSlave {
             i2c: i2c.degrade(),
             phantom: PhantomData,
+            clock_guard,
             guard,
-            config: DriverConfig {
-                config,
-                sda_pin,
-                scl_pin,
-            },
+            sda_pin,
+            scl_pin,
         };
 
         slave.apply_config(&config)?;
@@ -173,6 +206,8 @@ impl<'d> I2cSlave<'d, Blocking> {
     }
 
     /// Reconfigures the driver to operate in [`Async`] mode.
+    ///
+    /// Pending requests are preserved.
     pub fn into_async(self) -> I2cSlave<'d, Async> {
         self.i2c
             .set_interrupt_handler(self.driver().info.async_handler);
@@ -180,23 +215,103 @@ impl<'d> I2cSlave<'d, Blocking> {
         I2cSlave {
             i2c: self.i2c,
             phantom: PhantomData,
+            clock_guard: self.clock_guard,
             guard: self.guard,
-            config: self.config,
+            sda_pin: self.sda_pin,
+            scl_pin: self.scl_pin,
         }
     }
 }
 
 impl<'d> I2cSlave<'d, Async> {
     /// Reconfigures the driver to operate in [`Blocking`] mode.
+    ///
+    /// Pending requests are preserved.
     pub fn into_blocking(self) -> I2cSlave<'d, Blocking> {
         self.i2c.disable_peri_interrupt();
 
         I2cSlave {
             i2c: self.i2c,
             phantom: PhantomData,
+            clock_guard: self.clock_guard,
             guard: self.guard,
-            config: self.config,
+            sda_pin: self.sda_pin,
+            scl_pin: self.scl_pin,
         }
+    }
+
+    /// Listens for a request from the master asynchronously.
+    ///
+    /// See [`Self::listen`] for the receive behavior and errors.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Canceling a pending operation resets the controller and discards pending
+    /// requests. The master must retry these requests.
+    /// The receive buffer can contain partial data.
+    pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
+        let regs = self.driver().info.regs();
+        let state = self.i2c.state();
+
+        self.driver().start_listen();
+
+        let cancel_on_drop = DropGuard::new(self.driver(), |driver| driver.recover());
+        let result = async {
+            let mut bytes_read = 0;
+            loop {
+                I2cSlaveFuture::new(
+                    regs,
+                    state,
+                    Event::SlaveStretch | Event::TransComplete | Event::StartDetected,
+                )
+                .await?;
+                if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
+                    return res;
+                }
+            }
+        }
+        .await;
+        cancel_on_drop.defuse();
+        result
+    }
+
+    /// Responds to a master read request asynchronously.
+    ///
+    /// See [`Self::respond_to_read`] for the response behavior and errors.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Canceling a pending operation resets the controller and discards pending
+    /// requests. The master must retry these requests.
+    pub async fn respond_to_read_async(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
+        let regs = self.driver().info.regs();
+        let state = self.i2c.state();
+
+        let mut bytes_written = 1;
+        let mut nack_received = false;
+        self.driver().start_read(buffer)?;
+
+        let cancel_on_drop = DropGuard::new(self.driver(), |driver| driver.recover());
+        let result = async {
+            loop {
+                let mut events = Event::TransComplete | Event::StartDetected;
+                if !nack_received {
+                    events |= Event::SlaveStretch | Event::Nack;
+                }
+                I2cSlaveFuture::new(regs, state, events).await?;
+
+                if let Some(status) = self.driver().respond_to_read_step(
+                    buffer,
+                    &mut bytes_written,
+                    &mut nack_received,
+                ) {
+                    return status;
+                }
+            }
+        }
+        .await;
+        cancel_on_drop.defuse();
+        result
     }
 }
 
@@ -204,8 +319,6 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     fn driver(&self) -> Driver<'_> {
         Driver {
             info: self.i2c.info(),
-            state: self.i2c.state(),
-            config: &self.config,
         }
     }
 
@@ -214,7 +327,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
         let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
-        Driver::connect_pin(sda.into(), input, output, &mut self.config.sda_pin);
+        Driver::connect_pin(sda.into(), input, output, &mut self.sda_pin);
         self
     }
 
@@ -223,44 +336,52 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
         let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
-        Driver::connect_pin(scl.into(), input, output, &mut self.config.scl_pin);
+        Driver::connect_pin(scl.into(), input, output, &mut self.scl_pin);
         self
     }
 
     /// Applies a new configuration.
+    ///
+    /// A valid configuration resets the controller and discards pending requests.
+    /// The master must retry these requests.
+    /// Invalid configurations preserve the current settings and FIFO contents.
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::AddressInvalid`] when the address is not a valid 7-bit address.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.config.config = *config;
-        self.driver().setup(config)?;
-        Ok(())
+        self.driver().setup(config)
     }
-}
 
-impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     /// Listens for a request from the master.
     ///
-    /// If the master writes to the slave, this method reads data into the provided
-    /// `buffer` and returns `Command::Write(len)`.
-    /// If the master is requesting a read, it returns `Command::Read` with the SCL line
-    /// stretched (held low).
+    /// Receives writes into `buffer` and returns [`Command::Write`] with the number
+    /// of received bytes at STOP or repeated START. Address-only write probes are ignored.
+    /// Extra bytes are discarded if `buffer` is too small.
+    ///
+    /// Returns [`Command::Read`] for a read request and holds SCL low until
+    /// [`Self::respond_to_read`] supplies the response.
+    /// Pending receive data is preserved between calls.
+    /// A pending write holds SCL low until this method receives its data.
+    ///
+    /// After [`Error::Timeout`] or [`Error::ArbitrationLost`], the next call resets
+    /// the controller and discards pending data.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Overflow`] when the receive buffer is too small or the RX FIFO overflows.
+    /// The error is reported after STOP or repeated START.
+    ///
+    /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
+    /// when arbitration is lost.
     pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
-        let regs = self.driver().info.regs();
-
-        self.driver().reset_fifo();
-
-        regs.scl_stretch_conf().modify(|_, w| unsafe {
-            w.stretch_protect_num().bits(0x3ff);
-            w.slave_scl_stretch_en().set_bit()
-        });
-
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        self.driver().update_registers();
+        let driver = self.driver();
+        driver.start_listen();
 
         let mut bytes_read = 0;
         loop {
-            self.driver().check_errors()?;
-            if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
+            Driver::check_errors(driver.regs(), true)?;
+            if let Some(res) = driver.listen_step(buffer, &mut bytes_read) {
                 return res;
             }
         }
@@ -268,91 +389,33 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
 
     /// Responds to a master read request.
     ///
-    /// Writes the contents of `buffer` to the TX FIFO, clears the clock stretch,
-    /// and waits for the transaction to complete.
+    /// Sends data from `buffer` and releases SCL clock stretching.
+    /// Waits for STOP or a repeated START to complete the response.
+    /// Data is padded with `0xff` if the master reads past the end of `buffer`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ResponseTooLong`] when `buffer` contains more than 65,535 bytes.
+    /// The pending read request is preserved.
+    ///
+    /// [`Error::ReadAborted`] when the master ends the read without a NACK.
+    /// The controller resets and discards pending requests.
+    /// The master must retry these requests.
+    ///
+    /// [`Error::Timeout`] when the bus times out, or [`Error::ArbitrationLost`]
+    /// when arbitration is lost.
     pub fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
-        let regs = self.driver().info.regs();
-        let mut bytes_written = 0;
-        let initial_write = core::cmp::min(buffer.len(), FIFO_SIZE);
-        for &byte in buffer.iter().take(initial_write) {
-            regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
-        }
-        bytes_written += initial_write;
-
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        self.driver().update_registers();
+        let driver = self.driver();
+        let mut bytes_written = 1;
+        let mut nack_received = false;
+        driver.start_read(buffer)?;
 
         loop {
-            self.driver().check_errors()?;
-            if let Some(res) = self
-                .driver()
-                .respond_to_read_step(buffer, &mut bytes_written)
+            Driver::check_errors(driver.regs(), !nack_received)?;
+            if let Some(status) =
+                driver.respond_to_read_step(buffer, &mut bytes_written, &mut nack_received)
             {
-                return res;
-            }
-        }
-    }
-}
-
-impl<'d> I2cSlave<'d, Async> {
-    /// Listens for a request from the master asynchronously.
-    pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
-        let regs = self.driver().info.regs();
-        let state = self.i2c.state();
-
-        self.driver().reset_fifo();
-
-        regs.scl_stretch_conf().modify(|_, w| unsafe {
-            w.stretch_protect_num().bits(0x3ff);
-            w.slave_scl_stretch_en().set_bit()
-        });
-
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        self.driver().update_registers();
-
-        let mut bytes_read = 0;
-        loop {
-            I2cSlaveFuture::new(regs, state, Event::SlaveStretch | Event::TransComplete).await?;
-            if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
-                return res;
-            }
-        }
-    }
-
-    /// Responds to a master read request asynchronously.
-    pub async fn respond_to_read_async(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
-        let regs = self.driver().info.regs();
-        let state = self.i2c.state();
-
-        let mut bytes_written = 0;
-        let initial_write = core::cmp::min(buffer.len(), FIFO_SIZE);
-        for &byte in buffer.iter().take(initial_write) {
-            regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
-        }
-        bytes_written += initial_write;
-
-        regs.scl_stretch_conf()
-            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-        regs.int_clr().write(|w| unsafe { w.bits(0x3fff) });
-        self.driver().update_registers();
-
-        loop {
-            I2cSlaveFuture::new(
-                regs,
-                state,
-                Event::SlaveStretch | Event::TransComplete | Event::Nack,
-            )
-            .await?;
-
-            if let Some(res) = self
-                .driver()
-                .respond_to_read_step(buffer, &mut bytes_written)
-            {
-                return res;
+                return status;
             }
         }
     }
@@ -367,6 +430,7 @@ pub(crate) enum Event {
     SlaveStretch,
     TransComplete,
     Nack,
+    StartDetected,
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -378,22 +442,7 @@ struct I2cSlaveFuture<'a> {
 }
 
 impl<'a> I2cSlaveFuture<'a> {
-    pub fn new(regs: &'a RegisterBlock, state: &'a State, events: EnumSet<Event>) -> Self {
-        regs.int_ena().modify(|_, w| {
-            if events.contains(Event::SlaveStretch) {
-                w.slave_stretch().set_bit();
-            }
-            if events.contains(Event::TransComplete) {
-                w.trans_complete().set_bit();
-            }
-            if events.contains(Event::Nack) {
-                w.nack().set_bit();
-            }
-            w.arbitration_lost().set_bit();
-            w.time_out().set_bit();
-            w
-        });
-
+    fn new(regs: &'a RegisterBlock, state: &'a State, events: EnumSet<Event>) -> Self {
         Self {
             regs,
             state,
@@ -409,25 +458,18 @@ impl Future for I2cSlaveFuture<'_> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         self.state.waker.register(cx.waker());
 
+        if let Err(error) =
+            Driver::check_errors(self.regs, self.events.contains(Event::SlaveStretch))
+        {
+            return Poll::Ready(Err(error));
+        }
+
         let raw = self.regs.int_raw().read();
-
-        if raw.arbitration_lost().bit_is_set() {
-            return Poll::Ready(Err(Error::ArbitrationLost));
-        }
-        if raw.time_out().bit_is_set() {
-            return Poll::Ready(Err(Error::Timeout));
-        }
-
-        let mut triggered = false;
-        if self.events.contains(Event::SlaveStretch) && raw.slave_stretch().bit_is_set() {
-            triggered = true;
-        }
-        if self.events.contains(Event::TransComplete) && raw.trans_complete().bit_is_set() {
-            triggered = true;
-        }
-        if self.events.contains(Event::Nack) && raw.nack().bit_is_set() {
-            triggered = true;
-        }
+        let triggered = (self.events.contains(Event::SlaveStretch)
+            && raw.slave_stretch().bit_is_set())
+            || (self.events.contains(Event::TransComplete) && raw.trans_complete().bit_is_set())
+            || (self.events.contains(Event::Nack) && raw.nack().bit_is_set())
+            || (self.events.contains(Event::StartDetected) && raw.det_start().bit_is_set());
 
         if triggered {
             Poll::Ready(Ok(()))
@@ -441,6 +483,9 @@ impl Future for I2cSlaveFuture<'_> {
                 }
                 if self.events.contains(Event::Nack) {
                     w.nack().set_bit();
+                }
+                if self.events.contains(Event::StartDetected) {
+                    w.det_start().set_bit();
                 }
                 w.arbitration_lost().set_bit();
                 w.time_out().set_bit();
@@ -484,6 +529,7 @@ pub struct Info {
     pub(crate) register_block: *const RegisterBlock,
     pub(crate) peripheral: crate::system::Peripheral,
     pub(crate) async_handler: InterruptHandler,
+    pub(crate) clock_instance: I2cInstance,
     pub(crate) scl_output: OutputSignal,
     pub(crate) scl_input: InputSignal,
     pub(crate) sda_output: OutputSignal,
@@ -516,11 +562,8 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
     }
 }
 
-#[allow(dead_code)]
 struct Driver<'a> {
     info: &'a Info,
-    state: &'a State,
-    config: &'a DriverConfig,
 }
 
 impl Driver<'_> {
@@ -549,6 +592,7 @@ impl Driver<'_> {
     fn init_slave(&self) {
         self.regs().ctr().write(|w| {
             w.ms_mode().clear_bit(); // Slave mode
+            w.rx_full_ack_level().clear_bit();
             w.sda_force_out().set_bit();
             w.scl_force_out().set_bit();
             #[cfg(i2c_master_has_arbitration_en)]
@@ -566,29 +610,26 @@ impl Driver<'_> {
         });
     }
 
-    fn set_slave_addr(&self, address: I2cAddress) -> Result<(), ConfigError> {
-        match address {
-            I2cAddress::SevenBit(addr) if addr <= 0x7F => {
-                self.regs().slave_addr().write(|w| unsafe {
-                    w.slave_addr().bits(addr as u16);
-                    w.addr_10bit_en().bit(false)
-                });
-                Ok(())
-            }
-            _ => Err(ConfigError::AddressInvalid),
-        }
-    }
-
     fn update_registers(&self) {
         #[cfg(i2c_master_has_conf_update)]
         self.regs().ctr().modify(|_, w| w.conf_upgate().set_bit());
     }
 
     fn setup(&self, config: &Config) -> Result<(), ConfigError> {
+        let address = match config.address {
+            I2cAddress::SevenBit(addr) if addr <= 0x7F => addr,
+            _ => return Err(ConfigError::AddressInvalid),
+        };
+
+        // FIFO resets do not clear an active transaction.
+        crate::system::PeripheralClockControl::reset(self.info.peripheral);
         self.init_slave();
-        self.set_slave_addr(config.address)?;
 
         let regs = self.regs();
+        regs.slave_addr().write(|w| unsafe {
+            w.slave_addr().bits(address as u16);
+            w.addr_10bit_en().clear_bit()
+        });
         regs.to().modify(|_, w| unsafe {
             w.time_out_en().set_bit();
             w.time_out_value().bits(14);
@@ -596,7 +637,6 @@ impl Driver<'_> {
         });
 
         regs.clk_conf().modify(|_, w| w.sclk_sel().clear_bit());
-        self.set_slave_addr(config.address)?;
 
         regs.ctr()
             .modify(|_, w| w.addr_broadcasting_en().clear_bit());
@@ -605,9 +645,6 @@ impl Driver<'_> {
             w.fifo_prt_en().set_bit();
             unsafe { w.txfifo_wm_thrhd().bits(0) }
         });
-
-        regs.fifo_conf().modify(|_, w| w.fifo_prt_en().set_bit());
-        regs.ctr().write(|w| w.rx_full_ack_level().clear_bit());
 
         regs.fifo_conf()
             .modify(|_, w| unsafe { w.rxfifo_wm_thrhd().bits(0x1F) });
@@ -620,6 +657,9 @@ impl Driver<'_> {
 
         regs.scl_stretch_conf().modify(|_, w| unsafe {
             w.stretch_protect_num().bits(0x3ff);
+            // Service each byte before the master can cross a transaction boundary.
+            w.slave_byte_ack_ctl_en().set_bit();
+            w.slave_byte_ack_lvl().clear_bit();
             w.slave_scl_stretch_en().set_bit()
         });
 
@@ -630,43 +670,65 @@ impl Driver<'_> {
         Ok(())
     }
 
+    fn reset_tx_fifo(&self) {
+        let regs = self.regs();
+        regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().set_bit());
+        regs.fifo_conf().modify(|_, w| w.tx_fifo_rst().clear_bit());
+    }
+
     fn reset_fifo(&self) {
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().set_bit());
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().clear_bit());
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.rx_fifo_rst().set_bit());
-        self.regs()
-            .fifo_conf()
-            .modify(|_, w| w.rx_fifo_rst().clear_bit());
+        self.reset_tx_fifo();
+        let regs = self.regs();
+        regs.fifo_conf().modify(|_, w| w.rx_fifo_rst().set_bit());
+        regs.fifo_conf().modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
 
-    fn reset_fsm(&self) {
-        #[cfg(i2c_master_has_reliable_fsm_reset)]
-        {
-            self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
-        }
-        #[cfg(not(i2c_master_has_reliable_fsm_reset))]
-        {
-            crate::system::PeripheralClockControl::reset(self.info.peripheral);
-            self.setup(&self.config.config).ok();
-        }
-    }
-
-    fn check_errors(&self) -> Result<(), Error> {
-        let r = self.regs().int_raw().read();
+    fn check_errors(regs: &RegisterBlock, allow_tx_stretch: bool) -> Result<(), Error> {
+        let r = regs.int_raw().read();
 
         if r.arbitration_lost().bit_is_set() {
             return Err(Error::ArbitrationLost);
         }
+        // The timeout counter also runs while the slave holds SCL low.
         if r.time_out().bit_is_set() {
-            return Err(Error::Timeout);
+            let status = regs.sr().read();
+            // ACK stretching can retain the previous TX stretch cause.
+            let tx_finished = status.slave_rw().bit_is_set()
+                && status.stretch_cause().bits() == 1
+                && (!allow_tx_stretch || r.nack().bit_is_set());
+            if r.slave_stretch().bit_is_clear() || tx_finished {
+                return Err(Error::Timeout);
+            }
         }
         Ok(())
+    }
+
+    fn release_stretch(&self) {
+        let regs = self.regs();
+        // Restart timeout counting when the master regains control of SCL.
+        regs.to().modify(|_, w| w.time_out_en().clear_bit());
+        self.update_registers();
+        regs.int_clr().write(|w| {
+            w.slave_stretch().clear_bit_by_one();
+            w.time_out().clear_bit_by_one()
+        });
+        regs.scl_stretch_conf()
+            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+        regs.to().modify(|_, w| w.time_out_en().set_bit());
+        self.update_registers();
+    }
+
+    fn recover(&self) {
+        let address = self.regs().slave_addr().read().slave_addr().bits() as u8;
+        self.setup(&Config::new(address)).ok();
+    }
+
+    fn start_listen(&self) {
+        if Self::check_errors(self.regs(), true).is_err() {
+            self.recover();
+        } else {
+            self.reset_tx_fifo();
+        }
     }
 
     fn listen_step(
@@ -677,118 +739,129 @@ impl Driver<'_> {
         let regs = self.regs();
         let ints = regs.int_raw().read();
 
-        if ints.slave_stretch().bit_is_set() {
-            let cause = regs.sr().read().stretch_cause().bits();
-            match cause {
-                0 => {
-                    let rw = regs.sr().read().slave_rw().bit_is_set();
-                    if rw {
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                        return Some(Ok(Command::Read));
-                    } else {
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                    }
+        // START and STOP are reported even for unmatched addresses.
+        regs.int_clr().write(|w| {
+            w.trans_complete().bit(ints.trans_complete().bit());
+            w.det_start().bit(ints.det_start().bit())
+        });
+        let status = regs.sr().read();
+        let fifo_overflow = ints.rxfifo_ovf().bit_is_set();
+        let read_pending = ints.slave_stretch().bit_is_set()
+            && status.stretch_cause().bits() == 0
+            && status.slave_rw().bit_is_set();
+        let write_ended = (ints.trans_complete().bit_is_set()
+            && (*bytes_read > 0 || fifo_overflow))
+            || (ints.det_start().bit_is_set() && *bytes_read > 0);
+
+        // Drain at ACK so STOP cannot race with FIFO reads.
+        // Preserve the next write's byte when the previous write has ended.
+        if (ints.slave_stretch().bit_is_set() && !write_ended) || fifo_overflow {
+            while regs.sr().read().rxfifo_cnt().bits() > 0 {
+                let byte = regs.data().read().fifo_rdata().bits();
+                if let Some(dest) = buffer.get_mut(*bytes_read) {
+                    *dest = byte;
                 }
-                2 => {
-                    while regs.sr().read().rxfifo_cnt().bits() > 0 && *bytes_read < buffer.len() {
-                        buffer[*bytes_read] = regs.data().read().fifo_rdata().bits();
-                        *bytes_read += 1;
-                    }
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                }
-                _ => {
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                }
+                *bytes_read = bytes_read.saturating_add(1);
             }
         }
 
-        while regs.sr().read().rxfifo_cnt().bits() > 0 && *bytes_read < buffer.len() {
-            buffer[*bytes_read] = regs.data().read().fifo_rdata().bits();
-            *bytes_read += 1;
+        let overflow = *bytes_read > buffer.len() || fifo_overflow;
+        let write_pending = *bytes_read > 0 || overflow;
+        let write_complete = read_pending || write_ended;
+        // Keep the next request stretched until the next listen call.
+        if write_pending && write_complete {
+            regs.int_clr().write(|w| w.rxfifo_ovf().clear_bit_by_one());
+            if fifo_overflow && status.stretch_cause().bits() == 2 {
+                self.release_stretch();
+            }
+            return Some(if overflow {
+                Err(Error::Overflow)
+            } else {
+                Ok(Command::Write(*bytes_read))
+            });
         }
 
-        if ints.trans_complete().bit_is_set() {
-            regs.int_clr()
-                .write(|w| w.trans_complete().clear_bit_by_one());
-            return Some(Ok(Command::Write(*bytes_read)));
+        if ints.slave_stretch().bit_is_set() {
+            if read_pending {
+                regs.int_clr()
+                    .write(|w| w.slave_stretch().clear_bit_by_one());
+                return Some(Ok(Command::Read));
+            }
+            self.release_stretch();
         }
 
         None
+    }
+
+    fn start_read(&self, buffer: &[u8]) -> Result<(), Error> {
+        if buffer.len() > u16::MAX as usize {
+            return Err(Error::ResponseTooLong);
+        }
+
+        let regs = self.regs();
+        // Queue one byte at a time to count short reads correctly.
+        regs.data()
+            .write(|w| unsafe { w.fifo_rdata().bits(buffer.first().copied().unwrap_or(0xff)) });
+
+        // Clear the current START before releasing the address stretch.
+        regs.int_clr().write(|w| unsafe {
+            w.bits(0x3fff);
+            w.det_start().clear_bit_by_one()
+        });
+        self.release_stretch();
+        Ok(())
     }
 
     fn respond_to_read_step(
         &self,
         buffer: &[u8],
         bytes_written: &mut usize,
+        nack_received: &mut bool,
     ) -> Option<Result<ReadStatus, Error>> {
         let regs = self.regs();
         let ints = regs.int_raw().read();
 
-        if ints.trans_complete().bit_is_set() || ints.nack().bit_is_set() {
-            let is_nack = ints.nack().bit_is_set();
+        // NACK ends the data phase; STOP or repeated START ends the response.
+        if ints.trans_complete().bit_is_set() || ints.det_start().bit_is_set() {
+            if !*nack_received && ints.nack().bit_is_clear() {
+                self.recover();
+                return Some(Err(Error::ReadAborted));
+            }
+            let bytes_read =
+                bytes_written.saturating_sub(regs.sr().read().txfifo_cnt().bits() as usize);
             regs.int_clr().write(|w| {
                 w.trans_complete().clear_bit_by_one();
+                w.det_start().clear_bit_by_one();
                 w.nack().clear_bit_by_one()
             });
-            if is_nack {
-                self.reset_fifo();
-                self.reset_fsm();
-            }
-
-            if *bytes_written > buffer.len() {
+            self.reset_tx_fifo();
+            if bytes_read > buffer.len() {
                 return Some(Ok(ReadStatus::NeedMoreBytes));
-            } else if *bytes_written < buffer.len() {
-                let rem = (buffer.len() - *bytes_written) as u16;
-                return Some(Ok(ReadStatus::LeftoverBytes(rem)));
+            } else if bytes_read < buffer.len() {
+                return Some(Ok(ReadStatus::LeftoverBytes(
+                    (buffer.len() - bytes_read) as u16,
+                )));
             } else {
                 return Some(Ok(ReadStatus::Done));
             }
         }
 
-        if ints.slave_stretch().bit_is_set() {
-            let cause = regs.sr().read().stretch_cause().bits();
-            if cause == 1 {
-                if *bytes_written < buffer.len() {
-                    let txfifo_cnt = regs.sr().read().txfifo_cnt().bits() as usize;
-                    let free = FIFO_SIZE - txfifo_cnt;
-                    let to_write = core::cmp::min(buffer.len() - *bytes_written, free);
-                    for i in 0..to_write {
-                        regs.data()
-                            .write(|w| unsafe { w.fifo_rdata().bits(buffer[*bytes_written + i]) });
-                    }
-                    *bytes_written += to_write;
+        if !*nack_received && ints.nack().bit_is_set() {
+            *nack_received = true;
+            regs.int_clr().write(|w| w.nack().clear_bit_by_one());
+        }
 
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                    self.update_registers();
-                } else {
-                    regs.data().write(|w| unsafe { w.fifo_rdata().bits(0xFF) });
-                    *bytes_written += 1;
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                    self.update_registers();
-                }
-            } else {
-                regs.scl_stretch_conf()
-                    .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                regs.int_clr()
-                    .write(|w| w.slave_stretch().clear_bit_by_one());
-                self.update_registers();
+        if *nack_received {
+            return None;
+        }
+
+        if ints.slave_stretch().bit_is_set() {
+            if regs.sr().read().stretch_cause().bits() == 1 {
+                let byte = buffer.get(*bytes_written).copied().unwrap_or(0xff);
+                regs.data().write(|w| unsafe { w.fifo_rdata().bits(byte) });
+                *bytes_written += 1;
             }
+            self.release_stretch();
         }
 
         None
@@ -812,6 +885,7 @@ impl crate::i2c::slave::Instance for crate::peripherals::I2C0<'_> {
             register_block: crate::peripherals::I2C0::ptr(),
             peripheral: crate::system::Peripheral::I2cExt0,
             async_handler: irq_handler,
+            clock_instance: I2cInstance::I2c0,
             scl_output: OutputSignal::I2CEXT0_SCL,
             scl_input: InputSignal::I2CEXT0_SCL,
             sda_output: OutputSignal::I2CEXT0_SDA,
@@ -838,6 +912,7 @@ impl crate::i2c::slave::Instance for crate::peripherals::I2C1<'_> {
             register_block: crate::peripherals::I2C1::ptr(),
             peripheral: crate::system::Peripheral::I2cExt1,
             async_handler: irq_handler,
+            clock_instance: I2cInstance::I2c1,
             scl_output: OutputSignal::I2CEXT1_SCL,
             scl_input: InputSignal::I2CEXT1_SCL,
             sda_output: OutputSignal::I2CEXT1_SDA,
@@ -880,10 +955,6 @@ impl AnyI2c<'_> {
         self.disable_peri_interrupt();
 
         self.info().regs().int_ena().write(|w| unsafe { w.bits(0) });
-        self.info()
-            .regs()
-            .int_clr()
-            .write(|w| unsafe { w.bits(0x3fff) });
 
         self.bind_peri_interrupt(handler);
         self.enable_peri_interrupt(handler.priority());
