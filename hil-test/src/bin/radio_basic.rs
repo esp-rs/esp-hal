@@ -50,6 +50,10 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 #[path = "radio_basic/esp_rtos.rs"]
 mod esp_rtos;
 
+#[cfg(multi_core)]
+#[path = "radio_basic/esp_radio_tasks.rs"]
+mod esp_radio_tasks;
+
 #[cfg(soc_has_wifi)]
 #[path = "radio_basic/init_tests.rs"]
 #[cfg(feature = "esp-radio")]
