@@ -9,23 +9,23 @@ use crate::{
         lp_io::{LpFunction, low_level},
     },
     i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
-    peripherals::{GPIO, RTC_IO, SENS},
+    peripherals::{RTC_IO, SENS},
     system::{Peripheral, PeripheralClockControl},
     time::Duration,
 };
 
 fn bind_pin(pin: &impl LpPin, function: LpFunction) {
     let lp = pin.lp_number();
+    let rtc_io = RTC_IO::regs();
 
-    GPIO::regs()
-        .pin(pin.number() as usize)
-        .modify(|_, w| w.pad_driver().bit(true));
-    RTC_IO::regs()
-        .touch_pad(lp as usize)
-        .modify(|_, w| w.rue().bit(true).rde().bit(false));
-    RTC_IO::regs()
-        .rtc_gpio_enable_w1ts()
-        .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << lp) });
+    rtc_io
+        .pin(lp as usize)
+        .modify(|_, w| w.pad_driver().set_bit());
+    rtc_io.touch_pad(lp as usize).modify(|_, w| {
+        w.rue().set_bit();
+        w.rde().clear_bit()
+    });
+    low_level::output_enable(lp, true);
     low_level::set_config(lp, true, true, function);
 }
 
@@ -34,7 +34,6 @@ for_each_lp_function! {
         impl Scl for crate::peripherals::$gpio<'_> {
             fn connect_scl(&self) {
                 bind_pin(self, LpFunction::$af);
-                // sar_i2c_io holds both selector fields; update only this one.
                 RTC_IO::regs().sar_i2c_io().modify(|_, w| unsafe {
                     w.sar_i2c_scl_sel().bits($n)
                 });
@@ -45,7 +44,6 @@ for_each_lp_function! {
         impl Sda for crate::peripherals::$gpio<'_> {
             fn connect_sda(&self) {
                 bind_pin(self, LpFunction::$af);
-                // sar_i2c_io holds both selector fields; update only this one.
                 RTC_IO::regs().sar_i2c_io().modify(|_, w| unsafe {
                     w.sar_i2c_sda_sel().bits($n)
                 });

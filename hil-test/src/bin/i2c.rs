@@ -496,11 +496,15 @@ mod lp_i2c {
     #[cfg(lp_i2c_master_version = "lp_i2c")]
     use esp_hal::{i2c::lp_i2c::ConfigError, peripherals::LP_I2C0, time::Rate};
     #[cfg(lp_i2c_master_version = "rtc_i2c")]
-    use esp_hal::{i2c::lp_i2c::Timing, time::Duration};
+    use esp_hal::{i2c::lp_i2c::Timing, peripherals::RTC_IO, time::Duration};
+
+    fn init_peripherals() -> esp_hal::peripherals::Peripherals {
+        esp_hal::init(esp_hal::Config::default())
+    }
 
     #[init]
     fn init() -> LpI2c<'static> {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = init_peripherals();
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
         let config = cfg_select! {
             lp_i2c_master_version = "rtc_i2c" => Config::default()
@@ -509,6 +513,43 @@ mod lp_i2c {
             _ => Config::default(),
         };
         LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap()
+    }
+
+    #[test(init = init_peripherals)]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn rtc_drop_releases_open_drain_pads(peripherals: esp_hal::peripherals::Peripherals) {
+        use esp_hal::{
+            gpio::{LpPin, Pin},
+            peripherals::GPIO,
+        };
+
+        let (sda, scl) = hil_test::i2c_pins!(peripherals);
+        let pads = [
+            (sda.lp_number(), sda.number()),
+            (scl.lp_number(), scl.number()),
+        ]
+        .map(|(lp, gpio)| {
+            (
+                RTC_IO::regs().pin(lp as usize),
+                GPIO::regs().pin(gpio as usize),
+            )
+        });
+        for (rtc, digital) in pads {
+            rtc.modify(|_, w| w.pad_driver().clear_bit());
+            digital.modify(|_, w| w.pad_driver().set_bit());
+        }
+
+        let config = Config::default().with_timing(Timing::standard_mode());
+        let i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
+        for (rtc, _) in pads {
+            assert!(rtc.read().pad_driver().bit_is_set());
+        }
+
+        drop(i2c);
+        for (rtc, digital) in pads {
+            assert!(rtc.read().pad_driver().bit_is_clear());
+            assert!(digital.read().pad_driver().bit_is_set());
+        }
     }
 
     #[cfg(lp_i2c_master_version = "lp_i2c")]
@@ -647,11 +688,18 @@ mod lp_i2c {
 
     #[test]
     #[cfg(lp_i2c_master_version = "rtc_i2c")]
-    fn empty_write_reaches_bus(mut i2c: LpI2c<'static>) {
-        assert_eq!(
-            i2c.write(super::NON_EXISTENT_ADDRESS, 0x10, &[]),
-            Err(Error::AckCheckFailed)
-        );
+    fn rtc_empty_write_sends_register_address(mut i2c: LpI2c<'static>) {
+        use super::{DUT_ADDRESS, WRITE_COMMAND};
+
+        i2c.write(DUT_ADDRESS, WRITE_COMMAND[0], &[]).unwrap();
+
+        let regs = esp_hal::peripherals::LP_I2C0::regs();
+        let write = regs.cmd(0).read();
+        let stop = regs.cmd(1).read();
+        assert!(write.command_done().bit_is_set());
+        assert_eq!(write.command().bits() as u8, 2);
+        assert!(stop.command_done().bit_is_set());
+        assert_eq!(stop.command().bits() >> 11, 3);
     }
 }
 

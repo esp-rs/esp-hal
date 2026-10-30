@@ -244,9 +244,7 @@ impl<'d> LpI2c<'d> {
 
         me.init();
 
-        // Configure LP I2C GPIOs
-        // NOTE: We always initialize the SCL pin first, then the SDA pin. This order of
-        // initialization is important to avoid any spurious I2C start conditions on the bus.
+        // Initialize SCL before SDA to avoid spurious START conditions.
         scl.connect_scl();
         sda.connect_sda();
 
