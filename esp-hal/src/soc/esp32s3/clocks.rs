@@ -141,6 +141,16 @@ fn configure_xtal_clk_impl(
 
 // PLL_CLK
 
+/// Configures and calibrates the BBPLL again.
+///
+/// The BBPLL loses its analog configuration while the RTC controller powers it down, for example in
+/// a light sleep.
+pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
+    if clocks.pll_clk_refcount > 0 {
+        enable_pll_clk_impl(clocks, true);
+    }
+}
+
 fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     // regi2c_ctrl_ll_i2c_bbpll_enable
     I2C_ANA_MST::regs()
