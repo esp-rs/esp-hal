@@ -850,7 +850,7 @@ impl UsbSerialJtagTx<'_, Async> {
                     match self.write_byte_nb(*byte) {
                         Ok(()) => break,
                         Err(nb::Error::WouldBlock) => self.wait_tx_ready().await,
-                        Err(nb::Error::Other(error)) => return Err(error),
+                        Err(nb::Error::Other(error)) => match error {},
                     }
                 }
             }
