@@ -17,20 +17,26 @@
 //!
 //! ## Examples
 //!
-//! The following example will measure the internal chip temperature every
-//! second, and print it
+//! This example measures the chip temperature every second.
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::tsens::{TemperatureSensor, Config, MeasurementRange};
+//! # use esp_hal::tsens::{Config, MeasurementRange, TemperatureSensor};
 //! # use esp_hal::delay::Delay;
 //!
 //! let config = Config::default().with_range(MeasurementRange::Minus10To80C);
 //! let mut temperature_sensor = TemperatureSensor::new(peripherals.TSENS, config)?;
 //! let delay = Delay::new();
 //! loop {
-//!     let temp = temperature_sensor.get_temperature();
-//!     println!("Temperature: {:.2}°C", temp.to_celsius());
+//!     let sample = temperature_sensor.get_temperature();
+//!     if let Some(celsius) = sample.to_celsius() {
+//!         println!("Temperature: {:.2} °C", celsius);
+//!     } else {
+//!         println!(
+//!             "Uncalibrated temperature: {:.2} °C",
+//!             sample.to_uncalibrated_celsius()
+//!         );
+//!     }
 //!     delay.delay_millis(1_000);
 //! }
 //! # }
@@ -110,43 +116,41 @@ impl MeasurementRange {
 #[non_exhaustive]
 pub enum ConfigError {}
 
-/// Stores the raw ADC value and can be used to calculate the temperature in Celsius using the
-/// formula: `(raw_value * 0.4386) - (offset * 27.88) - 20.52`.
+/// A temperature measurement from one sensor sample.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Temperature {
-    /// Raw ADC value.
-    pub raw_value: u8,
-
-    /// Offset value - depends on the temperature range configured.
-    pub offset: i8,
+    raw_value: u8,
+    offset: i8,
+    calibration: Option<i16>,
 }
 
 impl Temperature {
-    /// Creates a new temperature value.
+    /// Returns the temperature in Celsius before factory calibration.
     #[inline]
-    pub fn new(raw_value: u8, offset: i8) -> Self {
-        Self { raw_value, offset }
+    pub fn to_uncalibrated_celsius(&self) -> f32 {
+        f32::from(self.raw_value) * 0.4386 - f32::from(self.offset) * 27.88 - 20.52
     }
 
-    /// Returns the temperature in Celsius.
+    /// Returns the calibrated temperature in Celsius.
+    ///
+    /// Returns `None` if factory calibration data is unavailable.
     #[inline]
-    pub fn to_celsius(&self) -> f32 {
-        (self.raw_value as f32) * 0.4386 - (self.offset as f32) * 27.88 - 20.52
+    pub fn to_celsius(&self) -> Option<f32> {
+        let calibration = self.calibration?;
+        Some(self.to_uncalibrated_celsius() - f32::from(calibration) / 10.0)
     }
 
-    /// Returns the temperature in Fahrenheit.
+    /// Returns the calibrated temperature in Fahrenheit, if available.
     #[inline]
-    pub fn to_fahrenheit(&self) -> f32 {
-        let celsius = self.to_celsius();
-        (celsius * 1.8) + 32.0
+    pub fn to_fahrenheit(&self) -> Option<f32> {
+        Some(self.to_celsius()? * 1.8 + 32.0)
     }
 
-    /// Returns the temperature in Kelvin.
+    /// Returns the calibrated temperature in Kelvin, if available.
     #[inline]
-    pub fn to_kelvin(&self) -> f32 {
-        let celsius = self.to_celsius();
-        celsius + 273.15
+    pub fn to_kelvin(&self) -> Option<f32> {
+        Some(self.to_celsius()? + 273.15)
     }
 }
 
@@ -156,6 +160,7 @@ impl Temperature {
 pub struct TemperatureSensor<'d> {
     range: MeasurementRange,
     stabilization: Option<(Instant, Duration)>,
+    calibration: Option<i16>,
     _peripheral: TSENS<'d>,
     _clock_guard: TsensClockGuard,
     _tsens_guard: GenericPeripheralGuard<{ crate::system::Peripheral::Tsens as u8 }>,
@@ -174,6 +179,7 @@ impl<'d> TemperatureSensor<'d> {
         let mut tsens = Self {
             range: config.range,
             stabilization: None,
+            calibration: crate::efuse::temperature_sensor_calibration(),
             _peripheral: peripheral,
             _clock_guard: TsensClockGuard::new(config.clock_source),
             _tsens_guard: tsens_guard,
@@ -289,7 +295,7 @@ impl<'d> TemperatureSensor<'d> {
         Ok(())
     }
 
-    /// Returns the raw temperature value.
+    /// Reads a temperature sample.
     ///
     /// Waits for any remaining stabilization time after power-up or a range change.
     #[inline]
@@ -311,8 +317,11 @@ impl<'d> TemperatureSensor<'d> {
             }}
             temp_sensor_register_block_lp_tsens => TSENS::regs().ctrl().read().out().bits(),
         };
-
-        Temperature::new(raw_value, self.range.settings().offset)
+        Temperature {
+            raw_value,
+            offset: self.range.settings().offset,
+            calibration: self.calibration,
+        }
     }
 }
 

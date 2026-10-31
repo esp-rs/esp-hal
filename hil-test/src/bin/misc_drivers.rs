@@ -23,15 +23,54 @@ mod tsens {
     use esp_hal::{
         clock::ll::TsensInstance,
         delay::Delay,
+        efuse,
         peripherals::Peripherals,
         time::{Duration, Instant},
-        tsens::{Config, MeasurementRange, TemperatureSensor},
+        tsens::{Config, MeasurementRange, Temperature, TemperatureSensor},
     };
     use hil_test::{assert, assert_eq};
+
+    const ADC_STEP_CELSIUS: f32 = 0.4386;
+    const ADC_ZERO_CELSIUS: f32 = -20.52;
 
     #[init]
     fn init() -> Peripherals {
         esp_hal::init(esp_hal::Config::default())
+    }
+
+    fn check_temperature(sample: &Temperature) {
+        let uncalibrated = sample.to_uncalibrated_celsius();
+        let calibrated = sample.to_celsius();
+        match efuse::temperature_sensor_calibration() {
+            Some(calibration) => {
+                let celsius = calibrated.unwrap();
+                assert!((uncalibrated - celsius - f32::from(calibration) / 10.0).abs() < 0.001);
+                assert!((sample.to_fahrenheit().unwrap() - (celsius * 1.8 + 32.0)).abs() < 0.001);
+                assert!((sample.to_kelvin().unwrap() - (celsius + 273.15)).abs() < 0.001);
+            }
+            None => {
+                assert_eq!(calibrated, None);
+                assert_eq!(sample.to_fahrenheit(), None);
+                assert_eq!(sample.to_kelvin(), None);
+            }
+        }
+    }
+
+    #[test]
+    fn factory_calibration_and_recreation(mut p: Peripherals) {
+        let config = Config::default().with_range(MeasurementRange::Minus10To80C);
+        for _ in 0..32 {
+            let mut sensor = TemperatureSensor::new(p.TSENS.reborrow(), config).unwrap();
+            let sample = sensor.get_temperature();
+            let uncalibrated = sample.to_uncalibrated_celsius();
+            assert!(uncalibrated > ADC_ZERO_CELSIUS);
+            assert!(uncalibrated < f32::from(u8::MAX) * ADC_STEP_CELSIUS + ADC_ZERO_CELSIUS);
+            check_temperature(&sample);
+            let calibrated = sample.to_celsius();
+            drop(sensor);
+            assert_eq!(sample.to_uncalibrated_celsius(), uncalibrated);
+            assert_eq!(sample.to_celsius(), calibrated);
+        }
     }
 
     fn stabilization_duration() -> Duration {
@@ -91,7 +130,7 @@ mod tsens {
         let base = Config::default();
         assert_eq!(base.range(), MeasurementRange::Minus10To80C);
         let mut sensor = TemperatureSensor::new(p.TSENS, base).unwrap();
-        let baseline = sensor.get_temperature().raw_value;
+        let baseline = sensor.get_temperature().to_uncalibrated_celsius();
         for _ in 0..4 {
             for (range, offset) in [
                 (MeasurementRange::Minus40To20C, 2i8),
@@ -102,17 +141,39 @@ mod tsens {
             ] {
                 let config = base.with_range(range);
                 sensor.apply_config(&config).unwrap();
-                let immediate = sensor.get_temperature();
-                assert_eq!(immediate.offset, offset);
+                let immediate = sensor.get_temperature().to_uncalibrated_celsius();
                 Delay::new().delay_millis(20);
-                let reference = sensor.get_temperature();
-                assert!(immediate.raw_value.abs_diff(reference.raw_value) <= 2);
+                let reference = sensor.get_temperature().to_uncalibrated_celsius();
+                assert!((immediate - reference).abs() <= 2.0 * ADC_STEP_CELSIUS + 0.001);
                 sensor.apply_config(&config).unwrap();
-                let value = sensor.get_temperature();
-                let expected = f32::from(baseline) + f32::from(offset) * 27.88 / 0.4386;
-                if (2.0..=253.0).contains(&expected) {
-                    assert!((f32::from(value.raw_value) - expected).abs() < 14.0);
+                let sample = sensor.get_temperature();
+                let expected_count =
+                    (baseline + f32::from(offset) * 27.88 - ADC_ZERO_CELSIUS) / ADC_STEP_CELSIUS;
+                if (2.0..=253.0).contains(&expected_count) {
+                    assert!(
+                        (sample.to_uncalibrated_celsius() - baseline).abs()
+                            < 14.0 * ADC_STEP_CELSIUS
+                    );
                 }
+                check_temperature(&sample);
+            }
+        }
+    }
+
+    #[cfg(soc_clock_node_tsens_sclk_is_configurable)]
+    #[test]
+    fn clock_sources_preserve_calibration(p: Peripherals) {
+        use esp_hal::tsens::ClockSource;
+
+        let config = Config::default();
+        let mut sensor = TemperatureSensor::new(p.TSENS, config).unwrap();
+        sensor.get_temperature();
+        for _ in 0..16 {
+            for source in [ClockSource::RcFast, ClockSource::Xtal] {
+                sensor
+                    .apply_config(&config.with_clock_source(source))
+                    .unwrap();
+                check_temperature(&sensor.get_temperature());
             }
         }
     }

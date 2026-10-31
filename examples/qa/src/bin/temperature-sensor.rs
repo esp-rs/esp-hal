@@ -26,8 +26,15 @@ fn main() -> ! {
     let delay = Delay::new();
 
     loop {
-        let temp = temperature_sensor.get_temperature();
-        println!("Temperature: {:.2}°C", temp.to_celsius());
+        let sample = temperature_sensor.get_temperature();
+        if let Some(celsius) = sample.to_celsius() {
+            println!("Temperature: {:.2} °C", celsius);
+        } else {
+            println!(
+                "Uncalibrated temperature: {:.2} °C",
+                sample.to_uncalibrated_celsius()
+            );
+        }
         delay.delay_millis(1_000);
     }
 }
