@@ -10,9 +10,6 @@
 //! frequency or I/O load. Generally, the chip’s internal temperature is higher
 //! than the operating ambient temperature.
 //!
-//! It is recommended to wait a few hundred microseconds after turning it on
-//! before measuring, in order to allow the sensor to stabilize.
-//!
 //! ## Configuration
 //!
 //! [`Config`] selects the clock source. Available sources depend on the chip;
@@ -28,9 +25,8 @@
 //! # use esp_hal::tsens::{TemperatureSensor, Config};
 //! # use esp_hal::delay::Delay;
 //!
-//! let temperature_sensor = TemperatureSensor::new(peripherals.TSENS, Config::default())?;
+//! let mut temperature_sensor = TemperatureSensor::new(peripherals.TSENS, Config::default())?;
 //! let delay = Delay::new();
-//! delay.delay_micros(300);
 //! loop {
 //!     let temp = temperature_sensor.get_temperature();
 //!     println!("Temperature: {:.2}°C", temp.to_celsius());
@@ -133,7 +129,7 @@ impl<'d> TemperatureSensor<'d> {
         let apb_saradc_guard = GenericPeripheralGuard::new();
         let tsens_guard = GenericPeripheralGuard::new();
 
-        let tsens = Self {
+        let mut tsens = Self {
             _peripheral: peripheral,
             _clock_guard: TsensClockGuard::new(config.clock_source),
             _tsens_guard: tsens_guard,
@@ -149,11 +145,13 @@ impl<'d> TemperatureSensor<'d> {
         #[cfg(temp_sensor_register_block_apb_saradc)]
         crate::soc::regi2c::I2C_SARADC_TSENS_DAC.write_field(7); // 20 °C to 100 °C, offset -1.
 
+        // https://github.com/espressif/esp-idf/blob/cebb3dd4d8704a5aa1c2b3a23c4c4b9b26e71194/components/esp_driver_tsens/src/temperature_sensor.c#L251-L254
+        crate::rom::ets_delay_us(300);
+
         Ok(tsens)
     }
 
-    /// Powers up the temperature sensor.
-    pub fn power_up(&self) {
+    fn power_up(&mut self) {
         debug!("Power up");
         cfg_select! {
             temp_sensor_register_block_apb_saradc => {
@@ -185,8 +183,7 @@ impl<'d> TemperatureSensor<'d> {
         }
     }
 
-    /// Powers down the temperature sensor to save power.
-    pub fn power_down(&self) {
+    fn power_down(&mut self) {
         cfg_select! {
             temp_sensor_register_block_apb_saradc => {
                 APB_SARADC::regs()
@@ -227,7 +224,7 @@ impl<'d> TemperatureSensor<'d> {
 
     /// Returns the raw temperature value.
     #[inline]
-    pub fn get_temperature(&self) -> Temperature {
+    pub fn get_temperature(&mut self) -> Temperature {
         // TODO Address multiple temperature ranges and offsets
         let (raw_value, offset) = cfg_select! {
             temp_sensor_register_block_apb_saradc => {
