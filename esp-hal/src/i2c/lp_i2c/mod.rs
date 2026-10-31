@@ -134,6 +134,8 @@ for_each_lp_function! {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// The device address exceeds the 7-bit address range.
+    AddressInvalid,
     /// The transmission size exceeded the limit.
     TransactionSizeLimitExceeded,
     /// The acknowledgment check failed.
@@ -178,6 +180,8 @@ pub struct LpI2c<'d> {
     /// LP pin numbers, kept so that the pads can be released when the driver is dropped.
     sda: u8,
     scl: u8,
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    needs_reset: bool,
 }
 
 impl<'d> LpI2c<'d> {
@@ -220,6 +224,8 @@ impl<'d> LpI2c<'d> {
             i2c,
             sda: sda.lp_number(),
             scl: scl.lp_number(),
+            #[cfg(lp_i2c_master_version = "rtc_i2c")]
+            needs_reset: false,
         };
 
         me.init();
@@ -283,7 +289,8 @@ impl<'d> LpI2c<'d> {
     /// Writes `data` to the `register` of the slave with the given `address`.
     ///
     /// The transfer consists of a single write transaction that sends the device address, the
-    /// register address, then `data`.
+    /// register address, then `data`. If `data` is empty, the transfer sends only the device
+    /// address and register address.
     ///
     /// # Examples
     ///
@@ -304,9 +311,14 @@ impl<'d> LpI2c<'d> {
     ///
     /// # Errors
     ///
+    /// [`Error::AddressInvalid`] when `address` exceeds `0x7f`.
+    ///
     /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
     /// can transfer in a single transaction.
     pub fn write(&mut self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
+        if address > 0x7f {
+            return Err(Error::AddressInvalid);
+        }
         self.write_bytes(address, register, data)
     }
 
@@ -324,7 +336,7 @@ impl<'d> LpI2c<'d> {
     /// `data`.
     ///
     /// The transfer writes the device address and the register address, then repeats the start
-    /// condition to read `data` back.
+    /// condition to read `data` back. If `data` is empty, no transfer starts.
     ///
     /// # Examples
     ///
@@ -346,9 +358,14 @@ impl<'d> LpI2c<'d> {
     ///
     /// # Errors
     ///
+    /// [`Error::AddressInvalid`] when `address` exceeds `0x7f`.
+    ///
     /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
     /// can transfer in a single transaction.
     pub fn read(&mut self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
+        if address > 0x7f {
+            return Err(Error::AddressInvalid);
+        }
         self.read_bytes(address, register, data)
     }
 }

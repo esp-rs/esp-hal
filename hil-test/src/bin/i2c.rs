@@ -489,27 +489,110 @@ mod tests {
         assert_ne!(read_data, [0u8; 5]);
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
+}
+
+#[cfg(lp_i2c_master_driver_supported)]
+#[embedded_test::tests(default_timeout = 3)]
+mod lp_i2c {
+    #[cfg(lp_i2c_master_version = "lp_i2c")]
+    use esp_hal::time::Rate;
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    use esp_hal::{i2c::lp_i2c::Timing, peripherals::RTC_IO, time::Duration};
+    use esp_hal::{
+        i2c::lp_i2c::{Config, ConfigError, Error, LpI2c},
+        peripherals::LP_I2C0,
+    };
+
+    use super::NON_EXISTENT_ADDRESS;
+
+    #[init]
+    fn init() -> LpI2c<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let (sda, scl) = hil_test::i2c_pins!(peripherals);
+        #[cfg(lp_i2c_master_version = "rtc_i2c")]
+        let pins = {
+            use esp_hal::gpio::LpPin;
+            let pins =
+                [sda.lp_number(), scl.lp_number()].map(|pin| RTC_IO::regs().pin(pin as usize));
+            for pin in pins {
+                pin.modify(|_, w| w.pad_driver().clear_bit());
+            }
+            pins
+        };
+        let config = cfg_select! {
+            lp_i2c_master_version = "rtc_i2c" => Config::default()
+                .with_timing(Timing::standard_mode())
+                .with_timeout(Duration::from_micros(100)),
+            _ => Config::default(),
+        };
+        let i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
+        #[cfg(lp_i2c_master_version = "rtc_i2c")]
+        for pin in pins {
+            assert!(pin.read().pad_driver().bit());
+        }
+        i2c
+    }
+
+    #[cfg(lp_i2c_master_version = "lp_i2c")]
+    fn config_registers() -> [u32; 5] {
+        let regs = LP_I2C0::regs();
+        [
+            regs.scl_low_period().read().bits(),
+            regs.scl_high_period().read().bits(),
+            regs.sda_hold().read().bits(),
+            regs.sda_sample().read().bits(),
+            regs.ctr().read().bits(),
+        ]
+    }
+
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn config_registers() -> [u32; 6] {
+        let regs = LP_I2C0::regs();
+        [
+            regs.scl_low().read().bits(),
+            regs.scl_high().read().bits(),
+            regs.sda_duty().read().bits(),
+            regs.scl_start_period().read().bits(),
+            regs.scl_stop_period().read().bits(),
+            regs.to().read().bits(),
+        ]
+    }
+
+    #[test]
+    fn validates_addresses(mut i2c: LpI2c<'static>) {
+        for address in [0x80, 0xff] {
+            assert_eq!(i2c.write(address, 0x10, &[]), Err(Error::AddressInvalid));
+            assert_eq!(
+                i2c.write(address, 0x10, &[0xa5]),
+                Err(Error::AddressInvalid)
+            );
+            assert_eq!(i2c.read(address, 0x10, &mut []), Err(Error::AddressInvalid));
+            let mut data = [0xa5];
+            assert_eq!(
+                i2c.read(address, 0x10, &mut data),
+                Err(Error::AddressInvalid)
+            );
+            assert_eq!(data, [0xa5]);
+        }
+        assert!(matches!(
+            i2c.write(0x7f, 0x10, &[0xa5]),
+            Err(Error::AckCheckFailed | Error::TimeOut)
+        ));
+    }
+
+    #[test]
+    fn empty_read_is_a_noop(mut i2c: LpI2c<'static>) {
+        for address in [NON_EXISTENT_ADDRESS, 0x7f] {
+            assert_eq!(i2c.read(address, 0x10, &mut []), Ok(()));
+        }
+    }
 
     // TODO: against the MCP4725, LP I2C transfers time out on the ESP32-S3 and are not
     // acknowledged on the ESP32-C5.
     #[test]
-    #[cfg(all(lp_i2c_master_driver_supported, not(any(esp32s3, esp32c5))))]
-    fn test_read_with_lp_i2c() {
-        use esp_hal::i2c::lp_i2c::{Config, LpI2c};
-
-        let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
-
-        let (sda, scl) = hil_test::i2c_pins!(peripherals);
-
-        // RTC_I2C has no usable default timing, it has to be spelled out.
-        let config = cfg_select! {
-            lp_i2c_master_version = "rtc_i2c" => Config::default()
-                .with_timing(esp_hal::i2c::lp_i2c::Timing::standard_mode())
-                .with_timeout(esp_hal::time::Duration::from_micros(100)),
-            _ => Config::default(),
-        };
-
-        let mut i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
+    #[cfg(not(any(esp32s3, esp32c5)))]
+    fn read_from_mcp4725(mut i2c: LpI2c<'static>) {
+        use super::{DUT_ADDRESS, WRITE_COMMAND};
 
         // The MCP4725 has no sub-registers, but `read` always sends a register byte before the
         // repeated start.
@@ -517,5 +600,213 @@ mod tests {
         i2c.read(DUT_ADDRESS, WRITE_COMMAND[0], &mut data).unwrap();
 
         assert_ne!(data, [0u8; 5]);
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "lp_i2c")]
+    fn timing_uses_selected_lp_fast_clock(mut i2c: LpI2c<'static>) {
+        use esp_hal::clock::ll::{self, ClockTree, LpFastClkConfig};
+
+        let sources = cfg_select! {
+            esp32c6 => [LpFastClkConfig::RcFastClk, LpFastClkConfig::XtalD2Clk],
+            _ => [LpFastClkConfig::RcFast, LpFastClkConfig::XtalD2],
+        };
+        let original = ClockTree::with(ll::lp_fast_clk_config).unwrap();
+        let config = Config::default().with_frequency(Rate::from_khz(100));
+        for source in sources {
+            ClockTree::with(|clocks| ll::configure_lp_fast_clk(clocks, source));
+            i2c.apply_config(&config).unwrap();
+            assert_eq!(
+                LP_I2C0::regs()
+                    .scl_low_period()
+                    .read()
+                    .scl_low_period()
+                    .bits() as u32,
+                ll::lp_fast_clk_frequency() / 100_000 / 2 - 1,
+            );
+        }
+        ClockTree::with(|clocks| ll::configure_lp_fast_clk(clocks, original));
+        i2c.apply_config(&config).unwrap();
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "lp_i2c")]
+    fn validates_frequency_limits(mut i2c: LpI2c<'static>) {
+        let source = esp_hal::clock::ll::lp_fast_clk_frequency();
+        let before = config_registers();
+        for hz in [0, 1, source / 1024, source / 8 + 1, 1 << 22, u32::MAX] {
+            assert_eq!(
+                i2c.apply_config(&Config::default().with_frequency(Rate::from_hz(hz))),
+                Err(ConfigError::FrequencyOutOfRange)
+            );
+            assert_eq!(config_registers(), before);
+        }
+        let regs = LP_I2C0::regs();
+        for hz in [source / 1024 + 1, 79_999, 80_000, source / 8] {
+            i2c.apply_config(&Config::default().with_frequency(Rate::from_hz(hz)))
+                .unwrap();
+            let half_cycle = source / hz / 2;
+            let wait_high = if hz < 80_000 {
+                half_cycle / 4
+            } else {
+                half_cycle / 2 - 2
+            };
+            let high = regs.scl_high_period().read();
+            assert_eq!(
+                regs.scl_low_period().read().scl_low_period().bits() as u32,
+                half_cycle - 1
+            );
+            assert_eq!(high.scl_high_period().bits() as u32, half_cycle - wait_high);
+            assert_eq!(high.scl_wait_high_period().bits() as u32, wait_high);
+        }
+    }
+
+    #[test]
+    #[cfg(esp32c6)]
+    fn scl_stall_returns_timeout(mut i2c: LpI2c<'static>) {
+        use esp_hal::peripherals::LP_IO;
+
+        let scl = LP_IO::regs().gpio(7);
+        for _ in 0..2 {
+            let saved = scl.read().bits();
+            // Disabling the input makes the controller observe SCL low.
+            scl.modify(|_, w| w.fun_ie().clear_bit().mcu_ie().clear_bit());
+            let result = i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]);
+            scl.write(|w| unsafe { w.bits(saved) });
+            assert_eq!(result, Err(Error::TimeOut));
+            let interrupts = LP_I2C0::regs().int_raw().read();
+            assert!(!interrupts.scl_st_to().bit());
+            assert!(!interrupts.scl_main_st_to().bit());
+        }
+        assert_eq!(
+            i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]),
+            Err(Error::AckCheckFailed)
+        );
+        assert_eq!(
+            i2c.read(NON_EXISTENT_ADDRESS, 0x10, &mut [0]),
+            Err(Error::AckCheckFailed)
+        );
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn rejects_rtc_timeout_before_truncation(mut i2c: LpI2c<'static>) {
+        use esp_hal::clock::ll;
+
+        let source = ll::rc_fast_clk_frequency() as u64;
+        let wrap_us = ((1u64 << 32) * 1_000_000).div_ceil(source);
+        let limit_us = ((1u64 << 20) * 1_000_000).div_ceil(source);
+        i2c.apply_config(
+            &Config::default()
+                .with_timing(Timing::standard_mode())
+                .with_timeout(Duration::from_micros(limit_us - 1)),
+        )
+        .unwrap();
+        let before = config_registers();
+        assert_eq!(before[5] as u64, (limit_us - 1) * source / 1_000_000);
+        for micros in [limit_us, wrap_us, u64::MAX] {
+            assert_eq!(
+                i2c.apply_config(&Config::default().with_timeout(Duration::from_micros(micros))),
+                Err(ConfigError::TimeoutTooLong)
+            );
+            assert_eq!(config_registers(), before);
+        }
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn rejects_oversized_rtc_timings(mut i2c: LpI2c<'static>) {
+        let max = (1 << 20) - 1;
+        let timing = Timing::default()
+            .with_scl_low_period(max)
+            .with_scl_high_period(max)
+            .with_sda_duty(max)
+            .with_scl_start_period(max)
+            .with_scl_stop_period(max);
+        i2c.apply_config(&Config::default().with_timing(timing))
+            .unwrap();
+        let before = config_registers();
+        assert_eq!(before, [max, max, max, max, max, 0]);
+        let timing = Timing::standard_mode();
+        for value in [1 << 20, u32::MAX] {
+            for timing in [
+                timing.with_scl_low_period(value),
+                timing.with_scl_high_period(value),
+                timing.with_sda_duty(value),
+                timing.with_scl_start_period(value),
+                timing.with_scl_stop_period(value),
+            ] {
+                assert_eq!(
+                    i2c.apply_config(
+                        &Config::default()
+                            .with_timing(timing)
+                            .with_timeout(Duration::from_micros(100)),
+                    ),
+                    Err(ConfigError::TimingOutOfRange)
+                );
+                assert_eq!(config_registers(), before);
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    fn empty_write_does_not_panic(mut i2c: LpI2c<'static>) {
+        assert!(matches!(
+            i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[]),
+            Err(Error::AckCheckFailed | Error::TimeOut)
+        ));
+    }
+
+    #[test]
+    #[cfg(esp32s3)]
+    fn rtc_recovers_after_scl_stall(mut i2c: LpI2c<'static>) {
+        let before = config_registers();
+        let scl = RTC_IO::regs().touch_pad(2);
+        let saved = scl.read().bits();
+        // Disabling the input makes the controller observe SCL low.
+        scl.modify(|_, w| w.fun_ie().clear_bit());
+        let result = i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]);
+        scl.write(|w| unsafe { w.bits(saved) });
+        assert_eq!(result, Err(Error::TimeOut));
+        assert_eq!(
+            i2c.read(NON_EXISTENT_ADDRESS, 0x10, &mut [0]),
+            Err(Error::AckCheckFailed)
+        );
+        assert_eq!(config_registers(), before);
+    }
+
+    #[test]
+    #[cfg(esp32s3)]
+    fn rtc_recovers_after_sda_stall(mut i2c: LpI2c<'static>) {
+        use esp_hal::time::Instant;
+
+        let timeout = Duration::from_millis(10);
+        i2c.apply_config(
+            &Config::default()
+                .with_timing(Timing::standard_mode())
+                .with_timeout(timeout),
+        )
+        .unwrap();
+        let before = config_registers();
+        let sda = RTC_IO::regs().touch_pad(3);
+        let saved = sda.read().bits();
+        // Disabling the input makes the controller observe SDA low.
+        sda.modify(|_, w| w.fun_ie().clear_bit());
+        let start = Instant::now();
+        let result = i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]);
+        let elapsed = start.elapsed();
+        sda.write(|w| unsafe { w.bits(saved) });
+        assert_eq!(result, Err(Error::TimeOut));
+        assert!((timeout..Duration::from_millis(100)).contains(&elapsed));
+        assert_eq!(
+            i2c.write(NON_EXISTENT_ADDRESS, 0x10, &[0xa5]),
+            Err(Error::AckCheckFailed)
+        );
+        assert_eq!(
+            i2c.read(NON_EXISTENT_ADDRESS, 0x10, &mut [0]),
+            Err(Error::AckCheckFailed)
+        );
+        assert_eq!(config_registers(), before);
     }
 }
