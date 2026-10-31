@@ -17,6 +17,7 @@ pub(crate) mod sleep;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
+pub(crate) mod temp_sensor;
 pub(crate) mod timergroup;
 pub(crate) mod uart;
 
@@ -38,6 +39,7 @@ pub(crate) use sleep::*;
 pub(crate) use soc::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
+pub(crate) use temp_sensor::*;
 pub(crate) use timergroup::*;
 pub(crate) use uart::*;
 
@@ -875,7 +877,10 @@ driver_configs![
         TempProperties {
             driver: temp_sensor,
             name: "Temperature sensor",
-            properties: {}
+            properties: {
+                #[serde(default)]
+                register_block: TempSensorRegisterBlock,
+            }
         },
         TouchProperties {
             driver: touch,

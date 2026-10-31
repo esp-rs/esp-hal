@@ -47,6 +47,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        lp_peri_clk: None,
         ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -64,6 +65,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        lp_peri_clk: None,
         ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -81,6 +83,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        lp_peri_clk: None,
         ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -117,7 +120,18 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(self, clocks: &mut ClockTree) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
+        if self.lp_peri_clk.is_none() {
+            // Keep the LP peripheral divider configured by the bootloader.
+            self.lp_peri_clk = Some(LpPeriClkConfig::new(
+                LP_AON_CLK_RST::regs()
+                    .lproot_clk_div()
+                    .read()
+                    .lpperi_clk_div_num()
+                    .bits() as u32,
+            ));
+        }
+
         // CPU_ROOT_CLK and the CPU, memory, AHB, and APB dividers share one
         // update signal. Write the complete configuration before latching it;
         // applying each change separately can temporarily overclock the buses.
@@ -553,6 +567,16 @@ fn configure_apb_clk_impl(_clocks: &mut ClockTree, _old: Option<ApbClkConfig>, n
 
 fn enable_lp_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do here
+}
+
+fn configure_lp_peri_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<LpPeriClkConfig>,
+    new: LpPeriClkConfig,
+) {
+    LP_AON_CLK_RST::regs()
+        .lproot_clk_div()
+        .modify(|_, w| unsafe { w.lpperi_clk_div_num().bits(new.divisor() as u8) });
 }
 
 fn configure_lp_fast_clk_impl(

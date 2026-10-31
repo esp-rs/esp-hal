@@ -423,6 +423,7 @@ support_status = "not_supported"
 [device.etm]
 [device.io_mux]
 [device.temp_sensor]
+register_block = "apb_saradc"
 [device.systimer]
 [device.ulp_riscv]
 [device.lp_timer]
