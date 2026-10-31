@@ -8,6 +8,7 @@
 //! System Timer Tests
 //! TWAI Tests
 //! Debug Assist Tests
+//! Temperature Sensor Tests
 //% CHIP_FILTER: gpio_driver_supported
 //% FEATURES: unstable embassy
 
@@ -15,6 +16,107 @@
 #![no_main]
 
 use hil_test as _;
+
+#[cfg(temp_sensor_driver_supported)]
+#[embedded_test::tests(default_timeout = 3)]
+mod tsens {
+    use esp_hal::{
+        clock::ll::TsensInstance,
+        delay::Delay,
+        peripherals::Peripherals,
+        time::{Duration, Instant},
+        tsens::{Config, MeasurementRange, TemperatureSensor},
+    };
+    use hil_test::{assert, assert_eq};
+
+    #[init]
+    fn init() -> Peripherals {
+        esp_hal::init(esp_hal::Config::default())
+    }
+
+    fn stabilization_duration() -> Duration {
+        let frequency = u64::from(TsensInstance::Tsens.sclk_frequency());
+        Duration::from_micros((20_000u64 * 1_000_000).div_ceil(frequency))
+    }
+
+    fn check_deferred_stabilization(sensor: &mut TemperatureSensor<'_>, start: Instant) {
+        let duration = stabilization_duration();
+        while start.elapsed() < duration / 2 {}
+        let before_read = Instant::now();
+        assert!(before_read - start < duration);
+        sensor.get_temperature();
+        let after_read = Instant::now();
+        assert!(after_read - start >= duration);
+        assert!(after_read - before_read < duration);
+    }
+
+    #[test]
+    fn stabilization_is_deferred_to_read(p: Peripherals) {
+        let config = Config::default();
+        let start = Instant::now();
+        let mut sensor = TemperatureSensor::new(p.TSENS, config).unwrap();
+        check_deferred_stabilization(&mut sensor, start);
+
+        let start = Instant::now();
+        let config = config.with_range(MeasurementRange::Plus20To100C);
+        sensor.apply_config(&config).unwrap();
+        check_deferred_stabilization(&mut sensor, start);
+    }
+
+    #[cfg(soc_clock_node_tsens_sclk_is_configurable)]
+    #[test]
+    fn clock_change_during_stabilization(mut p: Peripherals) {
+        use esp_hal::tsens::ClockSource;
+
+        let xtal = Config::default().with_clock_source(ClockSource::Xtal);
+        let rc_fast = xtal.with_clock_source(ClockSource::RcFast);
+        for (from, to) in [(xtal, rc_fast), (rc_fast, xtal)] {
+            let mut sensor = TemperatureSensor::new(p.TSENS.reborrow(), from).unwrap();
+            let start = Instant::now();
+            sensor.apply_config(&to).unwrap();
+            check_deferred_stabilization(&mut sensor, start);
+
+            let range = MeasurementRange::Plus20To100C;
+            sensor.apply_config(&to.with_range(range)).unwrap();
+            Delay::new().delay(stabilization_duration());
+            let start = Instant::now();
+            sensor.apply_config(&from.with_range(range)).unwrap();
+            sensor.get_temperature();
+            assert!(start.elapsed() < stabilization_duration());
+        }
+    }
+
+    #[test]
+    fn ranges_and_repeated_configurations(p: Peripherals) {
+        let base = Config::default();
+        assert_eq!(base.range(), MeasurementRange::Minus10To80C);
+        let mut sensor = TemperatureSensor::new(p.TSENS, base).unwrap();
+        let baseline = sensor.get_temperature().raw_value;
+        for _ in 0..4 {
+            for (range, offset) in [
+                (MeasurementRange::Minus40To20C, 2i8),
+                (MeasurementRange::Minus30To50C, 1),
+                (MeasurementRange::Minus10To80C, 0),
+                (MeasurementRange::Plus20To100C, -1),
+                (MeasurementRange::Plus50To125C, -2),
+            ] {
+                let config = base.with_range(range);
+                sensor.apply_config(&config).unwrap();
+                let immediate = sensor.get_temperature();
+                assert_eq!(immediate.offset, offset);
+                Delay::new().delay_millis(20);
+                let reference = sensor.get_temperature();
+                assert!(immediate.raw_value.abs_diff(reference.raw_value) <= 2);
+                sensor.apply_config(&config).unwrap();
+                let value = sensor.get_temperature();
+                let expected = f32::from(baseline) + f32::from(offset) * 27.88 / 0.4386;
+                if (2.0..=253.0).contains(&expected) {
+                    assert!((f32::from(value.raw_value) - expected).abs() < 14.0);
+                }
+            }
+        }
+    }
+}
 
 #[cfg(pcnt_driver_supported)]
 #[embedded_test::tests(default_timeout = 3)]
