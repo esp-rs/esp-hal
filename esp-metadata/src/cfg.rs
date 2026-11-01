@@ -878,6 +878,9 @@ driver_configs![
             driver: dac,
             name: "DAC",
             properties: {
+                /// Register layout used by the DAC controller.
+                #[serde(default)]
+                version: u32,
                 #[serde(default)]
                 channel_count: DacChannels,
                 /// Number of bits in a direct-output DAC code.

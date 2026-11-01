@@ -126,6 +126,7 @@ key_length = { options = [
 
 [device.dac]
 support_status = "partial"
+version = 1
 channel_count = 2
 resolution = 8
 
