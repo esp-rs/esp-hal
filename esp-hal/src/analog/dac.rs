@@ -35,29 +35,26 @@
 use super::ADC_DAC_LOCK;
 use crate::gpio::AnalogPin;
 
-/// Digital-to-Analog Converter (DAC) Channel.
+/// A digital-to-analog converter (DAC) channel.
 ///
 /// Dropping the driver disables its analog output.
 #[cfg_attr(
     esp32s2,
     doc = "The shared DAC clock is disabled after both channels are powered down."
 )]
-pub struct Dac<'d, T>
-where
-    T: Instance + 'd,
-    T::Pin: AnalogPin + 'd,
-{
-    _inner: T,
-    _lifetime: core::marker::PhantomData<&'d mut ()>,
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Dac<'d> {
+    channel: AnyDacChannel<'d>,
 }
 
-impl<'d, T> Dac<'d, T>
-where
-    T: Instance + 'd,
-    T::Pin: AnalogPin + 'd,
-{
-    /// Creates a new instance of [`Dac`].
-    pub fn new(dac: T, pin: T::Pin) -> Self {
+impl<'d> Dac<'d> {
+    /// Creates a new DAC channel.
+    pub fn new<T: Instance + 'd>(dac: T, pin: T::Pin) -> Self
+    where
+        T::Pin: AnalogPin + 'd,
+    {
+        let channel = dac.degrade();
         pin.set_analog(crate::private::Internal);
 
         ADC_DAC_LOCK.lock(|| {
@@ -66,7 +63,7 @@ where
                 .sar_dac_ctrl1()
                 .modify(|_, w| w.dac_clkgate_en().set_bit());
 
-            select_direct_source(T::INDEX);
+            select_direct_source(channel.index());
 
             // Prevent ADC sampling from powering the DAC back up after drop.
             // https://github.com/espressif/esp-idf/blob/4d80c1b29aeabc8e735ffc6e1be9bb23e95d1d5d/components/esp_hal_ana_conv/esp32/include/hal/dac_ll.h#L94-L104
@@ -78,14 +75,11 @@ where
             control.modify(|_, w| unsafe { w.sar1_dac_xpd_fsm().bits(0) });
 
             crate::peripherals::RTC_IO::regs()
-                .pad_dac(T::INDEX)
+                .pad_dac(channel.index())
                 .modify(|_, w| w.dac_xpd_force().set_bit().xpd_dac().set_bit());
         });
 
-        Self {
-            _inner: dac,
-            _lifetime: core::marker::PhantomData,
-        }
+        Self { channel }
     }
 
     /// Writes the given value.
@@ -95,23 +89,20 @@ where
     #[cfg_attr(esp32s2, doc = "The reference supply `Vref` is `VDD3P3_RTC_IO`.")]
     pub fn write(&mut self, value: u8) {
         ADC_DAC_LOCK.lock(|| {
-            select_direct_source(T::INDEX);
+            select_direct_source(self.channel.index());
             crate::peripherals::RTC_IO::regs()
-                .pad_dac(T::INDEX)
+                .pad_dac(self.channel.index())
                 .modify(|_, w| unsafe { w.dac().bits(value) });
         });
     }
 }
 
-impl<T: Instance> Drop for Dac<'_, T>
-where
-    T::Pin: AnalogPin,
-{
+impl Drop for Dac<'_> {
     fn drop(&mut self) {
         ADC_DAC_LOCK.lock(|| {
             let rtc_io = crate::peripherals::RTC_IO::regs();
             rtc_io
-                .pad_dac(T::INDEX)
+                .pad_dac(self.channel.index())
                 .modify(|_, w| w.xpd_dac().clear_bit().dac_xpd_force().clear_bit());
 
             // Both channels share the clock gate.
@@ -126,14 +117,6 @@ where
             }
         });
     }
-}
-
-// Public because it appears in the bounds of Dac.
-#[doc(hidden)]
-pub trait Instance: crate::private::Sealed {
-    const INDEX: usize;
-
-    type Pin;
 }
 
 fn select_direct_source(index: usize) {
@@ -151,6 +134,31 @@ fn select_direct_source(index: usize) {
         .modify(|_, w| w.trans().clear_bit());
 }
 
+crate::any_peripheral! {
+    /// Type-erased ownership of a DAC channel.
+    #[doc(hidden)]
+    pub peripheral AnyDacChannel<'d> {
+        #[cfg(soc_has_dac1)]
+        Dac1(crate::peripherals::DAC1<'d>),
+        #[cfg(soc_has_dac2)]
+        Dac2(crate::peripherals::DAC2<'d>),
+    }
+}
+
+// Public because it appears in Dac::new's bounds.
+#[doc(hidden)]
+pub trait Instance: crate::private::Sealed + any::Degrade {
+    type Pin;
+
+    fn index(&self) -> usize;
+}
+
+impl AnyDacChannel<'_> {
+    fn index(&self) -> usize {
+        any::delegate!(self, channel => { channel.index() })
+    }
+}
+
 for_each_analog_function! {
     (DACn $((($channel:ident, DACn, $number:literal), $gpio:ident)),*) => {
         const _: () = core::assert!(
@@ -161,9 +169,11 @@ for_each_analog_function! {
 
     (($channel:ident, DACn, $number:literal), $gpio:ident) => {
         impl<'d> Instance for crate::peripherals::$channel<'d> {
-            const INDEX: usize = $number - 1;
-
             type Pin = crate::peripherals::$gpio<'d>;
+
+            fn index(&self) -> usize {
+                $number - 1
+            }
         }
     };
 }
