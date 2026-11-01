@@ -84,8 +84,6 @@ peripherals = [
 
     { name = "ADC1", virtual = true },
     { name = "ADC2", virtual = true },
-    { name = "DAC1", virtual = true },
-    { name = "DAC2", virtual = true },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "PSRAM", virtual = true },
@@ -123,10 +121,7 @@ key_length = { options = [
 
 [device.dac]
 support_status = { status = "partial", issue = 6752 }
-instances = [
-    { name = "dac1" },
-    { name = "dac2" },
-]
+channel_count = 2
 
 [device.dma]
 support_status = "partial"

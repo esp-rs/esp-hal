@@ -403,6 +403,12 @@ macro_rules! property {
     ("adc.sar_power_override") => {
         false
     };
+    ("dac.channel_count") => {
+        2
+    };
+    ("dac.channel_count", str) => {
+        stringify!(2)
+    };
     ("ledc.version") => {
         1
     };
@@ -5016,6 +5022,9 @@ macro_rules! for_each_peripheral {
         "PCNT0_UNIT6 peripheral singleton"] PCNT0_UNIT6 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "PCNT0_UNIT7 peripheral singleton"] PCNT0_UNIT7 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "DAC1 peripheral singleton"]
+        DAC1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "DAC2 peripheral singleton"] DAC2 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SDM_CH0 peripheral singleton"]
         SDM_CH0 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "SDM_CH1 peripheral singleton"] SDM_CH1 <= virtual() (unstable)));
@@ -5130,10 +5139,7 @@ macro_rules! for_each_peripheral {
         enable_rwbt_interrupt, disable_rwbt_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
         CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "DAC1 peripheral singleton"] DAC1 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "DAC2 peripheral singleton"]
-        DAC2 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "FLASH peripheral singleton"] FLASH <= virtual() (unstable)));
+        #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "PSRAM peripheral singleton"]
         PSRAM <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "TOUCH peripheral singleton"] TOUCH <= virtual() (unstable)));
@@ -5177,6 +5183,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PCNT0_UNIT5(unstable)));
         _for_each_inner_peripheral!((PCNT0_UNIT6(unstable)));
         _for_each_inner_peripheral!((PCNT0_UNIT7(unstable)));
+        _for_each_inner_peripheral!((DAC1(unstable)));
+        _for_each_inner_peripheral!((DAC2(unstable)));
         _for_each_inner_peripheral!((SDM_CH0(unstable)));
         _for_each_inner_peripheral!((SDM_CH1(unstable)));
         _for_each_inner_peripheral!((SDM_CH2(unstable)));
@@ -5232,8 +5240,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((ADC2(unstable)));
         _for_each_inner_peripheral!((BT(unstable)));
         _for_each_inner_peripheral!((CPU_CTRL(unstable)));
-        _for_each_inner_peripheral!((DAC1(unstable)));
-        _for_each_inner_peripheral!((DAC2(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((TOUCH(unstable)));
@@ -5422,6 +5428,8 @@ macro_rules! for_each_peripheral {
         "PCNT0_UNIT5 peripheral singleton"] PCNT0_UNIT5 <= virtual() (unstable)), (@
         peri_type #[doc = "PCNT0_UNIT6 peripheral singleton"] PCNT0_UNIT6 <= virtual()
         (unstable)), (@ peri_type #[doc = "PCNT0_UNIT7 peripheral singleton"] PCNT0_UNIT7
+        <= virtual() (unstable)), (@ peri_type #[doc = "DAC1 peripheral singleton"] DAC1
+        <= virtual() (unstable)), (@ peri_type #[doc = "DAC2 peripheral singleton"] DAC2
         <= virtual() (unstable)), (@ peri_type #[doc = "SDM_CH0 peripheral singleton"]
         SDM_CH0 <= virtual() (unstable)), (@ peri_type #[doc =
         "SDM_CH1 peripheral singleton"] SDM_CH1 <= virtual() (unstable)), (@ peri_type
@@ -5509,8 +5517,6 @@ macro_rules! for_each_peripheral {
         enable_rwble_interrupt, disable_rwble_interrupt }, RWBT : { bind_rwbt_interrupt,
         enable_rwbt_interrupt, disable_rwbt_interrupt }) (unstable)), (@ peri_type #[doc
         = "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable)), (@
-        peri_type #[doc = "DAC1 peripheral singleton"] DAC1 <= virtual() (unstable)), (@
-        peri_type #[doc = "DAC2 peripheral singleton"] DAC2 <= virtual() (unstable)), (@
         peri_type #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)),
         (@ peri_type #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual()
         (unstable)), (@ peri_type #[doc = "TOUCH peripheral singleton"] TOUCH <=
@@ -5530,11 +5536,11 @@ macro_rules! for_each_peripheral {
         (DMA_SPI3(unstable)), (DMA_I2S0(unstable)), (DMA_I2S1(unstable)),
         (PCNT0_UNIT0(unstable)), (PCNT0_UNIT1(unstable)), (PCNT0_UNIT2(unstable)),
         (PCNT0_UNIT3(unstable)), (PCNT0_UNIT4(unstable)), (PCNT0_UNIT5(unstable)),
-        (PCNT0_UNIT6(unstable)), (PCNT0_UNIT7(unstable)), (SDM_CH0(unstable)),
-        (SDM_CH1(unstable)), (SDM_CH2(unstable)), (SDM_CH3(unstable)),
-        (SDM_CH4(unstable)), (SDM_CH5(unstable)), (SDM_CH6(unstable)),
-        (SDM_CH7(unstable)), (AES(unstable)), (APB_CTRL(unstable)), (BB(unstable)),
-        (DPORT(unstable)), (SYSTEM(unstable)), (ETH(unstable)),
+        (PCNT0_UNIT6(unstable)), (PCNT0_UNIT7(unstable)), (DAC1(unstable)),
+        (DAC2(unstable)), (SDM_CH0(unstable)), (SDM_CH1(unstable)), (SDM_CH2(unstable)),
+        (SDM_CH3(unstable)), (SDM_CH4(unstable)), (SDM_CH5(unstable)),
+        (SDM_CH6(unstable)), (SDM_CH7(unstable)), (AES(unstable)), (APB_CTRL(unstable)),
+        (BB(unstable)), (DPORT(unstable)), (SYSTEM(unstable)), (ETH(unstable)),
         (FLASH_ENCRYPTION(unstable)), (FRC_TIMER(unstable)), (GPIO(unstable)),
         (GPIO_SD(unstable)), (HINF(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
         (I2S1(unstable)), (IO_MUX(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
@@ -5545,9 +5551,8 @@ macro_rules! for_each_peripheral {
         (SPI1(unstable)), (SPI2), (SPI3), (TIMG0(unstable)), (TIMG1(unstable)),
         (TWAI0(unstable)), (UART0), (UART1), (UART2), (UHCI0(unstable)),
         (UHCI1(unstable)), (WIFI), (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)),
-        (CPU_CTRL(unstable)), (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
-        (PSRAM(unstable)), (TOUCH(unstable)), (IPC(unstable)),
-        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
+        (CPU_CTRL(unstable)), (FLASH(unstable)), (PSRAM(unstable)), (TOUCH(unstable)),
+        (IPC(unstable)), (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, SpiDmaChannel), (I2S0,
         I2s0, 0, I2sDmaChannel), (SPI3, Spi3, 1, SpiDmaChannel), (I2S1, I2s1, 1,
         I2sDmaChannel)));
