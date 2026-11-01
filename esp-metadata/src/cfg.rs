@@ -893,6 +893,9 @@ driver_configs![
             properties: {
                 #[serde(default)]
                 channel_count: DacChannels,
+                /// Number of bits in a direct-output DAC code.
+                #[serde(default)]
+                resolution: u32,
             }
         },
         TempProperties {

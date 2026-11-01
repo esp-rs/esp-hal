@@ -4,8 +4,8 @@
 //! # Digital to Analog Converter (DAC)
 //!
 //! ## Overview
-//! Two 8-bit DAC channels convert digital values from 0 to 255 into analog
-//! voltages from 0 V to the reference supply voltage.
+//! Two DAC channels convert digital codes into analog voltages from 0 V to the
+//! reference supply voltage. [`Dac::resolution`] gives the code width in bits.
 //!
 //! ## Configuration
 //! Each DAC channel uses a fixed GPIO pin.
@@ -15,21 +15,10 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::analog::dac::Dac;
-//! # use esp_hal::delay::Delay;
-//! # use embedded_hal::delay::DelayNs;
 //! let mut dac1 = Dac::new(peripherals.DAC1, peripherals.__dac1_pin__);
 //!
-//! let mut delay = Delay::new();
-//!
-//! let mut voltage_dac1 = 200u8;
-//!
-//! loop {
-//!     voltage_dac1 = voltage_dac1.wrapping_add(1);
-//!     dac1.write(voltage_dac1);
-//!
-//!     delay.delay_ms(50u32);
-//! }
-//! # }
+//! dac1.write(128);
+//! # {after_snippet}
 //! ```
 
 use super::ADC_DAC_LOCK;
@@ -82,7 +71,13 @@ impl<'d> Dac<'d> {
         Self { channel }
     }
 
-    /// Writes the given value.
+    /// Returns the DAC resolution in bits.
+    #[instability::unstable]
+    pub const fn resolution(&self) -> u8 {
+        property!("dac.resolution")
+    }
+
+    /// Writes a raw DAC code.
     ///
     /// The nominal output voltage is `Vref * value / 255`.
     #[cfg_attr(esp32, doc = "The reference supply `Vref` is `VDD3P3_RTC`.")]

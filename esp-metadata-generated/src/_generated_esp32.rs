@@ -409,6 +409,12 @@ macro_rules! property {
     ("dac.channel_count", str) => {
         stringify!(2)
     };
+    ("dac.resolution") => {
+        8
+    };
+    ("dac.resolution", str) => {
+        stringify!(8)
+    };
     ("ledc.version") => {
         1
     };

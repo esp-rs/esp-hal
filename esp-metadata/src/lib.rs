@@ -502,6 +502,10 @@ impl Config {
                 dac.channel_count.count > 0,
                 "DAC needs at least one channel"
             );
+            ensure!(
+                (1..=16).contains(&dac.resolution),
+                "DAC resolution must be 1..=16 bits"
+            );
         }
 
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
