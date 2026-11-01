@@ -442,6 +442,24 @@ macro_rules! property {
     ("adc.sar_power_override") => {
         false
     };
+    ("dac.version") => {
+        2
+    };
+    ("dac.version", str) => {
+        stringify!(2)
+    };
+    ("dac.channel_count") => {
+        2
+    };
+    ("dac.channel_count", str) => {
+        stringify!(2)
+    };
+    ("dac.resolution") => {
+        12
+    };
+    ("dac.resolution", str) => {
+        stringify!(12)
+    };
     ("sdm.channel_count") => {
         8
     };
@@ -6064,6 +6082,8 @@ macro_rules! implement_peripheral_clocks {
             AxiGdma,
             /// CORDIC peripheral clock signal
             Cordic,
+            /// DAC peripheral clock signal
+            Dac,
             /// DMA2D peripheral clock signal
             Dma2d,
             /// ECC peripheral clock signal
@@ -6140,6 +6160,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::ApbSarAdc,
                 Self::AxiGdma,
                 Self::Cordic,
+                Self::Dac,
                 Self::Dma2d,
                 Self::Ecc,
                 Self::Emac,
@@ -6198,6 +6219,16 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .cordic_ctrl0()
                         .modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));
+                }
+                Peripheral::Dac => {
+                    let reg = crate::peripherals::LP_PERI::regs().dac_ctrl();
+                    if enable {
+                        reg.write(|w| unsafe {
+                            w.lp_dac_clk_sel().bits(1).lp_dac_clk_en().set_bit()
+                        });
+                    } else {
+                        reg.modify(|_, w| w.lp_dac_clk_en().clear_bit());
+                    }
                 }
                 Peripheral::Dma2d => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -6393,6 +6424,11 @@ macro_rules! implement_peripheral_clocks {
                                 .core_rst_en()
                                 .bit(reset)
                         });
+                }
+                Peripheral::Dac => {
+                    crate::peripherals::LP_PERI::regs()
+                        .dac_ctrl()
+                        .modify(|_, w| w.lp_dac_rst_en().bit(reset));
                 }
                 Peripheral::Dma2d => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -7107,6 +7143,9 @@ macro_rules! for_each_peripheral {
         "PCNT1_UNIT2 peripheral singleton"] PCNT1_UNIT2 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "PCNT1_UNIT3 peripheral singleton"] PCNT1_UNIT3 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "DAC1 peripheral singleton"]
+        DAC1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "DAC2 peripheral singleton"] DAC2 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SDM_CH0 peripheral singleton"]
         SDM_CH0 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "SDM_CH1 peripheral singleton"] SDM_CH1 <= virtual() (unstable)));
@@ -7145,14 +7184,15 @@ macro_rules! for_each_peripheral {
         #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
         EMAC_MAC <= GMAC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "ECC peripheral singleton"] ECC <= ECC() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EFUSE peripheral singleton"]
-        EFUSE <= EFUSE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO_SD peripheral singleton"]
-        GPIO_SD <= GPIO_EXT() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "HP_APM peripheral singleton"] HP_APM <= HP_APM() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "DAC peripheral singleton"] DAC <= DAC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ECC peripheral singleton"] ECC
+        <= ECC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO peripheral singleton"]
+        GPIO <= GPIO() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_EXT() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_APM peripheral singleton"]
+        HP_APM <= HP_APM() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "HP_MEM_APM peripheral singleton"] HP_MEM_APM <= HP_MEM_APM() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "HP_SYS peripheral singleton"]
         HP_SYS <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -7343,6 +7383,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PCNT1_UNIT1(unstable)));
         _for_each_inner_peripheral!((PCNT1_UNIT2(unstable)));
         _for_each_inner_peripheral!((PCNT1_UNIT3(unstable)));
+        _for_each_inner_peripheral!((DAC1(unstable)));
+        _for_each_inner_peripheral!((DAC2(unstable)));
         _for_each_inner_peripheral!((SDM_CH0(unstable)));
         _for_each_inner_peripheral!((SDM_CH1(unstable)));
         _for_each_inner_peripheral!((SDM_CH2(unstable)));
@@ -7649,6 +7691,8 @@ macro_rules! for_each_peripheral {
         <= virtual() (unstable)), (@ peri_type #[doc =
         "PCNT1_UNIT2 peripheral singleton"] PCNT1_UNIT2 <= virtual() (unstable)), (@
         peri_type #[doc = "PCNT1_UNIT3 peripheral singleton"] PCNT1_UNIT3 <= virtual()
+        (unstable)), (@ peri_type #[doc = "DAC1 peripheral singleton"] DAC1 <= virtual()
+        (unstable)), (@ peri_type #[doc = "DAC2 peripheral singleton"] DAC2 <= virtual()
         (unstable)), (@ peri_type #[doc = "SDM_CH0 peripheral singleton"] SDM_CH0 <=
         virtual() (unstable)), (@ peri_type #[doc = "SDM_CH1 peripheral singleton"]
         SDM_CH1 <= virtual() (unstable)), (@ peri_type #[doc =
@@ -7678,6 +7722,7 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)), (@
         peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC()
+        (unstable)), (@ peri_type #[doc = "DAC peripheral singleton"] DAC <= DAC()
         (unstable)), (@ peri_type #[doc = "ECC peripheral singleton"] ECC <= ECC()
         (unstable)), (@ peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <= EFUSE()
         (unstable)), (@ peri_type #[doc = "GPIO peripheral singleton"] GPIO <= GPIO()
@@ -7811,9 +7856,9 @@ macro_rules! for_each_peripheral {
         (DMA_AXI_CH2(unstable)), (PCNT0_UNIT0(unstable)), (PCNT0_UNIT1(unstable)),
         (PCNT0_UNIT2(unstable)), (PCNT0_UNIT3(unstable)), (PCNT1_UNIT0(unstable)),
         (PCNT1_UNIT1(unstable)), (PCNT1_UNIT2(unstable)), (PCNT1_UNIT3(unstable)),
-        (SDM_CH0(unstable)), (SDM_CH1(unstable)), (SDM_CH2(unstable)),
-        (SDM_CH3(unstable)), (SDM_CH4(unstable)), (SDM_CH5(unstable)),
-        (SDM_CH6(unstable)), (SDM_CH7(unstable)), (AES(unstable)),
+        (DAC1(unstable)), (DAC2(unstable)), (SDM_CH0(unstable)), (SDM_CH1(unstable)),
+        (SDM_CH2(unstable)), (SDM_CH3(unstable)), (SDM_CH4(unstable)),
+        (SDM_CH5(unstable)), (SDM_CH6(unstable)), (SDM_CH7(unstable)), (AES(unstable)),
         (APB_SARADC(unstable)), (ASSIST_DEBUG(unstable)), (CACHE(unstable)),
         (CLIC(unstable)), (CLINT(unstable)), (CLINT_OTHER_CORE(unstable)),
         (CORDIC(unstable)), (DMA2D(unstable)), (ETH(unstable)), (ECC(unstable)),
@@ -8064,6 +8109,8 @@ macro_rules! for_each_analog_function {
         macro_rules! _for_each_inner_analog_function { $(($pattern) => $code;)* ($other :
         tt) => {} } _for_each_inner_analog_function!((XTAL_32K_N, GPIO0));
         _for_each_inner_analog_function!((XTAL_32K_P, GPIO1));
+        _for_each_inner_analog_function!((DAC1, GPIO4));
+        _for_each_inner_analog_function!((DAC2, GPIO5));
         _for_each_inner_analog_function!((USJ_DM, GPIO33));
         _for_each_inner_analog_function!((USJ_DP, GPIO34));
         _for_each_inner_analog_function!((ADC1_CH0, GPIO42));
@@ -8082,6 +8129,8 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((ADC2_CH5, GPIO55));
         _for_each_inner_analog_function!((ADC2_CH6, GPIO56));
         _for_each_inner_analog_function!((ADC2_CH7, GPIO57));
+        _for_each_inner_analog_function!(((DAC1, DACn, 1), GPIO4));
+        _for_each_inner_analog_function!(((DAC2, DACn, 2), GPIO5));
         _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO42));
         _for_each_inner_analog_function!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO43));
         _for_each_inner_analog_function!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO44));
@@ -8099,20 +8148,21 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!(((ADC2_CH6, ADCn_CHm, 2, 6), GPIO56));
         _for_each_inner_analog_function!(((ADC2_CH7, ADCn_CHm, 2, 7), GPIO57));
         _for_each_inner_analog_function!((all(XTAL_32K_N, GPIO0), (XTAL_32K_P, GPIO1),
-        (USJ_DM, GPIO33), (USJ_DP, GPIO34), (ADC1_CH0, GPIO42), (ADC1_CH1, GPIO43),
-        (ADC1_CH2, GPIO44), (ADC1_CH3, GPIO45), (ADC1_CH4, GPIO46), (ADC1_CH5, GPIO47),
-        (ADC1_CH6, GPIO48), (ADC1_CH7, GPIO49), (ADC2_CH0, GPIO50), (ADC2_CH1, GPIO51),
-        (ADC2_CH2, GPIO52), (ADC2_CH3, GPIO53), (ADC2_CH4, GPIO54), (ADC2_CH5, GPIO55),
-        (ADC2_CH6, GPIO56), (ADC2_CH7, GPIO57)));
-        _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0, ADCn_CHm, 1, 0), GPIO42),
-        ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO43), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO44),
-        ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO45), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO46),
-        ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO47), ((ADC1_CH6, ADCn_CHm, 1, 6), GPIO48),
-        ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO49), ((ADC2_CH0, ADCn_CHm, 2, 0), GPIO50),
-        ((ADC2_CH1, ADCn_CHm, 2, 1), GPIO51), ((ADC2_CH2, ADCn_CHm, 2, 2), GPIO52),
-        ((ADC2_CH3, ADCn_CHm, 2, 3), GPIO53), ((ADC2_CH4, ADCn_CHm, 2, 4), GPIO54),
-        ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO55), ((ADC2_CH6, ADCn_CHm, 2, 6), GPIO56),
-        ((ADC2_CH7, ADCn_CHm, 2, 7), GPIO57)));
+        (DAC1, GPIO4), (DAC2, GPIO5), (USJ_DM, GPIO33), (USJ_DP, GPIO34), (ADC1_CH0,
+        GPIO42), (ADC1_CH1, GPIO43), (ADC1_CH2, GPIO44), (ADC1_CH3, GPIO45), (ADC1_CH4,
+        GPIO46), (ADC1_CH5, GPIO47), (ADC1_CH6, GPIO48), (ADC1_CH7, GPIO49), (ADC2_CH0,
+        GPIO50), (ADC2_CH1, GPIO51), (ADC2_CH2, GPIO52), (ADC2_CH3, GPIO53), (ADC2_CH4,
+        GPIO54), (ADC2_CH5, GPIO55), (ADC2_CH6, GPIO56), (ADC2_CH7, GPIO57)));
+        _for_each_inner_analog_function!((DACn((DAC1, DACn, 1), GPIO4), ((DAC2, DACn, 2),
+        GPIO5))); _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0, ADCn_CHm, 1, 0),
+        GPIO42), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO43), ((ADC1_CH2, ADCn_CHm, 1, 2),
+        GPIO44), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO45), ((ADC1_CH4, ADCn_CHm, 1, 4),
+        GPIO46), ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO47), ((ADC1_CH6, ADCn_CHm, 1, 6),
+        GPIO48), ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO49), ((ADC2_CH0, ADCn_CHm, 2, 0),
+        GPIO50), ((ADC2_CH1, ADCn_CHm, 2, 1), GPIO51), ((ADC2_CH2, ADCn_CHm, 2, 2),
+        GPIO52), ((ADC2_CH3, ADCn_CHm, 2, 3), GPIO53), ((ADC2_CH4, ADCn_CHm, 2, 4),
+        GPIO54), ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO55), ((ADC2_CH6, ADCn_CHm, 2, 6),
+        GPIO56), ((ADC2_CH7, ADCn_CHm, 2, 7), GPIO57)));
     };
 }
 /// This macro can be used to generate code for each LP function of each GPIO.
@@ -8559,10 +8609,16 @@ macro_rules! gpio_for_signal {
     (LCD_DATA_21 $(, $_fallback:literal)?) => {
         "GPIO4"
     };
+    (DAC1 $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
     (LP_GPIO4 $(, $_fallback:literal)?) => {
         "GPIO4"
     };
     (LCD_DATA_22 $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (DAC2 $(, $_fallback:literal)?) => {
         "GPIO5"
     };
     (LP_GPIO5 $(, $_fallback:literal)?) => {

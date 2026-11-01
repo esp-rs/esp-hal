@@ -1,5 +1,9 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dac1_pin" => gpio_for_signal!(DAC1),
+    "write_value" => {
+        cfg(dac_version = "1") => "dac1.write(128);",
+        cfg(dac_version = "2") => "dac1.write(2048)?;",
+    },
 ))]
 //! # Digital to Analog Converter (DAC)
 //!
@@ -17,27 +21,53 @@
 //! # use esp_hal::analog::dac::Dac;
 //! let mut dac1 = Dac::new(peripherals.DAC1, peripherals.__dac1_pin__);
 //!
-//! dac1.write(128);
+//! __write_value__
 //! # {after_snippet}
 //! ```
 
 use super::ADC_DAC_LOCK;
 use crate::gpio::AnalogPin;
 
+#[cfg_attr(dac_version = "2", path = "v2.rs")]
 #[cfg_attr(dac_version = "1", path = "v1.rs")]
 mod ll;
+
+/// DAC output error.
+#[cfg(dac_version = "2")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum Error {
+    /// The output code is out of range.
+    ValueOutOfRange,
+}
+
+#[cfg(dac_version = "2")]
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::ValueOutOfRange => f.write_str("DAC code is out of range"),
+        }
+    }
+}
+
+#[cfg(dac_version = "2")]
+impl core::error::Error for Error {}
 
 /// A digital-to-analog converter (DAC) channel.
 ///
 /// Dropping the driver disables its analog output.
 #[cfg_attr(
-    esp32s2,
+    any(esp32s2, dac_version = "2"),
     doc = "The shared DAC clock is disabled after both channels are powered down."
 )]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Dac<'d> {
     channel: AnyDacChannel<'d>,
+    #[cfg(dac_version = "2")]
+    _guard: crate::system::GenericPeripheralGuard<{ crate::system::Peripheral::Dac as u8 }>,
 }
 
 impl<'d> Dac<'d> {
@@ -48,10 +78,19 @@ impl<'d> Dac<'d> {
     {
         let channel = dac.degrade();
 
+        // The DAC function clock also gates access to its registers.
+        // See <https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/esp_hal_ana_conv/esp32s31/include/hal/dac_ll.h#L62-L75>.
+        #[cfg(dac_version = "2")]
+        let guard = crate::system::GenericPeripheralGuard::new();
+
         pin.set_analog(crate::private::Internal);
         ADC_DAC_LOCK.lock(|| ll::enable(channel.index()));
 
-        Self { channel }
+        Self {
+            channel,
+            #[cfg(dac_version = "2")]
+            _guard: guard,
+        }
     }
 
     /// Returns the DAC resolution in bits.
@@ -60,13 +99,36 @@ impl<'d> Dac<'d> {
         property!("dac.resolution")
     }
 
-    /// Writes a raw DAC code.
-    ///
-    /// The nominal output voltage is `Vref * value / 255`.
-    #[cfg_attr(esp32, doc = "The reference supply `Vref` is `VDD3P3_RTC`.")]
-    #[cfg_attr(esp32s2, doc = "The reference supply `Vref` is `VDD3P3_RTC_IO`.")]
-    pub fn write(&mut self, value: u8) {
-        ADC_DAC_LOCK.lock(|| ll::write(self.channel.index(), value));
+    core::cfg_select! {
+        dac_version = "1" => {
+            /// Writes a raw DAC code.
+            ///
+            /// The nominal output voltage is `Vref * value / 255`.
+            #[cfg_attr(esp32, doc = "The reference supply `Vref` is `VDD3P3_RTC`.")]
+            #[cfg_attr(esp32s2, doc = "The reference supply `Vref` is `VDD3P3_RTC_IO`.")]
+            pub fn write(&mut self, value: u8) {
+                ADC_DAC_LOCK.lock(|| ll::write(self.channel.index(), value));
+            }
+        }
+        dac_version = "2" => {
+            /// Writes a raw DAC code.
+            ///
+            /// The valid range is `0..(1 << self.resolution())`. The nominal output
+            /// voltage is `Vref * value / ((1 << self.resolution()) - 1)`.
+            /// The DAC uses Low-speed mode with the output buffer bypassed.
+            ///
+            /// # Errors
+            ///
+            /// [`Error::ValueOutOfRange`] if `value` is outside the valid range.
+            /// The output remains unchanged on error.
+            pub fn write(&mut self, value: u16) -> Result<(), Error> {
+                if u32::from(value) >= 1 << self.resolution() {
+                    return Err(Error::ValueOutOfRange);
+                }
+                ADC_DAC_LOCK.lock(|| ll::write(self.channel.index(), value));
+                Ok(())
+            }
+        }
     }
 }
 
