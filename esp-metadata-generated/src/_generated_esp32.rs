@@ -403,6 +403,12 @@ macro_rules! property {
     ("adc.sar_power_override") => {
         false
     };
+    ("dac.version") => {
+        1
+    };
+    ("dac.version", str) => {
+        stringify!(1)
+    };
     ("dac.channel_count") => {
         2
     };
