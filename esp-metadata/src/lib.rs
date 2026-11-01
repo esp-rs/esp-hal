@@ -495,6 +495,15 @@ impl Config {
             );
         }
 
+        if let Some(dac) = self.device.peri_config.dac.as_ref()
+            && dac.support_status.is_supported()
+        {
+            ensure!(
+                dac.channel_count.count > 0,
+                "DAC needs at least one channel"
+            );
+        }
+
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
             dma.engines
                 .validate_mem2mem(dma.mem2mem_requires_peripheral)?;
@@ -879,6 +888,20 @@ This pin may be available with certain limitations. Check your hardware to make 
                     all_peripherals.push(quote! { @peri_type #tokens (unstable) });
                     singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
                 }
+            }
+        }
+
+        if let Some(dac) = self.device.peri_config.dac.as_ref()
+            && dac.support_status.is_supported()
+        {
+            for channel in 1..=dac.channel_count.count {
+                let name = format_ident!("DAC{channel}");
+                let singleton_doc = format!("{name} peripheral singleton");
+                let tokens = quote! {
+                    #[doc = #singleton_doc] #name <= virtual ()
+                };
+                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
             }
         }
 

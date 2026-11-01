@@ -1,5 +1,6 @@
 pub(crate) mod aes;
 pub(crate) mod canfd;
+pub(crate) mod dac;
 pub(crate) mod dma;
 pub(crate) mod ecc;
 pub(crate) mod gpio;
@@ -23,6 +24,7 @@ pub(crate) mod uart;
 
 pub(crate) use aes::*;
 pub(crate) use canfd::*;
+pub(crate) use dac::*;
 pub(crate) use dma::*;
 pub(crate) use ecc::*;
 pub(crate) use gpio::*;
@@ -875,7 +877,10 @@ driver_configs![
         DacProperties {
             driver: dac,
             name: "DAC",
-            properties: {}
+            properties: {
+                #[serde(default)]
+                channel_count: DacChannels,
+            }
         },
         TempProperties {
             driver: temp_sensor,

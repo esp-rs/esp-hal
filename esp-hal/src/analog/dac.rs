@@ -35,18 +35,6 @@
 use super::ADC_DAC_LOCK;
 use crate::gpio::AnalogPin;
 
-cfg_select! {
-    esp32 => {
-        type Dac1Gpio<'d> = crate::peripherals::GPIO25<'d>;
-        type Dac2Gpio<'d> = crate::peripherals::GPIO26<'d>;
-    }
-    esp32s2 => {
-        type Dac1Gpio<'d> = crate::peripherals::GPIO17<'d>;
-        type Dac2Gpio<'d> = crate::peripherals::GPIO18<'d>;
-    }
-    _ => {}
-}
-
 /// Digital-to-Analog Converter (DAC) Channel.
 ///
 /// Dropping the driver disables its analog output.
@@ -163,16 +151,19 @@ fn select_direct_source(index: usize) {
         .modify(|_, w| w.trans().clear_bit());
 }
 
-#[cfg(dac_dac1)]
-impl<'d> Instance for crate::peripherals::DAC1<'d> {
-    const INDEX: usize = 0;
+for_each_analog_function! {
+    (DACn $((($channel:ident, DACn, $number:literal), $gpio:ident)),*) => {
+        const _: () = core::assert!(
+            [$($number),*].len() == property!("dac.channel_count"),
+            "DAC channel count does not match its analog pin mappings"
+        );
+    };
 
-    type Pin = Dac1Gpio<'d>;
-}
+    (($channel:ident, DACn, $number:literal), $gpio:ident) => {
+        impl<'d> Instance for crate::peripherals::$channel<'d> {
+            const INDEX: usize = $number - 1;
 
-#[cfg(dac_dac2)]
-impl<'d> Instance for crate::peripherals::DAC2<'d> {
-    const INDEX: usize = 1;
-
-    type Pin = Dac2Gpio<'d>;
+            type Pin = crate::peripherals::$gpio<'d>;
+        }
+    };
 }
