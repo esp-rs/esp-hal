@@ -879,6 +879,8 @@ driver_configs![
             name: "DAC",
             properties: {
                 /// Register layout used by the DAC controller.
+                ///
+                /// `1` uses RTC_IO and SENS; `2` uses a dedicated DAC register block.
                 #[serde(default)]
                 version: u32,
                 #[serde(default)]

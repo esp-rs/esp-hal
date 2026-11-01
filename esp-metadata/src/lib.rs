@@ -502,7 +502,10 @@ impl Config {
                 dac.channel_count.count > 0,
                 "DAC needs at least one channel"
             );
-            ensure!(dac.version == 1, "Unsupported DAC register layout");
+            ensure!(
+                (1..=2).contains(&dac.version),
+                "Unsupported DAC register layout"
+            );
             ensure!(
                 (1..=16).contains(&dac.resolution),
                 "DAC resolution must be 1..=16 bits"

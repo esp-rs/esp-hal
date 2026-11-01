@@ -282,6 +282,11 @@ peripheral_clocks = { templates = [
         clk_en_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_clk_en().bit(enable));",
         rst_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_rst_en().bit(reset));"
     } },
+    # Restore the clock divider's PAC reset value when selecting XTAL.
+    { name = "Dac", template_params = {
+        clk_en_template = "let reg = crate::peripherals::LP_PERI::regs().dac_ctrl(); if enable { reg.write(|w| unsafe { w.lp_dac_clk_sel().bits(1).lp_dac_clk_en().set_bit() }); } else { reg.modify(|_, w| w.lp_dac_clk_en().clear_bit()); }",
+        rst_template = "crate::peripherals::LP_PERI::regs().dac_ctrl().modify(|_, w| w.lp_dac_rst_en().bit(reset));"
+    } },
     { name = "Tsens", template_params = {
         clk_en_template = "crate::peripherals::LP_PERI::regs().tsens_ctrl().modify(|_, w| w.lp_tsens_clk_en().bit(enable));",
         rst_template = "crate::peripherals::LP_PERI::regs().tsens_ctrl().modify(|_, w| w.lp_tsens_rst_en().bit(reset));"

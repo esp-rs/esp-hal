@@ -63,6 +63,7 @@ peripherals = [
     { name = "ETH", virtual = true, interrupts = { peri = "SBD" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
     { name = "EMAC_MAC", pac = "GMAC", hidden = true },
+    { name = "DAC", hidden = true },
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
@@ -428,7 +429,10 @@ support_status = "not_supported"
 [device.bit_scrambler]
 support_status = "not_supported"
 [device.dac]
-support_status = "not_supported"
+support_status = "partial"
+version = 2
+channel_count = 2
+resolution = 12
 [device.ethernet]
 support_status = "partial"
 mii_via_gpio_matrix = true
