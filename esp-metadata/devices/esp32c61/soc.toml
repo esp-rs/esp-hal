@@ -31,6 +31,7 @@ cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x1f
 cpu_pmp_granularity = 128
+cpu_powers_down_cache = true
 
 has_swd_watchdog = true
 
@@ -288,7 +289,6 @@ support_status = { status = "not_supported", issue = 1909 }
 [device.psram]
 extmem_origin = 0x42000000
 has_timing_tuning = true
-writeback_before_cpu_power_down = true
 
 [device.sha]
 support_status = "partial"

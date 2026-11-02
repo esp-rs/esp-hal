@@ -1138,10 +1138,6 @@ driver_configs![
             driver: psram,
             name: "PSRAM",
             properties: {
-                /// Whether a sleep that powers the CPU down must first write back the data cache.
-                /// The power-down loses the dirty cache lines.
-                #[serde(default)]
-                writeback_before_cpu_power_down: bool,
                 #[serde(default)]
                 octal_spi: bool,
                 #[serde(default)]
@@ -1191,6 +1187,10 @@ driver_configs![
                 cpu_csr_prv_mode: Option<u32>,
                 #[serde(default)]
                 internal_memory_cached: bool,
+                /// Whether the cache is in the CPU power domain. A CPU power-down loses the dirty
+                /// cache lines.
+                #[serde(default)]
+                cpu_powers_down_cache: bool,
                 #[serde(default)]
                 has_swd_watchdog: bool,
                 #[serde(default)]

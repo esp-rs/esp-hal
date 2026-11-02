@@ -562,9 +562,6 @@ macro_rules! property {
     ("mmu.entry_num", str) => {
         stringify!(1024)
     };
-    ("psram.writeback_before_cpu_power_down") => {
-        true
-    };
     ("psram.octal_spi") => {
         true
     };
@@ -618,6 +615,9 @@ macro_rules! property {
     };
     ("soc.internal_memory_cached") => {
         false
+    };
+    ("soc.cpu_powers_down_cache") => {
+        true
     };
     ("soc.has_swd_watchdog") => {
         true
