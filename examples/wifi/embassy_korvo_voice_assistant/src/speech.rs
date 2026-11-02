@@ -23,6 +23,12 @@ const MAX_GAIN: i32 = 8;
 
 static REQUEST: Signal<CriticalSectionRawMutex, Samples> = Signal::new();
 static RESULT: Signal<CriticalSectionRawMutex, Option<usize>> = Signal::new();
+static READY: Signal<CriticalSectionRawMutex, ()> = Signal::new();
+
+/// Waits until the recognizer has loaded its model and phrases.
+pub async fn wait_until_ready() {
+    READY.wait().await
+}
 
 /// Returns the index of the phrase in 16 kHz mono speech, if any.
 pub async fn recognize(speech: Samples) -> Option<usize> {
@@ -37,6 +43,7 @@ pub fn run(phrases: Vec<Phrase<'static>>) -> ! {
         Err(error) => panic!("Failed to start MultiNet: {error:?}"),
     };
     log::info!("Speech recognizer ready");
+    READY.signal(());
     let delay = Delay::new();
     loop {
         let Some(mut speech) = REQUEST.try_take() else {

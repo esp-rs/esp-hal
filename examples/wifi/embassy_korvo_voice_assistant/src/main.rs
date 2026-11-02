@@ -289,13 +289,18 @@ async fn main(spawner: Spawner) -> ! {
 /// answers questions.
 async fn assistant(service: Option<(Service, Stack<'static>)>, mut led: Led) -> ! {
     let mut screen = Screen {
-        status: String::from("Connecting to Wi-Fi"),
+        status: String::from("Loading speech model"),
         button: Button::Busy,
         you: String::new(),
         assistant: String::from(PHRASES_HINT),
     };
+    display::show(&screen);
+    // Loading the model takes so much PSRAM bandwidth that the display refresh can slip. The next
+    // screen restarts the refresh, so it must come after the loading.
+    speech::wait_until_ready().await;
     let mut api = match service {
         Some((service, stack)) => {
+            screen.status = String::from("Connecting to Wi-Fi");
             display::show(&screen);
             stack.wait_config_up().await;
             Some((service, Api::new(stack)))
