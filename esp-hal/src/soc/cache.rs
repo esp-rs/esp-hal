@@ -1,12 +1,12 @@
-//! Cache suspend and resume around ROM flash operations.
+//! Cache suspend and resume around ROM flash operations and light sleep.
 //!
 //! Dropping cache lines for a flash range needs the MMU table and lives in
-//! [`super::mmu`] instead.
+//! `flash::mmu` instead.
 
 use procmacros::ram;
 
-/// Suspends the flash-backed caches for the duration of a ROM flash operation.
-pub(super) struct CacheGuard {
+/// Suspends the flash-backed caches for the duration of a ROM flash operation or a light sleep.
+pub(crate) struct CacheGuard {
     inner: Inner,
     // Fields drop after `Drop::drop`, so the predictor turns on after the caches resume.
     #[cfg(soc_cpu_has_branch_predictor)]
@@ -50,8 +50,9 @@ cfg_select! {
 impl CacheGuard {
     /// Disable the branch predictor (it issues cache requests) and suspend the
     /// external-memory caches.
-    #[ram]
-    pub(super) fn suspend() -> Self {
+    #[cfg_attr(cpu_retention = "software", ram(unstable(caches_suspended)))]
+    #[cfg_attr(not(cpu_retention = "software"), ram)]
+    pub(crate) fn suspend() -> Self {
         #[cfg(soc_cpu_has_branch_predictor)]
         let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 
@@ -66,7 +67,7 @@ impl CacheGuard {
     /// Flush every line. Must run while the caches are still off.
     #[cfg(esp32)]
     #[ram]
-    pub(super) fn flush_while_off(&self) {
+    pub(crate) fn flush_while_off(&self) {
         unsafe {
             if self.inner.pro {
                 Cache_Flush_rom(0);
@@ -79,7 +80,8 @@ impl CacheGuard {
 }
 
 impl Drop for CacheGuard {
-    #[ram]
+    #[cfg_attr(cpu_retention = "software", ram(unstable(caches_suspended)))]
+    #[cfg_attr(not(cpu_retention = "software"), ram)]
     fn drop(&mut self) {
         resume_caches(&self.inner);
     }
@@ -128,7 +130,8 @@ unsafe extern "C" {
     }
 }
 
-#[ram]
+#[cfg_attr(cpu_retention = "software", ram(unstable(caches_suspended)))]
+#[cfg_attr(not(cpu_retention = "software"), ram)]
 fn suspend_caches() -> Inner {
     cfg_select! {
         esp32 => {
@@ -202,7 +205,8 @@ fn suspend_caches() -> Inner {
     }
 }
 
-#[ram]
+#[cfg_attr(cpu_retention = "software", ram(unstable(caches_suspended)))]
+#[cfg_attr(not(cpu_retention = "software"), ram)]
 fn resume_caches(inner: &Inner) {
     cfg_select! {
         esp32 => {

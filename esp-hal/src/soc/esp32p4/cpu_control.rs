@@ -82,15 +82,18 @@ pub(crate) fn disable_core1() {
 /// Releases core 1 from reset after a CPU-domain power-down wake.
 ///
 /// esp-idf keys this on `core_id == 0` in both the initiator and the helper paths.
+///
+/// It is inlined, because light sleep calls it while the caches are suspended.
 #[cfg(all(
     cpu_retention = "software",
     multi_core,
     supports_cpu_power_down,
     feature = "rt"
 ))]
-#[crate::ram]
+#[inline(always)]
 pub(crate) fn restart_core1_after_wake() {
-    if Cpu::current() != Cpu::ProCpu {
+    // `Cpu::current` can panic, and its panic is in flash.
+    if crate::system::raw_core() != 0 {
         return;
     }
     HP_SYS_CLKRST::regs()

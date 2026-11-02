@@ -12,12 +12,16 @@ impl RegI2cMaster {
         Self { master, host_id }
     }
 
+    // Light sleep can set a PLL while the caches are suspended. The accessors in this file are
+    // inlined, so that a `#[ram]` caller does not run them from flash.
     #[allow(unused)]
+    #[inline(always)]
     pub fn write(&self, reg: u8, data: u8) {
         regi2c_write(self.master, self.host_id, reg, data);
     }
 
     #[allow(unused)]
+    #[inline(always)]
     pub fn read(&self, reg: u8) -> u8 {
         regi2c_read(self.master, self.host_id, reg)
     }
@@ -36,11 +40,13 @@ impl RegI2cRegister {
     }
 
     #[allow(unused)]
+    #[inline(always)]
     pub fn write_reg(&self, data: u8) {
         self.master.write(self.reg_add, data);
     }
 
     #[allow(unused)]
+    #[inline(always)]
     pub fn read(&self) -> u8 {
         self.master.read(self.reg_add)
     }
@@ -61,6 +67,7 @@ impl RawRegI2cField {
         Self { register, msb, lsb }
     }
 
+    #[inline(always)]
     const fn mask(&self) -> u8 {
         const fn lower_n_bits(bits: u8) -> u8 {
             !((u32::MAX << bits) as u8)
@@ -70,11 +77,13 @@ impl RawRegI2cField {
     }
 
     #[allow(unused)]
+    #[inline(always)]
     pub fn read(&self) -> u8 {
         (self.register.read() >> self.lsb) & self.mask()
     }
 
     #[allow(unused)]
+    #[inline(always)]
     pub fn write_field(&self, data: u8) {
         let mask = self.mask() << self.lsb;
         let bits = self.register.read();

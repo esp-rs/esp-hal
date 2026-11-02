@@ -71,9 +71,13 @@ use xtensa_lx::interrupt::free;
 
 #[cfg(not(xtensa))]
 use crate::interrupt::free;
-use crate::{Blocking, DriverMode, peripherals::FLASH, soc::is_slice_in_dram};
+use crate::{
+    Blocking,
+    DriverMode,
+    peripherals::FLASH,
+    soc::{cache, is_slice_in_dram},
+};
 
-mod cache;
 mod mmu;
 mod rom;
 

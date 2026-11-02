@@ -55,3 +55,13 @@ SECTIONS {
   } > ROTEXT
 
 }
+
+#IF cpu_retention == "software"
+/* Light sleep runs `.rwtext.caches_suspended` while the caches are suspended, so code and
+   constants in flash cannot be read. A build that leaves a helper of that code in flash, such as
+   esp-hal at opt-level 0, fails here and names the helper. The code in `.rwtext` is not checked,
+   so the checked code must not call it either. */
+NOCROSSREFS_TO(.text .rwtext.caches_suspended)
+NOCROSSREFS_TO(.rodata .rwtext.caches_suspended)
+NOCROSSREFS_TO(.rwtext .rwtext.caches_suspended)
+#ENDIF

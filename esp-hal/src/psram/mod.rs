@@ -91,6 +91,8 @@ const EXTMEM_ORIGIN: usize = property!("psram.extmem_origin");
 static MAPPED_PSRAM_START: AtomicUsize = AtomicUsize::new(0);
 static MAPPED_PSRAM_END: AtomicUsize = AtomicUsize::new(0);
 
+// The function is inlined, because light sleep can call it with the caches suspended.
+#[inline(always)]
 pub(crate) fn psram_range() -> Range<usize> {
     let end = MAPPED_PSRAM_END.load(Ordering::Acquire);
     let start = MAPPED_PSRAM_START.load(Ordering::Relaxed);

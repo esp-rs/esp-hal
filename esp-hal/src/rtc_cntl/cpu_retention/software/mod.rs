@@ -3,9 +3,10 @@
 //! esp-idf saves the CPU-domain device registers with plain loops, not with the PAU regdma engine
 //! (`esp32c6/sleep_cpu.c:237-341`).
 
-use core::{mem::offset_of, ptr, ptr::NonNull, slice};
+use core::{mem::offset_of, ptr, ptr::NonNull};
 
 use portable_atomic::{AtomicPtr, Ordering};
+use procmacros::ram;
 
 use crate::{
     rtc_cntl::{
@@ -246,7 +247,7 @@ macro_rules! critical_regs_asm {
         restore_extra: [$($restore_extra:literal),*],
         common: { $($common:tt)* }
     ) => {
-        #[unsafe(link_section = ".rwtext")]
+        #[unsafe(link_section = ".rwtext.caches_suspended.critical_regs_save")]
         #[unsafe(naked)]
         unsafe extern "C" fn critical_regs_save(
             _frame: *mut CriticalSleepFrame,
@@ -316,7 +317,7 @@ macro_rules! critical_regs_asm {
             );
         }
 
-        #[unsafe(link_section = ".rwtext")]
+        #[unsafe(link_section = ".rwtext.caches_suspended.critical_regs_restore")]
         #[unsafe(naked)]
         unsafe extern "C" fn critical_regs_restore() {
             core::arch::naked_asm!(
@@ -443,51 +444,54 @@ pub(crate) struct CoreRetentionContext {
 }
 
 impl CoreRetentionContext {
-    #[crate::ram]
+    #[ram(unstable(caches_suspended))]
     pub(crate) fn new(buffer: *mut u8, core: usize) -> Self {
-        // SAFETY: `install_cpu_retention_memory` checked the buffer against the size of every
-        // block.
-        let buffer = unsafe { buffer.add(core * BLOCK_SIZE) };
+        // `install_cpu_retention_memory` checked the buffer against the size of every block. The
+        // arithmetic wraps, because the panic of an overflow check is in flash.
+        let buffer = buffer.wrapping_add(core.wrapping_mul(BLOCK_SIZE));
         Self { buffer, core }
     }
 
-    #[crate::ram]
+    #[ram(unstable(caches_suspended))]
     pub(crate) fn device_frame(&mut self) -> &mut [u32] {
+        // `slice::from_raw_parts_mut` checks its pointer in a build with debug assertions, and the
+        // panic of that check is in flash.
         // SAFETY: the buffer is installed and sized for this chip.
         unsafe {
-            slice::from_raw_parts_mut(
-                self.buffer.add(DEVICE_REGIONS_OFFSET) as *mut u32,
+            &mut *ptr::slice_from_raw_parts_mut(
+                self.buffer.wrapping_add(DEVICE_REGIONS_OFFSET) as *mut u32,
                 DEVICE_REGION_WORDS,
             )
         }
     }
 
-    #[crate::ram]
+    #[ram(unstable(caches_suspended))]
     pub(crate) fn non_critical(&self) -> *mut NonCriticalSleepFrame {
-        // SAFETY: the buffer is installed and sized for this chip.
-        unsafe { self.buffer.add(NON_CRITICAL_FRAME_OFFSET) as *mut NonCriticalSleepFrame }
+        self.buffer.wrapping_add(NON_CRITICAL_FRAME_OFFSET) as *mut NonCriticalSleepFrame
     }
 
-    #[crate::ram]
+    #[ram(unstable(caches_suspended))]
     pub(crate) fn critical(&self) -> *mut CriticalSleepFrame {
-        // SAFETY: the buffer is installed and sized for this chip.
-        unsafe { self.buffer.add(CRITICAL_FRAME_OFFSET) as *mut CriticalSleepFrame }
+        self.buffer.wrapping_add(CRITICAL_FRAME_OFFSET) as *mut CriticalSleepFrame
     }
 }
 
 /// Saves the device registers and the non-critical frame.
-#[crate::ram]
+#[ram(unstable(caches_suspended))]
 pub(crate) fn save_pre_critical(ctx: &mut CoreRetentionContext) {
     device_regs::save(&regions(), ctx.device_frame());
     // SAFETY: the buffer is installed and sized for this chip.
-    unsafe { ctx.non_critical().as_mut().unwrap().save() };
+    unsafe { (*ctx.non_critical()).save() };
 }
 
 /// Saves the critical frame and returns its pointer.
-#[crate::ram]
+#[ram(unstable(caches_suspended))]
 pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSleepFrame {
     let critical = ctx.critical();
-    CRITICAL_FRAME_PTR[ctx.core].store(critical, Ordering::Release);
+    // `get` avoids the bounds check, whose panic is in flash. `ctx.core` is always in range.
+    if let Some(slot) = CRITICAL_FRAME_PTR.get(ctx.core) {
+        slot.store(critical, Ordering::Release);
+    }
     // This call returns twice. It returns here after it saved the frame, and again from the wake
     // stub, with every register of the frame back in place.
     unsafe { critical_regs_save(critical) }
@@ -500,10 +504,8 @@ pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSl
 ///
 /// `enter_sleep` requests the sleep. `wait` blocks until the hardware reports the result.
 ///
-/// esp-idf does not write back or invalidate the cache on this chip. It saves and restores the
-/// cache configuration registers in the device-region frame instead
-/// (`esp32c6/sleep_cpu.c:317-341`).
-#[crate::ram]
+/// The caller has suspended the cache. This function does not invalidate it.
+#[ram(unstable(caches_suspended))]
 pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool {
     let core = system::raw_core();
     let mut ctx = CoreRetentionContext::new(buffer, core);
@@ -512,11 +514,16 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool
 
     // The wake stub writes this word while the compiler believes that nothing did.
     // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
-    let pmufunc = unsafe { ptr::read_volatile(&raw const (*frame).pmufunc) };
+    let pmufunc = unsafe { device_regs::load_word(&raw const (*frame).pmufunc) };
     let rejected = if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
         arm_wake_stub();
         enter_sleep()
     } else {
+        // Like esp-idf's `do_cpu_retention`, this code runs `pmu_sleep_finish` after the critical
+        // restore and before the non-critical restore, see
+        // <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/lowpower/port/esp32s31/sleep_cpu.c#L333>.
+        #[cfg(sleep_pmu_sleep_steps)]
+        sleep::pmu_sleep_finish();
         // The wake holds the APP CPU in reset. A core that waits in the rendezvous comes back
         // through the wake stub once it runs again.
         #[cfg(all(multi_core, feature = "rt"))]
@@ -532,7 +539,7 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool
     // (`esp32c6/sleep_cpu.c:331-341`).
     if !rejected {
         // SAFETY: the frame was filled on this path before the sleep.
-        unsafe { ctx.non_critical().as_mut().unwrap().restore() };
+        unsafe { (*ctx.non_critical()).restore() };
         device_regs::restore(&regions(), &*ctx.device_frame());
     }
 
@@ -666,14 +673,26 @@ pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Optio
 /// The retained path returns twice, so it owns the request and the wait. A sleep that keeps the
 /// domain powered needs no frames, and it must not write them back: the registers still hold what
 /// a save would have read, and a restore repeats side effects such as an interrupt claim.
-#[crate::ram]
+///
+/// A light sleep suspends the caches and turns off the branch predictor. The caches and the
+/// predictor stay off from before the sleep request until the end of the restore. In that time,
+/// code must not run from flash or access PSRAM.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L24-L53>.
+#[ram(unstable(caches_suspended))]
 pub(crate) fn enter_sleep_with_retention(
     config: &RtcSleepConfig,
     buffer: Option<NonNull<u8>>,
 ) -> bool {
-    match buffer.filter(|_| config.pd_flags.pd_cpu()) {
+    let retained = buffer.filter(|_| config.pd_flags.pd_cpu());
+    let _cache = (!config.is_deep_sleep()).then(crate::soc::cache::CacheGuard::suspend);
+
+    match retained {
         Some(buffer) => {
-            cpu_retention::sleep_retained(buffer.as_ptr(), sleep::pmu_common::request_sleep)
+            let request = cfg_select! {
+                sleep_pmu_sleep_steps => sleep::pmu_sleep_start,
+                _ => sleep::pmu_common::request_sleep,
+            };
+            cpu_retention::sleep_retained(buffer.as_ptr(), request)
         }
         None => config.enter_sleep(),
     }
