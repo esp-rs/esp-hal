@@ -9,6 +9,11 @@ allocator-api2 = { version = "0.3.0", default-features = false, features = ["all
 embassy-executor = "0.10.0"
 embassy-time = "0.5.0"
 embedded-graphics = "0.8.1"
+embedded-graphics-framebuf = "0.5.0"
+embedded-gui = { version = "0.2.7", default-features = false, features = [
+    "embedded-graphics",
+    "libm",
+] }
 esp-alloc = { path = "../../esp-alloc" }
 esp-backtrace = { path = "../../esp-backtrace", features = [
     "panic-handler",
@@ -18,7 +23,6 @@ esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
 esp-println = { path = "../../esp-println", features = ["log-04"] }
 esp-rtos = { path = "../../esp-rtos", features = ["embassy", "log-04"] }
-libm = "0.2"
 
 [features]
 esp32s31 = [

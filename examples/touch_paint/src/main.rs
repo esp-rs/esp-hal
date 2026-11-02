@@ -13,6 +13,7 @@ extern crate alloc;
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
+use embedded_graphics::prelude::Point;
 use esp_backtrace as _;
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
@@ -24,9 +25,8 @@ use esp_println::println;
 
 use crate::{
     display::Display,
-    framebuf::FrameBuf,
     touch::{Touch, TouchEvent},
-    ui::{CANVAS_COLOR, PALETTE, TOOLBAR_HEIGHT, ToolbarButton},
+    ui::{TOOLBAR_HEIGHT, Toolbar},
 };
 
 mod display;
@@ -85,22 +85,13 @@ async fn main(_spawner: Spawner) -> ! {
 
     let resources = split_resources!(peripherals);
 
-    let mut selected = 1usize;
-    let mut radius = 7i32;
-    let mut eraser = false;
-
     let mut display = Display::new(resources.display);
+    let mut toolbar = Toolbar::new();
     let dirty = {
-        let mut frame = FrameBuf::new(&mut display);
-        frame.fill_rect(
-            0,
-            0,
-            display::WIDTH as i32,
-            display::HEIGHT as i32,
-            CANVAS_COLOR,
-        );
-        ui::draw_toolbar(&mut frame, selected, radius, eraser);
-        frame.dirty_rows()
+        let mut frame = framebuf::frame(&mut display);
+        ui::clear_canvas(&mut frame);
+        toolbar.draw(&mut frame);
+        frame.data.dirty_rows()
     };
     display.writeback(dirty);
 
@@ -112,7 +103,7 @@ async fn main(_spawner: Spawner) -> ! {
     let mut adc = Adc::new(peripherals.ADC1, adc_config).unwrap();
 
     let mut was_down = false;
-    let mut last_point: Option<(i32, i32)> = None;
+    let mut last_point: Option<Point> = None;
     let mut set_debounce = 0u8;
     let mut set_latched = false;
 
@@ -125,10 +116,9 @@ async fn main(_spawner: Spawner) -> ! {
             set_debounce = set_debounce.saturating_add(1);
             if set_debounce >= 3 && !set_latched {
                 let dirty = {
-                    let mut frame = FrameBuf::new(&mut display);
+                    let mut frame = framebuf::frame(&mut display);
                     ui::draw_demo_picture(&mut frame);
-                    ui::draw_toolbar(&mut frame, selected, radius, eraser);
-                    frame.dirty_rows()
+                    frame.data.dirty_rows()
                 };
                 display.writeback(dirty);
                 last_point = None;
@@ -143,38 +133,29 @@ async fn main(_spawner: Spawner) -> ! {
         match touch.read().await {
             None => {}
             Some(TouchEvent::Up) => {
+                toolbar.release();
                 was_down = false;
                 last_point = None;
             }
             Some(TouchEvent::Down(x, y)) => {
                 let dirty = {
-                    let mut frame = FrameBuf::new(&mut display);
+                    let mut frame = framebuf::frame(&mut display);
                     if y < TOOLBAR_HEIGHT {
                         if !was_down {
-                            match ui::toolbar_button(x) {
-                                Some(ToolbarButton::Color(index)) => {
-                                    selected = index;
-                                    eraser = false;
-                                }
-                                Some(ToolbarButton::BrushSize(size)) => radius = size,
-                                Some(ToolbarButton::Eraser) => eraser = true,
-                                Some(ToolbarButton::Clear) => ui::clear_canvas(&mut frame),
-                                None => {}
+                            if toolbar.press(x, y) {
+                                ui::clear_canvas(&mut frame);
                             }
-                            ui::draw_toolbar(&mut frame, selected, radius, eraser);
+                            toolbar.draw(&mut frame);
                         }
                         last_point = None;
                     } else {
-                        let point = (x, y);
-                        let color = if eraser {
-                            CANVAS_COLOR
-                        } else {
-                            PALETTE[selected]
-                        };
-                        frame.draw_line(last_point.unwrap_or(point), point, radius, color);
+                        let point = Point::new(x, y);
+                        let (color, radius) = toolbar.brush();
+                        let from = last_point.unwrap_or(point);
+                        ui::draw_stroke(&mut frame, from, point, color, radius);
                         last_point = Some(point);
                     }
-                    frame.dirty_rows()
+                    frame.data.dirty_rows()
                 };
                 display.writeback(dirty);
                 was_down = true;
