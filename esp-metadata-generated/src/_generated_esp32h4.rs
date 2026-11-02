@@ -385,6 +385,18 @@ macro_rules! property {
     ("mmu.entry_num", str) => {
         stringify!(512)
     };
+    ("psram.octal_spi") => {
+        false
+    };
+    ("psram.hex_spi") => {
+        false
+    };
+    ("psram.extmem_origin") => {
+        1107296256
+    };
+    ("psram.extmem_origin", str) => {
+        stringify!(1107296256)
+    };
     ("rom.has_crc_le") => {
         true
     };
@@ -410,6 +422,9 @@ macro_rules! property {
         true
     };
     ("soc.multi_core_enabled") => {
+        true
+    };
+    ("soc.cpu_pma_needs_core1_setup") => {
         true
     };
     ("soc.cpu_csr_prv_mode") => {
@@ -4653,14 +4668,16 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "PMU peripheral singleton"] PMU
         <= PMU(PMU : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "PVT peripheral singleton"] PVT <= PVT() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "RMT peripheral singleton"] RMT
-        <= RMT(RMT : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
-        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RNG peripheral singleton"] RNG <= RNG() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SHA peripheral singleton"] SHA
-        <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
-        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "PVT peripheral singleton"] PVT
+        <= PVT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "RMT peripheral singleton"] RMT <= RMT(RMT : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RNG peripheral singleton"] RNG
+        <= RNG() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SHA peripheral singleton"] SHA <= SHA(SHA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "RTC_TIMER peripheral singleton"] RTC_TIMER <= LP_TIMER() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SPI0 peripheral singleton"]
         SPI0 <= SPI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -4796,6 +4813,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PCNT(unstable)));
         _for_each_inner_peripheral!((PCR(unstable)));
         _for_each_inner_peripheral!((PMU(unstable)));
+        _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((PVT(unstable)));
         _for_each_inner_peripheral!((RMT(unstable)));
         _for_each_inner_peripheral!((RNG(unstable)));
@@ -5061,8 +5079,9 @@ macro_rules! for_each_peripheral {
         = "PCR peripheral singleton"] PCR <= PCR() (unstable)), (@ peri_type #[doc =
         "PMU peripheral singleton"] PMU <= PMU(PMU : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "PVT peripheral singleton"] PVT <= PVT() (unstable)), (@ peri_type #[doc =
-        "RMT peripheral singleton"] RMT <= RMT(RMT : { bind_peri_interrupt,
+        = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)), (@ peri_type
+        #[doc = "PVT peripheral singleton"] PVT <= PVT() (unstable)), (@ peri_type #[doc
+        = "RMT peripheral singleton"] RMT <= RMT(RMT : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "RNG peripheral singleton"] RNG <= RNG() (unstable)), (@ peri_type #[doc =
         "SHA peripheral singleton"] SHA <= SHA(SHA : { bind_peri_interrupt,
@@ -5137,14 +5156,14 @@ macro_rules! for_each_peripheral {
         (LP_TEE(unstable)), (LP_WDT(unstable)), (MCPWM0(unstable)), (MCPWM1(unstable)),
         (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
         (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)), (PCR(unstable)),
-        (PMU(unstable)), (PVT(unstable)), (RMT(unstable)), (RNG(unstable)),
-        (SHA(unstable)), (RTC_TIMER(unstable)), (SPI0(unstable)), (SPI1(unstable)),
-        (SPI2), (SPI3), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)),
-        (TIMG0(unstable)), (TIMG1(unstable)), (TOUCH(unstable)), (TOUCH_AON(unstable)),
-        (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)),
-        (USB_FS(unstable)), (ZERO_DET(unstable)), (ADC1(unstable)), (BT(unstable)),
-        (CPU_CTRL(unstable)), (IPC(unstable)), (FLASH(unstable)),
-        (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
+        (PMU(unstable)), (PSRAM(unstable)), (PVT(unstable)), (RMT(unstable)),
+        (RNG(unstable)), (SHA(unstable)), (RTC_TIMER(unstable)), (SPI0(unstable)),
+        (SPI1(unstable)), (SPI2), (SPI3), (SYSTEM(unstable)), (SYSTIMER(unstable)),
+        (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TOUCH(unstable)),
+        (TOUCH_AON(unstable)), (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)),
+        (USB_DEVICE(unstable)), (USB_FS(unstable)), (ZERO_DET(unstable)),
+        (ADC1(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (IPC(unstable)),
+        (FLASH(unstable)), (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
         (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
         _for_each_inner_peripheral!((dma_eligible(SPI3, Spi3, 0, AhbGdmaChannel), (SPI2,
         Spi2, 1, AhbGdmaChannel), (UHCI0, Uhci0, 2, AhbGdmaChannel), (I2S0, I2s0, 3,

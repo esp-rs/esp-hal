@@ -28,6 +28,7 @@ has_md5_bsd = true
 
 [device.soc]
 multi_core_enabled = true
+cpu_pma_needs_core1_setup = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_has_zcmp_workaround = true

@@ -27,6 +27,12 @@ cfg_select! {
         const SPICS1_OUT_IDX: u8 = 101;
         const PSRAM_SPIWP_SD3_IO: u8 = 18;
     }
+    esp32h4 => {
+        const PSRAM_CS_IO: u8 = 6;
+        const SPI_CS1_GPIO_NUM: u8 = 6;
+        const SPICS1_OUT_IDX: u8 = 102;
+        const PSRAM_SPIWP_SD3_IO: u8 = 9;
+    }
     _ => {}
 }
 
@@ -36,49 +42,151 @@ pub(crate) enum PsramLlCsIdT {
     PsramLlCsId1,
 }
 
-/// Frequency of flash memory
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum FlashFreq {
-    /// Flash frequency 40 MHz
-    FlashFreq40m = 40,
-    /// Flash frequency 80 MHz
-    #[default]
-    FlashFreq80m = 80,
-}
+#[cfg(any(esp32c5, esp32c61))]
+mod chip {
+    use super::{CACHE, MspiTimingSpeedMode};
 
-impl FlashFreq {
-    fn mhz(&self) -> u32 {
-        match self {
-            FlashFreq::FlashFreq40m => 40,
-            FlashFreq::FlashFreq80m => 80,
+    /// Frequency of flash memory
+    #[derive(Copy, Clone, Debug, Default, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub enum FlashFreq {
+        /// Flash frequency 40 MHz
+        FlashFreq40m = 40,
+        /// Flash frequency 80 MHz
+        #[default]
+        FlashFreq80m = 80,
+    }
+
+    impl FlashFreq {
+        pub(super) fn mhz(&self) -> u32 {
+            match self {
+                FlashFreq::FlashFreq40m => 40,
+                FlashFreq::FlashFreq80m => 80,
+            }
         }
     }
-}
 
-/// Frequency of PSRAM memory
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SpiRamFreq {
-    /// PSRAM frequency 40 MHz
-    Freq40m = 40,
-    /// PSRAM frequency 80 MHz. Default.
-    #[default]
-    Freq80m = 80,
-}
-
-impl SpiRamFreq {
-    pub(crate) fn need_timing_tuning(&self) -> bool {
-        *self != SpiRamFreq::Freq40m
+    /// Frequency of PSRAM memory
+    #[derive(Copy, Clone, Debug, Default, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub enum SpiRamFreq {
+        /// PSRAM frequency 40 MHz
+        Freq40m = 40,
+        /// PSRAM frequency 80 MHz. Default.
+        #[default]
+        Freq80m = 80,
     }
 
-    fn mhz(&self) -> u32 {
-        match self {
-            SpiRamFreq::Freq40m => 40,
-            SpiRamFreq::Freq80m => 80,
+    impl SpiRamFreq {
+        pub(crate) fn need_timing_tuning(&self) -> bool {
+            *self != SpiRamFreq::Freq40m
+        }
+
+        pub(super) fn mhz(&self) -> u32 {
+            match self {
+                SpiRamFreq::Freq40m => 40,
+                SpiRamFreq::Freq80m => 80,
+            }
         }
     }
+
+    pub(super) fn core_clock_for_mode(_speed_mode: MspiTimingSpeedMode) -> u32 {
+        // in all cases (low and high speed) we use an MSPI clock of 80 MHz on this target
+        80
+    }
+
+    /// Sets MSPI_FAST_CLK's high-speed divider (valid when SOC_ROOT clock source is PLL).
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_set_core_clock(core_clk_mhz: u32) {
+        let divider = match core_clk_mhz {
+            80 => 6,
+            _ => panic!("Invalid core clock"),
+        };
+
+        crate::peripherals::PCR::regs()
+            .mspi_clk_conf()
+            .modify(|_, w| unsafe { w.mspi_fast_div_num().bits(divider - 1) });
+    }
+
+    pub(super) fn enable_cache_buses() {
+        CACHE::regs().cache_ctrl().modify(|_, w| {
+            w.cache_shut_bus0().clear_bit();
+            w.cache_shut_bus1().clear_bit()
+        });
+    }
 }
+
+#[cfg(esp32h4)]
+mod chip {
+    use super::{CACHE, MspiTimingSpeedMode};
+
+    /// Frequency of flash memory
+    #[derive(Copy, Clone, Debug, Default, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub enum FlashFreq {
+        /// Flash frequency 32 MHz
+        FlashFreq32m = 32,
+        /// Flash frequency 64 MHz
+        #[default]
+        FlashFreq64m = 64,
+    }
+
+    impl FlashFreq {
+        pub(super) fn mhz(&self) -> u32 {
+            match self {
+                FlashFreq::FlashFreq32m => 32,
+                FlashFreq::FlashFreq64m => 64,
+            }
+        }
+    }
+
+    /// Frequency of PSRAM memory
+    #[derive(Copy, Clone, Debug, Default, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub enum SpiRamFreq {
+        /// PSRAM frequency 32 MHz
+        Freq32m = 32,
+        /// PSRAM frequency 64 MHz. Default.
+        #[default]
+        Freq64m = 64,
+    }
+
+    impl SpiRamFreq {
+        pub(crate) fn need_timing_tuning(&self) -> bool {
+            false
+        }
+
+        pub(super) fn mhz(&self) -> u32 {
+            match self {
+                SpiRamFreq::Freq32m => 32,
+                SpiRamFreq::Freq64m => 64,
+            }
+        }
+    }
+
+    pub(super) fn core_clock_for_mode(_speed_mode: MspiTimingSpeedMode) -> u32 {
+        64
+    }
+
+    // The bootloader sets XTAL_X2_CLK as the MSPI core clock. Flash also uses this clock.
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_set_core_clock(_core_clk_mhz: u32) {}
+
+    pub(super) fn enable_cache_buses() {
+        // Each core has its own instruction and data bus.
+        CACHE::regs().l1_icache_ctrl().modify(|_, w| {
+            w.l1_icache_shut_ibus0().clear_bit();
+            w.l1_icache_shut_ibus1().clear_bit()
+        });
+        CACHE::regs().l1_dcache_ctrl().modify(|_, w| {
+            w.l1_dcache_shut_dbus0().clear_bit();
+            w.l1_dcache_shut_dbus1().clear_bit()
+        });
+    }
+}
+
+pub use chip::{FlashFreq, SpiRamFreq};
+use chip::{core_clock_for_mode, enable_cache_buses, mspi_timing_ll_set_core_clock};
 
 /// MSPI timing tuning parameters.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -184,18 +292,9 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
         write_psram_mmu_entry(i + mapped_pages, i as u16);
     }
 
-    // enable busses
-    CACHE::regs().cache_ctrl().modify(|_, w| {
-        w.cache_shut_bus0().clear_bit();
-        w.cache_shut_bus1().clear_bit()
-    });
+    enable_cache_buses();
 
     start as usize..start as usize + config.size.get()
-}
-
-fn core_clock_for_mode(_speed_mode: MspiTimingSpeedMode) -> u32 {
-    // in all cases (low and high speed) we use an MSPI clock of 80 MHz on this target
-    80
 }
 
 mod ctrlr_ll {
@@ -316,19 +415,6 @@ fn mspi_timing_config_set_flash_clock(flash_freq_mhz: u32, speed_mode: quad::Msp
     let reg_val: u32 = mspi_timing_ll_calculate_clock_reg(freqdiv);
     mspi_timing_ll_set_flash_clock(0, reg_val);
     mspi_timing_ll_set_flash_clock(1, reg_val);
-}
-
-/// Sets MSPI_FAST_CLK's high-speed divider (valid when SOC_ROOT clock source is PLL).
-#[inline(always)]
-pub(crate) fn mspi_timing_ll_set_core_clock(core_clk_mhz: u32) {
-    let divider = match core_clk_mhz {
-        80 => 6,
-        _ => panic!("Invalid core clock"),
-    };
-
-    crate::peripherals::PCR::regs()
-        .mspi_clk_conf()
-        .modify(|_, w| unsafe { w.mspi_fast_div_num().bits(divider - 1) });
 }
 
 /// Calculates spi_flash clock frequency division parameters for register.

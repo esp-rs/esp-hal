@@ -1177,6 +1177,9 @@ driver_configs![
                 cpu_has_zcmp_workaround: bool,
                 #[serde(default)]
                 multi_core_enabled: bool,
+                /// The bootloader sets the PMA entries on core 0 only. Core 1 must copy them.
+                #[serde(default)]
+                cpu_pma_needs_core1_setup: bool,
                 #[serde(default)]
                 cpu_csr_prv_mode: Option<u32>,
                 #[serde(default)]

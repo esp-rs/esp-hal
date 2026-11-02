@@ -544,6 +544,9 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         true
     };
+    ("soc.cpu_pma_needs_core1_setup") => {
+        false
+    };
     ("soc.internal_memory_cached") => {
         false
     };

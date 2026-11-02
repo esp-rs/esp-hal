@@ -601,6 +601,9 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         true
     };
+    ("soc.cpu_pma_needs_core1_setup") => {
+        true
+    };
     ("soc.cpu_csr_prv_mode") => {
         2064
     };

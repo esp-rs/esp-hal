@@ -308,19 +308,73 @@ fn setup_second_core_stack<'a, F, const SIZE: usize>(
         entry_dst.write(entry);
 
         let entry_fn = entry_dst.cast::<()>();
-        #[cfg(esp32s31)]
-        crate::soc::cpu_control::save_core0_pma(&mut *core0_pma_slot::<F>(entry_fn));
+        #[cfg(soc_cpu_pma_needs_core1_setup)]
+        pma::save_core0_pma(&mut *core0_pma_slot::<F>(entry_fn));
         START_CORE1_FUNCTION.store(entry_fn, Ordering::Release);
         APP_CORE_STACK_TOP.store(stack.top(), Ordering::Release);
         APP_CORE_STACK_GUARD.store(stack_guard.cast(), Ordering::Release);
     }
 }
 
-#[cfg(esp32s31)]
+#[cfg(soc_cpu_pma_needs_core1_setup)]
 fn core0_pma_slot<F>(entry: *mut ()) -> *mut [u32; 32] {
     let end = entry.cast::<u8>().wrapping_add(core::mem::size_of::<F>());
     end.wrapping_add(end.align_offset(core::mem::align_of::<u32>()))
         .cast()
+}
+
+#[cfg(soc_cpu_pma_needs_core1_setup)]
+mod pma {
+    macro_rules! read_csr {
+        ($csr:literal) => {{
+            let value: u32;
+            unsafe { core::arch::asm!(concat!("csrr {0}, ", $csr), out(reg) value) };
+            value
+        }};
+    }
+
+    macro_rules! write_csr {
+        ($csr:literal, $value:expr) => {
+            unsafe { core::arch::asm!(concat!("csrw ", $csr, ", {0}"), in(reg) $value) }
+        };
+    }
+
+    macro_rules! pma_entries {
+        ($($i:literal: $cfg:literal, $addr:literal;)*) => {
+            pub(super) fn save_core0_pma(dst: &mut [u32; 32]) {
+                $(
+                    dst[$i] = read_csr!($cfg);
+                    dst[$i + 16] = read_csr!($addr);
+                )*
+            }
+
+            pub(super) fn set_core1_pma(src: &[u32; 32]) {
+                $(
+                    write_csr!($addr, src[$i + 16]);
+                    write_csr!($cfg, src[$i]);
+                )*
+            }
+        };
+    }
+
+    pma_entries! {
+        0: "0xbc0", "0xbd0";
+        1: "0xbc1", "0xbd1";
+        2: "0xbc2", "0xbd2";
+        3: "0xbc3", "0xbd3";
+        4: "0xbc4", "0xbd4";
+        5: "0xbc5", "0xbd5";
+        6: "0xbc6", "0xbd6";
+        7: "0xbc7", "0xbd7";
+        8: "0xbc8", "0xbd8";
+        9: "0xbc9", "0xbd9";
+        10: "0xbca", "0xbda";
+        11: "0xbcb", "0xbdb";
+        12: "0xbcc", "0xbdc";
+        13: "0xbcd", "0xbdd";
+        14: "0xbce", "0xbde";
+        15: "0xbcf", "0xbdf";
+    }
 }
 
 /// Core 1 entry point, set as the boot address.
@@ -424,8 +478,8 @@ fn start_core1_init_impl<F>() -> !
 where
     F: FnOnce(),
 {
-    #[cfg(esp32s31)]
-    crate::soc::cpu_control::set_core1_pma(unsafe {
+    #[cfg(soc_cpu_pma_needs_core1_setup)]
+    pma::set_core1_pma(unsafe {
         &*core0_pma_slot::<F>(START_CORE1_FUNCTION.load(Ordering::Acquire))
     });
 
