@@ -1,7 +1,7 @@
 #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
 use crate::gpio::lp_io::{LpInputSignal, LpOutputSignal};
 use crate::{
-    gpio::{LpPin, lp_io::LpFunction},
+    gpio::{GPIO_LOCK, LpPin, lp_io::LpFunction},
     peripherals::{LP_GPIO, LP_IO_MUX, LP_PERI, LP_SYS},
 };
 
@@ -64,14 +64,17 @@ pub(crate) fn set_config(lp: u8, input_enable: bool, mux: bool, func: LpFunction
         enable_io_clock();
     }
 
-    LP_SYS::regs().padctrl().modify(|r, w| unsafe {
-        let mut sel = r.pad_mux_sel().bits();
-        if mux {
-            sel |= 1u8 << lp;
-        } else {
-            sel &= !(1u8 << lp);
-        }
-        w.pad_mux_sel().bits(sel)
+    // PAD_MUX_SEL and PAD_HOLD share one register across all LP pads.
+    GPIO_LOCK.lock(|| {
+        LP_SYS::regs().padctrl().modify(|r, w| unsafe {
+            let mut sel = r.pad_mux_sel().bits();
+            if mux {
+                sel |= 1u8 << lp;
+            } else {
+                sel &= !(1u8 << lp);
+            }
+            w.pad_mux_sel().bits(sel)
+        });
     });
 
     LP_IO_MUX::regs().gpio(lp as usize).modify(|_, w| unsafe {
@@ -120,14 +123,16 @@ pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
 }
 
 pub(crate) fn pad_hold(lp: u8, enable: bool) {
-    LP_SYS::regs().padctrl().modify(|r, w| unsafe {
-        let mut hold = r.pad_hold().bits();
-        if enable {
-            hold |= 1u8 << lp;
-        } else {
-            hold &= !(1u8 << lp);
-        }
-        w.pad_hold().bits(hold)
+    GPIO_LOCK.lock(|| {
+        LP_SYS::regs().padctrl().modify(|r, w| unsafe {
+            let mut hold = r.pad_hold().bits();
+            if enable {
+                hold |= 1u8 << lp;
+            } else {
+                hold &= !(1u8 << lp);
+            }
+            w.pad_hold().bits(hold)
+        });
     });
 }
 
