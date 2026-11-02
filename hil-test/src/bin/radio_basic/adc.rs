@@ -1,21 +1,42 @@
 //! Checks that one-shot ADC conversions are unaffected by a running radio.
 //!
 //! Radio initialization hands SAR power to the PHY's power detector, which powers the SAR down
-//! between its own measurements. Without the ADC driver overriding that, a grounded pad reads close
-//! to full scale.
+//! between its own measurements. Without the ADC driver overriding that, a pad driven to 0 V reads
+//! close to full scale.
 
 #[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
 mod tests {
     use esp_hal::{
         analog::adc::{Adc, AdcConfig, Attenuation},
         clock::CpuClock,
-        gpio::{Level, Output, OutputConfig},
+        delay::Delay,
+        i2c::master::{Config as I2cConfig, I2c},
         peripherals::Peripherals,
+        time::Rate,
         timer::timg::TimerGroup,
     };
 
-    // The grounded pad reads a few codes; the failure reads close to full scale.
+    const MCP4725_ADDR: u8 = 0x60;
+    // The 0 V DAC output reads a few codes; the failure reads close to full scale.
     const TOLERANCE: u16 = 0x100;
+
+    fn set_dac_code(i2c: &mut I2c<'_, esp_hal::Blocking>, code: u16, delay: &Delay) {
+        let code = code & 0x0fff;
+        let fast_buf = [(code >> 8) as u8 & 0x0f, code as u8];
+        i2c.write(MCP4725_ADDR, &fast_buf).unwrap();
+        delay.delay_millis(5);
+
+        let mut data = [0u8; 3];
+        i2c.read(MCP4725_ADDR, &mut data).unwrap();
+        let readback = ((data[1] as u16) << 4) | (data[2] as u16 >> 4);
+        if readback != code {
+            let reg_buf = [0x40, (code >> 4) as u8, ((code & 0x0f) << 4) as u8];
+            i2c.write(MCP4725_ADDR, &reg_buf).unwrap();
+            delay.delay_millis(5);
+        }
+
+        delay.delay_millis(10);
+    }
 
     #[init]
     fn init() -> Peripherals {
@@ -30,28 +51,25 @@ mod tests {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
-        // The ADC pads of the `adc` test, driven by the other pad of their pair.
-        cfg_select! {
-            any(esp32c5, esp32c6) => {
-                let (adc_pin, driver) = hil_test::lp_test_pins!(p);
-            }
-            esp32c61 => {
-                let (driver, adc_pin) = hil_test::lp_test_pins!(p);
-            }
-            esp32h2 => {
-                let (adc_pin, driver) = hil_test::hp_test_pins!(p);
-            }
-        }
+        let delay = Delay::new();
+        let (sda, scl) = hil_test::i2c_pins!(p);
+        let mut i2c = I2c::new(
+            p.I2C0,
+            I2cConfig::default().with_frequency(Rate::from_khz(100)),
+        )
+        .unwrap()
+        .with_sda(sda)
+        .with_scl(scl);
 
-        let _driver = Output::new(driver, Level::Low, OutputConfig::default());
+        set_dac_code(&mut i2c, 0, &delay);
 
         let mut config = AdcConfig::new();
-        let mut pin = config.enable_pin(adc_pin, Attenuation::_11dB);
+        let mut pin = config.enable_pin(hil_test::adc_pin!(p), Attenuation::_11dB);
         let mut adc = Adc::new(p.ADC1, config).unwrap();
         let mut read = || nb::block!(adc.read_oneshot(&mut pin)).unwrap();
 
         let before = read();
-        hil_test::assert!(before < TOLERANCE, "grounded pad read {}", before);
+        hil_test::assert!(before < TOLERANCE, "0 V pad read {}", before);
 
         {
             let _radio = cfg_select! {

@@ -13,6 +13,10 @@ for a review.
   Remove comments that narrate the code, explain how you found the bug, or describe how the code
   worked before. Do not add section separators. Do not add a `TODO` for a known limitation: fix it
   in the PR, or open an issue.
+- **ESP-IDF references**: In code ported from ESP-IDF, state the hardware constraint, not the
+  ESP-IDF function that the code copies. Do not write "Like esp-idf's `x`, this code …" or "Ports
+  esp-idf's `x`". Put the permalink, with a commit hash, on a separate `See <link>.` line. See
+  [Maintainability] for details.
 - **Approach**: Fix the cause, not the symptom. Make the smallest change that solves the problem.
   Before you add new code, a dependency or an abstraction, look for one that the codebase already
   has.
@@ -40,6 +44,7 @@ for a review.
   Do not merge or rebase on `main` unless there is a conflict, because each push runs CI again.
 
 [esp-rs developer guidelines]: ./DEVELOPER-GUIDELINES.md
+[Maintainability]: ./DEVELOPER-GUIDELINES.md#maintainability
 [Changelog and Migration Guide Entries]: #changelog-and-migration-guide-entries
 
 ## Writing the description

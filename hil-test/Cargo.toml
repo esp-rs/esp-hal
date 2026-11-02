@@ -33,6 +33,11 @@ harness           = false
 required-features = ["esp-alloc"]
 
 [[bin]]
+name              = "ieee802154"
+harness           = false
+required-features = ["esp-alloc"]
+
+[[bin]]
 name              = "gpio"
 harness           = false
 
@@ -98,7 +103,7 @@ harness           = false
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
 critical-section   = "1"
 defmt              = "1.1"
-defmt-rtt          = { version = "1.0.0", optional = true }
+rtt-target         = { version = "0.6.2", features = ["defmt"], optional = true }
 embassy-executor   = { version = "0.10.0", default-features = false }
 embassy-futures    = "0.1"
 embassy-sync       = "0.8.0"
@@ -143,6 +148,11 @@ sm3                 = { version = "0.5", default-features = false }
 
 paste               = "1.0.15"
 
+sdio                  = "0.5"
+block-device-adapters = "0.2.0"
+embedded-fatfs        = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112", default-features = false }
+embedded-partitions   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+
 [build-dependencies]
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
 
@@ -151,7 +161,7 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 # Add the `embedded-test/defmt` feature for more verbose testing
-defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt", "esp-radio-rtos-driver?/defmt"]
+defmt = ["dep:rtt-target", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt", "esp-radio-rtos-driver?/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 esp-radio-unstable = ["esp-radio/unstable"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
@@ -278,3 +288,7 @@ lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = true
 # We rarely debug HIL binaries, so let's shrink the .ELF size
 debug            = 0
+
+[patch.crates-io]
+block-device-driver   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+block-device-adapters = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }

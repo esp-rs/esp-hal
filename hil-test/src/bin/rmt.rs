@@ -708,7 +708,7 @@ mod tests {
     }
 
     // Test that errors on invalid data are returned as expected (in particular, checks that the
-    // methods don't hang executing a never-ending/never-started tranmission).
+    // methods don't hang executing a never-ending/never-started transmission).
     #[test]
     fn rmt_tx_errors_blocking(mut ctx: Context) {
         let conf = LoopbackConfig {

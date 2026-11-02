@@ -166,9 +166,9 @@ fn invalidate_cache(vaddr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
     }
-    unsafe {
+    crate::soc::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_Addr(map, vaddr, size);
-    }
+    });
 }
 
 #[cfg(esp32)]

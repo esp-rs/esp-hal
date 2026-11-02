@@ -1435,7 +1435,7 @@ mod tests {
             let n = clock.clkcnt_n().bits() as u32 + 1;
             let pre = clock.clkdiv_pre().bits() as u32 + 1;
 
-            let actual = f_mst / (n * pre);
+            let actual = f_mst.div_ceil(n * pre);
 
             assert_eq!(
                 actual, input,
@@ -1448,7 +1448,17 @@ mod tests {
             esp_hal::clock::ll::ClockTree::with(|clocks| {
                 SpiInstance::Spi2.request_function_clock(clocks)
             });
-            let f_min = SpiInstance::function_clock_source_frequency(source) / 1024;
+            let f_min = SpiInstance::function_clock_source_frequency(source).div_ceil(1024);
+            for input in [0, f_min - 1] {
+                assert_eq!(
+                    ctx.spi.apply_config(
+                        &Config::default()
+                            .with_clock_source(source)
+                            .with_frequency(Rate::from_hz(input)),
+                    ),
+                    Err(esp_hal::spi::master::ConfigError::FrequencyOutOfRange),
+                );
+            }
             assert_frequency_roundtrips(ctx, source, f_min);
             assert_frequency_roundtrips(
                 ctx,

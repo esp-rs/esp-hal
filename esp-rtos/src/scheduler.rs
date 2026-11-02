@@ -170,7 +170,12 @@ impl SchedulerState {
 
     #[cfg(multi_core)]
     pub(crate) fn priority_of_core(per_cpu: &[CpuState], core: usize) -> Priority {
-        unsafe { per_cpu[core].current_task.as_ref() }
+        Self::priority_of_task(per_cpu[core].current_task)
+    }
+
+    #[cfg(multi_core)]
+    fn priority_of_task(task: *mut Task) -> Priority {
+        unsafe { task.as_ref() }
             .map(|task| task.priority)
             .unwrap_or(Priority::ZERO)
     }
@@ -320,7 +325,14 @@ impl SchedulerState {
         }
 
         let mut arm_next_timeslice_tick = false;
-        let next_task = self.run_queue.pop();
+
+        #[cfg(multi_core)]
+        let other_core_task = self.per_cpu[1 - current_cpu].current_task;
+
+        let next_task = self.run_queue.pop(
+            #[cfg(multi_core)]
+            other_core_task,
+        );
         if next_task != current_task || deleted_self {
             debug!("Switching task {:?} -> {:?}", current_task, next_task);
 
@@ -340,8 +352,7 @@ impl SchedulerState {
                 #[cfg(multi_core)]
                 if self.active_cores.is_smp()
                     && current_ref.pinned_to.is_none()
-                    && current_ref.priority
-                        >= Self::priority_of_core(&self.per_cpu, 1 - current_cpu)
+                    && current_ref.priority >= Self::priority_of_task(other_core_task)
                 {
                     task::schedule_other_core();
                 }

@@ -229,6 +229,21 @@ Hardware channels are instances too. Describe them in the driver's metadata (a c
 - Avoid excessive use of macros unless there is no other option; modification of the PAC crates should be considered before resorting to macros.
 - Every line of code is a liability. Take some time to see if your implementation can be simplified before opening a PR.
 - If you are porting code from ESP-IDF (or anything else), please include a link WITH the commit hash in it, and please highlight the relevant line(s) of code
+  - In the comment, state the hardware constraint, not which ESP-IDF function the code copies. Do not write "Like esp-idf's `x`, this code …", "Ports esp-idf's `x`" or "Mirrors ESP-IDF".
+  - Put the link on a separate line: `See <https://github.com/espressif/esp-idf/blob/<commit>/<path>#Lx-Ly>.` For more than one link, write `See <a>` and `and <b>.` on the next line.
+  - Name ESP-IDF only if the comment needs it to state the constraint, for example "The write-back runs twice, as in the ESP-IDF patch of `Cache_WriteBack_All`."
+  - Do not put ESP-IDF links in `esp-metadata` property docs.
+
+  ```rust
+  // ❌ BAD
+  // Like esp-idf's `pmu_sleep_config_default`, this code keeps the reference current on
+  // while PSRAM is mapped, see <https://github.com/espressif/esp-idf/blob/383dda6c182/…#L223-L229>.
+
+  // ✅ GOOD
+  // Without the reference current, PSRAM loses its data and its mode register settings in
+  // light sleep.
+  // See <https://github.com/espressif/esp-idf/blob/383dda6c182/…#L223-L229>.
+  ```
 - If necessary provide further context as comments (consider linking to code, PRs, TRM - make sure to use permanent links, e.g. include the hash when linking to a Git repository, include the revision, page number etc. when linking to TRMs)
 - Prefer line comments (//) to block comments (/* ... */)
 - Generally, follow common "good practices" and idiomatic Rust style

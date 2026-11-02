@@ -448,7 +448,7 @@ mod camera_tests {
             esp32s3 => unsafe {
                 (
                     peripherals.GPIO6.split(),
-                    peripherals.GPIO7.split(),
+                    peripherals.GPIO4.split(),
                     peripherals.GPIO14.split(),
                     peripherals.GPIO13.split(),
                     peripherals.GPIO11.split(),
@@ -473,7 +473,7 @@ mod camera_tests {
                     peripherals.GPIO42.split(),
                     peripherals.GPIO43.split(),
                     peripherals.GPIO46.split(),
-                    peripherals.GPIO47.split(),
+                    peripherals.GPIO45.split(),
                     peripherals.GPIO48.split(),
                 )
             },

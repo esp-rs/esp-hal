@@ -100,7 +100,7 @@ impl Value {
                     [b'0', b'b', ..] => i128::from_str_radix(&s[2..], 2),
                     _ => s.parse(),
                 }
-                .map_err(|_| Error::parse(format!("Expected valid intger value, found: '{s}'")))?;
+                .map_err(|_| Error::parse(format!("Expected valid integer value, found: '{s}'")))?;
 
                 Value::Integer(inner)
             }

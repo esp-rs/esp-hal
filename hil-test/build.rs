@@ -4,6 +4,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Define all necessary configuration symbols for the configured device:
     esp_metadata_generated::Chip::from_cargo_feature()?.define_cfgs();
     println!("cargo::rustc-check-cfg=cfg(rust_analyzer)");
+    // Set by the `self_cal` configuration of the `adc` test.
+    println!("cargo::rustc-check-cfg=cfg(__test_adc_self_cal)");
 
     Ok(())
 }

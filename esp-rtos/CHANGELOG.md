@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial support for ESP32-P4 (#5523, #5535)
 - Add ESP32-S31 support (#5922)
-- `start_on_second_core_only` on multi-core chips, for applications where it is simler to keep the first core bare metal. (#6044)
+- `start_on_second_core_only` on multi-core chips, for applications where it is simpler to keep the first core bare metal. (#6044)
 - Configuration for the esp-radio timer thread priority. (#5908)
 - Sleep: enabled auto-lightsleep when esp-rtos runs on multiple cores (#5825)
 - `rearm_alarm` to manually adjust the time base after waking up from light sleep (#5778)

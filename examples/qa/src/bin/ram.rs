@@ -32,6 +32,14 @@ static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
 #[ram(unstable(rtc_fast, zeroed))]
 static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 
+#[cfg(esp32p4)]
+#[ram(unstable(uncached))]
+static mut UNCACHE_DATA: [u8; 4] = [0x11, 0x22, 0x33, 0x44];
+
+#[cfg(esp32p4)]
+#[ram(unstable(uncached, zeroed))]
+static mut UNCACHE_BSS: [u8; 8] = [0; 8];
+
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -56,6 +64,16 @@ fn main() -> ! {
 
         assert_eq!(&[0xff, 0xbb], &SOME_INITED_DATA);
         assert_eq!(&[0xff, 0, 0, 0, 0, 0, 0, 0], &SOME_ZEROED_DATA);
+
+        #[cfg(esp32p4)]
+        {
+            let data_addr = &raw const UNCACHE_DATA as usize;
+            let bss_addr = &raw const UNCACHE_BSS as usize;
+            assert!((0x8FF0_0000..0x9000_0000).contains(&data_addr));
+            assert!((0x8FF0_0000..0x9000_0000).contains(&bss_addr));
+            assert_eq!(&[0x11, 0x22, 0x33, 0x44], &UNCACHE_DATA);
+            assert_eq!(&[0; 8], &UNCACHE_BSS);
+        }
 
         if SOME_PERSISTENT_DATA[1] == 0xff {
             SOME_PERSISTENT_DATA[1] = 0;
