@@ -53,19 +53,28 @@ struct IeeeState {
     /// as it is received, but, only delivered (queued and notified) once the
     /// ACK is sent or aborted - see [`deliver_pending_rx`].
     pending_rx: Option<RawReceived>,
-    /// The driver's PHY reference is given back while asleep - the C driver's `s_rf_closed`.
-    rf_closed: bool,
+    /// Whether the PHY reference is given back while asleep (`Config::modem_sleep`).
+    modem_sleep: bool,
+    /// The driver's PHY reference. `None` while it is given back - the C driver's `s_rf_closed`.
+    phy: Option<PhyInitGuard<'static>>,
 }
 
-static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
-    state: Ieee802154State::Idle,
-    rx_queue: Queue::new(),
-    rx_queue_size: 10,
-    pending_tx: None,
-    ack_frame: None,
-    pending_rx: None,
-    rf_closed: false,
-});
+impl IeeeState {
+    const fn new() -> Self {
+        Self {
+            state: Ieee802154State::Idle,
+            rx_queue: Queue::new(),
+            rx_queue_size: 10,
+            pending_tx: None,
+            ack_frame: None,
+            pending_rx: None,
+            modem_sleep: false,
+            phy: None,
+        }
+    }
+}
+
+static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState::new());
 
 unsafe extern "C" {
     fn bt_bb_set_zb_tx_on_delay(time: u16); // from libbtbb.a
@@ -129,7 +138,7 @@ impl Drop for RadioClockGuard {
 
 /// Counts the radio as a TRNG entropy source while the PHY is enabled.
 ///
-/// Must be dropped before the PHY guards: the count must fall before the entropy source is
+/// Must be dropped before [`RadioStopGuard`]: the count must fall before the entropy source is
 /// disabled.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -155,12 +164,39 @@ impl Drop for EntropySourceGuard {
     }
 }
 
-pub(crate) fn esp_ieee802154_enable(
-    radio: IEEE802154<'_>,
+/// Stops the radio and gives the PHY reference back when dropped - the C driver's
+/// `esp_ieee802154_disable`.
+///
+/// The interrupt is disabled first, so that the handler cannot run `next_operation` on a radio
+/// that is being stopped. The PHY reference has one owner, the driver state, and is given back
+/// exactly once, whatever happened before.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct RadioStopGuard<'a> {
+    radio: IEEE802154<'a>,
+}
+
+impl Drop for RadioStopGuard<'_> {
+    fn drop(&mut self) {
+        // The driver may be dropped on another core than the one it was created on.
+        self.radio.disable_mac_interrupt_on_all_cores();
+
+        let phy = STATE.with(|state| {
+            sleep_inner(state);
+            // Nothing handles these any more, and the next driver instance should not find them.
+            clear_events(Event::mask());
+            state.phy.take()
+        });
+        drop(phy);
+    }
+}
+
+pub(crate) fn esp_ieee802154_enable<'a>(
+    radio: IEEE802154<'a>,
 ) -> (
     EntropySourceGuard,
-    PhyClockGuard<'_>,
-    PhyInitGuard<'_>,
+    RadioStopGuard<'a>,
+    PhyClockGuard<'a>,
     RadioClockGuard,
 ) {
     // The modem power domain (and, with it, the modem reset) and the BT baseband are shared with
@@ -170,22 +206,27 @@ pub(crate) fn esp_ieee802154_enable(
     let phy_clock_guard = esp_phy::enable_phy_clock();
     enable_ieee802154(true);
 
-    let phy_init_guard = esp_phy::enable_phy();
+    let phy = esp_phy::enable_phy();
+    // Whatever a previous driver instance left behind is of no use: start over, holding the PHY.
+    STATE.with(|state| {
+        *state = IeeeState::new();
+        state.phy = Some(phy);
+    });
     let entropy_source_guard = EntropySourceGuard::new();
 
     crate::btbb_enable();
-    ieee802154_mac_init(radio);
+    ieee802154_mac_init(&radio);
 
     info!("date={:x}", mac_date());
     (
         entropy_source_guard,
+        RadioStopGuard { radio },
         phy_clock_guard,
-        phy_init_guard,
         RadioClockGuard,
     )
 }
 
-fn ieee802154_mac_init(radio: IEEE802154<'_>) {
+fn ieee802154_mac_init(radio: &IEEE802154<'_>) {
     #[cfg(soc_has_wifi)]
     unsafe {
         unsafe extern "C" {
@@ -329,8 +370,8 @@ pub fn ieee802154_receive() -> i32 {
 ///
 /// As there, the operation is stopped even with a frame on the air: a frame being received is
 /// lost, the ACK of a received frame is aborted (the frame itself is delivered), and a
-/// transmission fails. The PHY reference is given back, so the RF is closed unless another radio
-/// still uses it.
+/// transmission fails. With modem sleep on, the PHY reference is given back too, so the RF is
+/// closed unless another radio still uses it.
 pub fn ieee802154_sleep() -> i32 {
     STATE.with(sleep_inner);
 
@@ -351,32 +392,21 @@ fn sleep_inner(state: &mut IeeeState) {
 
     state.state = Ieee802154State::Sleep;
 
-    rf_disable(state);
+    if state.modem_sleep {
+        rf_disable(state);
+    }
 }
 
 /// Takes the PHY reference back - the C driver's `ieee802154_rf_enable`.
 fn rf_enable(state: &mut IeeeState) {
-    if state.rf_closed {
-        core::mem::forget(esp_phy::enable_phy());
-        state.rf_closed = false;
+    if state.phy.is_none() {
+        state.phy = Some(esp_phy::enable_phy());
     }
 }
 
 /// Gives the PHY reference back - the C driver's `ieee802154_rf_disable`.
-///
-/// The driver's [`PhyInitGuard`] stays alive: [`ieee802154_rf_restore`] retakes the reference
-/// before it is dropped.
 fn rf_disable(state: &mut IeeeState) {
-    if !state.rf_closed {
-        esp_phy::disable_phy();
-        state.rf_closed = true;
-    }
-}
-
-/// Takes the PHY reference back if sleep gave it back, so the driver's [`PhyInitGuard`] can be
-/// dropped.
-pub(crate) fn ieee802154_rf_restore() {
-    STATE.with(rf_enable);
+    state.phy = None;
 }
 
 pub fn ieee802154_poll() -> Option<RawReceived> {
@@ -554,6 +584,22 @@ pub fn set_coordinator(enable: bool) {
 
 pub fn set_rx_when_idle(enable: bool) {
     ieee802154_pib_set_rx_when_idle(enable);
+}
+
+/// Sets whether the PHY reference is given back while asleep. Applies at once if the radio is
+/// asleep.
+pub fn set_modem_sleep(enable: bool) {
+    STATE.with(|state| {
+        state.modem_sleep = enable;
+
+        if state.state == Ieee802154State::Sleep {
+            if enable {
+                rf_disable(state);
+            } else {
+                rf_enable(state);
+            }
+        }
+    });
 }
 
 pub fn set_tx_power(power: i8) {
