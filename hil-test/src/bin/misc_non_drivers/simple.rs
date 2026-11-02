@@ -204,4 +204,89 @@ mod tests {
 
         _ = UsbSerialJtag::new(ctx.p.USB_DEVICE).into_async().split();
     }
+
+    // These tests need a runner that reads the serial endpoint, as `probe-rs run` does. Without
+    // a reader, the boot messages fill the output FIFO and a write never finishes. Nothing sends
+    // to the board, so the qa example `usb-serial-jtag-io` tests reads.
+    #[test]
+    #[cfg(usb_serial_jtag_driver_supported)]
+    fn usb_serial_jtag_reports_room_and_no_data(ctx: Context) {
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+
+        let mut usb_serial = UsbSerialJtag::new(ctx.p.USB_DEVICE);
+
+        assert!(usb_serial.write_ready());
+        assert!(!usb_serial.read_ready());
+        assert_eq!(
+            embedded_io::WriteReady::write_ready(&mut usb_serial),
+            Ok(true)
+        );
+        assert_eq!(
+            embedded_io::ReadReady::read_ready(&mut usb_serial),
+            Ok(false)
+        );
+        assert_eq!(
+            embedded_io_06::WriteReady::write_ready(&mut usb_serial),
+            Ok(true)
+        );
+        assert_eq!(
+            embedded_io_06::ReadReady::read_ready(&mut usb_serial),
+            Ok(false)
+        );
+
+        let (mut rx, mut tx) = usb_serial.split();
+        assert!(tx.write_ready());
+        assert!(!rx.read_ready());
+        assert_eq!(embedded_io::WriteReady::write_ready(&mut tx), Ok(true));
+        assert_eq!(embedded_io::ReadReady::read_ready(&mut rx), Ok(false));
+        assert_eq!(embedded_io_06::WriteReady::write_ready(&mut tx), Ok(true));
+        assert_eq!(embedded_io_06::ReadReady::read_ready(&mut rx), Ok(false));
+    }
+
+    #[test]
+    #[cfg(usb_serial_jtag_driver_supported)]
+    fn usb_serial_jtag_io_write_returns_after_one_packet(ctx: Context) {
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+
+        let mut usb_serial = UsbSerialJtag::new(ctx.p.USB_DEVICE);
+        assert_eq!(
+            embedded_io::Write::write(&mut usb_serial, &[0x55; 100]),
+            Ok(64)
+        );
+        assert_eq!(
+            embedded_io_06::Write::write(&mut usb_serial, &[0x55; 100]),
+            Ok(64)
+        );
+
+        let (_, mut tx) = usb_serial.split();
+        assert_eq!(embedded_io::Write::write(&mut tx, &[0x55; 100]), Ok(64));
+        assert_eq!(embedded_io_06::Write::write(&mut tx, &[0x55; 100]), Ok(64));
+    }
+
+    #[test]
+    #[cfg(usb_serial_jtag_driver_supported)]
+    fn usb_serial_jtag_io_write_returns_a_short_count(ctx: Context) {
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+
+        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE).split();
+
+        assert_eq!(embedded_io::Write::write(&mut tx, b"hello"), Ok(5));
+        assert_eq!(embedded_io::Write::write(&mut tx, &[]), Ok(0));
+    }
+
+    #[test]
+    #[cfg(usb_serial_jtag_driver_supported)]
+    fn usb_serial_jtag_io_flush_and_write_all_finish(ctx: Context) {
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+
+        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE).split();
+
+        assert_eq!(embedded_io::Write::write(&mut tx, b"hello"), Ok(5));
+        assert_eq!(embedded_io::Write::flush(&mut tx), Ok(()));
+        assert!(tx.write_ready());
+        assert_eq!(
+            embedded_io::Write::write_all(&mut tx, &[b'-'; 1000]),
+            Ok(())
+        );
+    }
 }
