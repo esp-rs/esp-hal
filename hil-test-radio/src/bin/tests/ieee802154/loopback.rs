@@ -207,6 +207,22 @@ mod tests {
     #[test]
     async fn sleep_stops_reception_until_start_receive(p: Peripherals) {
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
+        sleep_stops_reception(&mut ieee802154).await;
+    }
+
+    /// As above, with the PHY reference given back while asleep: `start_receive` has to reopen
+    /// the RF.
+    #[test]
+    async fn sleep_stops_reception_until_start_receive_with_modem_sleep(p: Peripherals) {
+        let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
+        ieee802154.set_config(Config {
+            modem_sleep: true,
+            ..dut_config()
+        });
+        sleep_stops_reception(&mut ieee802154).await;
+    }
+
+    async fn sleep_stops_reception(ieee802154: &mut Ieee802154<'_>) {
         ieee802154.set_tx_done_callback_fn(on_tx_done);
 
         for seq in 0..5u8 {
@@ -280,13 +296,52 @@ mod tests {
         );
     }
 
-    /// Asleep, the driver gives its PHY reference back, but the RF stays on for BLE. Dropping BLE
-    /// then closes the RF, and `start_receive` must reopen it.
+    /// Dropping the driver with a transmission in flight must leave the PHY reference count right,
+    /// wherever the interrupt that ends the transmission lands. Checked by bringing the radio up
+    /// again, with the drop at varying points of the transmission.
+    #[test]
+    async fn survives_drop_with_transmission_in_flight(p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        let mut radio = p.IEEE802154;
+
+        for delay_us in (0..2000u64).step_by(50) {
+            let mut ieee802154 = Ieee802154::new(radio.reborrow());
+            // Without `rx_when_idle`, the end of the transmission puts the radio to sleep, which
+            // gives the PHY reference back with `modem_sleep`.
+            ieee802154.set_config(Config {
+                rx_when_idle: false,
+                modem_sleep: true,
+                ..dut_config()
+            });
+
+            ieee802154.transmit(&data_frame(0, true), false).ok();
+            let until = Instant::now() + Duration::from_micros(delay_us);
+            while Instant::now() < until {}
+            drop(ieee802154);
+        }
+
+        let mut ieee802154 = Ieee802154::new(radio.reborrow());
+        ieee802154.set_config(dut_config());
+        ieee802154.start_receive();
+        assert!(
+            receives_echo(&mut ieee802154).await,
+            "802.15.4 did not come back after being dropped with a transmission in flight"
+        );
+    }
+
+    /// With modem sleep, the driver gives its PHY reference back while asleep, but the RF stays on
+    /// for BLE. Dropping BLE then closes the RF, and `start_receive` must reopen it.
     #[test]
     async fn wakes_after_ble_dropped_while_asleep(p: Peripherals) {
         use esp_radio::ble::controller::BleConnector;
 
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
+        ieee802154.set_config(Config {
+            modem_sleep: true,
+            ..dut_config()
+        });
         let ble = BleConnector::new(p.BT, Default::default()).unwrap();
 
         ieee802154.sleep();
