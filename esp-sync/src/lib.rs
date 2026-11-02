@@ -46,6 +46,7 @@ impl RestoreState {
     /// # Safety
     ///
     /// The `inner` value must be appropriate for the [RawMutex] implementation that creates it.
+    #[inline]
     pub const unsafe fn new(inner: u32) -> Self {
         Self(inner, PhantomData)
     }
@@ -54,6 +55,7 @@ impl RestoreState {
     ///
     /// Note that due to the safety contract of [`RawLock::enter`]/[`RawLock::exit`], you must not
     /// pass a `RestoreState` obtained from this method to [`RawLock::exit`].
+    #[inline]
     pub const fn invalid() -> Self {
         Self(0, PhantomData)
     }
@@ -85,6 +87,7 @@ mod single_core {
     }
 
     impl LockedState {
+        #[inline]
         pub const fn new() -> Self {
             Self {
                 locked: Cell::new(false),
