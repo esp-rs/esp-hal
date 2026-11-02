@@ -355,6 +355,12 @@ macro_rules! property {
     ("ethernet.dma_burst_len", str) => {
         stringify!(32)
     };
+    ("ethernet.dma_alignment") => {
+        4
+    };
+    ("ethernet.dma_alignment", str) => {
+        stringify!(4)
+    };
     ("ethernet.has_rgmii") => {
         false
     };
