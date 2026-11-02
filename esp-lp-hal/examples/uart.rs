@@ -2,7 +2,7 @@
 //!
 //! Uses GPIO4 for RX and GPIO5 for TX. GPIOs can't be changed.
 //!
-//! It is neccessary to use Serial-Uart bridge connected to TX and RX to see
+//! It is necessary to use Serial-Uart bridge connected to TX and RX to see
 //! logs from LP_UART. Make sure the LP RAM is cleared before loading the code.
 
 //% CHIP_FILTER: ulp_riscv_driver_supported && soc_has_lp_uart

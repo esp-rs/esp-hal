@@ -88,7 +88,7 @@ impl RawLock for SingleCoreInterruptLock {
 
     #[inline]
     unsafe fn exit(&self, token: RestoreState) {
-        // Ensure no preceeding memory accesses are reordered to after interrupts are
+        // Ensure no preceding memory accesses are reordered to after interrupts are
         // enabled.
         compiler_fence(Ordering::SeqCst);
 

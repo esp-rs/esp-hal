@@ -516,7 +516,7 @@ impl ClockTreeNodeInstance {
         let request_direct_dependencies = self.node.request_direct_dependencies(self, tree);
         let release_direct_dependencies = self.node.release_direct_dependencies(self, tree);
 
-        // Only configurables have an apply fn
+        // Only configurable clock nodes have an apply fn
         let apply_fn = ty_name
             .as_ref()
             .map(|_| self.node.config_apply_function(self, tree));
@@ -872,7 +872,7 @@ impl SystemClocks {
         let mut clock_tree_state_field_initializers = vec![];
         let mut clock_tree_refcount_field_decls = vec![];
         let mut clock_tree_refcount_field_inits = vec![];
-        let mut configurables = vec![];
+        let mut configurable_fields = vec![];
         let mut system_config_steps = HashMap::new();
 
         let mut first_instances = HashSet::new();
@@ -1042,7 +1042,7 @@ impl SystemClocks {
 
                 let cfg_attr = clock_item.rustc_cfg_attr();
 
-                configurables.push(quote! {
+                configurable_fields.push(quote! {
                     #cfg_attr
                     #docline
                     pub #name: Option<#config_type_name>,
@@ -1474,7 +1474,7 @@ impl SystemClocks {
                     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                     #[instability::unstable]
                     pub struct ClockConfig {
-                        #(#configurables)*
+                        #(#configurable_fields)*
                     }
 
                     impl ClockConfig {

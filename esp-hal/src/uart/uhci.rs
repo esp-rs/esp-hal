@@ -426,7 +426,7 @@ impl<'d> Uhci<'d, Async> {
     }
 }
 
-/// Splitted Uhci structs, Tx part for sending data
+/// Split Uhci structs, Tx part for sending data
 pub struct UhciTx<'d, Dm>
 where
     Dm: DriverMode,
@@ -472,7 +472,7 @@ where
     }
 }
 
-/// Splitted Uhci structs, Rx part for receiving data
+/// Split Uhci structs, Rx part for receiving data
 pub struct UhciRx<'d, Dm>
 where
     Dm: DriverMode,

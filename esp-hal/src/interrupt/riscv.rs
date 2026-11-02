@@ -670,11 +670,10 @@ pub(crate) mod rt {
         }
 
         let handle_interrupts = || unsafe {
-            for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
-                crate::interrupt::should_handle(Cpu::current(), interrupt_nr as u32, prio as u32)
+            for interrupt in status.iterator().filter(|&interrupt| {
+                crate::interrupt::should_handle(Cpu::current(), interrupt as u32, prio as u32)
             }) {
-                let handler =
-                    crate::soc::pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler;
+                let handler = crate::soc::pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
 
                 handler();
             }

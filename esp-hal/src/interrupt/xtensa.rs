@@ -529,10 +529,11 @@ pub(crate) mod rt {
             };
 
             let core = Cpu::current();
-            for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
-                crate::interrupt::should_handle(core, interrupt_nr as u32, LEVEL)
-            }) {
-                let handler = unsafe { crate::pac::__INTERRUPTS[interrupt_nr as usize]._handler };
+            for interrupt in status
+                .iterator()
+                .filter(|&interrupt| crate::interrupt::should_handle(core, interrupt as u32, LEVEL))
+            {
+                let handler = unsafe { crate::pac::__INTERRUPTS[interrupt as usize]._handler };
                 let handler: fn(&mut Context) = unsafe {
                     core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
                 };

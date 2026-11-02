@@ -27,6 +27,12 @@ inputs:
       the `MAX_*` limits are also built at each of them.
     required: false
     default: ""
+  has-cached:
+    description: >-
+      When "true", download the `sizes-cached` artifact produced by `prepare`
+      so commits already stored in `app-metrics` are not rebuilt.
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -48,6 +54,13 @@ runs:
         xtensa-default: "true"
         riscv: ${{ steps.target.outputs.arch == 'riscv' }}
         riscv-targets: ${{ steps.target.outputs.rust-target }}
+
+    - if: inputs.has-cached == 'true'
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: sizes-cached
+        path: sizes
 
     - name: Measure ${{ inputs.soc }}
       uses: actions/github-script@v8

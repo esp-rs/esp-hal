@@ -28,6 +28,9 @@ MEMORY
 {
     RAM : ORIGIN = 0x4FF00000 + RESERVED_L2_CACHE, LENGTH = 0xADFC0 - RESERVED_L2_CACHE
 
+    /* L1-bypass alias of RAM. The address is the RAM address + 0x40000000. */
+    UNCACHE (RW) : ORIGIN = 0x8FF00000 + RESERVED_L2_CACHE, LENGTH = 0xADFC0 - RESERVED_L2_CACHE
+
     /* Memory available after the 2nd stage bootloader finishes.
        Upper bound is __stack_app = 0x4ffbefc0.
        Source: esp-idf C:\_Espressif\esp-idf\components\bootloader\subproject\main\ld\esp32p4\bootloader.memory.ld.in

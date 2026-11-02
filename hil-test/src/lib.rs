@@ -23,9 +23,6 @@ unsafe impl defmt::Logger for Logger {
 }
 
 #[cfg(feature = "defmt")]
-use defmt_rtt as _;
-
-#[cfg(feature = "defmt")]
 #[macro_export]
 macro_rules! assert {
     ($($t:tt)*) => { defmt::assert!($($t)*) }
@@ -162,6 +159,23 @@ macro_rules! unconnected_pin {
     }};
 }
 
+// The ADC1 GPIO connected to the MCP4725 DAC's VOUT pin.
+#[macro_export]
+macro_rules! adc_pin {
+    ($peripherals:expr) => {{
+        cfg_select! {
+            esp32 => $peripherals.GPIO36,
+            any(esp32c2, esp32c3) => $peripherals.GPIO1,
+            esp32c5 => $peripherals.GPIO6,
+            any(esp32c6, esp32c61, esp32h2) => $peripherals.GPIO4,
+            esp32h4 => $peripherals.GPIO28,
+            esp32p4 => $peripherals.GPIO20,
+            any(esp32s2, esp32s3) => $peripherals.GPIO7,
+            esp32s31 => $peripherals.GPIO47,
+        }
+    }};
+}
+
 #[macro_export]
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -211,13 +225,39 @@ pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
 
-/// Disables every watchdog timer with raw register writes.
+/// Starts the RTT logger and disables every watchdog timer with raw register writes.
 ///
-/// This prevents the firmware reset loop if no debugger is attached. The function must not depend
-/// on esp-hal drivers, because a driver that is broken or half-initialized must not stop the tests
-/// from running.
+/// Disabling the watchdogs prevents the firmware reset loop if no debugger is attached. The
+/// function must not depend on esp-hal drivers, because a driver that is broken or half-initialized
+/// must not stop the tests from running.
 #[embedded_test::setup]
-fn disable_watchdogs_before_semihosting() {
+fn init_rtt_and_disable_watchdogs() {
+    #[cfg(feature = "defmt")]
+    {
+        let channels = cfg_select! {
+            esp32p4 => rtt_target::rtt_init! {
+                up: {
+                    0: {
+                        size: 1024,
+                        name: "defmt",
+                        section: ".uncached.data",
+                    }
+                }
+                section_cb: ".uncached.data"
+            },
+            _ => rtt_target::rtt_init! {
+                up: {
+                    0: {
+                        size: 1024,
+                        name: "defmt",
+                    }
+                }
+            },
+        };
+
+        rtt_target::set_defmt_channel(channels.up.0);
+    }
+
     cfg_select! {
         soc_has_lp_wdt => {
             use esp_hal::peripherals::LP_WDT;

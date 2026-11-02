@@ -35,14 +35,19 @@ macro_rules! i2s_instance_resources {
         let i2s: esp_hal::i2s::AnyI2s<'static> = peripherals.$i2s.into();
         let dma_channel = i2s_test_dma_channel!(peripherals, $i2s);
 
-        #[cfg(not(esp32c5))]
+        #[cfg(not(any(esp32c5, esp32c61)))]
         let (_, dout) = hil_test::common_test_pins!(peripherals);
+
+        // On the ESP32-C61 HIL runner, loopback data on the common test pins comes back with extra
+        // bits set, so use the HP pair instead.
+        #[cfg(esp32c61)]
+        let (dout, _) = hil_test::hp_test_pins!(peripherals);
 
         // there are some random pulses counted on ESP32-C5 in our HIL setup
         // with the common test pin, so just use a fixed GPIO pin which is not used for anything
         // else in this test on that chip in the hope it will fix it
         #[cfg(esp32c5)]
-        let dout = peripherals.GPIO6;
+        let dout = peripherals.GPIO7;
 
         let dout = dout.degrade();
         (i2s, dma_channel, dout)
@@ -744,7 +749,7 @@ mod tests {
                         // representation in memory and in the i2s stream (the naming is very
                         // confusing here). This simplifies the loopback test.
                         .with_endianness(Endianness::BigEndian)
-                        // Ensures that all the data fron the i2s stream comes back in
+                        // Ensures that all the data from the i2s stream comes back in
                         .with_channels(Channels::STEREO)
                         .with_alignment(rx_alignment),
                 ),
@@ -1359,11 +1364,12 @@ macro_rules! pdm_instance_resources {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        let (clk, dout) = hil_test::common_test_pins!(peripherals);
         (
             peripherals.$i2s,
             pdm_test_dma_channel!(peripherals, $i2s),
-            peripherals.GPIO1,
-            peripherals.GPIO2,
+            clk,
+            dout,
         )
     }};
 }
@@ -1428,8 +1434,8 @@ mod pdm_tx_tests {
     #[test]
     #[cfg(soc_has_i2s0)]
     fn pdm_tx_config_validate_i2s0() {
-        let i2s = unsafe { esp_hal::peripherals::I2S0::steal() };
-        run_test_pdm_tx_config_validate(&i2s);
+        let peripherals = esp_hal::init(Default::default());
+        run_test_pdm_tx_config_validate(&peripherals.I2S0);
     }
 
     #[test]
@@ -1442,8 +1448,8 @@ mod pdm_tx_tests {
     #[test]
     #[cfg(soc_has_i2s1)]
     fn pdm_tx_config_validate_i2s1() {
-        let i2s = unsafe { esp_hal::peripherals::I2S1::steal() };
-        run_test_pdm_tx_config_validate(&i2s);
+        let peripherals = esp_hal::init(Default::default());
+        run_test_pdm_tx_config_validate(&peripherals.I2S1);
     }
 
     #[test]
@@ -1456,8 +1462,8 @@ mod pdm_tx_tests {
     #[test]
     #[cfg(soc_has_i2s2)]
     fn pdm_tx_config_validate_i2s2() {
-        let i2s = unsafe { esp_hal::peripherals::I2S2::steal() };
-        run_test_pdm_tx_config_validate(&i2s);
+        let peripherals = esp_hal::init(Default::default());
+        run_test_pdm_tx_config_validate(&peripherals.I2S2);
     }
 
     #[test]
@@ -1528,8 +1534,8 @@ mod pdm_rx_tests {
     #[test]
     #[cfg(soc_has_i2s0)]
     fn pdm_rx_config_validate_i2s0() {
-        let i2s = unsafe { esp_hal::peripherals::I2S0::steal() };
-        run_test_pdm_rx_config_validate(&i2s);
+        let peripherals = esp_hal::init(Default::default());
+        run_test_pdm_rx_config_validate(&peripherals.I2S0);
     }
 
     #[test]
@@ -1543,8 +1549,8 @@ mod pdm_rx_tests {
     #[test]
     #[cfg(all(soc_has_i2s1, not(esp32)))]
     fn pdm_rx_config_validate_i2s1() {
-        let i2s = unsafe { esp_hal::peripherals::I2S1::steal() };
-        run_test_pdm_rx_config_validate(&i2s);
+        let peripherals = esp_hal::init(Default::default());
+        run_test_pdm_rx_config_validate(&peripherals.I2S1);
     }
 
     #[test]
@@ -1557,8 +1563,8 @@ mod pdm_rx_tests {
     #[test]
     #[cfg(soc_has_i2s2)]
     fn pdm_rx_config_validate_i2s2() {
-        let i2s = unsafe { esp_hal::peripherals::I2S2::steal() };
-        run_test_pdm_rx_config_validate(&i2s);
+        let peripherals = esp_hal::init(Default::default());
+        run_test_pdm_rx_config_validate(&peripherals.I2S2);
     }
 
     #[test]

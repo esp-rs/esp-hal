@@ -682,7 +682,7 @@ pub(crate) mod utils {
         addr_bit_len: u16,  // Address byte length
         tx_data: &'a [u32], // Point to send data buffer
         tx_data_bit_len: u16,
-        rx_data: &'a mut [u32], // Point to recevie data buffer
+        rx_data: &'a mut [u32], // Point to receive data buffer
         rx_data_bit_len: u16,
         dummy_bit_len: u32,
     }

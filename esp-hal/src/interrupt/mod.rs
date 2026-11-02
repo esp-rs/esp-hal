@@ -207,6 +207,7 @@ const STATUS_WORDS: usize = property!("interrupts.status_registers");
 #[derive(Clone, Copy, Default, Debug)]
 #[instability::unstable]
 pub struct InterruptStatus {
+    // Every set bit names a variant of `Interrupt`.
     status: [u32; STATUS_WORDS],
 }
 
@@ -264,11 +265,17 @@ impl InterruptStatus {
     }
 
     /// Returns the status of peripheral interrupts.
+    ///
+    /// A status bit with no [`Interrupt`] variant reads as clear.
     #[instability::unstable]
     pub fn current() -> InterruptStatus {
         let cpu = Cpu::current();
         InterruptStatus {
-            status: core::array::from_fn(|word| Self::interrupt_status_word(cpu, word)),
+            // `Interrupt::MASK` and the status registers can have different word counts.
+            status: core::array::from_fn(|word| {
+                Self::interrupt_status_word(cpu, word)
+                    & Interrupt::MASK.get(word).copied().unwrap_or(0)
+            }),
         }
     }
 
@@ -280,8 +287,9 @@ impl InterruptStatus {
 
     /// Sets the given interrupt status bit.
     #[instability::unstable]
-    pub fn set(&mut self, interrupt: u8) {
-        self.status[interrupt as usize / 32] |= 1 << (interrupt % 32);
+    pub fn set(&mut self, interrupt: Interrupt) {
+        let interrupt = interrupt as usize;
+        self.status[interrupt / 32] |= 1 << (interrupt % 32);
     }
 
     /// Returns an iterator over the set interrupt status bits.
@@ -303,7 +311,7 @@ pub struct InterruptStatusIterator {
 }
 
 impl Iterator for InterruptStatusIterator {
-    type Item = u8;
+    type Item = Interrupt;
 
     fn next(&mut self) -> Option<Self::Item> {
         for i in self.idx..STATUS_WORDS {
@@ -311,7 +319,9 @@ impl Iterator for InterruptStatusIterator {
                 let bit = self.status.status[i].trailing_zeros();
                 self.status.status[i] ^= 1 << bit;
                 self.idx = i;
-                return Some((bit + 32 * i as u32) as u8);
+                let nr = (bit + 32 * i as u32) as u16;
+                // SAFETY: every set bit in `InterruptStatus` names a variant of `Interrupt`.
+                return Some(unsafe { core::mem::transmute::<u16, Interrupt>(nr) });
             }
         }
         self.idx = usize::MAX;

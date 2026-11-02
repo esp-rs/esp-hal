@@ -8,7 +8,7 @@ use procmacros::doc_replace;
 use crate::soc::is_valid_psram_address;
 use crate::{
     dma::{DmaAlignmentError, DmaBufError},
-    soc::is_valid_ram_address,
+    soc::{is_uncached_ram_address, is_valid_ram_address},
 };
 
 /// DMA appropriate wrapper type for internal memory values.
@@ -78,6 +78,11 @@ impl<T> InternalMemory<T> {
 /// Both the address and size of a DMA buffer must be a multiple of this value
 /// so that cache maintenance on the buffer cannot corrupt neighboring data.
 pub(crate) fn region_dma_alignment(addr: usize) -> Option<usize> {
+    // Uncached memory has no cache lines. The DMA burst alignment check is separate.
+    if is_uncached_ram_address(addr) {
+        return Some(1);
+    }
+
     if is_valid_ram_address(addr) {
         return Some(core::mem::align_of::<InternalMemory<()>>());
     }
@@ -154,15 +159,21 @@ where
     T: ?Sized;
 
 impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
-    #[doc_replace("align_req" => {
-        cfg(soc_internal_memory_cached) => "64",
-        _ => "4"
-    })]
+    #[doc_replace(
+        "align_req" => {
+            cfg(soc_internal_memory_cached) => "64",
+            _ => "4"
+        },
+        "uncached_note" => {
+            cfg(esp32p4) => "This does not apply to `#[ram(unstable(uncached))]` variables.",
+            _ => ""
+        }
+    )]
     /// Creates a new [`DmaAlignedMut`] from a mutable variable, if it is
     /// provably compatible.
     ///
     /// In internal memory, the address and size of the variable
-    /// must be at least __align_req__ byte aligned.
+    /// must be at least __align_req__ byte aligned. __uncached_note__
     #[instability::unstable]
     pub fn new(ptr: &'a mut T) -> Result<Self, DmaBufError> {
         let addr = ptr as *mut T as *mut () as usize;
@@ -272,15 +283,21 @@ where
     T: ?Sized;
 
 impl<'a, T: ?Sized> DmaAlignedRef<'a, T> {
-    #[doc_replace("align_req" => {
-        cfg(soc_internal_memory_cached) => "64",
-        _ => "4"
-    })]
+    #[doc_replace(
+        "align_req" => {
+            cfg(soc_internal_memory_cached) => "64",
+            _ => "4"
+        },
+        "uncached_note" => {
+            cfg(esp32p4) => "This does not apply to `#[ram(unstable(uncached))]` values.",
+            _ => ""
+        }
+    )]
     /// Creates a new [`DmaAlignedRef`] from a shared reference, if it is
     /// provably compatible.
     ///
     /// In internal memory, the address and size of the value
-    /// must be at least __align_req__ byte aligned.
+    /// must be at least __align_req__ byte aligned. __uncached_note__
     #[instability::unstable]
     pub fn new(ptr: &'a T) -> Result<Self, DmaBufError> {
         let addr = ptr as *const T as *const () as usize;
