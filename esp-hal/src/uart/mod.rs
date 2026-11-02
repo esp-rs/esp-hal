@@ -2172,6 +2172,8 @@ where
         // Must apply the common settings first, as `rx.apply_config` reads back symbol
         // size.
         self.rx.uart.info().apply_config(config)?;
+        // `send_break` calculates the break duration from this value.
+        self.tx.baudrate = config.baudrate;
 
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
