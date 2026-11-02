@@ -33,6 +33,13 @@ To run a single test on a target, run the following command from the workspace r
 cargo xtask test esp32c6 gpio
 ```
 
+To run only some of the test cases of a binary, add a filter as `binary::filter`:
+
+```shell
+# Run the GPIO test cases whose name contains `pad_hold` on ESP32-C6
+cargo xtask test esp32c6 gpio::pad_hold
+```
+
 If you want to run a test multiple times:
 
 ```shell
