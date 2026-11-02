@@ -73,17 +73,32 @@ pub(crate) fn psram_init(config: &mut super::PsramConfig) {
 
         info!("Detected PSRAM chip id = {:x}", dev_id);
 
-        let density = (((dev_id >> 16) & 0xff) >> 5) & 7;
+        const MFID_AP: u64 = 0x0d;
+        const EID_64MBIT_TRIAL: u64 = 0x26;
+
+        let eid_47_40 = (dev_id >> 16) & 0xff;
+        let density = eid_47_40 >> 5;
         info!("Detected PSRAM chip density = {}", density);
 
-        let size = match density {
+        let mut size = match density {
+            _ if eid_47_40 == EID_64MBIT_TRIAL => 8 * 1024 * 1024,
             0 => 2 * 1024 * 1024,
             1 => 4 * 1024 * 1024,
-            // while density says 8m, esp-idf considers it 4m - so we do the same
-            2 if dev_id == 0xa188145b5d0d => 4 * 1024 * 1024,
             2 => 8 * 1024 * 1024,
             _ => 2 * 1024 * 1024,
         };
+
+        // An AP Memory chip in 2T mode addresses only half of its density.
+        // See <https://github.com/espressif/esp-idf/blob/e4df0c12f70/components/esp_psram/device/esp_psram_impl_ap_quad.c#L306-L337>.
+        let eid_47_16 = ((dev_id >> 16) as u32).swap_bytes();
+        let two_t_mode = eid_47_16 & (1 << 25) == 0 || (eid_47_16 >> 5) & 0xf_ffff == 0x8_a445;
+        if dev_id & 0xff == MFID_AP
+            && size == 8 * 1024 * 1024
+            && eid_47_40 != EID_64MBIT_TRIAL
+            && two_t_mode
+        {
+            size /= 2;
+        }
 
         info!("PSRAM size is {}", size);
 
