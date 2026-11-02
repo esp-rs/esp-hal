@@ -1,25 +1,18 @@
 //! Embassy Voice Assistant Example
 //!
-//! Set SSID, PASSWORD, ESP_SR_COMPONENTS and one of ANTHROPIC_API_KEY or OPENAI_API_KEY env
-//! variables before running this example. Without an API key, the example only recognizes the
+//! Set SSID, PASSWORD and one of ANTHROPIC_API_KEY or OPENAI_API_KEY env variables before running
+//! this example. Without an API key, the example only recognizes the
 //! light commands and does not use Wi-Fi.
 //!
 //! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the talk button on the
 //! screen, say one of the phrases that the phrases button shows, then tap the talk button again.
-//! The second core recognizes the phrase with MultiNet from Espressif's ESP-SR. Claude or OpenAI
+//! The second core recognizes the phrase with MultiNet from Espressif's ESP-SR, through the
+//! `esp-sr` crate, which provides its prebuilt libraries and model. Claude or OpenAI
 //! answers questions, and light commands set the color of the board's RGB LED. The phrase and the
 //! answer are shown on the screen.
 //!
 //! The API key is stored in the firmware in plain text, and anyone with access to the board can
 //! read it. Use a key with a spending limit.
-//!
-//! Building needs:
-//! - Espressif's RISC-V GCC toolchain (`riscv32-esp-elf-gcc` and `riscv32-esp-elf-ld`, 15.2 or
-//!   later, with picolibc) in `PATH`. The ESP-SR libraries need GNU ld.
-//! - ESP_SR_COMPONENTS set to a directory with the ESP-IDF components `espressif__esp-sr`,
-//!   `espressif__dl_fft` and `espressif__cjson`, for example the `managed_components` directory of
-//!   an ESP-IDF project that depends on `espressif/esp-sr`. `src/speech.rs` mirrors C types of
-//!   esp-sr 2.6.0.
 //!
 //! Hardware setup:
 //! - Connect the LCD sub-board.
@@ -36,7 +29,6 @@ mod api;
 mod audio;
 mod display;
 mod es8389;
-mod idf;
 mod led;
 mod speech;
 mod touch;
@@ -128,14 +120,15 @@ const PHRASES: &[(&CStr, Action)] = &[
     (c"turn off the light", Action::Light(Color::OFF)),
 ];
 
-/// Extra pronunciations of phrases in ESP-SR's phonemes, see `speech::run`. The t of "light" runs
-/// into the next word, and a final consonant is often barely released, so MultiNet hears `Li Wi`
-/// instead of `LiT WiT`, or `Li Rf` instead of `LiT RfD`.
-const PRONUNCIATIONS: &[(&CStr, &CStr)] = &[
-    (c"turn the light red", c"TkN jc Li RfD"),
-    (c"turn the light red", c"TkN jc Li Rf"),
-    (c"turn the light white", c"TkN jc Li WiT"),
-    (c"turn the light white", c"TkN jc Li Wi"),
+/// Extra pronunciations of phrases in ESP-SR's phonemes, see [`esp_sr::Phrase`]. The t of "light"
+/// runs into the next word, and a final consonant is often barely released, so MultiNet hears
+/// `Li Wi` instead of `LiT WiT`, or `Li Rf` instead of `LiT RfD`.
+const PRONUNCIATIONS: &[(&CStr, &[&CStr])] = &[
+    (c"turn the light red", &[c"TkN jc Li RfD", c"TkN jc Li Rf"]),
+    (
+        c"turn the light white",
+        &[c"TkN jc Li WiT", c"TkN jc Li Wi"],
+    ),
 ];
 
 /// How long the recording goes on after the tap that stops it.
@@ -169,12 +162,7 @@ async fn main(spawner: Spawner) -> ! {
         ConstStaticCell::new(system::Stack::new());
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
     let _speech_core = cpu_control
-        .start_app_core(SPEECH_STACK.take(), || {
-            speech::run(
-                available_phrases().map(|(phrase, _)| *phrase),
-                PRONUNCIATIONS,
-            )
-        })
+        .start_app_core(SPEECH_STACK.take(), || speech::run(recognized_phrases()))
         .unwrap();
 
     // Display, with the sub-board timings from Espressif's `esp32_s3_lcd_ev_board` BSP
@@ -383,6 +371,19 @@ async fn converse(
 }
 
 const PHRASES_HINT: &str = "Tap Phrases to see what I understand.";
+
+/// The phrases for the recognizer, with their extra pronunciations.
+fn recognized_phrases() -> Vec<esp_sr::Phrase<'static>> {
+    available_phrases()
+        .map(|&(text, _)| esp_sr::Phrase {
+            text,
+            pronunciations: PRONUNCIATIONS
+                .iter()
+                .find(|(phrase, _)| *phrase == text)
+                .map_or(&[], |(_, pronunciations)| pronunciations),
+        })
+        .collect()
+}
 
 /// The phrases the assistant handles: all of them with an API key, only light commands without.
 fn available_phrases() -> impl Iterator<Item = &'static (&'static CStr, Action)> {

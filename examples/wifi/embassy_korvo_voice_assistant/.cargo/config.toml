@@ -1,9 +1,6 @@
 [target.riscv32imafc-unknown-none-elf]
 runner    = "espflash flash --monitor"
-# The ESP-SR libraries use Espressif relocations that only GNU ld supports.
-linker    = "riscv32-esp-elf-ld"
 rustflags = [
-  "-C", "linker-flavor=ld",
   "-C", "link-arg=-Tlinkall.x",
   "-C", "force-frame-pointers",
 ]
@@ -16,7 +13,6 @@ PASSWORD = "PASSWORD"
 # Set one of the keys for answers to questions. Without a key, only the light commands work.
 # ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
 # OPENAI_API_KEY = "OPENAI_API_KEY"
-ESP_SR_COMPONENTS = { value = "managed_components", relative = true }
 
 [unstable]
 build-std = ["alloc", "core"]

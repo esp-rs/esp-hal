@@ -23,8 +23,7 @@ embedded-io-async = "0.7.0"
 # `rsa` verifies certificates signed with RSA keys, such as the root certificate.
 embedded-tls = { version = "0.18.0", default-features = false, features = ["rsa"] }
 embedded-text = "0.7.2"
-# Without `compat`, whose C allocation functions `src/idf.rs` replaces.
-esp-alloc = { path = "../../../esp-alloc", default-features = false, features = ["global-allocator"] }
+esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
     "println",
@@ -39,6 +38,7 @@ esp-radio = { path = "../../../esp-radio", features = [
     "wifi",
 ] }
 esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
+esp-sr = { path = "esp-sr" }
 log = "0.4.27"
 rand_chacha = { version = "0.3.1", default-features = false }
 rand_core = "0.6.4"
@@ -46,9 +46,6 @@ reqwless = { version = "0.14.0", default-features = false }
 serde = { version = "1.0.228", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1.0.145", default-features = false, features = ["alloc"] }
 static_cell = "2.1.0"
-
-[build-dependencies]
-cc = "1.2"
 
 [features]
 esp32s31 = [
@@ -58,6 +55,7 @@ esp32s31 = [
     "esp-hal/esp32s31",
     "esp-metadata-generated/esp32s31",
     "esp-rtos/esp32s31",
+    "esp-sr/esp32s31",
     "esp-radio/esp32s31",
 ]
 
