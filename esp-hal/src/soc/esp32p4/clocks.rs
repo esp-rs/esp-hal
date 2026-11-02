@@ -511,6 +511,66 @@ impl RmtInstance {
     }
 }
 
+impl ParlIoInstance {
+    // PARL_IO_RX_CLOCK
+
+    fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl117()
+            .modify(|_, w| w.parlio_rx_clk_en().bit(en));
+    }
+
+    fn configure_rx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
+    ) {
+        // The driver selects the pad clock (3) itself.
+        LP_AON_CLKRST::regs()
+            .lp_aonclkrst_hp_clk_ctrl()
+            .modify(|_, w| w.lp_aonclkrst_hp_pad_parlio_rx_clk_en().clear_bit());
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl117()
+            .modify(|_, w| unsafe {
+                w.parlio_rx_clk_src_sel().bits(match new_config {
+                    ParlIoClkConfig::XtalClk => 0,
+                    ParlIoClkConfig::RcFastClk => 1,
+                    ParlIoClkConfig::PllF160m => 2,
+                })
+            });
+    }
+
+    // PARL_IO_TX_CLOCK
+
+    fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl118()
+            .modify(|_, w| w.parlio_tx_clk_en().bit(en));
+    }
+
+    fn configure_tx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
+    ) {
+        // The driver selects the pad clock (3) itself.
+        LP_AON_CLKRST::regs()
+            .lp_aonclkrst_hp_clk_ctrl()
+            .modify(|_, w| w.lp_aonclkrst_hp_pad_parlio_tx_clk_en().clear_bit());
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl118()
+            .modify(|_, w| unsafe {
+                w.parlio_tx_clk_src_sel().bits(match new_config {
+                    ParlIoClkConfig::XtalClk => 0,
+                    ParlIoClkConfig::RcFastClk => 1,
+                    ParlIoClkConfig::PllF160m => 2,
+                })
+            });
+    }
+}
+
 // System clock impl functions
 
 // Mux enable stubs (mux nodes need enable functions too)
