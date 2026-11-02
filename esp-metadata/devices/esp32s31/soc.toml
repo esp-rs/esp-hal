@@ -597,6 +597,7 @@ ram_size = 20 # FIXME: placeholder
 support_status = "partial"
 extmem_origin = 0x5000_0000
 octal_spi = true
+has_timing_tuning = true
 
 [device.pixel_accelerator]
 support_status = "not_supported"

@@ -565,6 +565,7 @@ algo = {
 extmem_origin = 0x4800_0000
 hex_spi = true
 octal_spi = true
+has_timing_tuning = true
 
 [device.rsa]
 version = 3

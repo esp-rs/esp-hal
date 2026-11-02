@@ -1142,6 +1142,9 @@ driver_configs![
                 octal_spi: bool,
                 #[serde(default)]
                 hex_spi: bool,
+                /// The MSPI can tune the flash and PSRAM input timing.
+                #[serde(default)]
+                has_timing_tuning: bool,
                 extmem_origin: u32,
             }
         },

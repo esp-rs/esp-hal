@@ -490,6 +490,9 @@ macro_rules! property {
     ("psram.hex_spi") => {
         false
     };
+    ("psram.has_timing_tuning") => {
+        false
+    };
     ("psram.extmem_origin") => {
         1062207488
     };

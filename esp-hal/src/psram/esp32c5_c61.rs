@@ -152,10 +152,6 @@ mod chip {
     }
 
     impl SpiRamFreq {
-        pub(crate) fn need_timing_tuning(&self) -> bool {
-            false
-        }
-
         pub(super) fn mhz(&self) -> u32 {
             match self {
                 SpiRamFreq::Freq32m => 32,
@@ -187,21 +183,11 @@ mod chip {
 
 pub use chip::{FlashFreq, SpiRamFreq};
 use chip::{core_clock_for_mode, enable_cache_buses, mspi_timing_ll_set_core_clock};
-
-/// MSPI timing tuning parameters.
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct MspiTimingTuningParam {
-    /// Input signal delay mode
-    pub spi_din_mode: u8,
-    /// Input signal delay number
-    pub spi_din_num: u8,
-    /// Extra dummy length
-    pub extra_dummy_len: u8,
-}
+#[cfg(psram_has_timing_tuning)]
+pub use tuning::MspiTimingTuningParam;
 
 /// PSRAM configuration
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PsramConfig {
     /// PSRAM size
@@ -210,33 +196,14 @@ pub struct PsramConfig {
     pub flash_frequency: FlashFreq,
     /// Flash timing tuning configuration.
     /// Used as needed.
+    #[cfg(psram_has_timing_tuning)]
     pub flash_tuning: MspiTimingTuningParam,
     /// Frequency of PSRAM memory
     pub ram_frequency: SpiRamFreq,
     /// PSRAM timing tuning configuration.
     /// Used as needed.
+    #[cfg(psram_has_timing_tuning)]
     pub ram_tuning: MspiTimingTuningParam,
-}
-
-impl Default for PsramConfig {
-    fn default() -> Self {
-        Self {
-            size: Default::default(),
-            flash_frequency: Default::default(),
-            flash_tuning: MspiTimingTuningParam {
-                spi_din_mode: 3,
-                spi_din_num: 1,
-                extra_dummy_len: 2,
-            },
-            ram_frequency: Default::default(),
-            // IDF default 80 MHz STR tuning point
-            ram_tuning: MspiTimingTuningParam {
-                spi_din_mode: 3,
-                spi_din_num: 1,
-                extra_dummy_len: 2,
-            },
-        }
-    }
 }
 
 /// Initializes PSRAM to be used for data.
@@ -464,190 +431,218 @@ fn mspi_timing_ll_set_psram_clock(clock_conf: u32) {
         .write(|w| unsafe { w.bits(clock_conf) });
 }
 
-/// Sets MSPI Flash din mode.
-#[inline(always)]
-pub(crate) fn mspi_timing_ll_set_flash_din_mode(mspi_id: u8, din_mode: u8) {
-    assert!(mspi_id == 0);
-    assert!(din_mode <= 7);
+#[cfg(psram_has_timing_tuning)]
+mod tuning {
+    use crate::peripherals::{SPI0, SPI1};
 
-    SPI0::regs().din_mode().modify(|_, w| {
-        unsafe {
-            w.din0_mode().bits(din_mode);
-            w.din1_mode().bits(din_mode);
-            w.din2_mode().bits(din_mode);
-            w.din3_mode().bits(din_mode);
-            w.din4_mode().bits(din_mode);
-            w.din5_mode().bits(din_mode);
-            w.din6_mode().bits(din_mode);
-            w.din7_mode().bits(din_mode);
-            w.dins_mode().bits(din_mode);
-        }
-
-        w
-    });
-
-    SPI0::regs()
-        .timing_cali()
-        .modify(|_, w| w.update().set_bit());
-}
-
-/// Sets MSPI Flash din num.
-#[inline(always)]
-pub(crate) fn mspi_timing_ll_set_flash_din_num(mspi_id: u8, din_num: u8) {
-    assert!(mspi_id == 0);
-    assert!(din_num <= 3);
-
-    SPI0::regs().din_num().modify(|_, w| {
-        unsafe {
-            w.din0_num().bits(din_num);
-            w.din1_num().bits(din_num);
-            w.din2_num().bits(din_num);
-            w.din3_num().bits(din_num);
-            w.din4_num().bits(din_num);
-            w.din5_num().bits(din_num);
-            w.din6_num().bits(din_num);
-            w.din7_num().bits(din_num);
-            w.dins_num().bits(din_num);
-        }
-
-        w
-    });
-
-    SPI0::regs()
-        .timing_cali()
-        .modify(|_, w| w.update().set_bit());
-}
-
-/// Sets MSPI Flash extra dummy.
-#[inline(always)]
-pub(crate) fn mspi_timing_ll_set_flash_extra_dummy(mspi_id: u8, extra_dummy: u8) {
-    if mspi_id == 0 {
-        SPI0::regs().timing_cali().modify(|_, w| {
-            w.timing_cali().bit(extra_dummy > 0);
-            unsafe { w.extra_dummy_cyclelen().bits(extra_dummy) };
-            w
-        });
-    } else {
-        SPI1::regs().timing_cali().modify(|_, w| {
-            w.timing_cali().bit(extra_dummy > 0);
-            unsafe { w.extra_dummy_cyclelen().bits(extra_dummy) };
-            w
-        });
+    /// MSPI timing tuning parameters.
+    #[derive(Copy, Clone, Debug, PartialEq)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub struct MspiTimingTuningParam {
+        /// Input signal delay mode
+        pub spi_din_mode: u8,
+        /// Input signal delay number
+        pub spi_din_num: u8,
+        /// Extra dummy length
+        pub extra_dummy_len: u8,
     }
 
-    SPI0::regs()
-        .timing_cali()
-        .modify(|_, w| w.update().set_bit());
-}
+    impl Default for MspiTimingTuningParam {
+        fn default() -> Self {
+            // IDF default 80 MHz STR tuning point
+            Self {
+                spi_din_mode: 3,
+                spi_din_num: 1,
+                extra_dummy_len: 2,
+            }
+        }
+    }
 
-/// Sets MSPI PSRAM din mode.
-#[inline(always)]
-pub(crate) fn mspi_timing_ll_set_psram_din_mode(mspi_id: u8, din_mode: u8) {
-    assert!(mspi_id == 0);
-    assert!(din_mode <= 7);
+    /// Sets MSPI Flash din mode.
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_set_flash_din_mode(mspi_id: u8, din_mode: u8) {
+        assert!(mspi_id == 0);
+        assert!(din_mode <= 7);
 
-    SPI0::regs().smem_din_mode().modify(|_, w| {
-        unsafe {
-            w.smem_din0_mode().bits(din_mode);
-            w.smem_din1_mode().bits(din_mode);
-            w.smem_din2_mode().bits(din_mode);
-            w.smem_din3_mode().bits(din_mode);
-            w.smem_din4_mode().bits(din_mode);
-            w.smem_din5_mode().bits(din_mode);
-            w.smem_din6_mode().bits(din_mode);
-            w.smem_din7_mode().bits(din_mode);
-            w.smem_dins_mode().bits(din_mode);
+        SPI0::regs().din_mode().modify(|_, w| {
+            unsafe {
+                w.din0_mode().bits(din_mode);
+                w.din1_mode().bits(din_mode);
+                w.din2_mode().bits(din_mode);
+                w.din3_mode().bits(din_mode);
+                w.din4_mode().bits(din_mode);
+                w.din5_mode().bits(din_mode);
+                w.din6_mode().bits(din_mode);
+                w.din7_mode().bits(din_mode);
+                w.dins_mode().bits(din_mode);
+            }
+
+            w
+        });
+
+        SPI0::regs()
+            .timing_cali()
+            .modify(|_, w| w.update().set_bit());
+    }
+
+    /// Sets MSPI Flash din num.
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_set_flash_din_num(mspi_id: u8, din_num: u8) {
+        assert!(mspi_id == 0);
+        assert!(din_num <= 3);
+
+        SPI0::regs().din_num().modify(|_, w| {
+            unsafe {
+                w.din0_num().bits(din_num);
+                w.din1_num().bits(din_num);
+                w.din2_num().bits(din_num);
+                w.din3_num().bits(din_num);
+                w.din4_num().bits(din_num);
+                w.din5_num().bits(din_num);
+                w.din6_num().bits(din_num);
+                w.din7_num().bits(din_num);
+                w.dins_num().bits(din_num);
+            }
+
+            w
+        });
+
+        SPI0::regs()
+            .timing_cali()
+            .modify(|_, w| w.update().set_bit());
+    }
+
+    /// Sets MSPI Flash extra dummy.
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_set_flash_extra_dummy(mspi_id: u8, extra_dummy: u8) {
+        if mspi_id == 0 {
+            SPI0::regs().timing_cali().modify(|_, w| {
+                w.timing_cali().bit(extra_dummy > 0);
+                unsafe { w.extra_dummy_cyclelen().bits(extra_dummy) };
+                w
+            });
+        } else {
+            SPI1::regs().timing_cali().modify(|_, w| {
+                w.timing_cali().bit(extra_dummy > 0);
+                unsafe { w.extra_dummy_cyclelen().bits(extra_dummy) };
+                w
+            });
         }
 
-        w
-    });
+        SPI0::regs()
+            .timing_cali()
+            .modify(|_, w| w.update().set_bit());
+    }
 
-    SPI0::regs()
-        .timing_cali()
-        .modify(|_, w| w.update().set_bit());
-}
+    /// Sets MSPI PSRAM din mode.
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_set_psram_din_mode(mspi_id: u8, din_mode: u8) {
+        assert!(mspi_id == 0);
+        assert!(din_mode <= 7);
 
-/// Sets MSPI PSRAM din num.
-#[inline(always)]
-pub(crate) fn mspi_timing_ll_set_psram_din_num(mspi_id: u8, din_num: u8) {
-    assert!(mspi_id == 0);
-    assert!(din_num <= 3);
+        SPI0::regs().smem_din_mode().modify(|_, w| {
+            unsafe {
+                w.smem_din0_mode().bits(din_mode);
+                w.smem_din1_mode().bits(din_mode);
+                w.smem_din2_mode().bits(din_mode);
+                w.smem_din3_mode().bits(din_mode);
+                w.smem_din4_mode().bits(din_mode);
+                w.smem_din5_mode().bits(din_mode);
+                w.smem_din6_mode().bits(din_mode);
+                w.smem_din7_mode().bits(din_mode);
+                w.smem_dins_mode().bits(din_mode);
+            }
 
-    SPI0::regs().smem_din_num().modify(|_, w| {
-        unsafe {
-            w.smem_din0_num().bits(din_num);
-            w.smem_din1_num().bits(din_num);
-            w.smem_din2_num().bits(din_num);
-            w.smem_din3_num().bits(din_num);
-            w.smem_din4_num().bits(din_num);
-            w.smem_din5_num().bits(din_num);
-            w.smem_din6_num().bits(din_num);
-            w.smem_din7_num().bits(din_num);
-            w.smem_dins_num().bits(din_num);
+            w
+        });
+
+        SPI0::regs()
+            .timing_cali()
+            .modify(|_, w| w.update().set_bit());
+    }
+
+    /// Sets MSPI PSRAM din num.
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_set_psram_din_num(mspi_id: u8, din_num: u8) {
+        assert!(mspi_id == 0);
+        assert!(din_num <= 3);
+
+        SPI0::regs().smem_din_num().modify(|_, w| {
+            unsafe {
+                w.smem_din0_num().bits(din_num);
+                w.smem_din1_num().bits(din_num);
+                w.smem_din2_num().bits(din_num);
+                w.smem_din3_num().bits(din_num);
+                w.smem_din4_num().bits(din_num);
+                w.smem_din5_num().bits(din_num);
+                w.smem_din6_num().bits(din_num);
+                w.smem_din7_num().bits(din_num);
+                w.smem_dins_num().bits(din_num);
+            }
+
+            w
+        });
+
+        SPI0::regs()
+            .timing_cali()
+            .modify(|_, w| w.update().set_bit());
+    }
+
+    /// Sets MSPI PSRAM extra dummy.
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_set_psram_extra_dummy(mspi_id: u8, extra_dummy: u8) {
+        assert!(mspi_id == 0);
+
+        SPI0::regs().smem_timing_cali().modify(|_, w| {
+            w.smem_timing_cali().bit(extra_dummy > 0);
+            unsafe { w.smem_extra_dummy_cyclelen().bits(extra_dummy) };
+            w
+        });
+
+        SPI0::regs()
+            .timing_cali()
+            .modify(|_, w| w.update().set_bit());
+    }
+
+    /// Returns the MSPI flash dummy info.
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_get_flash_dummy(mspi_id: u8) -> (u8, u8) {
+        assert!(mspi_id <= 1);
+
+        if mspi_id == 0 {
+            let usr_dummy = SPI0::regs().user1().read().usr_dummy_cyclelen().bits();
+            let extra_dummy = SPI0::regs()
+                .timing_cali()
+                .read()
+                .extra_dummy_cyclelen()
+                .bits();
+            (usr_dummy, extra_dummy)
+        } else {
+            let usr_dummy = SPI1::regs().user1().read().usr_dummy_cyclelen().bits();
+            let extra_dummy = SPI1::regs()
+                .timing_cali()
+                .read()
+                .extra_dummy_cyclelen()
+                .bits();
+            (usr_dummy, extra_dummy)
         }
+    }
 
-        w
-    });
+    /// Returns the MSPI PSRAM dummy info.
+    #[inline(always)]
+    pub(crate) fn mspi_timing_ll_get_psram_dummy(mspi_id: u8) -> (u8, u8) {
+        assert!(mspi_id == 0);
 
-    SPI0::regs()
-        .timing_cali()
-        .modify(|_, w| w.update().set_bit());
-}
-
-/// Sets MSPI PSRAM extra dummy.
-#[inline(always)]
-pub(crate) fn mspi_timing_ll_set_psram_extra_dummy(mspi_id: u8, extra_dummy: u8) {
-    assert!(mspi_id == 0);
-
-    SPI0::regs().smem_timing_cali().modify(|_, w| {
-        w.smem_timing_cali().bit(extra_dummy > 0);
-        unsafe { w.smem_extra_dummy_cyclelen().bits(extra_dummy) };
-        w
-    });
-
-    SPI0::regs()
-        .timing_cali()
-        .modify(|_, w| w.update().set_bit());
-}
-
-/// Returns the MSPI flash dummy info.
-#[inline(always)]
-pub(crate) fn mspi_timing_ll_get_flash_dummy(mspi_id: u8) -> (u8, u8) {
-    assert!(mspi_id <= 1);
-
-    if mspi_id == 0 {
-        let usr_dummy = SPI0::regs().user1().read().usr_dummy_cyclelen().bits();
+        let usr_dummy = SPI0::regs()
+            .cache_sctrl()
+            .read()
+            .sram_rdummy_cyclelen()
+            .bits();
         let extra_dummy = SPI0::regs()
-            .timing_cali()
+            .smem_timing_cali()
             .read()
-            .extra_dummy_cyclelen()
-            .bits();
-        (usr_dummy, extra_dummy)
-    } else {
-        let usr_dummy = SPI1::regs().user1().read().usr_dummy_cyclelen().bits();
-        let extra_dummy = SPI1::regs()
-            .timing_cali()
-            .read()
-            .extra_dummy_cyclelen()
+            .smem_extra_dummy_cyclelen()
             .bits();
         (usr_dummy, extra_dummy)
     }
-}
-
-/// Returns the MSPI PSRAM dummy info.
-#[inline(always)]
-pub(crate) fn mspi_timing_ll_get_psram_dummy(mspi_id: u8) -> (u8, u8) {
-    assert!(mspi_id == 0);
-
-    let usr_dummy = SPI0::regs()
-        .cache_sctrl()
-        .read()
-        .sram_rdummy_cyclelen()
-        .bits();
-    let extra_dummy = SPI0::regs()
-        .smem_timing_cali()
-        .read()
-        .smem_extra_dummy_cyclelen()
-        .bits();
-    (usr_dummy, extra_dummy)
 }
