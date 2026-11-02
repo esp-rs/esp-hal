@@ -1,4 +1,4 @@
-#[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
+#[cfg(lp_uart_driver_supported)]
 use crate::gpio::lp_io::{LpInputSignal, LpOutputSignal};
 use crate::{
     gpio::{GPIO_LOCK, LpPin, lp_io::LpFunction},
@@ -25,7 +25,7 @@ for_each_lp_function! {
         ($( $lp_in_af:ident => $lp_in_signal:ident )*)
         ($( $lp_out_af:ident => $lp_out_signal:ident )*)
     )),*) => {
-        #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
+        #[cfg(lp_uart_driver_supported)]
         pub(crate) fn input_signals(lp: u8) -> &'static [(LpFunction, LpInputSignal)] {
             match lp {
                 $( $lp_pin => &[$( (LpFunction::$lp_in_af, LpInputSignal::$lp_in_signal) ),*], )*
@@ -33,7 +33,7 @@ for_each_lp_function! {
             }
         }
 
-        #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
+        #[cfg(lp_uart_driver_supported)]
         pub(crate) fn output_signals(lp: u8) -> &'static [(LpFunction, LpOutputSignal)] {
             match lp {
                 $( $lp_pin => &[$( (LpFunction::$lp_out_af, LpOutputSignal::$lp_out_signal) ),*], )*
@@ -84,13 +84,11 @@ pub(crate) fn set_config(lp: u8, input_enable: bool, mux: bool, func: LpFunction
     });
 }
 
-#[cfg(lp_io_has_gpio_matrix)]
 pub(crate) fn init_pin(lp: u8, input_enable: bool) -> u8 {
     set_config(lp, input_enable, true, LpFunction::LP_GPIO);
     lp
 }
 
-#[cfg(lp_io_has_gpio_matrix)]
 pub(crate) fn output_enable(lp: u8, enable: bool) {
     if enable {
         LP_GPIO::regs()
@@ -103,7 +101,6 @@ pub(crate) fn output_enable(lp: u8, enable: bool) {
     }
 }
 
-#[cfg(lp_io_has_gpio_matrix)]
 pub(crate) fn input_enable(lp: u8, enable: bool) {
     LP_IO_MUX::regs()
         .gpio(lp as usize)
@@ -149,21 +146,23 @@ pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
         return;
     };
 
-    if bit < 32 {
-        let mask = 1 << bit;
-        LP_SYS::regs().hp_gpio_o_hold_ctrl0().modify(|r, w| unsafe {
-            let bits = r.hp_gpio_0_hold_ctrl0().bits();
-            w.hp_gpio_0_hold_ctrl0()
-                .bits(if enable { bits | mask } else { bits & !mask })
-        });
-    } else {
-        let mask = 1 << (bit - 32);
-        LP_SYS::regs().hp_gpio_o_hold_ctrl1().modify(|r, w| unsafe {
-            let bits = r.hp_gpio_0_hold_ctrl1().bits();
-            w.hp_gpio_0_hold_ctrl1()
-                .bits(if enable { bits | mask } else { bits & !mask })
-        });
-    }
+    GPIO_LOCK.lock(|| {
+        if bit < 32 {
+            let mask = 1 << bit;
+            LP_SYS::regs().hp_gpio_o_hold_ctrl0().modify(|r, w| unsafe {
+                let bits = r.hp_gpio_0_hold_ctrl0().bits();
+                w.hp_gpio_0_hold_ctrl0()
+                    .bits(if enable { bits | mask } else { bits & !mask })
+            });
+        } else {
+            let mask = 1 << (bit - 32);
+            LP_SYS::regs().hp_gpio_o_hold_ctrl1().modify(|r, w| unsafe {
+                let bits = r.hp_gpio_0_hold_ctrl1().bits();
+                w.hp_gpio_0_hold_ctrl1()
+                    .bits(if enable { bits | mask } else { bits & !mask })
+            });
+        }
+    });
 }
 
 /// Returns whether something holds the pad of `gpio`.
@@ -191,7 +190,6 @@ pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
     }
 }
 
-#[cfg(lp_io_has_gpio_matrix)]
 pub(crate) fn set_open_drain_output(lp: u8, enable: bool) {
     LP_GPIO::regs()
         .pin(lp as usize)

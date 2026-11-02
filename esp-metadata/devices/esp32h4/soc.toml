@@ -159,10 +159,6 @@ channels = [
 
 [device.io_mux]
 
-[device.lp_io]
-support_status = "partial"
-version = "v4"
-
 [device.uart]
 support_status = "partial"
 instances = [

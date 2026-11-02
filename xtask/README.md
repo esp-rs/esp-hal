@@ -387,6 +387,10 @@ For example, running `cargo xtask test esp32 embassy_test` will run both
 `embassy_test_single_integrated` and `embassy_test_multiple_integrated`, but you can also
 run `cargo xtask test esp32 embassy_test_multiple_integrated` to select only one.
 
+To run only some test cases of a binary, add a filter as `binary::filter`. For example,
+`cargo xtask test esp32 gpio::pad_hold` runs the test cases of `gpio` whose name contains
+`pad_hold`.
+
 In this example, running the `cargo xtask build tests esp32 embassy_test` command creates an
 `embassy_test_single_integrated` and an `embassy_test_multiple_integrated` binary.
 
