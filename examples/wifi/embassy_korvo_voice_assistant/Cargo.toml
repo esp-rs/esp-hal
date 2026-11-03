@@ -38,7 +38,7 @@ esp-radio = { path = "../../../esp-radio", features = [
     "wifi",
 ] }
 esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
-esp-sr = { path = "esp-sr" }
+esp-sr = { git = "https://github.com/SergioGasquez/esp-sr", rev = "e56a9c6" }
 log = "0.4.27"
 rand_chacha = { version = "0.3.1", default-features = false }
 rand_core = "0.6.4"
@@ -58,6 +58,10 @@ esp32s31 = [
     "esp-sr/esp32s31",
     "esp-radio/esp32s31",
 ]
+
+# esp-sr allocates from the heap of esp-alloc, so it must use the same esp-alloc as this example.
+[patch.crates-io]
+esp-alloc = { path = "../../../esp-alloc" }
 
 [profile.release]
 debug            = true
