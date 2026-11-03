@@ -26,7 +26,12 @@ esp-backtrace = { path = "../../esp-backtrace", features = [
     "println",
 ] }
 esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
-esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
+esp-hal = { path = "../../esp-hal", default-features = false, features = [
+    "rt",
+    "exception-handler",
+    "log-04",
+    "unstable",
+] }
 esp-metadata-generated = { path = "../../esp-metadata-generated" }
 esp-rtos = { path = "../../esp-rtos", optional = true, features = [
     "log-04",
@@ -55,7 +60,9 @@ log = "0.4"
 libm = "0.2"
 
 [features]
+default = ["float-save-restore"]
 unstable = []
+float-save-restore = ["esp-hal/float-save-restore"]
 
 esp-radio = [
     "dep:esp-radio",

@@ -80,6 +80,11 @@ fn try_main() -> Result<(), Box<dyn Error>> {
     // Define all necessary configuration symbols for the configured device:
     chip.define_cfgs();
 
+    println!("cargo:rustc-check-cfg=cfg(fpu_disabled_in_interrupts)");
+    if std::env::var_os("DEP_ESP_RISCV_RT_FPU_DISABLED_IN_INTERRUPTS").is_some() {
+        println!("cargo:rustc-cfg=fpu_disabled_in_interrupts");
+    }
+
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
