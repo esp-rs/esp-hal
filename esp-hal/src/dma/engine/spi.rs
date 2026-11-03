@@ -554,10 +554,24 @@ pub(super) fn enable_spi_dma() {
         // restrictive than necessary but we currently support the same
         // number of SPI peripherals as SPI DMA channels so it's not a big
         // deal.
-        connect_spi_dma(crate::dma::DmaPeripheral::SPI2, true);
-        connect_spi_dma(crate::dma::DmaPeripheral::SPI3, true);
+        SPI_DMA_CHAN_SEL_LOCK.lock(|| {
+            crate::peripherals::DPORT::regs()
+                .spi_dma_chan_sel()
+                .modify(|_, w| unsafe {
+                    w.spi2_dma_chan_sel().bits(SPI2_DMA_CHANNEL);
+                    w.spi3_dma_chan_sel().bits(SPI3_DMA_CHANNEL)
+                });
+        });
     }
 }
+
+#[cfg(esp32)]
+const SPI2_DMA_CHANNEL: u8 = 1;
+#[cfg(esp32)]
+const SPI3_DMA_CHANNEL: u8 = 2;
+
+#[cfg(esp32)]
+static SPI_DMA_CHAN_SEL_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 /// Connects an SPI host to its DMA channel, or disconnects it.
 ///
@@ -568,11 +582,11 @@ pub(crate) fn connect_spi_dma(peripheral: crate::dma::DmaPeripheral, connect: bo
     use crate::{dma::DmaPeripheral, peripherals::DPORT};
 
     let channel = |channel: u8| if connect { channel } else { 0 };
-    critical_section::with(|_| {
+    SPI_DMA_CHAN_SEL_LOCK.lock(|| {
         DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
             match peripheral {
-                DmaPeripheral::SPI2 => w.spi2_dma_chan_sel().bits(channel(1)),
-                DmaPeripheral::SPI3 => w.spi3_dma_chan_sel().bits(channel(2)),
+                DmaPeripheral::SPI2 => w.spi2_dma_chan_sel().bits(channel(SPI2_DMA_CHANNEL)),
+                DmaPeripheral::SPI3 => w.spi3_dma_chan_sel().bits(channel(SPI3_DMA_CHANNEL)),
                 _ => w,
             }
         });
