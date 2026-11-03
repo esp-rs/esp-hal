@@ -10,10 +10,14 @@ fn main() {
         println!("cargo::rustc-cfg=riscv_has_f");
     }
 
-    // Crates that depend directly on `esp-riscv-rt` read this value as
-    // `DEP_ESP_RISCV_RT_FLOAT_SAVE_RESTORE`.
-    if has_f && std::env::var_os("CARGO_FEATURE_FLOAT_SAVE_RESTORE").is_some() {
-        println!("cargo::metadata=float_save_restore=1");
+    // Crates that depend directly on `esp-riscv-rt` read these values as
+    // `DEP_ESP_RISCV_RT_FLOAT_SAVE_RESTORE` and `DEP_ESP_RISCV_RT_FPU_DISABLED_IN_INTERRUPTS`.
+    if has_f {
+        if std::env::var_os("CARGO_FEATURE_FLOAT_SAVE_RESTORE").is_some() {
+            println!("cargo::metadata=float_save_restore=1");
+        } else {
+            println!("cargo::metadata=fpu_disabled_in_interrupts=1");
+        }
     }
 }
 

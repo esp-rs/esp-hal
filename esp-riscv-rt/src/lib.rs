@@ -220,10 +220,17 @@ r#"
 "#,
 }
 
-#[cfg(not(all(riscv_has_f, feature = "float-save-restore")))]
+#[cfg(not(riscv_has_f))]
 macro_rules! interrupt_handler {
     () => {
         "handle_interrupts"
+    };
+}
+
+#[cfg(all(riscv_has_f, not(feature = "float-save-restore")))]
+macro_rules! interrupt_handler {
+    () => {
+        "handle_interrupts_disable_fpu"
     };
 }
 
@@ -302,6 +309,38 @@ extern "C" fn handle_interrupts_save_fpu() {
         addi sp, sp, 96
         ret
         .option pop
+        "
+    }
+}
+
+/// Calls `handle_interrupts` with `mstatus.FS` set to Off.
+///
+/// An FPU instruction in an interrupt handler then causes an illegal instruction exception. The
+/// hardware does not change `mstatus.FS` on a trap or on `mret`, so this routine restores the
+/// previous value.
+#[cfg(all(riscv_has_f, not(feature = "float-save-restore")))]
+#[unsafe(naked)]
+#[unsafe(no_mangle)]
+#[unsafe(link_section = ".trap.start")]
+extern "C" fn handle_interrupts_disable_fpu() {
+    core::arch::naked_asm! {
+        "
+        addi sp, sp, -16
+        sw ra, 0(sp)
+        li t0, 0x6000
+        csrrc t0, mstatus, t0
+        sw t0, 4(sp)
+
+        jal ra, handle_interrupts
+
+        li t1, 0x6000
+        csrc mstatus, t1
+        lw t0, 4(sp)
+        and t0, t0, t1
+        csrs mstatus, t0
+        lw ra, 0(sp)
+        addi sp, sp, 16
+        ret
         "
     }
 }
