@@ -330,7 +330,6 @@ channel_count = 8
 support_status = "not_supported"
 
 [device.pcnt]
-support_status = "not_supported"
 instances = {
     PCNT = {
         sys_instance = "Pcnt",

@@ -4575,9 +4575,16 @@ macro_rules! for_each_peripheral {
         { bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         DMA_OUT_CH4 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable))); _for_each_inner_peripheral!((@
-        peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        peri_type #[doc = "PCNT0_UNIT0 peripheral singleton"] PCNT0_UNIT0 <= virtual()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PCNT0_UNIT1 peripheral singleton"] PCNT0_UNIT1 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PCNT0_UNIT2 peripheral singleton"] PCNT0_UNIT2 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PCNT0_UNIT3 peripheral singleton"] PCNT0_UNIT3 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "AES peripheral singleton"] AES
+        <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC(APB_ADC : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -4775,6 +4782,10 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((DMA_CH2(unstable)));
         _for_each_inner_peripheral!((DMA_CH3(unstable)));
         _for_each_inner_peripheral!((DMA_CH4(unstable)));
+        _for_each_inner_peripheral!((PCNT0_UNIT0(unstable)));
+        _for_each_inner_peripheral!((PCNT0_UNIT1(unstable)));
+        _for_each_inner_peripheral!((PCNT0_UNIT2(unstable)));
+        _for_each_inner_peripheral!((PCNT0_UNIT3(unstable)));
         _for_each_inner_peripheral!((AES(unstable)));
         _for_each_inner_peripheral!((APB_SARADC(unstable)));
         _for_each_inner_peripheral!((ASRC(unstable)));
@@ -5013,16 +5024,21 @@ macro_rules! for_each_peripheral {
         bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         DMA_OUT_CH4 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
-        "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC(APB_ADC : {
+        "PCNT0_UNIT0 peripheral singleton"] PCNT0_UNIT0 <= virtual() (unstable)), (@
+        peri_type #[doc = "PCNT0_UNIT1 peripheral singleton"] PCNT0_UNIT1 <= virtual()
+        (unstable)), (@ peri_type #[doc = "PCNT0_UNIT2 peripheral singleton"] PCNT0_UNIT2
+        <= virtual() (unstable)), (@ peri_type #[doc =
+        "PCNT0_UNIT3 peripheral singleton"] PCNT0_UNIT3 <= virtual() (unstable)), (@
+        peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "ASRC peripheral singleton"] ASRC <=
-        ASRC(ASRC_CHNL0 : { bind_chnl0_interrupt, enable_chnl0_interrupt,
-        disable_chnl0_interrupt }, ASRC_CHNL1 : { bind_chnl1_interrupt,
-        enable_chnl1_interrupt, disable_chnl1_interrupt }) (unstable)), (@ peri_type
-        #[doc = "BUS_MONITOR peripheral singleton"] BUS_MONITOR <=
-        BUS_MONITOR(BUS_MONITOR : { bind_peri_interrupt, enable_peri_interrupt,
+        (unstable)), (@ peri_type #[doc = "APB_SARADC peripheral singleton"] APB_SARADC
+        <= APB_SARADC(APB_ADC : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "ASRC peripheral singleton"] ASRC <= ASRC(ASRC_CHNL0 : { bind_chnl0_interrupt,
+        enable_chnl0_interrupt, disable_chnl0_interrupt }, ASRC_CHNL1 : {
+        bind_chnl1_interrupt, enable_chnl1_interrupt, disable_chnl1_interrupt })
+        (unstable)), (@ peri_type #[doc = "BUS_MONITOR peripheral singleton"] BUS_MONITOR
+        <= BUS_MONITOR(BUS_MONITOR : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
         "CACHE peripheral singleton"] CACHE <= CACHE(CACHE : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
@@ -5157,9 +5173,10 @@ macro_rules! for_each_peripheral {
         (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27), (GPIO28), (GPIO29), (GPIO30),
         (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38),
         (GPIO39), (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)),
-        (DMA_CH3(unstable)), (DMA_CH4(unstable)), (AES(unstable)),
-        (APB_SARADC(unstable)), (ASRC(unstable)), (BUS_MONITOR(unstable)),
-        (CACHE(unstable)), (CLIC(unstable)), (CLINT(unstable)),
+        (DMA_CH3(unstable)), (DMA_CH4(unstable)), (PCNT0_UNIT0(unstable)),
+        (PCNT0_UNIT1(unstable)), (PCNT0_UNIT2(unstable)), (PCNT0_UNIT3(unstable)),
+        (AES(unstable)), (APB_SARADC(unstable)), (ASRC(unstable)),
+        (BUS_MONITOR(unstable)), (CACHE(unstable)), (CLIC(unstable)), (CLINT(unstable)),
         (CLINT_OTHER_CORE(unstable)), (CPU_APM(unstable)), (DMA(unstable)),
         (ECC(unstable)), (ECDSA(unstable)), (ETM(unstable)), (GPIO(unstable)),
         (GPIO_DEDICATED(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
