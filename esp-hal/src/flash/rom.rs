@@ -1,7 +1,5 @@
 //! ROM SPI flash wrappers and JEDEC capacity decode.
 
-use procmacros::ram;
-
 use super::{ConfigError, Error};
 
 #[repr(C)]
@@ -120,46 +118,47 @@ pub(super) fn capacity_from_cached_id(raw: u32) -> Result<usize, ConfigError> {
     Ok(size as usize)
 }
 
-#[inline(always)]
-fn check_rc(rc: i32) -> Result<(), Error> {
-    if rc == 0 {
-        Ok(())
-    } else {
-        decode_rom_error(rc)
-    }
-}
+/// A non-zero status of a ROM flash function.
+pub(super) struct RomError(i32);
 
-/// Must live in RAM: callers run with the flash cache suspended.
-#[ram]
-fn decode_rom_error(rc: i32) -> Result<(), Error> {
-    match rc {
-        1 => Err(Error::IoError),
-        2 => Err(Error::IoTimeout),
-        other => {
-            warn!("unexpected flash ROM status {}", other);
-            Err(Error::Unknown)
+impl From<RomError> for Error {
+    fn from(RomError(rc): RomError) -> Self {
+        match rc {
+            1 => Error::IoError,
+            2 => Error::IoTimeout,
+            other => {
+                warn!("unexpected flash ROM status {}", other);
+                Error::Unknown
+            }
         }
     }
 }
 
 #[inline(always)]
-pub(super) fn read(src_addr: u32, data: &mut [u32]) -> Result<(), Error> {
+fn check_rc(rc: i32) -> Result<(), RomError> {
+    if rc == 0 { Ok(()) } else { Err(RomError(rc)) }
+}
+
+// The wrappers below run with the caches suspended, so they must not panic. `Flash` checks the
+// lengths before the call.
+#[inline(always)]
+pub(super) fn read(src_addr: u32, data: &mut [u32]) -> Result<(), RomError> {
     check_rc(unsafe {
         esp_rom_sys::rom::spiflash::esp_rom_spiflash_read(
             src_addr,
             data.as_mut_ptr(),
-            data.len() as u32 * super::WORD_SIZE,
+            (data.len() as u32).wrapping_mul(super::WORD_SIZE),
         )
     })
 }
 
 #[inline(always)]
-pub(super) fn write(dest_addr: u32, data: &[u32]) -> Result<(), Error> {
+pub(super) fn write(dest_addr: u32, data: &[u32]) -> Result<(), RomError> {
     check_rc(unsafe {
         esp_rom_sys::rom::spiflash::esp_rom_spiflash_write(
             dest_addr,
             data.as_ptr(),
-            data.len() as u32 * super::WORD_SIZE,
+            (data.len() as u32).wrapping_mul(super::WORD_SIZE),
         )
     })
 }
@@ -170,18 +169,18 @@ pub(super) fn write(dest_addr: u32, data: &[u32]) -> Result<(), Error> {
 /// 32-byte aligned. On later chips, 16/32/64-byte rows are accepted. The
 /// ROM may encrypt in place.
 #[inline(always)]
-pub(super) fn write_encrypted(dest_addr: u32, data: *mut u32, len: u32) -> Result<(), Error> {
+pub(super) fn write_encrypted(dest_addr: u32, data: *mut u32, len: u32) -> Result<(), RomError> {
     check_rc(unsafe {
         esp_rom_sys::rom::spiflash::esp_rom_spiflash_write_encrypted(dest_addr, data, len)
     })
 }
 
 #[inline(always)]
-pub(super) fn erase_sector(sector_number: u32) -> Result<(), Error> {
+pub(super) fn erase_sector(sector_number: u32) -> Result<(), RomError> {
     check_rc(unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_erase_sector(sector_number) })
 }
 
 #[inline(always)]
-pub(super) fn erase_block(block_number: u32) -> Result<(), Error> {
+pub(super) fn erase_block(block_number: u32) -> Result<(), RomError> {
     check_rc(unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_erase_block(block_number) })
 }
