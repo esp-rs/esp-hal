@@ -18,10 +18,6 @@ const CACHED_FILE = path.join(SIZES_DIR, "cached.txt");
 const METRICS_FILE = "binary_size_metrics.json";
 const METRICS_NAMES = ["binary_size", "binary_size_sections"];
 const MAX_BETWEEN_COMMITS = 15;
-// Nightly jobs that may fail without making the run incomplete. The upload
-// depends on a self-hosted runner and the S3 service. When it fails, the next
-// run must still start at this run's head, or it reports the same commits again.
-const OPTIONAL_NIGHTLY_JOBS = new Set(["upload-metrics"]);
 
 // Runs git and returns its trimmed output.
 async function git(exec, args) {
@@ -113,22 +109,15 @@ async function fetchLatestCommitMetrics({ context, core }) {
 // reads. Metrics stored without a RAM total counted `.data` as flash only, so
 // they are not comparable and the commit is built again.
 function metricsToLines(metrics, role) {
-  const totals = metrics?.binary_size?.data || [];
-  if (totals.some((t) => t.ram === undefined)) return [];
-  const sections = metrics?.binary_size_sections?.data || [];
-  if (sections.length > 0) {
-    return sections.map(
-      (s) => `${s.chip} ${s.example} ${role} ${s.section} ${s.kind} ${s.bytes}`,
-    );
-  }
-  return totals.flatMap((t) => [
-    `${t.chip} ${t.example} ${role} .flash flash ${t.flash}`,
-    `${t.chip} ${t.example} ${role} .ram bss ${t.ram}`,
-  ]);
+  if (!metrics?.binary_size?.data?.every((t) => t.ram !== undefined)) return [];
+  return (metrics.binary_size_sections?.data || []).map(
+    (s) => `${s.chip} ${s.example} ${role} ${s.section} ${s.kind} ${s.bytes}`,
+  );
 }
 
-// Whether the run measured every chip it had to and reported the result. Only
-// the jobs in `OPTIONAL_NIGHTLY_JOBS` may have failed.
+// Whether the run measured every chip it had to and reported the result. The
+// metrics upload may fail: it depends on a self-hosted runner and the S3
+// service, and waiting for it would report the same commits again.
 async function isCompleteRun({ github, context }, runId) {
   const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
     ...context.repo,
@@ -136,14 +125,10 @@ async function isCompleteRun({ github, context }, runId) {
     filter: "latest",
     per_page: 100,
   });
-  const prepared = jobs.some((job) => job.name === "prepare" && job.conclusion === "success");
   return (
-    prepared &&
+    jobs.some((job) => job.name === "prepare" && job.conclusion === "success") &&
     jobs.every(
-      (job) =>
-        OPTIONAL_NIGHTLY_JOBS.has(job.name) ||
-        job.conclusion === "success" ||
-        job.conclusion === "skipped",
+      (job) => job.name === "upload-metrics" || ["success", "skipped"].includes(job.conclusion),
     )
   );
 }
@@ -560,17 +545,7 @@ async function measureBetween({ core, exec, soc, target, flash, pkg, lines, betw
   for (const commit of between) {
     try {
       found.push(
-        ...(await measureCommit({
-          core,
-          exec,
-          soc,
-          target,
-          flash,
-          pkg,
-          examples,
-          role: commit,
-          commit,
-        })),
+        ...(await measureCommit({ core, exec, soc, target, flash, pkg, examples, role: commit, commit })),
       );
     } catch (error) {
       core.warning(`Skipping ${commit} on ${soc}: ${error.message}`);
@@ -862,11 +837,6 @@ function whereText(rows) {
     .join("; ");
 }
 
-// The cause of regressions in a range whose commits were not built one by one.
-function unsplitGrowth(rows) {
-  return { table: "", hasRows: false, culprits: new Map(), unexplained: [], unsplit: rows };
-}
-
 // Names the pull requests that alone grew past the limits, and where, and the
 // regressions that only add up over several pull requests.
 function causeText({ culprits, unexplained, unsplit = [] }) {
@@ -880,7 +850,7 @@ function causeText({ culprits, unexplained, unsplit = [] }) {
   }
   if (unsplit.length > 0) {
     lines.push(
-      `The check measures each pull request of a range only when the range is a line of at most ${MAX_BETWEEN_COMMITS} commits on \`main\`, so it does not name the pull request behind the growth in ${whereText(unsplit)}. See the pull requests merged in the range below.`,
+      `The check measures each pull request of a range only when the range is a line of at most ${MAX_BETWEEN_COMMITS} commits on \`main\`, so it does not name the pull request behind the growth in ${whereText(unsplit)}.`,
     );
   }
   return lines.length === 1 ? lines[0] : lines.map((line) => `- ${line}`).join("\n");
@@ -915,8 +885,18 @@ async function reportNightly({ github, context, core, exec }) {
             [base, ...between, head],
             limits,
           )
-        : unsplitGrowth(regressions);
+        : { hasRows: false, culprits: new Map(), unexplained: [], unsplit: regressions };
   }
+  const growthText = growth?.hasRows
+    ? [
+        "### Growth by pull request",
+        "",
+        "The size after each pull request that changed it. In bold where that pull request alone grew past the limits.",
+        "",
+        growth.table,
+        "",
+      ]
+    : [];
 
   const summary = [
     "## Binary size report",
@@ -929,16 +909,7 @@ async function reportNightly({ github, context, core, exec }) {
   if (regressions.length > 0) {
     summary.push("### Cause", "", causeText(growth), "");
     summary.push("### Regressions", "", totalsTable(regressions), "", sectionsDetails(regressions), "");
-    if (growth.hasRows) {
-      summary.push(
-        "### Growth by pull request",
-        "",
-        "The size after each pull request that changed it. In bold where that pull request alone grew past the limits.",
-        "",
-        growth.table,
-        "",
-      );
-    }
+    summary.push(...growthText);
   }
 
   if (improvements.length > 0) {
@@ -989,16 +960,7 @@ async function reportNightly({ github, context, core, exec }) {
     "",
     sectionsDetails(regressions),
     "",
-    ...(growth.hasRows
-      ? [
-          "### Growth by pull request",
-          "",
-          "The size after each pull request that changed it. In bold where that pull request alone grew past the limits.",
-          "",
-          growth.table,
-          "",
-        ]
-      : []),
+    ...growthText,
     `### Merged between \`${base.slice(0, 10)}\` and \`${head.slice(0, 10)}\``,
     "",
     merged,
