@@ -75,7 +75,10 @@ other core running. The limits above on the cache and the other core do not appl
 
 These limits apply:
 
-- Don't map flash during an erase or a write."
+- Don't map flash during an erase or a write.
+- On a chip with two cores, don't start a flash operation inside a critical section.
+- A light sleep returns `Refused` while a core holds the flash lock.
+- esp-storage does not take esp-hal's flash lock, so it is not compatible with code in PSRAM."
 )]
 
 use core::marker::PhantomData;
@@ -85,6 +88,8 @@ use esp_sync::{
     RestoreState,
     raw::{RawLock, SingleCoreInterruptLock},
 };
+#[cfg(code_in_psram)]
+use portable_atomic::Ordering;
 use procmacros::{BuilderLite, ram};
 
 #[cfg(all(multi_core, not(code_in_psram)))]
@@ -754,7 +759,11 @@ impl Flash<'_, Blocking> {
         f: impl FnOnce(&mut Self) -> Result<R, Error>,
     ) -> Result<R, Error> {
         cfg_select! {
-            code_in_psram => f(self),
+            code_in_psram => {
+                // The read goes through the cache, so it must not meet an erase or a write.
+                let _chip = FlashChipGuard::enter();
+                f(self)
+            }
             _ => {
                 let _park = ParkGuard::enter(self)?;
                 free(|| f(self))
@@ -793,6 +802,8 @@ impl Flash<'_, Blocking> {
             // No flash page is mapped, so the operation does not invalidate the cache.
             code_in_psram => {
                 let _ = invalidate;
+                // A light sleep requested while the guard is held is refused.
+                let _chip = FlashChipGuard::enter();
                 Ok(f()?)
             }
             _ => {
@@ -864,6 +875,45 @@ fn with_caches_suspended<R>(
     }
     drop(cache);
     result
+}
+
+/// Holds the flash chip for one ROM flash call or one encrypted read.
+///
+/// A park or a stop of the other core waits until the lock is free. A light sleep does not wait.
+/// It parks the other cores first, then refuses if the lock is held. After the park, with this
+/// core's interrupts disabled, no flash operation can start, so the lock stays free until the sleep
+/// ends.
+#[cfg(code_in_psram)]
+pub(crate) struct FlashChipGuard;
+
+#[cfg(code_in_psram)]
+impl FlashChipGuard {
+    #[inline(always)]
+    fn enter() -> Self {
+        let lock = crate::rtc_cntl::flash_chip_lock();
+        let holder = crate::system::Cpu::current() as u8 + 1;
+        let take = || {
+            lock.compare_exchange_weak(0, holder, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+        };
+        cfg_select! {
+            multi_core => crate::system::multi_core::wait_answering_parks(take),
+            _ => {
+                while !take() {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+        Self
+    }
+}
+
+#[cfg(code_in_psram)]
+impl Drop for FlashChipGuard {
+    #[inline(always)]
+    fn drop(&mut self) {
+        crate::rtc_cntl::flash_chip_lock().store(0, Ordering::Release);
+    }
 }
 
 /// Stops the other core according to [`MultiCoreStrategy`], and masks the interrupts of the

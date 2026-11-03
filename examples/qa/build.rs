@@ -12,5 +12,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // esp-hal's flash chip lock, which `sleep-checks` reads, exists only with esp-hal's
+    // `code-in-psram`, so it needs a cfg. The build script reads the variable that
+    // `qa_test::code_in_psram` reads.
+    println!("cargo:rustc-check-cfg=cfg(code_in_psram)");
+    println!("cargo:rerun-if-env-changed=ESP_HAL_CONFIG_CODE_IN_PSRAM");
+    if std::env::var("ESP_HAL_CONFIG_CODE_IN_PSRAM").as_deref() == Ok("true") {
+        println!("cargo::rustc-cfg=code_in_psram");
+    }
+
     Ok(())
 }

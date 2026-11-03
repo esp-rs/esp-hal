@@ -838,6 +838,55 @@ cfg_select! {
     }
 }
 
+// The lock on the flash chip, for code in PSRAM: 0 while free, otherwise one more than the number
+// of the core that holds it. A core holds it for one ROM flash call, for one encrypted read, or
+// while it parks or stops the other core. Every copy of esp-hal in a program uses the one lock,
+// as for `ESP_HAL_WAKE_LOCK_COUNT`. A core waits for the lock only in a wait that answers park
+// requests, because the core that holds it can park the waiting core.
+//
+// The core in the lock is exact only while no RTOS moves threads between the cores. Only a park or
+// a stop reads the core. A thread that moves to the other core during a flash operation leaves the
+// lock naming the core it left, and a park from that core then does not wait.
+#[cfg(code_in_psram)]
+cfg_select! {
+    feature = "rt" => {
+        #[unsafe(no_mangle)]
+        static ESP_HAL_FLASH_CHIP_LOCK: portable_atomic::AtomicU8 =
+            portable_atomic::AtomicU8::new(0);
+
+        #[inline(always)]
+        pub(crate) fn flash_chip_lock() -> &'static portable_atomic::AtomicU8 {
+            &ESP_HAL_FLASH_CHIP_LOCK
+        }
+    }
+    _ => {
+        unsafe extern "Rust" {
+            static ESP_HAL_FLASH_CHIP_LOCK: portable_atomic::AtomicU8;
+        }
+
+        #[inline(always)]
+        pub(crate) fn flash_chip_lock() -> &'static portable_atomic::AtomicU8 {
+            // SAFETY: the `rt` copy of esp-hal defines the static.
+            unsafe { &ESP_HAL_FLASH_CHIP_LOCK }
+        }
+    }
+}
+
+/// Returns whether a core holds the flash chip lock: for a flash operation on any core or in any
+/// thread, or while it parks or stops the other core.
+///
+/// A light sleep calls this after it parks the other cores, with interrupts disabled, so the answer
+/// holds until the sleep ends. Without code in PSRAM, a flash operation parks the other core and
+/// masks interrupts itself, and this returns `false`.
+#[cfg(sleep_driver_supported)]
+#[inline(always)]
+pub(crate) fn flash_operation_in_progress() -> bool {
+    cfg_select! {
+        code_in_psram => flash_chip_lock().load(portable_atomic::Ordering::Acquire) != 0,
+        _ => false,
+    }
+}
+
 /// A guard that prevents the system from entering automatic light sleep.
 ///
 /// While at least one `WakeLock` is held, [`WakeLock::is_active`] returns `true`
