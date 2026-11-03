@@ -27,8 +27,8 @@ cfg_select! {
         pub(crate) mod park;
         mod start;
 
-        pub(crate) use park::unpark;
         use park::{park_request, park_stall, stop_app_core};
+        pub(crate) use park::{serve_current as serve_parks, unpark};
         pub(crate) use start::app_core_takes_ipc;
         use start::{APP_CORE_STOPPING, APP_CORE_TAKES_IPC, app_core_running, start_app_core};
 
@@ -41,6 +41,7 @@ cfg_select! {
             fn esp_hal_park_stall(core: u8, generation: u32) -> bool;
             fn esp_hal_unpark_core(core: u8);
             fn esp_hal_stop_app_core();
+            fn esp_hal_park_serve();
         }
 
         unsafe extern "Rust" {
@@ -81,6 +82,64 @@ cfg_select! {
         fn stop_app_core() {
             unsafe { esp_hal_stop_app_core() }
         }
+
+        #[inline(always)]
+        pub(crate) fn serve_parks() {
+            unsafe { esp_hal_park_serve() }
+        }
+    }
+}
+
+/// Waits until `done` returns `true`, and answers the park requests of the other core meanwhile.
+///
+/// A core that waits for the flash chip lock can have its interrupts masked, for example inside a
+/// critical section. It must still answer a park, or the other core, which can hold the lock while
+/// it parks this core, never ends the park. The caller can run with interrupts on or masked: each
+/// answer masks them around its own check.
+#[inline(always)]
+pub(crate) fn wait_answering_parks(done: impl Fn() -> bool) {
+    while !done() {
+        serve_parks();
+        core::hint::spin_loop();
+    }
+}
+
+/// Runs `park`, which parks the other core, outside that core's ROM flash calls, and returns its
+/// result. The caller defers the context switches of the current core.
+///
+/// With code in PSRAM, a ROM flash call leaves interrupts enabled, and a core parked in one keeps
+/// the flash chip held. The park therefore takes the flash chip lock first, and releases it after
+/// the park. It does not wait when the current core holds the lock, because that call cannot end
+/// before the park does. Meanwhile, a light sleep on the current core returns `Refused`.
+#[inline(always)]
+fn park_outside_flash_call<R>(park: impl FnOnce() -> R) -> R {
+    cfg_select! {
+        code_in_psram => {
+            let lock = crate::rtc_cntl::flash_chip_lock();
+            let current = Cpu::current() as u8 + 1;
+            let taken = core::cell::Cell::new(false);
+            wait_answering_parks(|| {
+                match lock.compare_exchange_weak(
+                    0,
+                    current,
+                    portable_atomic::Ordering::Acquire,
+                    portable_atomic::Ordering::Relaxed,
+                ) {
+                    Ok(_) => {
+                        taken.set(true);
+                        true
+                    }
+                    Err(holder) => holder == current,
+                }
+            });
+            let result = park();
+            if taken.get() {
+                lock.store(0, portable_atomic::Ordering::Release);
+            }
+            result
+        }
+        // A ROM flash call masks interrupts, so no park lands in one.
+        _ => park(),
     }
 }
 
@@ -387,10 +446,20 @@ impl<'d> CpuControl<'d> {
     ///
     /// Panics if `core` is the current core. A thread that an RTOS can move between cores can run
     /// on `core` at the call.
+    #[cfg_attr(
+        psram_code_in_psram,
+        doc = "\n\nWith the `code-in-psram` option, the call first waits until a ROM flash call of \
+               the other core ends, so that the other core never parks in one. The current core \
+               defers its context switches meanwhile. With esp-rtos on both cores, do not park \
+               through a `CpuControl` from `CPU_CTRL::steal`. A thread can then move to the other \
+               core in the middle of a ROM flash call, and the park can wait for a call that \
+               cannot end."
+    )]
     #[instability::unstable]
     pub fn park_core(&self, core: Cpu) -> ParkGuard<'_> {
+        let _suspend = SchedulerSuspendGuard::new();
         ParkGuard {
-            core: park(core).then_some(core),
+            core: park_outside_flash_call(|| park(core)).then_some(core),
             phantom: PhantomData,
         }
     }
@@ -401,8 +470,9 @@ impl<'d> CpuControl<'d> {
     /// RTOS can move between cores can thus call this function.
     #[instability::unstable]
     pub fn park_other_core(&self) -> ParkGuard<'_> {
+        let _suspend = SchedulerSuspendGuard::new();
         ParkGuard {
-            core: park_other_masked().map(|(core, token)| {
+            core: park_outside_flash_call(park_other_masked).map(|(core, token)| {
                 unsafe { SingleCoreInterruptLock.exit(token) };
                 core
             }),
@@ -419,6 +489,12 @@ impl<'d> CpuControl<'d> {
     ///
     /// The APP core can park while the other core suspends the caches. See [Optimization
     /// level](crate#optimization-level) for the build requirement.
+    #[cfg_attr(
+        psram_code_in_psram,
+        doc = "\n\nWith the `code-in-psram` option, the stop first waits until a ROM flash call of \
+               the APP core ends, so that the core never stops in one. The current core defers its \
+               context switches meanwhile."
+    )]
     #[instability::unstable]
     pub fn start_app_core<'a, const SIZE: usize, F>(
         &mut self,
@@ -453,6 +529,12 @@ impl<'d> CpuControl<'d> {
     ///
     /// The APP core can park while the other core suspends the caches. See [Optimization
     /// level](crate#optimization-level) for the build requirement.
+    #[cfg_attr(
+        psram_code_in_psram,
+        doc = "\n\nWith the `code-in-psram` option, the stop first waits until a ROM flash call of \
+               the APP core ends, so that the core never stops in one. The current core defers its \
+               context switches meanwhile."
+    )]
     #[instability::unstable]
     pub fn start_app_core_with_stack_guard_offset<'a, const SIZE: usize, F>(
         &mut self,

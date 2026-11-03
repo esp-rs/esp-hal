@@ -77,7 +77,13 @@ is not relevant, and operations do not return [`Error::OtherCoreRunning`].
   and [`Flash::read_encrypted`] maps one only for its own call.
 - An interrupt can arrive during an operation, so an interrupt handler must not call the ROM
   flash functions.
-- A thread preempted during an operation keeps the flash busy until it runs again."
+- An operation waits for one in progress on the other core or in another thread. A thread
+  preempted during an operation keeps the flash busy until it runs again. If a higher-priority
+  thread on the same core then starts an operation, and the first thread cannot run on another
+  core, the wait never ends. One thread, or threads of one priority, must use the flash.
+- A light sleep that starts during a ROM flash call, or during [`Flash::read_encrypted`], is
+  refused. The refusal covers one ROM call, so a light sleep can start between two sectors of a
+  longer erase."
 )]
 
 use core::marker::PhantomData;
@@ -87,6 +93,8 @@ use esp_sync::{
     RestoreState,
     raw::{RawLock, SingleCoreInterruptLock},
 };
+#[cfg(code_in_psram)]
+use portable_atomic::Ordering;
 use procmacros::{BuilderLite, ram};
 
 #[cfg(all(multi_core, not(code_in_psram)))]
@@ -756,7 +764,11 @@ impl Flash<'_, Blocking> {
         f: impl FnOnce(&mut Self) -> Result<R, Error>,
     ) -> Result<R, Error> {
         cfg_select! {
-            code_in_psram => f(self),
+            code_in_psram => {
+                // The read goes through the cache, so it must not meet an erase or a write.
+                let _chip = FlashChipGuard::enter();
+                f(self)
+            }
             _ => {
                 let _park = ParkGuard::enter(self)?;
                 free(|| f(self))
@@ -795,6 +807,8 @@ impl Flash<'_, Blocking> {
             // No flash page is mapped, so the operation does not invalidate the cache.
             code_in_psram => {
                 let _ = invalidate;
+                // A light sleep that the guard sees is refused.
+                let _chip = FlashChipGuard::enter();
                 Ok(f()?)
             }
             _ => {
@@ -857,6 +871,44 @@ fn with_caches_suspended<R>(
     }
     drop(cache);
     result
+}
+
+/// Holds the flash chip for one ROM flash call or one encrypted read.
+///
+/// With code in PSRAM, an operation leaves the other core and the other threads running, so an
+/// operation waits for the one in progress. A light sleep checks the lock after it parks the other
+/// cores, and refuses. It never waits: until the sleep ends, no operation can start.
+#[cfg(code_in_psram)]
+pub(crate) struct FlashChipGuard;
+
+#[cfg(code_in_psram)]
+impl FlashChipGuard {
+    #[inline(always)]
+    fn enter() -> Self {
+        let lock = crate::rtc_cntl::flash_chip_lock();
+        let holder = crate::system::Cpu::current() as u8 + 1;
+        let take = || {
+            lock.compare_exchange_weak(0, holder, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+        };
+        cfg_select! {
+            multi_core => crate::system::multi_core::wait_answering_parks(take),
+            _ => {
+                while !take() {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+        Self
+    }
+}
+
+#[cfg(code_in_psram)]
+impl Drop for FlashChipGuard {
+    #[inline(always)]
+    fn drop(&mut self) {
+        crate::rtc_cntl::flash_chip_lock().store(0, Ordering::Release);
+    }
 }
 
 /// Stops the other core according to [`MultiCoreStrategy`], and masks the interrupts of the

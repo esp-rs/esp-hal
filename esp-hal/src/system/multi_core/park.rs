@@ -225,6 +225,18 @@ pub(crate) fn end_run(core: Cpu) {
     unsafe { internal_park_core(core, true) };
 }
 
+/// Answers a park request of the other core, if one waits. The caller can have interrupts on or
+/// masked.
+///
+/// `serve` reads the phase before it masks interrupts. With interrupts on, the IPC handler could
+/// answer the request in between, and `serve` would then wait for a release that never comes.
+#[ram]
+pub(crate) fn serve_current() {
+    let token = unsafe { SingleCoreInterruptLock.enter() };
+    serve(Cpu::current());
+    unsafe { SingleCoreInterruptLock.exit(token) };
+}
+
 /// Waits until `done` returns `true`, and answers the park requests of the other core meanwhile.
 ///
 /// Use this function to wait with masked interrupts for work that the other core does.
@@ -248,7 +260,8 @@ pub(crate) fn stop_app_core() {
     }
 
     // A park that never ends keeps the core stalled after the other parks end.
-    if park(Cpu::AppCpu) {
+    let parked = super::park_outside_flash_call(|| park(Cpu::AppCpu));
+    if parked {
         let claim = Claim::take();
         APP_CORE_TAKES_IPC.store(false, Ordering::SeqCst);
         drop(claim);
@@ -413,4 +426,12 @@ extern "C" fn export_unpark_core(core: u8) {
 #[unsafe(export_name = "esp_hal_stop_app_core")]
 extern "C" fn export_stop_app_core() {
     stop_app_core()
+}
+
+/// Answers a park request of the other core, if one waits, on the current core, as
+/// [`serve_current`] does.
+#[ram]
+#[unsafe(export_name = "esp_hal_park_serve")]
+extern "C" fn export_park_serve() {
+    serve_current()
 }

@@ -834,6 +834,68 @@ cfg_select! {
     }
 }
 
+// The lock on the flash chip, for code in PSRAM: 0 while free, otherwise one more than the number
+// of the core whose ROM flash call holds it. Every copy of esp-hal in a program uses the one lock,
+// as for `ESP_HAL_WAKE_LOCK_COUNT`. A core waits for the lock only in a wait that answers park
+// requests, because the core that holds it can park the waiting core.
+//
+// The core in the lock is exact only while no RTOS moves threads between the cores. Only a park or
+// a stop reads the core. With esp-rtos on both cores the program has no `CpuControl`, because
+// esp-rtos's `start_second_core_with_stack_guard_offset` takes `CPU_CTRL` and forgets the APP
+// core's guard.
+#[cfg(code_in_psram)]
+cfg_select! {
+    feature = "rt" => {
+        #[unsafe(no_mangle)]
+        static ESP_HAL_FLASH_CHIP_LOCK: portable_atomic::AtomicU8 =
+            portable_atomic::AtomicU8::new(0);
+
+        #[inline(always)]
+        pub(crate) fn flash_chip_lock() -> &'static portable_atomic::AtomicU8 {
+            &ESP_HAL_FLASH_CHIP_LOCK
+        }
+    }
+    _ => {
+        unsafe extern "Rust" {
+            static ESP_HAL_FLASH_CHIP_LOCK: portable_atomic::AtomicU8;
+        }
+
+        #[inline(always)]
+        pub(crate) fn flash_chip_lock() -> &'static portable_atomic::AtomicU8 {
+            // SAFETY: the `rt` copy of esp-hal defines the static.
+            unsafe { &ESP_HAL_FLASH_CHIP_LOCK }
+        }
+    }
+}
+
+/// Returns the core whose ROM flash call holds the flash chip, if one does.
+#[cfg(code_in_psram)]
+#[inline(always)]
+pub(crate) fn flash_chip_holder() -> Option<crate::system::Cpu> {
+    match flash_chip_lock().load(portable_atomic::Ordering::Acquire) {
+        0 => None,
+        1 => Some(crate::system::Cpu::ProCpu),
+        #[cfg(multi_core)]
+        _ => Some(crate::system::Cpu::AppCpu),
+        #[cfg(not(multi_core))]
+        _ => Some(crate::system::Cpu::ProCpu),
+    }
+}
+
+/// Returns whether a ROM flash call is in progress on any core or in any thread.
+///
+/// A light sleep calls this after it parks the other cores, with interrupts disabled, so the answer
+/// holds until the sleep ends. Without code in PSRAM, a flash operation parks the other core and
+/// masks interrupts itself, and this returns `false`.
+#[cfg(sleep_driver_supported)]
+#[inline(always)]
+pub(crate) fn flash_operation_in_progress() -> bool {
+    cfg_select! {
+        code_in_psram => flash_chip_holder().is_some(),
+        _ => false,
+    }
+}
+
 /// A guard that prevents the system from entering automatic light sleep.
 ///
 /// While at least one `WakeLock` is held, [`WakeLock::is_active`] returns `true`

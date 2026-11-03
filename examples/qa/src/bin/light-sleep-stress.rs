@@ -43,11 +43,17 @@
 //! - Between sleeps, the core reads, checks, and writes back part of the kept PSRAM, so that cache
 //!   lines are dirty when a sleep starts.
 //! - About every 100 ms, a core that is not sleeping erases, writes, and reads back one flash
-//!   sector of the free space after the image. The sector must read back what was written. On a
-//!   chip with two cores, each flash operation first parks the other core, which masks its
-//!   interrupts and waits in RAM until the operation ends. A core that wakes while an operation
-//!   waits for it joins that park before its sleep call returns. So a sleep or a wait during a
-//!   flash cycle does not get an upper bound.
+//!   sector of the free space after the image. The sector must read back what was written.
+//! - Without code in PSRAM, each flash operation masks the interrupts of its core and, on a chip
+//!   with two cores, first parks the other core, which waits in RAM until the operation ends. A
+//!   core that wakes while an operation waits for it joins that park before its sleep call returns.
+//!   So no sleep is requested during a flash operation, and a sleep or a wait during a flash cycle
+//!   does not get an upper bound.
+//! - With code in PSRAM, a flash operation leaves interrupts enabled and the other core running. A
+//!   light sleep requested during a ROM flash call returns `Refused`, and one between two calls of
+//!   a cycle proceeds. A phase in which a sleep can be requested during a flash operation fails
+//!   when no light sleep was refused.
+//! - A light sleep returns `Refused` only when a flash cycle ran during the call.
 //! - On a chip with two cores, a random core requests each sleep while the other core works. The
 //!   working core must return from the park, and with CPU retention from the rendezvous, with its
 //!   state intact. A core that makes no progress for [`STALL_REPORTS`] reports fails the phase.
@@ -97,7 +103,7 @@ use esp_hal::{
 };
 use esp_rtos::{CurrentThreadHandle, thread::ThreadSpawner};
 use portable_atomic::{AtomicBool, AtomicU32, Ordering};
-use qa_test::{Progress, ProgressWord, free_flash, report};
+use qa_test::{Progress, ProgressWord, code_in_psram, free_flash, report};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -635,6 +641,9 @@ fn sleep_round(core: usize, lpwr: &mut LowPower<'_>, rng: &mut Rng, retention: b
     let n = count(&COUNTS.sleeps);
     if result == LightSleep::Refused {
         count(&COUNTS.refused);
+        if !flash_ran(flash_gen) {
+            problem!("core {core}: sleep {n}: refused while no flash cycle ran");
+        }
     }
 
     if result == LightSleep::Ended && length >= LONG_SLEEP {
@@ -793,6 +802,14 @@ impl Controller {
                 if c.not_slept.load(Ordering::Relaxed) > c.long_slept.load(Ordering::Relaxed) =>
             {
                 Some("more long sleeps returned without a sleep than ended within their bounds")
+            }
+            // On one core, the main loop never requests a sleep during its own flash operation.
+            Caller::Bare | Caller::Thread
+                if code_in_psram()
+                    && (phase.caller == Caller::Thread || CORES == 2)
+                    && !made(&c.refused) =>
+            {
+                Some("no light sleep was refused")
             }
             _ => None,
         };

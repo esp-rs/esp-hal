@@ -1,4 +1,5 @@
-//! Shared parts of the qa examples: the console, the progress across resets, and the free flash.
+//! Shared parts of the qa examples: the console, the progress across resets, the free flash, and
+//! whether the build places code in PSRAM.
 
 #![no_std]
 
@@ -17,6 +18,12 @@ pub const DRAM2_UNINIT_SIZE: usize = {
     let range: core::ops::Range<usize> = esp_metadata_generated::memory_range!("DRAM2_UNINIT");
     range.end - range.start
 };
+
+/// Returns whether the build places code in PSRAM. The address of the code does not show it,
+/// because on some chips flash and PSRAM share one address range.
+pub fn code_in_psram() -> bool {
+    option_env!("ESP_HAL_CONFIG_CODE_IN_PSRAM") == Some("true")
+}
 
 #[doc(hidden)]
 pub mod __private {

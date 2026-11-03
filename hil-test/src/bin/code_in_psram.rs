@@ -763,3 +763,262 @@ mod rtos_flash {
         assert!(ticks > 1, "the ticker ran {ticks} times during the write");
     }
 }
+
+/// A stop or a park of the APP core while it erases blocks back to back. Both wait for the APP
+/// core's ROM call, so afterwards the flash chip is free, and the APP core's last erase is
+/// complete.
+#[cfg(feature = "esp32s31")]
+#[embedded_test::tests(default_timeout = 30)]
+mod stop_and_park_during_erase {
+    use core::sync::atomic::AtomicBool;
+
+    use esp_hal::{
+        flash::{Config, Flash},
+        peripherals::{FLASH, Peripherals},
+        system::{AppCoreGuard, Cpu, CpuControl, Stack},
+        time::{Duration, Instant},
+    };
+    use hil_test::mk_static;
+
+    use super::*;
+
+    const BLOCK: u32 = 0x1_0000;
+    /// The stop and the park wait for one block erase, which lasts a few hundred milliseconds.
+    const LIMIT: Duration = Duration::from_secs(3);
+
+    static ERASES: AtomicU32 = AtomicU32::new(0);
+    static ERASE_FAILED: AtomicBool = AtomicBool::new(false);
+
+    /// Starts the APP core, which erases `block` again and again with its own `Flash`, and returns
+    /// once it has finished its first erase.
+    fn start_erasing<'a>(
+        cpu_control: &mut CpuControl<'static>,
+        flash: FLASH<'static>,
+        block: u32,
+    ) -> AppCoreGuard<'a> {
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let guard = cpu_control
+            .start_app_core(stack, move || {
+                let mut flash = Flash::new(flash, Config::default()).unwrap();
+                loop {
+                    // SAFETY: the block is in the booted partition, after the image.
+                    if unsafe { flash.erase(block, block + BLOCK) }.is_err() {
+                        ERASE_FAILED.store(true, Ordering::Relaxed);
+                    }
+                    ERASES.fetch_add(1, Ordering::Release);
+                }
+            })
+            .unwrap();
+        while ERASES.load(Ordering::Acquire) == 0 {}
+        guard
+    }
+
+    /// Checks that the block reads back erased, through the PRO core's `Flash`.
+    fn assert_erased(flash: &mut Flash<'static, esp_hal::Blocking>, block: u32) {
+        let mut words = [0u32; 256];
+        for offset in (0..BLOCK).step_by(1024) {
+            flash.read(block + offset, &mut words).unwrap();
+            assert!(
+                words.iter().all(|&word| word == u32::MAX),
+                "the block is not erased at {:#x}",
+                block + offset
+            );
+        }
+    }
+
+    #[test]
+    fn test_stop_waits_for_the_app_core_erase() {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        // SAFETY: each core uses its own `Flash`, and the flash chip lock keeps their ROM calls
+        // apart.
+        let app_flash = unsafe { p.FLASH.clone_unchecked() };
+        let mut flash = Flash::new(p.FLASH, Config::default()).unwrap();
+        let block = scratch_block(&mut flash);
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+
+        let guard = start_erasing(&mut cpu_control, app_flash, block);
+        let before = Instant::now();
+        drop(guard);
+        let took = Instant::now() - before;
+
+        assert!(took < LIMIT, "the stop took {took}");
+        assert!(!ERASE_FAILED.load(Ordering::Relaxed));
+        assert_erased(&mut flash, block);
+    }
+
+    #[test]
+    fn test_park_waits_for_the_app_core_erase() {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        // SAFETY: as above.
+        let app_flash = unsafe { p.FLASH.clone_unchecked() };
+        let mut flash = Flash::new(p.FLASH, Config::default()).unwrap();
+        let block = scratch_block(&mut flash);
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+
+        let _running = start_erasing(&mut cpu_control, app_flash, block);
+        let before = Instant::now();
+        let parked = cpu_control.park_core(Cpu::AppCpu);
+        let took = Instant::now() - before;
+        let erases = ERASES.load(Ordering::Acquire);
+
+        assert!(took < LIMIT, "the park took {took}");
+        assert!(!ERASE_FAILED.load(Ordering::Relaxed));
+        assert_erased(&mut flash, block);
+        assert_eq!(
+            ERASES.load(Ordering::Acquire),
+            erases,
+            "the APP core erased while parked"
+        );
+
+        drop(parked);
+        let resumed = Instant::now();
+        while ERASES.load(Ordering::Acquire) == erases {
+            assert!(
+                Instant::now() - resumed < LIMIT,
+                "the APP core did not erase after the park"
+            );
+        }
+    }
+}
+
+/// A light sleep that a PRO-core interrupt requests during the PRO core's erase, while the APP core
+/// waits for the flash with its interrupts masked. The sleep parks the APP core before it checks
+/// the flash, so the APP core must answer the park while it waits, and the sleep then returns
+/// `Refused`.
+#[cfg(feature = "esp32s31")]
+#[embedded_test::tests(default_timeout = 30)]
+mod sleep_during_erase_with_masked_reader {
+    use core::{ptr::addr_of_mut, sync::atomic::AtomicBool};
+
+    use esp_hal::{
+        Blocking,
+        flash::{Config, Flash},
+        handler,
+        peripherals::{LPWR, Peripherals},
+        rtc_cntl::sleep::{LightSleep, LowPower, RtcSleepConfig},
+        system::{CpuControl, Stack},
+        time::{Duration, Instant},
+        timer::{OneShotTimer, timg::TimerGroup},
+    };
+    use hil_test::mk_static;
+
+    use super::*;
+
+    const BLOCK: u32 = 0x1_0000;
+    /// After this delay the erase of a block still runs.
+    const SLEEP_AFTER: Duration = Duration::from_millis(20);
+
+    static ERASING: AtomicBool = AtomicBool::new(false);
+    static STOP_READS: AtomicBool = AtomicBool::new(false);
+    static READS: AtomicU32 = AtomicU32::new(0);
+    static READ_FAILED: AtomicBool = AtomicBool::new(false);
+    /// 0 before the sleep, 1 for `Refused`, 2 for `Ended`.
+    static SLEEP_RESULT: AtomicU32 = AtomicU32::new(0);
+    static SLEPT_IN_ERASE: AtomicBool = AtomicBool::new(false);
+    /// Whether the APP core is inside its critical section, and whether it was at the sleep.
+    static IN_CRITICAL_SECTION: AtomicBool = AtomicBool::new(false);
+    static WAITER_MASKED: AtomicBool = AtomicBool::new(false);
+
+    /// The timer of the sleep. The test stores it before it arms it, and then only the handler uses
+    /// it. The handler takes no critical section, because the APP core holds one while it waits.
+    static mut TIMER: Option<OneShotTimer<'static, Blocking>> = None;
+
+    #[handler]
+    fn sleep_in_erase() {
+        // SAFETY: after the test arms the timer, only this handler uses `TIMER`.
+        if let Some(timer) = unsafe { (*addr_of_mut!(TIMER)).as_mut() } {
+            timer.clear_interrupt();
+        }
+        SLEPT_IN_ERASE.store(ERASING.load(Ordering::Acquire), Ordering::Relaxed);
+        WAITER_MASKED.store(
+            IN_CRITICAL_SECTION.load(Ordering::Acquire),
+            Ordering::Relaxed,
+        );
+        let mut lpwr = LowPower::new(unsafe { LPWR::steal() });
+        lpwr.set_wakeup_deadline(Instant::now() + Duration::from_millis(20));
+        let result = lpwr.sleep_light(RtcSleepConfig::default());
+        let code = if result == LightSleep::Refused { 1 } else { 2 };
+        SLEEP_RESULT.store(code, Ordering::Release);
+    }
+
+    #[test]
+    fn test_sleep_is_refused_while_the_other_core_waits_masked() {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        // SAFETY: each core uses its own `Flash`, and the flash chip lock keeps their ROM calls
+        // apart.
+        let app_flash = unsafe { p.FLASH.clone_unchecked() };
+        let mut flash = Flash::new(p.FLASH, Config::default()).unwrap();
+        let block = scratch_block(&mut flash);
+
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _app = cpu_control
+            .start_app_core(stack, move || {
+                let mut flash = Flash::new(app_flash, Config::default()).unwrap();
+                let mut words = [0u32; 64];
+                while !STOP_READS.load(Ordering::Acquire) {
+                    // The read waits for the PRO core's erase with interrupts masked.
+                    let ok = critical_section::with(|_| {
+                        IN_CRITICAL_SECTION.store(true, Ordering::Release);
+                        let ok = flash.read(block, &mut words).is_ok();
+                        IN_CRITICAL_SECTION.store(false, Ordering::Release);
+                        ok
+                    });
+                    if !ok {
+                        READ_FAILED.store(true, Ordering::Relaxed);
+                    }
+                    READS.fetch_add(1, Ordering::Release);
+                }
+            })
+            .unwrap();
+        while READS.load(Ordering::Acquire) == 0 {}
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let mut timer = OneShotTimer::new(timg0.timer0);
+        timer.set_interrupt_handler(sleep_in_erase);
+        // SAFETY: the timer is not armed yet, so the handler does not use `TIMER`.
+        let timer = unsafe { (*addr_of_mut!(TIMER)).insert(timer) };
+        timer.listen();
+
+        ERASING.store(true, Ordering::Release);
+        timer.schedule(SLEEP_AFTER).unwrap();
+        let started = Instant::now();
+        // SAFETY: the block is in the booted partition, after the image.
+        let erased = unsafe { flash.erase(block, block + BLOCK) }.is_ok();
+        ERASING.store(false, Ordering::Release);
+        let took = Instant::now() - started;
+
+        let reads = READS.load(Ordering::Acquire);
+        let deadline = Instant::now() + Duration::from_secs(1);
+        while READS.load(Ordering::Acquire) == reads {
+            assert!(
+                Instant::now() < deadline,
+                "the APP core read nothing after the erase"
+            );
+        }
+        STOP_READS.store(true, Ordering::Release);
+
+        assert!(erased, "the erase failed");
+        assert!(
+            !READ_FAILED.load(Ordering::Relaxed),
+            "a read on the APP core failed"
+        );
+        assert!(
+            took > SLEEP_AFTER,
+            "the erase ended before the sleep, after {took}"
+        );
+        assert!(
+            SLEPT_IN_ERASE.load(Ordering::Relaxed),
+            "the sleep came after the erase"
+        );
+        assert!(
+            WAITER_MASKED.load(Ordering::Relaxed),
+            "the APP core was not in its critical section at the sleep"
+        );
+        assert_eq!(
+            SLEEP_RESULT.load(Ordering::Acquire),
+            1,
+            "the sleep was not refused"
+        );
+    }
+}
