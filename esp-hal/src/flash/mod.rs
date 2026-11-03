@@ -813,7 +813,16 @@ fn with_caches_suspended<R>(
     #[cfg_attr(not(esp32), expect(unused_variables))] flush: bool,
     f: impl FnOnce() -> Result<R, rom::RomError>,
 ) -> Result<R, rom::RomError> {
-    let cache = cache::CacheGuard::suspend();
+    let cache = cfg_select! {
+        esp32 => {
+            if flush {
+                cache::CacheGuard::suspend_for_flush()
+            } else {
+                cache::CacheGuard::suspend()
+            }
+        }
+        _ => cache::CacheGuard::suspend(),
+    };
     let result = f();
     #[cfg(esp32)]
     if flush {
