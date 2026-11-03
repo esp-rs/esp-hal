@@ -1,5 +1,6 @@
 //! Interrupt Tests
 //!     "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
+//! LEDC Tests
 //! MCPWM Tests
 //! PCNT Tests
 //! RNG Tests
@@ -505,6 +506,82 @@ mod mcpwm {
 
         let edges = unit.value();
         hil_test::assert!((98..=102).contains(&edges), "counted {} edges", edges);
+    }
+}
+
+#[cfg(ledc_driver_supported)]
+#[embedded_test::tests(default_timeout = 3)]
+mod ledc {
+    use esp_hal::{
+        gpio::{AnyPin, DriveMode, Input, InputConfig, Pin, Pull},
+        ledc::{
+            LSGlobalClkSource,
+            Ledc,
+            LowSpeed,
+            channel::{self, ChannelIFace},
+            timer::{self, TimerIFace},
+        },
+        peripherals::LEDC,
+        time::{Duration, Instant, Rate},
+    };
+
+    struct Context<'d> {
+        ledc: LEDC<'d>,
+        input: AnyPin<'d>,
+        output: AnyPin<'d>,
+    }
+
+    #[init]
+    fn init() -> Context<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (din, dout) = hil_test::common_test_pins!(peripherals);
+
+        Context {
+            ledc: peripherals.LEDC,
+            input: din.degrade(),
+            output: dout.degrade(),
+        }
+    }
+
+    #[test]
+    fn low_speed_output_frequency_matches_configuration(ctx: Context<'static>) {
+        let mut ledc = Ledc::new(ctx.ledc);
+        ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
+
+        let mut timer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
+        timer0
+            .configure(timer::config::Config {
+                duty: timer::config::Duty::Duty10Bit,
+                clock_source: timer::LSClockSource::APBClk,
+                frequency: Rate::from_khz(1),
+            })
+            .unwrap();
+
+        let mut channel0 = ledc.channel(channel::Number::Channel0, ctx.output);
+        channel0
+            .configure(channel::config::Config {
+                timer: &timer0,
+                duty_pct: 50,
+                drive_mode: DriveMode::PushPull,
+            })
+            .unwrap();
+
+        // Not every chip has a PCNT, so count edges by polling.
+        let input = Input::new(ctx.input, InputConfig::default().with_pull(Pull::Down));
+        let mut edges = 0;
+        let mut was_high = input.is_high();
+        let deadline = Instant::now() + Duration::from_millis(20);
+        while Instant::now() < deadline {
+            let is_high = input.is_high();
+            if is_high && !was_high {
+                edges += 1;
+            }
+            was_high = is_high;
+        }
+
+        // 20 ms at 1 kHz is 20 rising edges.
+        hil_test::assert!((19..=21).contains(&edges), "counted {} edges", edges);
     }
 }
 
