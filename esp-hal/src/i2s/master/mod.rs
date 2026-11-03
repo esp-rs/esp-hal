@@ -153,7 +153,7 @@
 //! let samples_len = samples.iter().len();
 //! while written < samples_len {
 //!     if transfer.available_bytes() > 0 {
-//!         let out_written = transfer.push(&audio_sample[written..]);
+//!         let out_written = transfer.push(&samples[written..]);
 //!         written += out_written;
 //!     }
 //! }
@@ -164,7 +164,6 @@
 //!
 //! # {after_snippet}
 //! ```
-//!
 #![cfg_attr(
     any(i2s_supports_pdm_tx, i2s_supports_pdm_rx),
     doc = r"## PDM mode
