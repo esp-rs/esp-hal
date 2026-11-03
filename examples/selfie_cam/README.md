@@ -12,14 +12,15 @@ Insert a FAT-formatted microSD card, then run:
 cargo xtask run selfie_cam esp32s31
 ```
 
-Without a card, the camera still runs, but it cannot save photos.
+Without a card, the camera still runs, but it cannot save photos. To keep about ten photos in
+PSRAM instead, until a reset, set `STORE_IN_RAM` in `src/main.rs`.
 
 The runner flashes the image with an 80 MHz flash clock. With the 40 MHz default, the panel
 shows stripes while a photo loads.
 
 ## Use
 
-- The screen shows the camera like a mirror.
+- The screen shows the image from the camera.
 - The SET key (or BOOT) takes a 1280x720 photo and saves it as `DCIM/IMG_NNNN.JPG` on the card.
 - GALLERY shows the saved photos. `<` and `>` go through them, DELETE (tapped twice) deletes
   one, and CAMERA (or SET) goes back to the camera.

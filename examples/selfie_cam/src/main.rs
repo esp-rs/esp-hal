@@ -1,8 +1,8 @@
-//! A selfie camera on the ESP32-S31-Korvo-1, in pure Rust.
+//! A selfie camera on the ESP32-S31-Korvo-1.
 //!
-//! The screen shows the camera like a mirror. The SET key (or BOOT) takes a 1280x720
-//! photo and saves it as a JPEG file on the microSD card. The GALLERY button on the
-//! screen shows the saved photos.
+//! The screen shows the image from the camera. The SET key (or BOOT) takes a 1280x720
+//! photo and saves it as a JPEG file on the microSD card, or with `STORE_IN_RAM` in
+//! PSRAM. The GALLERY button on the screen shows the saved photos.
 
 //% CHIP_FILTER: esp32s31
 //% TAG: complex
@@ -56,11 +56,21 @@ mod ui;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+/// Keeps the photos in PSRAM instead of on the microSD card. About ten fit, and a reset
+/// loses them.
+const STORE_IN_RAM: bool = false;
+
 /// How often the main loop reads the touch panel and the keys.
 const POLL: Duration = Duration::from_millis(20);
 /// How long a message stays on the screen.
 const MESSAGE_TIME: Duration = Duration::from_secs(2);
 const STATUS_Y: i32 = 44;
+/// Where the photos are, for the log.
+const PLACE: &str = if STORE_IN_RAM {
+    "in RAM"
+} else {
+    "on the SD card"
+};
 
 static DISPLAY_STACK: ConstStaticCell<Stack<{ 8 * 1024 }>> = ConstStaticCell::new(Stack::new());
 
@@ -179,7 +189,7 @@ async fn main(spawner: Spawner) -> ! {
     let mut app = App {
         touch,
         buttons: Buttons::new(resources.buttons),
-        storage: Storage::new(resources.sd),
+        storage: Storage::new(resources.sd, STORE_IN_RAM),
         photos: None,
         camera: Screen::camera(),
         gallery: Screen::gallery(),
@@ -198,7 +208,7 @@ struct App {
     touch: Touch,
     buttons: Buttons,
     storage: Storage,
-    /// The photo numbers on the card, or `None` without a card.
+    /// The photo numbers, or `None` without a card.
     photos: Option<Vec<u32>>,
     camera: Screen,
     gallery: Screen,
@@ -215,7 +225,7 @@ impl App {
             Err(_) => None,
         };
         if let Some(photos) = &photos {
-            println!("{} photos on the SD card", photos.len());
+            println!("{} photos {PLACE}", photos.len());
         }
         self.photos = photos;
     }
@@ -252,6 +262,9 @@ impl App {
     fn camera_status(&mut self) {
         let text = match &self.photos {
             None => String::from("No SD card"),
+            Some(photos) if STORE_IN_RAM => {
+                format!("{} photos in RAM  -  press SET to take one", photos.len())
+            }
             Some(photos) => format!("{} photos  -  press SET to take one", photos.len()),
         };
         self.set_status(&text);
@@ -320,7 +333,7 @@ impl App {
         }
     }
 
-    /// Saves the picture as the next photo on the SD card.
+    /// Saves the picture as the next photo.
     async fn take_photo(&mut self, picture: Arc<Picture>) {
         if self.photos.is_none() {
             self.mount().await;
@@ -343,12 +356,17 @@ impl App {
         let jpeg = jpeg::encode(picture.pixels());
         let encoded = started.elapsed();
         let saved = match jpeg {
-            Ok(jpeg) => self
-                .storage
-                .save(number, &jpeg)
-                .await
-                .map(|()| jpeg.len())
-                .map_err(|error| format!("{error:?}")),
+            Ok(jpeg) => match self.storage.save(number, &jpeg).await {
+                Err(storage::Error::Full) => {
+                    println!("No room for more photos {PLACE}");
+                    self.show_message("No room for more photos");
+                    self.camera_status();
+                    return;
+                }
+                saved => saved
+                    .map(|()| jpeg.len())
+                    .map_err(|error| format!("{error:?}")),
+            },
             Err(error) => Err(format!("{error:?}")),
         };
         match saved {

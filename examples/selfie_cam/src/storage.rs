@@ -1,9 +1,11 @@
-//! The photos on the microSD card, as `DCIM/IMG_NNNN.JPG` on its FAT volume.
+//! The photos on the microSD card, as `DCIM/IMG_NNNN.JPG` on its FAT volume, or in
+//! PSRAM until a reset.
 //!
 //! The card runs on the SDMMC host with a 4-bit bus. Until a card answers, each
 //! [`Storage::mount`] tries again, so a card that goes in after boot still works.
 
 use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
+use core::ops::Range;
 
 use aligned::{A4, Aligned};
 use block_device_adapters::{BufStream, StreamSlice};
@@ -25,6 +27,9 @@ use crate::SdResources;
 
 const CARD_HZ: u32 = 40_000_000;
 const FOLDER: &str = "DCIM";
+/// The PSRAM for photos without a card. The rest must hold the 2.7 MB that the gallery
+/// decodes a photo into.
+const RAM_BYTES: usize = 3 * 1024 * 1024;
 
 type Blocks = BlockDevice<SdCard, Slot<'static, 0, Async>, Delay, 512>;
 type Block = Aligned<A4, [u8; 512]>;
@@ -84,12 +89,37 @@ pub enum Error {
     NoVolume,
     /// Reading or writing failed.
     Io,
+    /// The photos in RAM have no room for another one.
+    Full,
 }
 
 enum State {
     Unmounted(Card),
     Mounted(Box<Fs>),
     Failed,
+    Ram(RamPhotos),
+}
+
+/// The photos in RAM, one after the other in a buffer that never grows. Photos of their
+/// own would split up the free PSRAM, and the gallery needs it in one piece.
+struct RamPhotos {
+    /// The number and the size of each photo, in order.
+    photos: Vec<(u32, usize)>,
+    jpegs: Vec<u8>,
+}
+
+impl RamPhotos {
+    /// The index of the photo, and where it is in `jpegs`.
+    fn find(&self, number: u32) -> Result<(usize, Range<usize>), Error> {
+        let mut start = 0;
+        for (index, &(other, size)) in self.photos.iter().enumerate() {
+            if other == number {
+                return Ok((index, start..start + size));
+            }
+            start += size;
+        }
+        Err(Error::Io)
+    }
 }
 
 pub struct Storage {
@@ -99,8 +129,18 @@ pub struct Storage {
 }
 
 impl Storage {
-    pub fn new(r: SdResources<'static>) -> Self {
+    /// Keeps the photos in RAM if `in_ram`, and leaves the card alone.
+    pub fn new(r: SdResources<'static>, in_ram: bool) -> Self {
         let power = Output::new(r.power, Level::Low, OutputConfig::default());
+        if in_ram {
+            return Self {
+                state: State::Ram(RamPhotos {
+                    photos: Vec::new(),
+                    jpegs: Vec::with_capacity(RAM_BYTES),
+                }),
+                _power: power,
+            };
+        }
         let controller =
             CONTROLLER.init(SdHostController::new(r.sdhost, Config::default()).unwrap());
         let slot = controller
@@ -125,7 +165,7 @@ impl Storage {
     /// Opens the card's FAT volume, if it is not open yet.
     pub async fn mount(&mut self) -> Result<(), Error> {
         let card = match &mut self.state {
-            State::Mounted(_) => return Ok(()),
+            State::Mounted(_) | State::Ram(_) => return Ok(()),
             State::Failed => return Err(Error::NoVolume),
             State::Unmounted(card) => card,
         };
@@ -156,6 +196,9 @@ impl Storage {
 
     /// The numbers of the photos on the card, in order.
     pub async fn photos(&mut self) -> Result<Vec<u32>, Error> {
+        if let State::Ram(ram) = &self.state {
+            return Ok(ram.photos.iter().map(|&(number, _)| number).collect());
+        }
         let fs = self.fs()?;
         let mut numbers = Vec::new();
         let Ok(folder) = fs.root_dir().open_dir(FOLDER).await else {
@@ -175,6 +218,14 @@ impl Storage {
     }
 
     pub async fn save(&mut self, number: u32, jpeg: &[u8]) -> Result<(), Error> {
+        if let State::Ram(ram) = &mut self.state {
+            if ram.jpegs.len() + jpeg.len() > ram.jpegs.capacity() {
+                return Err(Error::Full);
+            }
+            ram.jpegs.extend_from_slice(jpeg);
+            ram.photos.push((number, jpeg.len()));
+            return Ok(());
+        }
         let fs = self.fs()?;
         let folder = folder(fs).await?;
         let mut file = folder
@@ -189,6 +240,12 @@ impl Storage {
     }
 
     pub async fn delete(&mut self, number: u32) -> Result<(), Error> {
+        if let State::Ram(ram) = &mut self.state {
+            let (index, range) = ram.find(number)?;
+            ram.photos.remove(index);
+            ram.jpegs.drain(range);
+            return Ok(());
+        }
         let fs = self.fs()?;
         let folder = fs.root_dir().open_dir(FOLDER).await.map_err(io_error)?;
         folder.remove(&file_name(number)).await.map_err(io_error)?;
@@ -196,6 +253,10 @@ impl Storage {
     }
 
     pub async fn load(&mut self, number: u32) -> Result<Vec<u8>, Error> {
+        if let State::Ram(ram) = &self.state {
+            let (_, range) = ram.find(number)?;
+            return Ok(ram.jpegs[range].to_vec());
+        }
         let fs = self.fs()?;
         let folder = fs.root_dir().open_dir(FOLDER).await.map_err(io_error)?;
         let name = file_name(number);
