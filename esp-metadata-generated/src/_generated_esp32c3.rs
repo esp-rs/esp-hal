@@ -544,6 +544,9 @@ macro_rules! property {
     ("soc.internal_memory_cached") => {
         false
     };
+    ("soc.cpu_powers_down_cache") => {
+        false
+    };
     ("soc.has_swd_watchdog") => {
         true
     };

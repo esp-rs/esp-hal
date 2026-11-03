@@ -35,6 +35,7 @@ cpu_has_zcmp_workaround = true
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x3f
 cpu_pmp_granularity = 128
+cpu_powers_down_cache = true
 
 has_swd_watchdog = true
 
