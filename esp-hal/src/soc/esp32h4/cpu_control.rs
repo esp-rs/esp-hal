@@ -62,6 +62,26 @@ pub(crate) fn pre_system_reset() {
     crate::rom::ets_set_appcpu_boot_addr(0);
 }
 
+/// Releases core 1 from reset after a CPU-domain power-down wake.
+///
+/// esp-idf keys this on `core_id == 0` in both the initiator and the helper paths.
+#[cfg(all(
+    cpu_retention = "software",
+    multi_core,
+    supports_cpu_power_down,
+    feature = "rt"
+))]
+#[crate::ram]
+pub(crate) fn restart_core1_after_wake() {
+    if Cpu::current() != Cpu::ProCpu {
+        return;
+    }
+    PCR::regs().core1_conf().modify(|_, w| {
+        w.core1_clk_en().set_bit();
+        w.core1_rst_en().clear_bit()
+    });
+}
+
 pub(crate) fn disable_core1() {
     // The reset defaults of the register, which is how ESP-IDF leaves Core 1 in single-core mode:
     // the core is clock gated and held in reset.
