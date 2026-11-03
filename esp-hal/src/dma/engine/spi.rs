@@ -554,11 +554,27 @@ pub(super) fn enable_spi_dma() {
         // restrictive than necessary but we currently support the same
         // number of SPI peripherals as SPI DMA channels so it's not a big
         // deal.
-        use crate::peripherals::DPORT;
-
-        DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
-            w.spi2_dma_chan_sel().bits(1);
-            w.spi3_dma_chan_sel().bits(2)
-        });
+        connect_spi_dma(crate::dma::DmaPeripheral::SPI2, true);
+        connect_spi_dma(crate::dma::DmaPeripheral::SPI3, true);
     }
+}
+
+/// Connects an SPI host to its DMA channel, or disconnects it.
+///
+/// A connected SPI host pushes received data into its RX DMA FIFO, also in a transfer without
+/// DMA. The DMA resets do not empty that FIFO.
+#[cfg(esp32)]
+pub(crate) fn connect_spi_dma(peripheral: crate::dma::DmaPeripheral, connect: bool) {
+    use crate::{dma::DmaPeripheral, peripherals::DPORT};
+
+    let channel = |channel: u8| if connect { channel } else { 0 };
+    critical_section::with(|_| {
+        DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
+            match peripheral {
+                DmaPeripheral::SPI2 => w.spi2_dma_chan_sel().bits(channel(1)),
+                DmaPeripheral::SPI3 => w.spi3_dma_chan_sel().bits(channel(2)),
+                _ => w,
+            }
+        });
+    });
 }
