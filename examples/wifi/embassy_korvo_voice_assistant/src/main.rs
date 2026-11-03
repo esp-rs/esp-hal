@@ -165,8 +165,8 @@ async fn main(spawner: Spawner) -> ! {
         .start_app_core(SPEECH_STACK.take(), || speech::run(recognized_phrases()))
         .unwrap();
 
-    // Display, with the sub-board timings from Espressif's `esp32_s3_lcd_ev_board` BSP
-    // (`SUB_BOARD3_800_480_PANEL_35HZ_RGB_TIMING`).
+    // The timings of the 800x480 panel refresh it at about 35 Hz with an 18 MHz pixel clock.
+    // See <https://github.com/espressif/esp-bsp/blob/67f41a169401/bsp/esp32_s3_lcd_ev_board/include/bsp/esp32_s3_lcd_ev_board.h#L378-L390>.
     let dpi_config = DpiConfig::default()
         .with_clock_mode(ClockMode {
             polarity: Polarity::IdleLow,

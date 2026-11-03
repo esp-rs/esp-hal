@@ -1,8 +1,7 @@
 //! Minimal ES8389 codec setup for the Korvo-1.
 //!
 //! The codec runs as an I2S slave and derives its clocks from BCLK (no MCLK), with 16-bit Philips
-//! frames at 48 kHz in both directions. The register sequence follows Espressif's `esp_codec_dev`
-//! ES8389 driver (`es8389_open`, `es8389_set_fs`, `es8389_set_bias_on`).
+//! frames at 48 kHz in both directions.
 
 use embassy_time::Timer;
 use esp_hal::{
@@ -10,7 +9,8 @@ use esp_hal::{
     i2c::master::{Error, I2c},
 };
 
-/// 7-bit I2C address (`ES8389_CODEC_DEFAULT_ADDR` is the 8-bit form, 0x20).
+/// 7-bit I2C address, 0x20 in the 8-bit form.
+/// See <https://github.com/espressif/esp-adf/blob/a8a14c8fa6cb/components/esp_codec_dev/device/include/es8389_codec.h#L19>.
 const ADDRESS: u8 = 0x10;
 
 /// Microphone PGA gain step (`0b1100` = 30.5 dB) on the differential inputs (bits 6:4 = 1).
@@ -19,7 +19,8 @@ const MIC_GAIN: u8 = 0x10 | 0b1100;
 /// DAC volume in 0.5 dB steps from -95.5 dB (`0xBF` = 0 dB).
 const DAC_VOLUME: u8 = 0xBF;
 
-/// The register writes of `es8389_open`.
+/// Resets the codec and sets up its clocks, analog parts, serial ports and volumes, in slave mode.
+/// See <https://github.com/espressif/esp-adf/blob/a8a14c8fa6cb/components/esp_codec_dev/device/es8389/es8389.c#L503-L638>.
 const OPEN: &[(u8, u8)] = &[
     (0xF3, 0x00),
     (0x00, 0x7E),
@@ -93,7 +94,9 @@ const OPEN: &[(u8, u8)] = &[
     (0x48, 0xBE),
 ];
 
-/// `es8389_config_sample` for 48 kHz with BCLK = 64 × LRCK (the `{64, 3072000, 48000}` entry).
+/// The clock dividers for 48 kHz with BCLK = 64 × LRCK.
+/// See <https://github.com/espressif/esp-adf/blob/a8a14c8fa6cb/components/esp_codec_dev/device/es8389/es8389.c#L454-L491>
+/// and <https://github.com/espressif/esp-adf/blob/a8a14c8fa6cb/components/esp_codec_dev/device/es8389/es8389.c#L113>.
 const SAMPLE_RATE_48K: &[(u8, u8)] = &[
     (0x04, 0x00),
     (0x05, 0x51),
@@ -114,7 +117,9 @@ const SAMPLE_RATE_48K: &[(u8, u8)] = &[
     (0x19, 0x28),
 ];
 
-/// `es8389_set_bias_on` without register 0x69, which needs a read-modify-write.
+/// The writes that power up the analog bias, after the read-modify-write of register 0x69 in
+/// [`bias_on`].
+/// See <https://github.com/espressif/esp-adf/blob/a8a14c8fa6cb/components/esp_codec_dev/device/es8389/es8389.c#L249-L262>.
 const BIAS_ON: &[(u8, u8)] = &[
     (0x61, 0xD9),
     (0x64, 0x8F),

@@ -2,10 +2,11 @@
 //!
 //! The panel has no frame memory, so the LCD peripheral refreshes it all the time from a frame
 //! buffer in PSRAM. Speech recognition on the second core takes so much PSRAM bandwidth that a DMA
-//! reading the frame buffer falls behind, and the picture slips sideways. So, as ESP-IDF's RGB LCD
-//! driver does with bounce buffers, the DMA sends two buffers in internal RAM in turns, and an
-//! interrupt copies the next lines of the frame buffer into each buffer while the DMA sends the
-//! other. The refresh stops while a new [`Screen`] is drawn.
+//! reading the frame buffer falls behind, and the picture slips sideways. So the DMA sends two
+//! bounce buffers in internal RAM in turns, and an interrupt copies the next lines of the frame
+//! buffer into each buffer while the DMA sends the other. The refresh stops while a new [`Screen`]
+//! is drawn.
+//! See <https://github.com/espressif/esp-idf/blob/0e6b480f858c/components/esp_lcd/rgb/esp_lcd_panel_rgb.c#L1196-L1208>.
 
 use alloc::string::String;
 use core::{
