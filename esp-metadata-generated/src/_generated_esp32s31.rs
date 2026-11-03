@@ -568,6 +568,9 @@ macro_rules! property {
     ("psram.hex_spi") => {
         false
     };
+    ("psram.has_timing_tuning") => {
+        true
+    };
     ("psram.extmem_origin") => {
         1342177280
     };
@@ -599,6 +602,9 @@ macro_rules! property {
         true
     };
     ("soc.multi_core_enabled") => {
+        true
+    };
+    ("soc.cpu_pma_needs_core1_setup") => {
         true
     };
     ("soc.cpu_csr_prv_mode") => {

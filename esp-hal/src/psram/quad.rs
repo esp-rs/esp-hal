@@ -112,7 +112,8 @@ pub(crate) fn psram_init(config: &mut super::PsramConfig) {
 
     // Do PSRAM timing tuning, we use SPI1 to do the tuning, and set the SPI0 PSRAM
     // timing related registers accordingly
-    mspi_timing_psram_tuning();
+    #[cfg(psram_has_timing_tuning)]
+    tuning::mspi_timing_psram_tuning();
 
     // Configure SPI0 PSRAM related SPI Phases
     config_psram_spi_phases();
@@ -160,16 +161,6 @@ fn config_psram_spi_phases() {
     psram_ctrlr_ll_set_cs_pin(PSRAM_CTRLR_LL_MSPI_ID_0, PsramLlCsIdT::PsramLlCsId1);
 }
 
-#[ram]
-fn mspi_timing_psram_tuning() {
-    // esp-idf will probe different settings and select a suitable one
-    //
-    // see mspi_timing_psram_tuning in
-    // components\esp_hw_support\mspi_timing_tuning\mspi_timing_tuning.c
-    //
-    // for now we just use the user provided setting (which might be default settings)
-}
-
 /// Sets SPI0 FLASH and PSRAM module clock, din_num, din_mode and extra
 /// dummy, according to the configuration got from timing tuning
 /// function (`calculate_best_flash_tuning_config`). iF control_spi1 ==
@@ -195,9 +186,10 @@ fn mspi_timing_enter_high_speed_mode(config: &PsramConfig) {
         MspiTimingSpeedMode::MspiTimingSpeedModeNormalPerf,
     );
 
+    #[cfg(psram_has_timing_tuning)]
     if config.ram_frequency.need_timing_tuning() {
-        mspi_timing_flash_config_set_tuning_regs(config);
-        mspi_timing_psram_config_set_tuning_regs(config);
+        tuning::mspi_timing_flash_config_set_tuning_regs(config);
+        tuning::mspi_timing_psram_config_set_tuning_regs(config);
     }
 }
 
@@ -479,96 +471,124 @@ fn mspi_timing_enter_low_speed_mode() {
         MspiTimingSpeedMode::MspiTimingSpeedModeLowPerf,
     );
 
-    // #if MSPI_TIMING_FLASH_NEEDS_TUNING || MSPI_TIMING_PSRAM_NEEDS_TUNING
-    mspi_timing_flash_config_clear_tuning_regs();
-    mspi_timing_psram_config_clear_tuning_regs();
-    // #endif  //#if MSPI_TIMING_FLASH_NEEDS_TUNING || MSPI_TIMING_PSRAM_NEEDS_TUNING
+    #[cfg(psram_has_timing_tuning)]
+    {
+        tuning::mspi_timing_flash_config_clear_tuning_regs();
+        tuning::mspi_timing_psram_config_clear_tuning_regs();
+    }
 }
 
-fn mspi_timing_flash_config_clear_tuning_regs() {
-    // bool control_both_mspi = true
-    s_set_flash_din_mode_num(0, 0, 0); //SPI0 and SPI1 share the registers for flash din mode and num setting, so we only set SPI0's reg
-    s_set_flash_extra_dummy(0, 0);
+#[cfg(psram_has_timing_tuning)]
+mod tuning {
+    use procmacros::ram;
 
-    s_set_flash_extra_dummy(1, 0);
-}
+    use super::super::tuning::{
+        mspi_timing_ll_get_flash_dummy,
+        mspi_timing_ll_get_psram_dummy,
+        mspi_timing_ll_set_flash_din_mode,
+        mspi_timing_ll_set_flash_din_num,
+        mspi_timing_ll_set_flash_extra_dummy,
+        mspi_timing_ll_set_psram_din_mode,
+        mspi_timing_ll_set_psram_din_num,
+        mspi_timing_ll_set_psram_extra_dummy,
+    };
+    use crate::psram::PsramConfig;
 
-fn mspi_timing_psram_config_clear_tuning_regs() {
-    // bool control_both_mspi = true
-    s_set_psram_din_mode_num(0, 0, 0);
-    s_set_psram_extra_dummy(0, 0);
-}
+    #[ram]
+    pub(super) fn mspi_timing_psram_tuning() {
+        // esp-idf will probe different settings and select a suitable one
+        //
+        // see mspi_timing_psram_tuning in
+        // components\esp_hw_support\mspi_timing_tuning\mspi_timing_tuning.c
+        //
+        // for now we just use the user provided setting (which might be default settings)
+    }
 
-fn s_set_flash_din_mode_num(mspi_id: u8, din_mode: u8, din_num: u8) {
-    super::mspi_timing_ll_set_flash_din_mode(mspi_id, din_mode);
-    super::mspi_timing_ll_set_flash_din_num(mspi_id, din_num);
-}
+    pub(super) fn mspi_timing_flash_config_clear_tuning_regs() {
+        // bool control_both_mspi = true
+        s_set_flash_din_mode_num(0, 0, 0); //SPI0 and SPI1 share the registers for flash din mode and num setting, so we only set SPI0's reg
+        s_set_flash_extra_dummy(0, 0);
 
-fn s_set_flash_extra_dummy(mspi_id: u8, extra_dummy: u8) {
-    super::mspi_timing_ll_set_flash_extra_dummy(mspi_id, extra_dummy);
-}
+        s_set_flash_extra_dummy(1, 0);
+    }
 
-fn s_set_psram_din_mode_num(mspi_id: u8, din_mode: u8, din_num: u8) {
-    super::mspi_timing_ll_set_psram_din_mode(mspi_id, din_mode);
-    super::mspi_timing_ll_set_psram_din_num(mspi_id, din_num);
-}
+    pub(super) fn mspi_timing_psram_config_clear_tuning_regs() {
+        // bool control_both_mspi = true
+        s_set_psram_din_mode_num(0, 0, 0);
+        s_set_psram_extra_dummy(0, 0);
+    }
 
-fn s_set_psram_extra_dummy(mspi_id: u8, extra_dummy: u8) {
-    super::mspi_timing_ll_set_psram_extra_dummy(mspi_id, extra_dummy);
-}
+    fn s_set_flash_din_mode_num(mspi_id: u8, din_mode: u8, din_num: u8) {
+        mspi_timing_ll_set_flash_din_mode(mspi_id, din_mode);
+        mspi_timing_ll_set_flash_din_num(mspi_id, din_num);
+    }
 
-fn mspi_timing_flash_config_set_tuning_regs(cfg: &PsramConfig) {
-    // bool control_both_mspi = true
+    fn s_set_flash_extra_dummy(mspi_id: u8, extra_dummy: u8) {
+        mspi_timing_ll_set_flash_extra_dummy(mspi_id, extra_dummy);
+    }
 
-    let timing_tuning_config = cfg.flash_tuning;
+    fn s_set_psram_din_mode_num(mspi_id: u8, din_mode: u8, din_num: u8) {
+        mspi_timing_ll_set_psram_din_mode(mspi_id, din_mode);
+        mspi_timing_ll_set_psram_din_num(mspi_id, din_num);
+    }
 
-    debug!(
-        "mspi_timing_flash_config_set_tuning_regs spi_din_mode {}, spi_din_num {}, extra_dummy_len {}",
-        timing_tuning_config.spi_din_mode,
-        timing_tuning_config.spi_din_num,
-        timing_tuning_config.extra_dummy_len
-    );
+    fn s_set_psram_extra_dummy(mspi_id: u8, extra_dummy: u8) {
+        mspi_timing_ll_set_psram_extra_dummy(mspi_id, extra_dummy);
+    }
 
-    // SPI0 and SPI1 share the registers for flash din mode and num setting, so we only set SPI0's
-    // reg
-    s_set_flash_din_mode_num(
-        0,
-        timing_tuning_config.spi_din_mode,
-        timing_tuning_config.spi_din_num,
-    );
-    s_set_flash_extra_dummy(0, timing_tuning_config.extra_dummy_len);
-    s_set_flash_extra_dummy(1, timing_tuning_config.extra_dummy_len);
+    pub(super) fn mspi_timing_flash_config_set_tuning_regs(cfg: &PsramConfig) {
+        // bool control_both_mspi = true
 
-    let (spi0_usr_dummy, spi0_extra_dummy) = super::mspi_timing_ll_get_flash_dummy(0);
-    let (spi1_usr_dummy, spi1_extra_dummy) = super::mspi_timing_ll_get_flash_dummy(1);
-    debug!(
-        "flash, spi0_usr_dummy: {}, spi0_extra_dummy: {}, spi1_usr_dummy: {}, spi1_extra_dummy: {}",
-        spi0_usr_dummy, spi0_extra_dummy, spi1_usr_dummy, spi1_extra_dummy
-    );
-}
+        let timing_tuning_config = cfg.flash_tuning;
 
-fn mspi_timing_psram_config_set_tuning_regs(cfg: &PsramConfig) {
-    // bool control_both_mspi = true
+        debug!(
+            "mspi_timing_flash_config_set_tuning_regs spi_din_mode {}, spi_din_num {}, extra_dummy_len {}",
+            timing_tuning_config.spi_din_mode,
+            timing_tuning_config.spi_din_num,
+            timing_tuning_config.extra_dummy_len
+        );
 
-    let timing_tuning_config = cfg.ram_tuning;
+        // SPI0 and SPI1 share the registers for flash din mode and num setting, so we only set
+        // SPI0's reg
+        s_set_flash_din_mode_num(
+            0,
+            timing_tuning_config.spi_din_mode,
+            timing_tuning_config.spi_din_num,
+        );
+        s_set_flash_extra_dummy(0, timing_tuning_config.extra_dummy_len);
+        s_set_flash_extra_dummy(1, timing_tuning_config.extra_dummy_len);
 
-    debug!(
-        "mspi_timing_psram_config_set_tuning_regs spi_din_mode {}, spi_din_num {}, extra_dummy_len {}",
-        timing_tuning_config.spi_din_mode,
-        timing_tuning_config.spi_din_num,
-        timing_tuning_config.extra_dummy_len
-    );
+        let (spi0_usr_dummy, spi0_extra_dummy) = mspi_timing_ll_get_flash_dummy(0);
+        let (spi1_usr_dummy, spi1_extra_dummy) = mspi_timing_ll_get_flash_dummy(1);
+        debug!(
+            "flash, spi0_usr_dummy: {}, spi0_extra_dummy: {}, spi1_usr_dummy: {}, spi1_extra_dummy: {}",
+            spi0_usr_dummy, spi0_extra_dummy, spi1_usr_dummy, spi1_extra_dummy
+        );
+    }
 
-    s_set_psram_din_mode_num(
-        0,
-        timing_tuning_config.spi_din_mode,
-        timing_tuning_config.spi_din_num,
-    );
-    s_set_psram_extra_dummy(0, timing_tuning_config.extra_dummy_len);
+    pub(super) fn mspi_timing_psram_config_set_tuning_regs(cfg: &PsramConfig) {
+        // bool control_both_mspi = true
 
-    let (spi0_usr_rdummy, spi0_extra_dummy) = super::mspi_timing_ll_get_psram_dummy(0);
-    debug!(
-        "psram, spi0_usr_rdummy: {}, spi0_extra_dummy: {}",
-        spi0_usr_rdummy, spi0_extra_dummy
-    );
+        let timing_tuning_config = cfg.ram_tuning;
+
+        debug!(
+            "mspi_timing_psram_config_set_tuning_regs spi_din_mode {}, spi_din_num {}, extra_dummy_len {}",
+            timing_tuning_config.spi_din_mode,
+            timing_tuning_config.spi_din_num,
+            timing_tuning_config.extra_dummy_len
+        );
+
+        s_set_psram_din_mode_num(
+            0,
+            timing_tuning_config.spi_din_mode,
+            timing_tuning_config.spi_din_num,
+        );
+        s_set_psram_extra_dummy(0, timing_tuning_config.extra_dummy_len);
+
+        let (spi0_usr_rdummy, spi0_extra_dummy) = mspi_timing_ll_get_psram_dummy(0);
+        debug!(
+            "psram, spi0_usr_rdummy: {}, spi0_extra_dummy: {}",
+            spi0_usr_rdummy, spi0_extra_dummy
+        );
+    }
 }

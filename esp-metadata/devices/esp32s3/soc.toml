@@ -489,6 +489,7 @@ fifo_depth_words = 256
 [device.psram]
 extmem_origin = 0x3C000000
 octal_spi = true
+has_timing_tuning = true
 
 [device.systimer]
 [device.temp_sensor]

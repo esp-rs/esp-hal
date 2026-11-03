@@ -29,6 +29,7 @@ no_libgcc   = true # since ECO2 (v0.2)
 
 [device.soc]
 multi_core_enabled = true
+cpu_pma_needs_core1_setup = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_has_zcmp_workaround = true
@@ -103,6 +104,7 @@ peripherals = [
     { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
     { name = "PMU", interrupts = { peri = "PMU" } },
+    { name = "PSRAM", virtual = true },
     { name = "PVT" },
     { name = "RMT", interrupts = { peri = "RMT" } },
     { name = "RNG" },
@@ -486,5 +488,5 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 context_switch_source = "ipc"
 
 [device.psram]
-support_status = "not_supported"
+support_status = "partial"
 extmem_origin = 0x4200_0000

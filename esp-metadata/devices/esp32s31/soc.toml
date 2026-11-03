@@ -28,6 +28,7 @@ has_md5_bsd = true
 
 [device.soc]
 multi_core_enabled = true
+cpu_pma_needs_core1_setup = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_has_zcmp_workaround = true
@@ -596,6 +597,7 @@ ram_size = 20 # FIXME: placeholder
 support_status = "partial"
 extmem_origin = 0x5000_0000
 octal_spi = true
+has_timing_tuning = true
 
 [device.pixel_accelerator]
 support_status = "not_supported"
