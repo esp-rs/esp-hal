@@ -22,7 +22,12 @@ pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LSGlobal
 }
 
 pub(super) fn ls_freq_hw(_clock_source: LSClockSource) -> Rate {
-    Rate::from_hz(clocks::apb_clk_frequency())
+    Rate::from_hz(cfg_select! {
+        // The PLL_F80M clock node is not requested, so this relies on the PLL being kept running
+        // by something else, e.g. the CPU clock.
+        esp32c6 => clocks::pll_f80m_frequency(),
+        esp32h2 => clocks::xtal_clk_frequency(),
+    })
 }
 
 pub(super) fn ls_configure_hw(
