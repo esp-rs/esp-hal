@@ -106,8 +106,8 @@ async function fetchLatestCommitMetrics({ context, core }) {
 
 // Converts a `metrics` object from `/api/v1/metrics/query` into the
 // `<chip> <example> <role> <section> <flash|ram|bss> <bytes>` lines `groupSizes`
-// reads. Metrics stored without a RAM total counted `.data` as flash only, so
-// they are not comparable and the commit is built again.
+// reads. Metrics without a `ram` total are not comparable, so the commit is
+// built again.
 function metricsToLines(metrics, role) {
   if (!metrics?.binary_size?.data?.every((t) => t.ram !== undefined)) return [];
   return (metrics.binary_size_sections?.data || []).map(
@@ -115,9 +115,9 @@ function metricsToLines(metrics, role) {
   );
 }
 
-// Whether the run measured every chip it had to and reported the result. The
-// metrics upload may fail: it depends on a self-hosted runner and the S3
-// service, and waiting for it would report the same commits again.
+// Whether the run reported the sizes of at least one chip. The report names the
+// chips that failed. Waiting for them, or for the metrics upload, would report
+// the same growth of the other chips again every night.
 async function isCompleteRun({ github, context }, runId) {
   const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
     ...context.repo,
@@ -125,11 +125,11 @@ async function isCompleteRun({ github, context }, runId) {
     filter: "latest",
     per_page: 100,
   });
+  const done = (job) => job && ["success", "skipped"].includes(job.conclusion);
   return (
-    jobs.some((job) => job.name === "prepare" && job.conclusion === "success") &&
-    jobs.every(
-      (job) => job.name === "upload-metrics" || ["success", "skipped"].includes(job.conclusion),
-    )
+    jobs.find((job) => job.name === "prepare")?.conclusion === "success" &&
+    done(jobs.find((job) => job.name === "report")) &&
+    jobs.some((job) => job.name.startsWith("measure") && done(job))
   );
 }
 
@@ -558,9 +558,10 @@ async function measureBetween({ core, exec, soc, target, flash, pkg, lines, betw
 // silently never reporting.
 function limitsFromEnv() {
   const limits = {
-    percent: Number(process.env.MAX_GROWTH_PERCENT),
     flash: Number(process.env.MAX_FLASH_GROWTH_BYTES),
+    flashPercent: Number(process.env.MAX_FLASH_GROWTH_PERCENT),
     ram: Number(process.env.MAX_RAM_GROWTH_BYTES),
+    ramPercent: Number(process.env.MAX_RAM_GROWTH_PERCENT),
   };
   for (const [name, value] of Object.entries(limits)) {
     if (!Number.isFinite(value)) {
@@ -696,8 +697,8 @@ function compare(was, now, maxBytes, maxPercent) {
 // Compares the totals of every entry. Without limits nothing regresses.
 function compareEntries(entries, limits) {
   return entries.map((entry) => {
-    const flash = compare(entry.base?.flash, entry.head.flash, limits?.flash, limits?.percent);
-    const ram = compare(entry.base?.ram, entry.head.ram, limits?.ram, limits?.percent);
+    const flash = compare(entry.base?.flash, entry.head.flash, limits?.flash, limits?.flashPercent);
+    const ram = compare(entry.base?.ram, entry.head.ram, limits?.ram, limits?.ramPercent);
     const regressed = flash.regressed || ram.regressed;
     const improved = !regressed && (flash.improved || ram.improved);
     return { ...entry, flash, ram, regressed, improved };
@@ -795,8 +796,8 @@ async function growthByPullRequest(api, rows, chain, limits) {
         for (const sha of pending) {
           if (!names.has(sha)) names.set(sha, await describeCommit(api, sha));
         }
-        const flash = compare(previous.flash, sizes.flash, limits.flash, limits.percent);
-        const ram = compare(previous.ram, sizes.ram, limits.ram, limits.percent);
+        const flash = compare(previous.flash, sizes.flash, limits.flash, limits.flashPercent);
+        const ram = compare(previous.ram, sizes.ram, limits.ram, limits.ramPercent);
         const pulls = pending.map((sha) => names.get(sha)).join("<br>");
         lines.push(
           `| \`${row.chip}\` | \`${row.example}\` | ${pulls} | ${flash.text} | ${ram.text} |`,
