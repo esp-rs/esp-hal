@@ -18,6 +18,10 @@ const CACHED_FILE = path.join(SIZES_DIR, "cached.txt");
 const METRICS_FILE = "binary_size_metrics.json";
 const METRICS_NAMES = ["binary_size", "binary_size_sections"];
 const MAX_BETWEEN_COMMITS = 15;
+// Nightly jobs that may fail without making the run incomplete. The upload
+// depends on a self-hosted runner and the S3 service. When it fails, the next
+// run must still start at this run's head, or it reports the same commits again.
+const OPTIONAL_NIGHTLY_JOBS = new Set(["upload-metrics"]);
 
 // Runs git and returns its trimmed output.
 async function git(exec, args) {
@@ -105,33 +109,62 @@ async function fetchLatestCommitMetrics({ context, core }) {
 }
 
 // Converts a `metrics` object from `/api/v1/metrics/query` into the
-// `<chip> <example> <role> <section> <flash|bss> <bytes>` lines `groupSizes`
-// reads.
+// `<chip> <example> <role> <section> <flash|ram|bss> <bytes>` lines `groupSizes`
+// reads. Metrics stored without a RAM total counted `.data` as flash only, so
+// they are not comparable and the commit is built again.
 function metricsToLines(metrics, role) {
+  const totals = metrics?.binary_size?.data || [];
+  if (totals.some((t) => t.ram === undefined)) return [];
   const sections = metrics?.binary_size_sections?.data || [];
   if (sections.length > 0) {
     return sections.map(
       (s) => `${s.chip} ${s.example} ${role} ${s.section} ${s.kind} ${s.bytes}`,
     );
   }
-  const totals = metrics?.binary_size?.data || [];
   return totals.flatMap((t) => [
     `${t.chip} ${t.example} ${role} .flash flash ${t.flash}`,
-    `${t.chip} ${t.example} ${role} .bss bss ${t.bss}`,
+    `${t.chip} ${t.example} ${role} .ram bss ${t.ram}`,
   ]);
 }
 
-// The head of the last successful scheduled run (or the latest commit on `main`
+// Whether the run measured every chip it had to and reported the result. Only
+// the jobs in `OPTIONAL_NIGHTLY_JOBS` may have failed.
+async function isCompleteRun({ github, context }, runId) {
+  const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+    ...context.repo,
+    run_id: runId,
+    filter: "latest",
+    per_page: 100,
+  });
+  const prepared = jobs.some((job) => job.name === "prepare" && job.conclusion === "success");
+  return (
+    prepared &&
+    jobs.every(
+      (job) =>
+        OPTIONAL_NIGHTLY_JOBS.has(job.name) ||
+        job.conclusion === "success" ||
+        job.conclusion === "skipped",
+    )
+  );
+}
+
+// The head of the last complete scheduled run (or the latest commit on `main`
 // in `app-metrics`), if `main` still contains it.
 async function previousHead({ github, context, core, exec }) {
   const { data } = await github.rest.actions.listWorkflowRuns({
     ...context.repo,
     workflow_id: "binary-size-nightly.yml",
     event: "schedule",
-    status: "success",
-    per_page: 1,
+    status: "completed",
+    per_page: 30,
   });
-  const sha = data.workflow_runs[0]?.head_sha;
+  let sha = "";
+  for (const run of data.workflow_runs) {
+    if (await isCompleteRun({ github, context }, run.id)) {
+      sha = run.head_sha;
+      break;
+    }
+  }
   if (sha && (await isAncestor(exec, sha, "HEAD"))) return sha;
 
   const latest = await fetchLatestCommitMetrics({ context, core });
@@ -240,12 +273,15 @@ async function resolveNightlyRange({ github, context, core, exec }) {
 
   // The commits merged before `head`, oldest first. `measure` builds them only
   // for examples that grew past the limits, to find the pull request behind it.
-  const between = (await isAncestor(exec, base, head))
+  const linear = await isAncestor(exec, base, head);
+  const between = linear
     ? (await git(exec, ["rev-list", "--first-parent", "--reverse", `${base}..${head}`]))
         .split("\n")
         .slice(0, -1)
     : [];
-  const shortBetween = between.length <= MAX_BETWEEN_COMMITS ? between : [];
+  // Only a range whose commits are built one by one can be split by pull request.
+  const split = linear && between.length <= MAX_BETWEEN_COMMITS;
+  const shortBetween = split ? between : [];
 
   const cachedLines = [];
   for (const [role, sha] of [
@@ -273,6 +309,7 @@ async function resolveNightlyRange({ github, context, core, exec }) {
   core.setOutput("base", base);
   core.setOutput("head", head);
   core.setOutput("between", shortBetween.join(" "));
+  core.setOutput("split", split ? "true" : "false");
   core.setOutput("all_chips", JSON.stringify(allChips));
 
   // Determine which chips still need a `measure` job: any chip missing `base`
@@ -370,11 +407,23 @@ async function sectionsWithSymbols(exec, elf) {
   return indices;
 }
 
-// Lists the sections of an ELF file that end up in the image (flag `A`):
-// sections with contents count as flash, NOBITS ones as bss. A NOBITS section
+// The address ranges `soc` maps from flash (`irom` and `drom` in esp-metadata).
+// Read before `measure` checks out other commits.
+function flashRanges(soc) {
+  const text = fs.readFileSync(path.join("esp-metadata", "devices", soc, "soc.toml"), "utf8");
+  const range = /name\s*=\s*"[id]rom"\s*,\s*start\s*=\s*(0x[\da-f_]+)\s*,\s*end\s*=\s*(0x[\da-f_]+)/gi;
+  const address = (hex) => Number(hex.replaceAll("_", ""));
+  const ranges = [...text.matchAll(range)].map((match) => [address(match[1]), address(match[2])]);
+  if (ranges.length === 0) throw new Error(`esp-metadata has no flash ranges for ${soc}.`);
+  return ranges;
+}
+
+// Lists the sections of an ELF file that take memory (flag `A`), by kind:
+// `flash` ones stay in flash, `ram` ones are copied from flash into RAM at boot
+// and take both, and NOBITS ones are `bss` and only take RAM. A NOBITS section
 // without a single variable in it, like `.stack` or `.text_gap`, only reserves
 // address space for the memory layout and is skipped.
-async function sectionsOf(exec, elf) {
+async function sectionsOf(exec, elf, flash) {
   const { stdout } = await exec.getExecOutput("readelf", ["-S", "-W", elf], {
     silent: true,
   });
@@ -384,11 +433,14 @@ async function sectionsOf(exec, elf) {
     // "[Nr] Name Type Address Off Size ES Flg Lk Inf Al"
     const row = line.match(/^\s*\[\s*(\d+)\]\s+(.*)$/);
     if (!row) continue;
-    const [name, type, , , size, , flags] = row[2].trim().split(/\s+/);
+    const [name, type, address, , size, , flags] = row[2].trim().split(/\s+/);
     const bytes = parseInt(size, 16);
     if (!flags?.includes("A") || !bytes) continue;
     if (type === "NOBITS" && !withSymbols.has(Number(row[1]))) continue;
-    sections.push({ name, kind: type === "NOBITS" ? "bss" : "flash", bytes });
+    const start = parseInt(address, 16);
+    const inFlash = flash.some(([from, to]) => start >= from && start < to);
+    const kind = type === "NOBITS" ? "bss" : inFlash ? "flash" : "ram";
+    sections.push({ name, kind, bytes });
   }
   return sections;
 }
@@ -410,6 +462,7 @@ async function measure({ core, exec }) {
         .filter((line) => line.startsWith(`${soc} `))
     : [];
   const cachedRoles = new Set(cachedSoc.map((line) => line.trim().split(/\s+/)[2]));
+  const flash = flashRanges(soc);
 
   // A pull request head may only be reachable from `refs/pull/*`.
   await exec.exec("git", ["fetch", "--quiet", "--no-tags", "origin", base, head]);
@@ -429,7 +482,7 @@ async function measure({ core, exec }) {
         continue;
       }
       built.push(
-        ...(await measureCommit({ core, exec, soc, target, pkg, examples, role, commit })),
+        ...(await measureCommit({ core, exec, soc, target, flash, pkg, examples, role, commit })),
       );
     }
     const uncachedBetween = between.filter((sha) => !cachedRoles.has(sha));
@@ -439,6 +492,7 @@ async function measure({ core, exec }) {
         exec,
         soc,
         target,
+        flash,
         pkg,
         lines: [...cachedSoc, ...built],
         between: uncachedBetween,
@@ -458,7 +512,7 @@ async function measure({ core, exec }) {
 }
 
 // Checks out one commit and returns the section lines of its examples.
-async function measureCommit({ core, exec, soc, target, pkg, examples, role, commit }) {
+async function measureCommit({ core, exec, soc, target, flash, pkg, examples, role, commit }) {
   await exec.exec("git", ["checkout", "--quiet", "--force", commit]);
 
   const lines = [];
@@ -483,7 +537,7 @@ async function measureCommit({ core, exec, soc, target, pkg, examples, role, com
       .find((file) => fs.existsSync(file));
     if (!elf) throw new Error(`No ELF found for ${example} on ${soc}.`);
 
-    for (const section of await sectionsOf(exec, elf)) {
+    for (const section of await sectionsOf(exec, elf, flash)) {
       lines.push(`${soc} ${example} ${role} ${section.name} ${section.kind} ${section.bytes}`);
     }
   }
@@ -493,7 +547,7 @@ async function measureCommit({ core, exec, soc, target, pkg, examples, role, com
 // Builds the examples that grew past the limits at every commit in between,
 // so the report can name the pull request behind the growth. A commit that
 // fails to build is skipped, its growth then shows up in the next one.
-async function measureBetween({ core, exec, soc, target, pkg, lines, between }) {
+async function measureBetween({ core, exec, soc, target, flash, pkg, lines, between }) {
   if (between.length === 0) return [];
   const entries = groupSizes(lines).filter((entry) => entry.head);
   const examples = compareEntries(entries, limitsFromEnv())
@@ -506,7 +560,17 @@ async function measureBetween({ core, exec, soc, target, pkg, lines, between }) 
   for (const commit of between) {
     try {
       found.push(
-        ...(await measureCommit({ core, exec, soc, target, pkg, examples, role: commit, commit })),
+        ...(await measureCommit({
+          core,
+          exec,
+          soc,
+          target,
+          flash,
+          pkg,
+          examples,
+          role: commit,
+          commit,
+        })),
       );
     } catch (error) {
       core.warning(`Skipping ${commit} on ${soc}: ${error.message}`);
@@ -521,7 +585,7 @@ function limitsFromEnv() {
   const limits = {
     percent: Number(process.env.MAX_GROWTH_PERCENT),
     flash: Number(process.env.MAX_FLASH_GROWTH_BYTES),
-    bss: Number(process.env.MAX_BSS_GROWTH_BYTES),
+    ram: Number(process.env.MAX_RAM_GROWTH_BYTES),
   };
   for (const [name, value] of Object.entries(limits)) {
     if (!Number.isFinite(value)) {
@@ -531,9 +595,10 @@ function limitsFromEnv() {
   return limits;
 }
 
-// Groups the "<chip> <example> <role> <section> <flash|bss> <bytes>" lines into
-// one entry per chip and example, with the sections and totals of each commit.
-// The role is `base`, `head`, or the hash of a commit in between.
+// Groups the "<chip> <example> <role> <section> <flash|ram|bss> <bytes>" lines
+// into one entry per chip and example, with the sections and the flash and RAM
+// totals of each commit. The role is `base`, `head`, or the hash of a commit in
+// between.
 function groupSizes(lines) {
   const examples = new Map();
   for (const line of lines) {
@@ -546,9 +611,10 @@ function groupSizes(lines) {
     const entry = examples.get(key);
     entry.kinds.set(section, kind);
     const sizes = role === "base" || role === "head" ? entry : entry.between;
-    sizes[role] ??= { flash: 0, bss: 0, sections: new Map() };
+    sizes[role] ??= { flash: 0, ram: 0, sections: new Map() };
     if (sizes[role].sections.has(section)) continue;
-    sizes[role][kind] += Number(bytes);
+    if (kind !== "bss") sizes[role].flash += Number(bytes);
+    if (kind !== "flash") sizes[role].ram += Number(bytes);
     sizes[role].sections.set(section, Number(bytes));
   }
   return [...examples.values()];
@@ -594,7 +660,7 @@ async function writeMetrics(exec, entries, head, missing) {
       chip: entry.chip,
       example: entry.example,
       flash: entry.head.flash,
-      bss: entry.head.bss,
+      ram: entry.head.ram,
     });
     for (const [section, bytes] of entry.head.sections) {
       sections.push({
@@ -656,21 +722,21 @@ function compare(was, now, maxBytes, maxPercent) {
 function compareEntries(entries, limits) {
   return entries.map((entry) => {
     const flash = compare(entry.base?.flash, entry.head.flash, limits?.flash, limits?.percent);
-    const bss = compare(entry.base?.bss, entry.head.bss, limits?.bss, limits?.percent);
-    const regressed = flash.regressed || bss.regressed;
-    const improved = !regressed && (flash.improved || bss.improved);
-    return { ...entry, flash, bss, regressed, improved };
+    const ram = compare(entry.base?.ram, entry.head.ram, limits?.ram, limits?.percent);
+    const regressed = flash.regressed || ram.regressed;
+    const improved = !regressed && (flash.improved || ram.improved);
+    return { ...entry, flash, ram, regressed, improved };
   });
 }
 
 // Renders compared entries as a Markdown table of their totals.
 function totalsTable(rows) {
   return [
-    "| Chip | Example | Flash (bytes) | bss (bytes) |",
+    "| Chip | Example | Flash (bytes) | RAM (bytes) |",
     "|---|---|---|---|",
     ...rows.map(
       (row) =>
-        `| \`${row.chip}\` | \`${row.example}\` | ${row.flash.text} | ${row.bss.text} |`,
+        `| \`${row.chip}\` | \`${row.example}\` | ${row.flash.text} | ${row.ram.text} |`,
     ),
   ].join("\n");
 }
@@ -744,40 +810,40 @@ async function growthByPullRequest(api, rows, chain, limits) {
     if (!row.base) continue;
     let previous = row.base;
     let pending = [];
-    const explained = { flash: false, bss: false };
+    const explained = { flash: false, ram: false };
     for (const commit of chain.slice(1)) {
       pending.push(commit);
       const sizes = commit === chain.at(-1) ? row.head : row.between[commit];
       if (!sizes) continue;
 
-      if (sizes.flash !== previous.flash || sizes.bss !== previous.bss) {
+      if (sizes.flash !== previous.flash || sizes.ram !== previous.ram) {
         for (const sha of pending) {
           if (!names.has(sha)) names.set(sha, await describeCommit(api, sha));
         }
         const flash = compare(previous.flash, sizes.flash, limits.flash, limits.percent);
-        const bss = compare(previous.bss, sizes.bss, limits.bss, limits.percent);
+        const ram = compare(previous.ram, sizes.ram, limits.ram, limits.percent);
         const pulls = pending.map((sha) => names.get(sha)).join("<br>");
         lines.push(
-          `| \`${row.chip}\` | \`${row.example}\` | ${pulls} | ${flash.text} | ${bss.text} |`,
+          `| \`${row.chip}\` | \`${row.example}\` | ${pulls} | ${flash.text} | ${ram.text} |`,
         );
 
-        if (flash.regressed || bss.regressed) {
+        if (flash.regressed || ram.regressed) {
           const culprit = pending.map((sha) => names.get(sha)).join(" or ");
           if (!culprits.has(culprit)) culprits.set(culprit, []);
           culprits.get(culprit).push(row);
         }
         explained.flash ||= flash.regressed;
-        explained.bss ||= bss.regressed;
+        explained.ram ||= ram.regressed;
       }
       previous = sizes;
       pending = [];
     }
-    if ((row.flash.regressed && !explained.flash) || (row.bss.regressed && !explained.bss)) {
+    if ((row.flash.regressed && !explained.flash) || (row.ram.regressed && !explained.ram)) {
       unexplained.push(row);
     }
   }
   const table = [
-    "| Chip | Example | Pull request | Flash (bytes) | bss (bytes) |",
+    "| Chip | Example | Pull request | Flash (bytes) | RAM (bytes) |",
     "|---|---|---|---|---|",
     ...lines,
   ].join("\n");
@@ -796,15 +862,25 @@ function whereText(rows) {
     .join("; ");
 }
 
+// The cause of regressions in a range whose commits were not built one by one.
+function unsplitGrowth(rows) {
+  return { table: "", hasRows: false, culprits: new Map(), unexplained: [], unsplit: rows };
+}
+
 // Names the pull requests that alone grew past the limits, and where, and the
 // regressions that only add up over several pull requests.
-function causeText({ culprits, unexplained }) {
+function causeText({ culprits, unexplained, unsplit = [] }) {
   const lines = [...culprits].map(
     ([culprit, rows]) => `**${culprit}** grew past the limits on its own: ${whereText(rows)}.`,
   );
   if (unexplained.length > 0) {
     lines.push(
       `No single pull request grew past the limits on its own in ${whereText(unexplained)}, the growth adds up over several of them. See the growth by pull request below.`,
+    );
+  }
+  if (unsplit.length > 0) {
+    lines.push(
+      `The check measures each pull request of a range only when the range is a line of at most ${MAX_BETWEEN_COMMITS} commits on \`main\`, so it does not name the pull request behind the growth in ${whereText(unsplit)}. See the pull requests merged in the range below.`,
     );
   }
   return lines.length === 1 ? lines[0] : lines.map((line) => `- ${line}`).join("\n");
@@ -829,15 +905,18 @@ async function reportNightly({ github, context, core, exec }) {
   const missingText = missingNote(missing);
 
   const between = (process.env.BETWEEN || "").split(/\s+/).filter(Boolean);
-  const growth =
-    regressions.length > 0
-      ? await growthByPullRequest(
-          { github, context, exec },
-          regressions,
-          [base, ...between, head],
-          limits,
-        )
-      : null;
+  let growth = null;
+  if (regressions.length > 0) {
+    growth =
+      process.env.SPLIT === "true"
+        ? await growthByPullRequest(
+            { github, context, exec },
+            regressions,
+            [base, ...between, head],
+            limits,
+          )
+        : unsplitGrowth(regressions);
+  }
 
   const summary = [
     "## Binary size report",
@@ -910,12 +989,16 @@ async function reportNightly({ github, context, core, exec }) {
     "",
     sectionsDetails(regressions),
     "",
-    "### Growth by pull request",
-    "",
-    "The size after each pull request that changed it. In bold where that pull request alone grew past the limits.",
-    "",
-    growth.table,
-    "",
+    ...(growth.hasRows
+      ? [
+          "### Growth by pull request",
+          "",
+          "The size after each pull request that changed it. In bold where that pull request alone grew past the limits.",
+          "",
+          growth.table,
+          "",
+        ]
+      : []),
     `### Merged between \`${base.slice(0, 10)}\` and \`${head.slice(0, 10)}\``,
     "",
     merged,

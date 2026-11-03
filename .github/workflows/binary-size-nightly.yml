@@ -1,6 +1,7 @@
 # Builds a few examples on every chip, once at the current `main` (or a chosen
-# end commit) and once at the `main` the last successful run measured (or a
-# chosen start commit, date, or release tag), and compares their sizes. Commits
+# end commit) and once at the `main` the last complete scheduled run measured
+# (or a chosen start commit, date, or release tag), and compares their sizes. A
+# run is complete when every job except the metrics upload succeeded. Commits
 # whose sizes are already stored in the Espressif App Metrics service are
 # fetched via its API instead of being rebuilt. Reports to the job summary,
 # uploads newly measured `HEAD` metrics to S3 from a Brno self-hosted runner,
@@ -50,7 +51,7 @@ env:
   # more than this many bytes.
   MAX_GROWTH_PERCENT: 1
   MAX_FLASH_GROWTH_BYTES: 2048
-  MAX_BSS_GROWTH_BYTES: 512
+  MAX_RAM_GROWTH_BYTES: 512
   # Read at compile time by the Wi-Fi examples.
   SSID: SSID
   PASSWORD: PASSWORD
@@ -65,12 +66,13 @@ jobs:
     runs-on: ${{ github.repository_owner == 'esp-rs' && 'macos-m1-self-hosted' || 'ubuntu-latest' }}
     permissions:
       contents: read
-      # Finds the last successful run.
+      # Finds the last complete run.
       actions: read
     outputs:
       base: ${{ steps.range.outputs.base }}
       head: ${{ steps.range.outputs.head }}
       between: ${{ steps.range.outputs.between }}
+      split: ${{ steps.range.outputs.split }}
       chips: ${{ steps.range.outputs.chips }}
       all_chips: ${{ steps.range.outputs.all_chips }}
       has_cached: ${{ steps.range.outputs.has_cached }}
@@ -152,6 +154,7 @@ jobs:
           BASE: ${{ needs.prepare.outputs.base }}
           HEAD: ${{ needs.prepare.outputs.head }}
           BETWEEN: ${{ needs.prepare.outputs.between }}
+          SPLIT: ${{ needs.prepare.outputs.split }}
           CHIPS: ${{ needs.prepare.outputs.all_chips }}
         with:
           script: |

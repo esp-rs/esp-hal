@@ -77,7 +77,7 @@ Triggers the binary size analysis workflow, which:
 
 - Builds the selected example for the PR head and for the commit the PR branched from.
 - Compares the size of every section that ends up in the image.
-- Reports the flash and bss totals and the sections that changed in a comment on the PR.
+- Reports the flash and RAM totals and the sections that changed in a comment on the PR.
 
 Examples:
 
