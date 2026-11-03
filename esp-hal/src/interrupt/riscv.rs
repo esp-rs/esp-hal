@@ -644,9 +644,10 @@ pub(crate) mod rt {
         }
     }
 
-    #[unsafe(no_mangle)]
+    /// Calls the handlers of `cpu_intr`. Runs on the interrupt stack.
     #[crate::ram]
-    unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
+    /// Returns whether the interrupt has [`Priority::min`], which lets the exit code switch tasks.
+    pub(crate) unsafe extern "C" fn dispatch_interrupts(cpu_intr: CpuInterrupt) -> bool {
         let status = InterruptStatus::current();
 
         // this has no effect on level interrupts, but the interrupt may be an edge one
@@ -702,5 +703,7 @@ pub(crate) mod rt {
                 unsafe { change_current_runlevel(level) };
             }
         }
+
+        prio == Priority::min() as u8
     }
 }

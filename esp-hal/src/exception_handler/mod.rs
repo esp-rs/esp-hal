@@ -15,7 +15,7 @@ unsafe extern "C" fn __user_exception(
     );
 }
 
-#[cfg(all(xtensa, stack_guard_monitoring))]
+#[cfg(all(xtensa, any(stack_guard_monitoring, isr_stack_guard_monitoring)))]
 #[inline(always)]
 pub(crate) fn breakpoint_interrupt(context: &TrapFrame) {
     let mut dbgcause: u32;
@@ -26,10 +26,22 @@ pub(crate) fn breakpoint_interrupt(context: &TrapFrame) {
         );
     }
 
+    // DBREAK is bit 2, DBNUM is bits 8..12.
+    let watchpoint = (dbgcause & 4 != 0).then_some((dbgcause >> 8) & 0b1111);
+
     #[cfg(stack_guard_monitoring)]
-    if dbgcause & 4 != 0 && dbgcause & 0b1111_0000_0000 == 0 {
+    if watchpoint == Some(0) {
         panic!(
             "\n\nDetected a write to the stack guard value on {:?}\n{:?}",
+            crate::system::Cpu::current(),
+            context
+        );
+    }
+
+    #[cfg(isr_stack_guard_monitoring)]
+    if watchpoint == Some(crate::debugger::ISR_STACK_WATCHPOINT as u32) {
+        panic!(
+            "\n\nDetected a write to the interrupt stack guard value on {:?}\n{:?}",
             crate::system::Cpu::current(),
             context
         );
@@ -63,7 +75,7 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
         );
     }
 
-    #[cfg(stack_guard_monitoring)]
+    #[cfg(any(stack_guard_monitoring, isr_stack_guard_monitoring))]
     if code == 3 {
         let guard_addr = core::ptr::addr_of_mut!(__stack_chk_guard) as *mut _ as usize;
 
@@ -73,6 +85,14 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
                 core, mepc, context.ra
             )
         } else {
+            #[cfg(isr_stack_guard_monitoring)]
+            if unsafe { crate::debugger::watchpoint_hit(crate::debugger::ISR_STACK_WATCHPOINT) } {
+                panic!(
+                    "[{:?}] Detected a write to the interrupt stack guard value at 0x{:x}, possibly called by 0x{:x}",
+                    core, mepc, context.ra
+                );
+            }
+
             if unsafe { crate::debugger::watchpoint_hit(1) } {
                 panic!(
                     "[{:?}] Detected a write to the trap/rwtext segment at 0x{:x}, possibly called by 0x{:x}",

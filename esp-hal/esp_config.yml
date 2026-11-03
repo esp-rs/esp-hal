@@ -60,6 +60,15 @@ options:
       - type:
           validator: non_negative_integer
 
+  - name: isr-stack-size
+    description: "The size of the interrupt stack of each CPU, in bytes. Interrupt handlers run on
+      this stack. Must be a multiple of 16."
+    default:
+      - value: 4096
+    constraints:
+      - type:
+          validator: positive_integer
+
   - name: init-stack-ptr-range-check
     description: Check that the stack pointer is in range during initialization.
     default:
@@ -68,6 +77,16 @@ options:
   - name: stack-guard-monitoring
     description: Use a data watchpoint to check if the stack guard was overwritten.
     default:
+      - value: true
+
+  - name: isr-stack-guard-monitoring
+    description: "Use a data watchpoint to check if the stack guard of an interrupt stack was
+      overwritten. The guard is `stack-guard-offset` bytes from the end of the interrupt stack. On
+      chips with two watchpoints, this takes the watchpoint that a debugger can use, and on RISC-V
+      it cannot be used together with `write-vec-table-monitoring`."
+    default:
+      - value: false
+        if: 'soc_cpu_watchpoints == "2"'
       - value: true
 
   - name: write-vec-table-monitoring
@@ -245,3 +264,4 @@ options:
 
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"
+  - "ESP_HAL_CONFIG_ISR_STACK_SIZE % 16 == 0"

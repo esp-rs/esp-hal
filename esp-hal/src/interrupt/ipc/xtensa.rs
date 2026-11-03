@@ -3,9 +3,6 @@
 //! The CPUs have no interrupt that reaches the other CPU. Each CPU therefore takes the call in
 //! a `FROM_CPU` interrupt of its own.
 
-use portable_atomic::Ordering;
-
-use super::STATE;
 use crate::{
     interrupt::{Priority, software::SoftwareInterrupt},
     peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1, Interrupt},
@@ -56,33 +53,15 @@ fn install_core(core: Cpu) {
     crate::interrupt::enable_on_cpu(core, interrupt(core), Priority::min());
 }
 
+/// A pending context switch runs when the interrupt exits.
 #[ram]
-fn ipc_handler(context: &mut TrapFrame) {
-    let core = Cpu::current();
-
+fn ipc_handler(_context: &mut TrapFrame) {
     // This is the only place that clears the request. A second clear would drop a request
     // that arrived while a handler was running.
-    match core {
+    match Cpu::current() {
         Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
         Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
     }
 
-    let state = &STATE[core as usize];
-
-    // The callback returns here, so it runs first.
-    let callback = state.callback.swap(core::ptr::null_mut(), Ordering::AcqRel);
-    if !callback.is_null() {
-        let callback = unsafe { core::mem::transmute::<*mut (), fn()>(callback) };
-        callback();
-    }
-
-    // The context switch chooses the context that the interrupt returns to, so it runs last.
-    let handler = state
-        .pending_context_switch
-        .swap(core::ptr::null_mut(), Ordering::AcqRel);
-    if !handler.is_null() {
-        let handler =
-            unsafe { core::mem::transmute::<*mut (), extern "C" fn(&mut TrapFrame)>(handler) };
-        handler(context);
-    }
+    super::run_callback();
 }

@@ -1,7 +1,18 @@
 SECTIONS {
   /* must be last segment using RWDATA */
-  .stack (NOLOAD) : ALIGN(4)
+  .stack (NOLOAD) : ALIGN(16)
   {
+    /* Interrupt stacks. Interrupt handlers run here, not on the interrupted stack. */
+    _isr_stack_bottom_cpu0 = ABSOLUTE(.);
+    . += ${ESP_HAL_CONFIG_ISR_STACK_SIZE};
+    _isr_stack_top_cpu0 = ABSOLUTE(.);
+#IF multi_core
+    _isr_stack_bottom_cpu1 = ABSOLUTE(.);
+    . += ${ESP_HAL_CONFIG_ISR_STACK_SIZE};
+    _isr_stack_top_cpu1 = ABSOLUTE(.);
+#ENDIF
+    ASSERT(${ESP_HAL_CONFIG_STACK_GUARD_OFFSET} + 4 <= ${ESP_HAL_CONFIG_ISR_STACK_SIZE}, "The stack guard offset must be inside the interrupt stack.");
+
     _stack_end = ABSOLUTE(.);
     _stack_end_cpu0 = ABSOLUTE(.);
 
