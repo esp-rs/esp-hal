@@ -263,6 +263,9 @@ impl RtcSleepConfig {
             rtc_cntl
                 .dig_pwc()
                 .modify(|_, w| w.wifi_force_pd().clear_bit());
+            rtc_cntl
+                .dig_iso()
+                .modify(|_, w| w.wifi_force_iso().clear_bit());
 
             regi2c::I2C_DIG_REG_XPD_RTC_REG.write_field(0);
             regi2c::I2C_DIG_REG_XPD_DIG_REG.write_field(0);
@@ -495,14 +498,13 @@ impl RtcSleepConfig {
             rtc_sleep_pu(true);
         }
 
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32s3/rtc_sleep.c#L187-L193
         if self.modem_pd_en() {
-            rtc_cntl.dig_iso().modify(|_, w| {
-                w.wifi_force_noiso().clear_bit();
-                w.wifi_force_iso().clear_bit()
-            });
+            rtc_cntl
+                .dig_iso()
+                .modify(|_, w| w.wifi_force_noiso().clear_bit());
         }
 
-        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32s3/rtc_sleep.c#L187-L193
         rtc_cntl.dig_pwc().modify(|_, w| {
             if self.modem_pd_en() {
                 w.wifi_force_pu().clear_bit();

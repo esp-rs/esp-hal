@@ -352,6 +352,9 @@ impl RtcSleepConfig {
             rtc_cntl
                 .dig_pwc()
                 .modify(|_, w| w.wifi_force_pd().clear_bit());
+            rtc_cntl
+                .dig_iso()
+                .modify(|_, w| w.wifi_force_iso().clear_bit());
 
             regi2c::I2C_DIG_REG_XPD_RTC_REG.write_field(0);
             regi2c::I2C_DIG_REG_XPD_DIG_REG.write_field(0);
@@ -535,11 +538,11 @@ impl RtcSleepConfig {
             rtc_sleep_pu(true);
         }
 
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32c3/rtc_sleep.c#L183-L196
         if self.wifi_pd_en() {
-            rtc_cntl.dig_iso().modify(|_, w| {
-                w.wifi_force_noiso().clear_bit();
-                w.wifi_force_iso().clear_bit()
-            });
+            rtc_cntl
+                .dig_iso()
+                .modify(|_, w| w.wifi_force_noiso().clear_bit());
 
             rtc_cntl.dig_pwc().modify(|_, w| {
                 w.wifi_force_pu().clear_bit();
@@ -549,10 +552,9 @@ impl RtcSleepConfig {
             rtc_cntl.dig_pwc().modify(|_, w| w.wifi_pd_en().clear_bit());
         }
         if self.bt_pd_en() {
-            rtc_cntl.dig_iso().modify(|_, w| {
-                w.bt_force_noiso().clear_bit();
-                w.bt_force_iso().clear_bit()
-            });
+            rtc_cntl
+                .dig_iso()
+                .modify(|_, w| w.bt_force_noiso().clear_bit());
 
             rtc_cntl.dig_pwc().modify(|_, w| {
                 w.bt_force_pu().clear_bit();
