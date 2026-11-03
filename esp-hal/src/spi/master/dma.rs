@@ -1853,7 +1853,7 @@ impl DmaDriver {
             self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
         }
         #[cfg(spi_master_version = "1")]
-        crate::dma::connect_spi_dma(self.dma_peripheral, false);
+        esp32_quirks::disconnect_dma(self.dma_peripheral);
     }
 
     fn regs(&self) -> &RegisterBlock {
@@ -1929,7 +1929,7 @@ impl DmaDriver {
         cfg_select! {
             any(spi_master_version = "1", spi_master_version = "2") => {
                 #[cfg(spi_master_version = "1")]
-                crate::dma::connect_spi_dma(self.dma_peripheral, true);
+                esp32_quirks::connect_dma(self.dma_peripheral);
                 self.reset_dma();
             }
             _ => {
@@ -2092,4 +2092,22 @@ with_spi_master_dma_engine! {
         // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
         type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
     };
+}
+
+#[cfg(spi_master_version = "1")]
+mod esp32_quirks {
+    use crate::dma::{DmaPeripheral, connect_spi_dma_channel};
+
+    /// Disconnects the SPI host from its DMA channel.
+    ///
+    /// A connected SPI host pushes received data into its RX DMA FIFO, also in a transfer without
+    /// DMA. The DMA resets do not empty that FIFO, so later DMA receives are short.
+    pub(super) fn disconnect_dma(peripheral: DmaPeripheral) {
+        connect_spi_dma_channel(peripheral, false);
+    }
+
+    /// Connects the SPI host to its DMA channel again.
+    pub(super) fn connect_dma(peripheral: DmaPeripheral) {
+        connect_spi_dma_channel(peripheral, true);
+    }
 }

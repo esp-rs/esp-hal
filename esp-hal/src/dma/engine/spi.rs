@@ -1,4 +1,6 @@
 use enumset::EnumSet;
+#[cfg(esp32)]
+use esp_sync::RawMutex;
 use portable_atomic::Ordering;
 
 use crate::{
@@ -20,6 +22,8 @@ use crate::{
     peripherals::Interrupt,
     system::{Peripheral, PeripheralGuard},
 };
+#[cfg(esp32)]
+use crate::{dma::DmaPeripheral, peripherals::DPORT};
 
 /// Immutable per-channel metadata.
 #[doc(hidden)]
@@ -555,12 +559,10 @@ pub(super) fn enable_spi_dma() {
         // number of SPI peripherals as SPI DMA channels so it's not a big
         // deal.
         SPI_DMA_CHAN_SEL_LOCK.lock(|| {
-            crate::peripherals::DPORT::regs()
-                .spi_dma_chan_sel()
-                .modify(|_, w| unsafe {
-                    w.spi2_dma_chan_sel().bits(SPI2_DMA_CHANNEL);
-                    w.spi3_dma_chan_sel().bits(SPI3_DMA_CHANNEL)
-                });
+            DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
+                w.spi2_dma_chan_sel().bits(SPI2_DMA_CHANNEL);
+                w.spi3_dma_chan_sel().bits(SPI3_DMA_CHANNEL)
+            });
         });
     }
 }
@@ -571,16 +573,11 @@ const SPI2_DMA_CHANNEL: u8 = 1;
 const SPI3_DMA_CHANNEL: u8 = 2;
 
 #[cfg(esp32)]
-static SPI_DMA_CHAN_SEL_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+static SPI_DMA_CHAN_SEL_LOCK: RawMutex = RawMutex::new();
 
-/// Connects an SPI host to its DMA channel, or disconnects it.
-///
-/// A connected SPI host pushes received data into its RX DMA FIFO, also in a transfer without
-/// DMA. The DMA resets do not empty that FIFO.
+/// Connects the SPI host of `peripheral` to its DMA channel, or disconnects it.
 #[cfg(esp32)]
-pub(crate) fn connect_spi_dma(peripheral: crate::dma::DmaPeripheral, connect: bool) {
-    use crate::{dma::DmaPeripheral, peripherals::DPORT};
-
+pub(crate) fn connect_spi_dma_channel(peripheral: DmaPeripheral, connect: bool) {
     let channel = |channel: u8| if connect { channel } else { 0 };
     SPI_DMA_CHAN_SEL_LOCK.lock(|| {
         DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
