@@ -44,11 +44,9 @@ impl I2sInstance {
     ) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
 
-        // Workaround for the I2S double-division issue:
-        // https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e
-        //
-        // First select a small divisor, then apply the target coefficients in the
-        // prescribed order. Keep each coefficient update as a separate register write.
+        // The divider applies twice, unless each coefficient has a separate register write in
+        // this sequence, with a small division before the target one.
+        // See <https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e>.
         self.regs()
             .tx_clkm_conf()
             .modify(|_, w| unsafe { w.tx_clkm_div_num().bits(2) });
@@ -99,11 +97,9 @@ impl I2sInstance {
     ) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
 
-        // Workaround for the I2S double-division issue:
-        // https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e
-        //
-        // First select a small divisor, then apply the target coefficients in the
-        // prescribed order. Keep each coefficient update as a separate register write.
+        // The divider applies twice, unless each coefficient has a separate register write in
+        // this sequence, with a small division before the target one.
+        // See <https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e>.
         self.regs()
             .rx_clkm_conf()
             .modify(|_, w| unsafe { w.rx_clkm_div_num().bits(2) });

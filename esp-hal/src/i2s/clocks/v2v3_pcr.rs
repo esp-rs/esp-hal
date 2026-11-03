@@ -47,11 +47,9 @@ impl I2sInstance {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
         let pcr = PCR::regs();
 
-        // Workaround for the I2S double-division issue:
-        // https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e
-        //
-        // First select a small divisor, then apply the target coefficients in the
-        // prescribed order. Keep each coefficient update as a separate register write.
+        // The divider applies twice, unless each coefficient has a separate register write in
+        // this sequence, with a small division before the target one.
+        // See <https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e>.
         pcr.i2s_tx_clkm_conf()
             .modify(|_, w| unsafe { w.i2s_tx_clkm_div_num().bits(2) });
         pcr.i2s_tx_clkm_div_conf()
@@ -94,11 +92,9 @@ impl I2sInstance {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
         let pcr = PCR::regs();
 
-        // Workaround for the I2S double-division issue:
-        // https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e
-        //
-        // First select a small divisor, then apply the target coefficients in the
-        // prescribed order. Keep each coefficient update as a separate register write.
+        // The divider applies twice, unless each coefficient has a separate register write in
+        // this sequence, with a small division before the target one.
+        // See <https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e>.
         pcr.i2s_rx_clkm_conf()
             .modify(|_, w| unsafe { w.i2s_rx_clkm_div_num().bits(2) });
         pcr.i2s_rx_clkm_div_conf()
@@ -110,7 +106,6 @@ impl I2sInstance {
         pcr.i2s_rx_clkm_div_conf()
             .modify(|_, w| unsafe { w.i2s_rx_clkm_div_x().bits(0) });
 
-        // Set target coefficients
         pcr.i2s_rx_clkm_div_conf()
             .modify(|_, w| w.i2s_rx_clkm_div_yn1().bit(fraction.yn1));
         pcr.i2s_rx_clkm_div_conf()
