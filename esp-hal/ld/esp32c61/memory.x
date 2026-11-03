@@ -24,7 +24,7 @@ MEMORY
      has a 0x18 byte file header, and each segment has a 0x08 byte segment
      header. Setting this offset makes it simple to meet the flash cache MMU's
      constraint that (paddr % 64KB == vaddr % 64KB).)
-     Sizes match esp-idf components/esp_system/ld/esp32c61/memory.ld.in.
+     See <https://github.com/espressif/esp-idf/blob/f82a0593e076/components/esp_system/ld/esp32c61/memory.ld.in#L31>.
     */
 
     /* Instruction and Data ROM */
