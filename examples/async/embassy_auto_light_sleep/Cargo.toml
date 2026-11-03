@@ -98,6 +98,10 @@ esp32s31 = [
     "esp-hal/esp32s31",
 ]
 
+[profile.dev.package.esp-hal]
+# Light sleep needs esp-hal at opt-level 2 or 3
+opt-level = 2
+
 [profile.release]
 debug            = true
 debug-assertions = true

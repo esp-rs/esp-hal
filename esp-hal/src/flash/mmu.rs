@@ -531,7 +531,7 @@ mod esp32_cache {
     use procmacros::ram;
 
     use super::table;
-    use crate::{flash::cache::CacheGuard, pac::mmu_table::ENTRY};
+    use crate::{pac::mmu_table::ENTRY, soc::cache::CacheGuard};
 
     /// Map `page_paddr` into `entry` and make the new mapping visible.
     #[ram]
