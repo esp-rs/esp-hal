@@ -362,6 +362,15 @@ of configuration can be specified this way.
 This key is additive. The unnamed list is added to named lists, and multiple lists with the
 same name are merged.
 
+### `//% DEFAULT-FEATURES`
+
+Set to `false` to build with `--no-default-features`. This disables only the default features
+of the package that contains the test or example, not the default features of its dependencies.
+
+```
+//% DEFAULT-FEATURES: false
+```
+
 ### Working with multiple metadata configurations
 
 Processing a file will create one configuration, or however many names (that is, the list of

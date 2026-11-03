@@ -23,6 +23,7 @@ pub struct Metadata {
     description: Option<String>,
     harness_firmware: Option<String>,
     support_firmware: bool,
+    default_features: bool,
     env_vars: HashMap<String, String>,
     cargo_config: Vec<String>,
 }
@@ -115,6 +116,11 @@ impl Metadata {
         self.support_firmware
     }
 
+    /// False if the package's default features must be disabled.
+    pub fn default_features(&self) -> bool {
+        self.default_features
+    }
+
     /// Check if the example matches the given filter.
     pub fn matches(&self, filter: Option<&str>) -> bool {
         let Some(filter) = filter else {
@@ -178,6 +184,7 @@ pub struct Configuration {
     tag: Option<String>,
     harness_firmware: Option<String>,
     support_firmware: Option<bool>,
+    default_features: Option<bool>,
 }
 
 struct ConfigurationCollector<'a> {
@@ -368,6 +375,12 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     })?;
                     relevant_metadata.apply(|meta| meta.support_firmware = Some(support));
                 }
+                // Disable the package's default features.
+                "DEFAULT-FEATURES" => {
+                    let enabled = parse_bool(&meta_line.value)
+                        .context("DEFAULT-FEATURES metadata must be true/false")?;
+                    relevant_metadata.apply(|meta| meta.default_features = Some(enabled));
+                }
                 key => log::warn!("Unrecognized metadata key '{key}', ignoring"),
             }
         }
@@ -392,6 +405,10 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             // Support firmware marker inherits if not explicitly set.
             if meta.support_firmware.is_none() {
                 meta.support_firmware = all_configuration.support_firmware;
+            }
+
+            if meta.default_features.is_none() {
+                meta.default_features = all_configuration.default_features;
             }
 
             // Other values are merged
@@ -442,6 +459,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     tag: configuration.tag.clone(),
                     harness_firmware: configuration.harness_firmware.clone(),
                     support_firmware: configuration.support_firmware.unwrap_or(false),
+                    default_features: configuration.default_features.unwrap_or(true),
                     env_vars,
                     cargo_config: configuration.cargo_config.clone(),
                 })
@@ -534,6 +552,7 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
                     description: description.clone(),
                     harness_firmware: None,
                     support_firmware: false,
+                    default_features: true,
                     env_vars: HashMap::new(),
                     cargo_config: Vec::new(),
                 });
@@ -575,6 +594,7 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
                 description: description.clone(),
                 harness_firmware: None,
                 support_firmware: false,
+                default_features: true,
                 env_vars: HashMap::new(),
                 cargo_config: Vec::new(),
             });
@@ -1103,6 +1123,7 @@ mod tests {
             ),
             harness_firmware: None,
             support_firmware: false,
+            default_features: true,
             env_vars: HashMap::new(),
             cargo_config: Vec::new(),
         };
