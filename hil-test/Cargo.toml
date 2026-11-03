@@ -157,6 +157,10 @@ embedded-partitions   = { git = "https://github.com/MabezDev/embedded-fatfs", re
 # Only the build script uses the `links` metadata of `esp-riscv-rt`.
 esp-riscv-rt = { path = "../esp-riscv-rt" }
 
+[target.'cfg(target_arch = "xtensa")'.dependencies]
+# Only the build script uses the `links` metadata of `xtensa-lx-rt`.
+xtensa-lx-rt = { path = "../xtensa-lx-rt" }
+
 [build-dependencies]
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
 
@@ -298,4 +302,4 @@ block-device-driver   = { git = "https://github.com/MabezDev/embedded-fatfs", re
 block-device-adapters = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
 
 [package.metadata.cargo-machete]
-ignored = ["esp-riscv-rt"]
+ignored = ["esp-riscv-rt", "xtensa-lx-rt"]

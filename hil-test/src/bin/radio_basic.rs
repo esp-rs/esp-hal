@@ -18,6 +18,7 @@
 
 #![no_std]
 #![no_main]
+#![cfg_attr(all(xtensa, float_save_restore), feature(asm_experimental_arch))]
 
 #[cfg(multi_core)]
 use esp_hal::system::Stack;
