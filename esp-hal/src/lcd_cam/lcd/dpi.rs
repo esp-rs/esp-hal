@@ -131,7 +131,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, RegisterAccess},
     gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -625,6 +625,14 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
 
         // Stop the DMA
         self.dpi.tx_channel.stop_transfer();
+
+        // A transfer stopped in the middle of a frame leaves pixels in the DMA channel and in the
+        // AFIFO. Without these resets, the next frame starts with them.
+        self.dpi.tx_channel.tx_impl.reset();
+        self.dpi
+            .regs()
+            .lcd_misc()
+            .modify(|_, w| w.lcd_afifo_reset().set_bit());
     }
 }
 
