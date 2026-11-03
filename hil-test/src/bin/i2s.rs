@@ -1175,14 +1175,23 @@ mod i2s_parallel_tests {
     use critical_section::Mutex as CsMutex;
     use esp_hal::{
         Blocking,
+        delay::Delay,
         dma::I2sDmaChannel,
         gpio::NoPin,
+        handler,
         i2s::{
             AnyI2s,
-            parallel::{I2sParallel, I2sParallelInterrupt, I2sParallelTransfer, TxSixteenBits},
+            parallel::{
+                I2sParallel,
+                I2sParallelInterrupt,
+                I2sParallelTransfer,
+                TxEightBits,
+                TxSixteenBits,
+            },
         },
         interrupt::{InterruptHandler, Priority},
-        time::Rate,
+        time::{Duration, Rate},
+        timer::{OneShotTimer, timg::TimerGroup},
     };
     use portable_atomic::{AtomicUsize, Ordering};
 
@@ -1336,6 +1345,111 @@ mod i2s_parallel_tests {
         let i2s = peripherals.I2S1.into();
         let dma_channel: esp_hal::dma::I2sDmaChannel<'static> = peripherals.DMA_I2S1.into();
         run_driver_does_not_hang_when_async(i2s, dma_channel).await;
+    }
+
+    // A transfer of this size at 2.4 MHz takes 27 us.
+    const STALL_TEST_BYTES: usize = 64;
+
+    static STALL_TIMER: CsMutex<RefCell<Option<OneShotTimer<'static, Blocking>>>> =
+        CsMutex::new(RefCell::new(None));
+
+    #[handler]
+    fn stall_longer_than_transfer() {
+        critical_section::with(|cs| {
+            STALL_TIMER
+                .borrow_ref_mut(cs)
+                .as_mut()
+                .unwrap()
+                .clear_interrupt()
+        });
+        Delay::new().delay_micros(50);
+    }
+
+    // Returns the driver at `rate`, a counter of the edges on its clock output, and a timer.
+    fn edge_counting_driver(
+        rate: Rate,
+    ) -> (
+        I2sParallel<'static, Blocking>,
+        super::EdgeCounter<'static>,
+        esp_hal::timer::timg::Timer<'static>,
+    ) {
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
+        let (_, dout) = hil_test::common_test_pins!(peripherals);
+        let (clock_in, clock_out) = unsafe { dout.split() };
+        let counter = super::EdgeCounter::new(clock_in);
+
+        let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
+        let i2s = I2sParallel::new(
+            peripherals.I2S1,
+            peripherals.DMA_I2S1,
+            rate,
+            pins,
+            clock_out,
+        );
+
+        (i2s, counter, TimerGroup::new(peripherals.TIMG0).timer0)
+    }
+
+    #[test]
+    fn send_does_not_hang_when_interrupted() {
+        let (mut i2s, mut counter, timer) = edge_counting_driver(Rate::from_khz(2400));
+        let mut tx_buf = esp_hal::dma_tx_buffer!(STALL_TEST_BYTES).unwrap();
+        tx_buf.fill(&[0x55; STALL_TEST_BYTES]);
+
+        let mut timer = OneShotTimer::new(timer);
+        timer.set_interrupt_handler(stall_longer_than_transfer);
+        timer.listen();
+        critical_section::with(|cs| STALL_TIMER.replace(cs, Some(timer)));
+
+        // The interrupt comes 20 us after it is scheduled. A wait of 0 to 24 us before `send`
+        // moves the interrupt over all of `send`, in steps of 4 CPU cycles.
+        for wait_cycles in (0..24 * 240).step_by(4) {
+            critical_section::with(|cs| {
+                STALL_TIMER
+                    .borrow_ref_mut(cs)
+                    .as_mut()
+                    .unwrap()
+                    .schedule(Duration::from_micros(20))
+                    .unwrap()
+            });
+            esp_hal::xtensa_lx::timer::delay(wait_cycles);
+
+            counter.clear();
+            let xfer = i2s
+                .send(tx_buf)
+                .map_err(|_| "failed to send buffer")
+                .unwrap();
+            (i2s, tx_buf) = xfer.wait();
+
+            // `wait` returns when TX has sent everything, so all edges are out already.
+            counter.check(STALL_TEST_BYTES as i32);
+
+            // Count the edges after the interrupt has ended.
+            Delay::new().delay_micros(60);
+            counter.check(STALL_TEST_BYTES as i32);
+        }
+    }
+
+    #[test]
+    fn send_sends_data_at_low_sample_rate() {
+        let (mut i2s, mut counter, _) = edge_counting_driver(Rate::from_khz(400));
+        let mut tx_buf = esp_hal::dma_tx_buffer!(STALL_TEST_BYTES).unwrap();
+        tx_buf.fill(&[0x55; STALL_TEST_BYTES]);
+
+        // TX samples TX_RESET with its own clock. A wait of 0 to 2 periods of that clock before
+        // `send` moves the reset over all phases of the clock.
+        for wait_cycles in (0..600).step_by(10) {
+            esp_hal::xtensa_lx::timer::delay(wait_cycles);
+            counter.clear();
+            let xfer = i2s
+                .send(tx_buf)
+                .map_err(|_| "failed to send buffer")
+                .unwrap();
+            (i2s, tx_buf) = xfer.wait();
+            counter.check(STALL_TEST_BYTES as i32);
+        }
     }
 }
 
