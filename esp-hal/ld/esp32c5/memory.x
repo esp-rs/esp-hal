@@ -30,10 +30,11 @@ MEMORY
      has a 0x18 byte file header, and each segment has a 0x08 byte segment
      header. Setting this offset makes it simple to meet the flash cache MMU's
      constraint that (paddr % 64KB == vaddr % 64KB).)
+     Sizes match esp-idf components/esp_system/ld/esp32c5/memory.ld.in.
     */
 
     /* Instruction and Data ROM */
-    ROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x400000 - 0x20
+    ROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x1000000 - 0x20
 
     /* RTC fast memory (executable). Persists over deep sleep. */
     RTC_FAST : ORIGIN = 0x50000000, LENGTH = 16K /*- ESP_BOOTLOADER_RESERVE_RTC*/
