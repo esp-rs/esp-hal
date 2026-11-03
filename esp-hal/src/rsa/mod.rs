@@ -909,7 +909,8 @@ impl<'d> RsaBackend<'d> {
     }
 
     fn process_item(&mut self, item: &mut RsaWorkItem) -> work_queue::Poll {
-        // The queue has its own interrupt handler and does not use SIGNALED.
+        // Use `low_level` here. `Rsa::is_idle` and `Rsa::start_*` use `SIGNALED`, which only
+        // `rsa_interrupt_handler` updates.
         match core::mem::take(&mut self.state) {
             RsaBackendState::Idle => {
                 let driver = Rsa {
@@ -1124,7 +1125,8 @@ enum RsaOperation {
 #[handler]
 #[ram]
 fn rsa_work_queue_handler() {
-    // Clearing the interrupt after processing can lose the next operation's completion event.
+    // Only `process_item` clears the interrupt. A clear here can drop the completion of the
+    // operation that `process` started.
     RSA_WORK_QUEUE.process();
 }
 
