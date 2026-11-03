@@ -1084,7 +1084,8 @@ mod tests {
     #[test]
     #[cfg(all(soc_has_i2s0, pcnt_driver_supported, not(i2s_version = "1")))]
     fn test_i2s_mclk_frequency_reconfigure_i2s0() {
-        // The MCLK divider changes from 39 + 1/16 to 13 + 1/48.
+        // From a 160 MHz source, the MCLK divider changes from 39 + 1/16 to 13 + 1/48.
+        // The 96 MHz source of ESP32-H2 and ESP32-H4 needs lower rates for the same dividers.
         cfg_select! {
             any(esp32h2, esp32h4) => run_test_i2s_mclk_frequency(&[9600, 28800]),
             _ => run_test_i2s_mclk_frequency(&[16000, 48000]),
