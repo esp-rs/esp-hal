@@ -15,7 +15,7 @@ use esp_hal::rng::TrngSource;
 use esp_hal::{
     Blocking,
     clock::CpuClock,
-    ecc::{Ecc, EllipticCurve, OperationError},
+    ecc::{Config, ConfigError, Ecc, EllipticCurve, OperationError},
     rng::Rng,
 };
 use hex_literal::hex;
@@ -403,6 +403,27 @@ macro_rules! buffers {
     }
 }
 
+/// The scalar 1, big-endian.
+#[cfg(ecc_supports_enhanced_security)]
+const ONE: [u8; 32] = {
+    let mut k = [0u8; 32];
+    k[31] = 1;
+    k
+};
+
+/// A scalar with alternating bits, below the order of P-256.
+#[cfg(ecc_supports_enhanced_security)]
+const ALTERNATING: [u8; 32] = [0xaa; 32];
+
+/// Returns whether this chip revision has the enhanced security mode. Only an ESP32-H2 below
+/// revision 1.2 does not. The default turns the mode off there, and the driver refuses a
+/// configuration that asks for it.
+#[cfg(ecc_supports_enhanced_security)]
+fn enhanced_security_available() -> bool {
+    !cfg!(esp32h2)
+        || esp_hal::efuse::chip_revision() >= esp_hal::efuse::ChipRevision::from_combined(102)
+}
+
 #[embedded_test::tests(default_timeout = 10)]
 mod tests {
     use super::*;
@@ -413,16 +434,91 @@ mod tests {
         _rng_source: TrngSource<'a>,
     }
 
+    /// Returns the microseconds one P-256 k * G takes in the blocking driver, including the result
+    /// read.
+    #[cfg(ecc_supports_enhanced_security)]
+    fn p256_multiplication_us(ecc: &mut Ecc<'static, Blocking>, k: &[u8; 32]) -> u64 {
+        let mut k = *k;
+        let mut x = [0u8; 32];
+        let mut y = [0u8; 32];
+        affine_point_coords(EllipticCurve::P256, &mut x, &mut y);
+        reverse!(k, x, y);
+        let start = esp_hal::time::Instant::now();
+        ecc.affine_point_multiplication(EllipticCurve::P256, &k, &x, &y)
+            .unwrap()
+            .read_affine_point_result(&mut x, &mut y)
+            .unwrap();
+        start.elapsed().as_micros()
+    }
+
     #[init]
     fn init() -> Context<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
 
         Context {
-            ecc: Ecc::new(p.ECC, Default::default()),
+            ecc: Ecc::new(p.ECC, Default::default()).unwrap(),
             #[cfg(rng_trng_supported)]
             _rng_source: TrngSource::new(p.RNG, p.ADC1),
         }
+    }
+
+    #[test]
+    #[cfg(ecc_supports_enhanced_security)]
+    fn test_enhanced_security_off_takes_longer_for_an_alternating_scalar(
+        mut ctx: Context<'static>,
+    ) {
+        // With enhanced security off, the time of a point multiplication depends on the scalar's
+        // digit pattern.
+        ctx.ecc
+            .apply_config(&Config::default().with_enhanced_security(false))
+            .unwrap();
+
+        // An untimed run first, so that neither timed run pays for cache misses.
+        p256_multiplication_us(&mut ctx.ecc, &ALTERNATING);
+        let one_us = p256_multiplication_us(&mut ctx.ecc, &ONE);
+        let alternating_us = p256_multiplication_us(&mut ctx.ecc, &ALTERNATING);
+
+        // k = 1 is the shortest and sparsest scalar and 0xaa..aa the longest and densest under a
+        // signed-digit recoding, so the two bound the block's time. The measured difference is far
+        // above the factor of 5.
+        hil_test::assert!(
+            one_us * 5 < alternating_us,
+            "k = 1 {} us, k = 0xaa..aa {} us",
+            one_us,
+            alternating_us
+        );
+    }
+
+    #[test]
+    #[cfg(ecc_supports_enhanced_security)]
+    fn test_enhanced_security_is_on_by_default(mut ctx: Context<'static>) {
+        if !enhanced_security_available() {
+            // ESP32-H2 revisions below 1.2 do not have the enhanced security mode, so asking
+            // for it is refused.
+            hil_test::assert_eq!(
+                ctx.ecc
+                    .apply_config(&Config::default().with_enhanced_security(true)),
+                Err(ConfigError::EnhancedSecurityUnsupported)
+            );
+            return;
+        }
+
+        // `init` built the driver with `Config::default()`. An untimed run first, so that neither
+        // timed run pays for cache misses.
+        p256_multiplication_us(&mut ctx.ecc, &ALTERNATING);
+        let one_us = p256_multiplication_us(&mut ctx.ecc, &ONE);
+        let alternating_us = p256_multiplication_us(&mut ctx.ecc, &ALTERNATING);
+
+        // With enhanced security off, 0xaa..aa takes more than five times k = 1, as the off test
+        // asserts. With it on, the two differ by the timer's resolution and the driver's overhead
+        // only, so 1 % tells the modes apart.
+        hil_test::assert!(
+            one_us.abs_diff(alternating_us) * 100 < one_us,
+            "k = 1 {} us, k = 0xaa..aa {} us",
+            one_us,
+            alternating_us
+        );
     }
 
     #[test]
@@ -860,10 +956,61 @@ mod work_queue_tests {
         let p = esp_hal::init(config);
 
         Context {
-            ecc: EccBackend::new(p.ECC, Default::default()),
+            ecc: EccBackend::new(p.ECC, Default::default()).unwrap(),
             #[cfg(rng_trng_supported)]
             _rng_source: TrngSource::new(p.RNG, p.ADC1),
         }
+    }
+
+    #[test]
+    #[cfg(ecc_supports_enhanced_security)]
+    fn test_ecc_work_queue_enhanced_security_is_on_by_default(mut ctx: Context<'static>) {
+        if !enhanced_security_available() {
+            // ESP32-H2 revisions below 1.2 do not have the enhanced security mode, so asking
+            // for it is refused.
+            drop(ctx.ecc);
+            // The backend above was the only owner of the peripheral.
+            let ecc = unsafe { esp_hal::peripherals::ECC::steal() };
+            hil_test::assert!(matches!(
+                EccBackend::new(ecc, Config::default().with_enhanced_security(true)),
+                Err(ConfigError::EnhancedSecurityUnsupported)
+            ));
+            return;
+        }
+
+        let _backend = ctx.ecc.start();
+
+        // `init` built the backend with `Config::default()`.
+        let multiplication_us = |k: &[u8; 32]| {
+            let mut k = *k;
+            let mut x = [0u8; 32];
+            let mut y = [0u8; 32];
+            affine_point_coords(EllipticCurve::P256, &mut x, &mut y);
+            reverse!(k, x, y);
+            let (mut rx, mut ry) = ([0u8; 32], [0u8; 32]);
+            let mut op = EllipticCurve::P256
+                .affine_point_multiplication(&k, &x, &y)
+                .and_then(|op| op.with_affine_point_result(&mut rx, &mut ry))
+                .unwrap();
+            let start = esp_hal::time::Instant::now();
+            op.process().wait_blocking();
+            start.elapsed().as_micros()
+        };
+
+        // An untimed run first, so that neither timed run pays for cache misses.
+        multiplication_us(&ALTERNATING);
+        let one_us = multiplication_us(&ONE);
+        let alternating_us = multiplication_us(&ALTERNATING);
+
+        // With enhanced security off, 0xaa..aa takes more than five times k = 1, as the off test
+        // asserts. With it on, the two differ by the timer's resolution and the driver's overhead
+        // only, so 1 % tells the modes apart.
+        hil_test::assert!(
+            one_us.abs_diff(alternating_us) * 100 < one_us,
+            "k = 1 {} us, k = 0xaa..aa {} us",
+            one_us,
+            alternating_us
+        );
     }
 
     #[test]
