@@ -28,7 +28,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-cfg=debug_build")
     }
 
-    // When `esp-riscv-rt` saves the FPU registers in interrupts, the task switch must save them too.
+    // When `esp-riscv-rt` saves the FPU registers in interrupts, the task switch must save them
+    // too.
     println!("cargo:rustc-check-cfg=cfg(float_save_restore)");
     if std::env::var_os("DEP_ESP_RISCV_RT_FLOAT_SAVE_RESTORE").is_some() {
         println!("cargo:rustc-cfg=float_save_restore");

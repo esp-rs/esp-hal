@@ -153,6 +153,10 @@ block-device-adapters = "0.2.0"
 embedded-fatfs        = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112", default-features = false }
 embedded-partitions   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
 
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+# Only the build script uses the `links` metadata of `esp-riscv-rt`.
+esp-riscv-rt = { path = "../esp-riscv-rt" }
+
 [build-dependencies]
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
 
@@ -292,3 +296,6 @@ debug            = 0
 [patch.crates-io]
 block-device-driver   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
 block-device-adapters = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+
+[package.metadata.cargo-machete]
+ignored = ["esp-riscv-rt"]

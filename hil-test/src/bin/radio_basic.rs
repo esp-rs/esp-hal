@@ -75,6 +75,6 @@ mod adc;
 #[cfg(feature = "esp-radio-unstable")]
 mod esp_now_config;
 
-#[cfg(xtensa)]
+#[cfg(any(xtensa, float_save_restore))]
 #[path = "radio_basic/fpu.rs"]
 mod fpu;
