@@ -10,6 +10,7 @@ use crate::{
     },
     i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
     peripherals::{GPIO, RTC_IO, SENS},
+    soc::SENS_PERI_CLK_GATE_LOCK,
     time::Duration,
 };
 
@@ -84,9 +85,11 @@ impl<'d> LpI2c<'d> {
         });
 
         // Enable clock gate.
-        SENS::regs()
-            .sar_peri_clk_gate_conf()
-            .modify(|_, w| w.rtc_i2c_clk_en().set_bit());
+        SENS_PERI_CLK_GATE_LOCK.lock(|| {
+            SENS::regs()
+                .sar_peri_clk_gate_conf()
+                .modify(|_, w| w.rtc_i2c_clk_en().set_bit());
+        });
 
         // Configure the RTC I2C controller into master mode.
         self.i2c
@@ -402,9 +405,11 @@ impl<'d> LpI2c<'d> {
             .sar_peri_reset_conf()
             .modify(|_, w| w.sar_rtc_i2c_reset().set_bit());
 
-        SENS::regs()
-            .sar_peri_clk_gate_conf()
-            .modify(|_, w| w.rtc_i2c_clk_en().clear_bit());
+        SENS_PERI_CLK_GATE_LOCK.lock(|| {
+            SENS::regs()
+                .sar_peri_clk_gate_conf()
+                .modify(|_, w| w.rtc_i2c_clk_en().clear_bit());
+        });
     }
 }
 
