@@ -415,6 +415,13 @@ impl Config {
 }
 
 impl AuthenticationMethod {
+    /// Espressif `wifi_auth_mode_t` / `wifi_scan.proto` auth value (`0` = Open, …).
+    ///
+    /// Useful for provisioning scan caches and other IDF-compatible wire formats.
+    pub fn as_wifi_auth_mode(self) -> u8 {
+        self.to_raw() as u8
+    }
+
     fn to_raw(self) -> wifi_auth_mode_t {
         match self {
             AuthenticationMethod::None => include::wifi_auth_mode_t_WIFI_AUTH_OPEN,
