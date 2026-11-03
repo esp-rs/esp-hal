@@ -19,20 +19,17 @@ pub enum PsramCacheSpeed {
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PsramVaddrMode {
-    /// App and pro CPU use their own flash cache for external RAM access.
+    /// Each CPU uses its own cache for PSRAM.
     ///
-    /// In this mode both cores access the same physical PSRAM.
-    #[default]
+    /// The caches are not coherent. A CPU can read old data after the other CPU writes PSRAM.
+    /// Use this mode only if one CPU accesses PSRAM.
     Normal = 0,
-    /// App and pro CPU share external RAM caches: pro CPU has low * 2M, app
-    /// CPU has high 2M.
-    ///
-    /// In this mode the two cores will access different parts of PSRAM.
+    /// The PRO CPU cache holds the low 2 MiB of PSRAM, and the APP CPU cache holds the high
+    /// 2 MiB. Both CPUs use both caches.
+    #[default]
     LowHigh,
-    /// App and pro CPU share external RAM caches: pro CPU does even 32 byte
-    /// ranges, app does odd ones.
-    ///
-    /// In this mode the two cores will access different parts of PSRAM.
+    /// The PRO CPU cache holds the even 32-byte lines of PSRAM, and the APP CPU cache holds the
+    /// odd lines. Both CPUs use both caches.
     Evenodd,
 }
 
@@ -91,6 +88,56 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     }
 
     true
+}
+
+/// Writes the dirty PSRAM lines of the CPU caches back to PSRAM.
+///
+/// The caches must be enabled. In [`PsramVaddrMode::Normal`] this only writes back the cache of
+/// the calling CPU.
+#[procmacros::ram]
+pub(crate) fn writeback_cache() {
+    const CACHE_SPAN: usize = 64 * 1024;
+    const HIGH_HALF: usize = 2 * 1024 * 1024;
+
+    let range = super::psram_range();
+    if range.len() < CACHE_SPAN {
+        return;
+    }
+    let low_high =
+        active_vaddr_mode() == PsramVaddrMode::LowHigh && range.len() >= HIGH_HALF + CACHE_SPAN;
+
+    let psram = range.start as *const u8;
+    for offset in (0..CACHE_SPAN).step_by(32) {
+        unsafe {
+            psram.add(offset).read_volatile();
+            if low_high {
+                psram.add(HIGH_HALF + offset).read_volatile();
+            }
+        }
+    }
+}
+
+/// Writes the dirty PSRAM lines of the cache of the calling CPU back to PSRAM, if the other CPU
+/// cannot write them back.
+///
+/// The caches must be enabled.
+#[procmacros::ram]
+pub(crate) fn writeback_private_cache() {
+    if active_vaddr_mode() == PsramVaddrMode::Normal {
+        writeback_cache();
+    }
+}
+
+#[procmacros::ram]
+fn active_vaddr_mode() -> PsramVaddrMode {
+    let ctrl = crate::peripherals::DPORT::regs().pro_cache_ctrl().read();
+    if ctrl.pro_dram_hl().bit_is_set() {
+        PsramVaddrMode::LowHigh
+    } else if ctrl.pro_dram_split().bit_is_set() {
+        PsramVaddrMode::Evenodd
+    } else {
+        PsramVaddrMode::Normal
+    }
 }
 
 #[procmacros::ram]

@@ -418,6 +418,94 @@ mod flash_tests {
     }
 }
 
+/// In `PsramVaddrMode::Normal`, each core caches PSRAM in its own cache.
+#[cfg(feature = "esp32")]
+#[embedded_test::tests(default_timeout = 10)]
+mod normal_vaddr_mode_tests {
+    use core::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+
+    use esp_hal::{
+        clock::CpuClock,
+        flash::{Config, Flash},
+        peripherals::{CPU_CTRL, FLASH},
+        psram::{Psram, PsramConfig, PsramVaddrMode},
+        system::{CpuControl, Stack},
+    };
+    use hil_test::mk_static;
+
+    struct Context {
+        cpu_ctrl: CPU_CTRL<'static>,
+        flash: FLASH<'static>,
+        psram: Psram,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let p = esp_hal::init(config);
+        let psram = Psram::new(
+            p.PSRAM,
+            PsramConfig {
+                psram_vaddr_mode: PsramVaddrMode::Normal,
+                ..Default::default()
+            },
+        );
+
+        Context {
+            cpu_ctrl: p.CPU_CTRL,
+            flash: p.FLASH,
+            psram,
+        }
+    }
+
+    #[test]
+    fn flash_write_keeps_psram_writes_of_the_other_core(ctx: Context) {
+        const NVS_PART_FLASH_ADDR: u32 = 0x9000;
+        const LEN: usize = 1024;
+        const WRITTEN: u8 = 1;
+        const FLASHED: u8 = 2;
+        const CHECKED: u8 = 3;
+        static STATE: AtomicU8 = AtomicU8::new(0);
+        static LOST: AtomicUsize = AtomicUsize::new(0);
+
+        let value = |i: usize| (i as u8) ^ 0x5A;
+
+        // This core does not access the buffer, so only the cache of the other core holds it.
+        let (start, size) = ctx.psram.raw_parts();
+        assert!(size >= LEN);
+        let buf = start as usize;
+
+        let mut cpu_control = CpuControl::new(ctx.cpu_ctrl);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, move || {
+                let buf = buf as *mut u8;
+                for i in 0..LEN {
+                    unsafe { buf.add(i).write_volatile(value(i)) };
+                }
+                STATE.store(WRITTEN, Ordering::Release);
+                while STATE.load(Ordering::Acquire) != FLASHED {}
+                let lost = (0..LEN)
+                    .filter(|&i| unsafe { buf.add(i).read_volatile() } != value(i))
+                    .count();
+                LOST.store(lost, Ordering::Relaxed);
+                STATE.store(CHECKED, Ordering::Release);
+                loop {}
+            })
+            .unwrap();
+
+        while STATE.load(Ordering::Acquire) != WRITTEN {}
+        let mut flash = Flash::new(ctx.flash, Config::default()).unwrap();
+        let flash_buf = [0u32; 256];
+        // SAFETY: the NVS partition is not mapped.
+        unsafe { flash.write(NVS_PART_FLASH_ADDR, &flash_buf) }.unwrap();
+        STATE.store(FLASHED, Ordering::Release);
+
+        while STATE.load(Ordering::Acquire) != CHECKED {}
+        assert_eq!(LOST.load(Ordering::Relaxed), 0);
+    }
+}
+
 /// PSRAM at the default 200 MHz with the MPLL at 400 MHz, and at 250 MHz with the MPLL at
 /// 500 MHz.
 #[cfg(feature = "esp32s31")]

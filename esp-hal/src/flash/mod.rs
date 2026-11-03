@@ -780,7 +780,16 @@ impl Flash<'_, Blocking> {
     ) -> Result<R, Error> {
         free(|| {
             let _park = ParkGuard::enter(self)?;
-            let cache = cache::CacheGuard::suspend();
+            let cache = cfg_select! {
+                esp32 => {
+                    if invalidate.is_some() {
+                        cache::CacheGuard::suspend_for_flush()
+                    } else {
+                        cache::CacheGuard::suspend()
+                    }
+                }
+                _ => cache::CacheGuard::suspend(),
+            };
             let result = f(self);
             cfg_select! {
                 esp32 => {

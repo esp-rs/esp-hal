@@ -193,6 +193,10 @@ fn serve(current: Cpu) {
         #[cfg(soc_cpu_has_branch_predictor)]
         let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 
+        // The other core can flush the cache of the current core while it is parked.
+        #[cfg(esp32)]
+        crate::psram::writeback_private_cache();
+
         phase.store(Phase::Parked, Ordering::Release);
         while phase.load(Ordering::Acquire) != Phase::Released {
             core::hint::spin_loop();
