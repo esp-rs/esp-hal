@@ -52,6 +52,7 @@ cfg_select! {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32s31",
         feature = "esp32p4"
     ) => {
@@ -153,6 +154,7 @@ async fn main(spawner: Spawner) {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32s31",
         feature = "esp32p4"
     ))]

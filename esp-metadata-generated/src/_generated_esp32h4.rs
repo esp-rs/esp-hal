@@ -440,7 +440,7 @@ macro_rules! property {
         false
     };
     ("soc.cpu_powers_down_cache") => {
-        false
+        true
     };
     ("soc.has_swd_watchdog") => {
         true
