@@ -742,6 +742,9 @@ driver_configs![
                 /// Programmable DMA burst length (`DMABUSMODE.PBL`). A 32-beat burst
                 /// overflows the AXI bus on some chips.
                 dma_burst_len: u32,
+                /// The alignment, in bytes, that the EMAC DMA needs for each descriptor and
+                /// buffer.
+                dma_alignment: u32,
                 /// When true, the MAC exposes RGMII (1000 Mbps) pads in addition to RMII/MII.
                 #[serde(default)]
                 has_rgmii: bool,

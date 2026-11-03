@@ -287,6 +287,7 @@ rx_store_and_forward = true
 rx_checksum_offload = false
 tx_checksum_offload = false
 dma_burst_len = 32
+dma_alignment = 4
 
 [device.camera]
 support_status = "not_supported"
