@@ -7,16 +7,10 @@ use crate::{
     task::{IdleFn, Task},
 };
 
-// FPU context offsets inside `CpuContext` (in words): `fcsr` is at 32, `f0..f31` are at 33..=64.
-// They come right after `pc` (31) so the integer offsets used below do not move.
-//
-// These macros expand to string literals so they can be spliced into `naked_asm!` via `concat!`.
-// Without the F extension (or without the feature) they expand to nothing.
+// `fcsr` is at word 32 of `CpuContext`, and `f0..f31` are at words 33 to 64.
 
-/// Saves `fcsr` and `f0..f31` into the `CpuContext` pointed to by `tp`.
-///
-/// Clobbers `t1`, which is already saved at this point.
-#[cfg(all(riscv_has_f, feature = "float-save-restore"))]
+/// Saves `fcsr` and `f0..f31` into the `CpuContext` at `tp`. Clobbers `t1`.
+#[cfg(float_save_restore)]
 macro_rules! fpu_save {
     () => {
         "
@@ -61,10 +55,8 @@ macro_rules! fpu_save {
     };
 }
 
-/// Restores `fcsr` and `f0..f31` from the `CpuContext` pointed to by `tp`.
-///
-/// Clobbers `t1`, which is reloaded from the context right after.
-#[cfg(all(riscv_has_f, feature = "float-save-restore"))]
+/// Restores `fcsr` and `f0..f31` from the `CpuContext` at `tp`. Clobbers `t1`.
+#[cfg(float_save_restore)]
 macro_rules! fpu_restore {
     () => {
         "
@@ -109,13 +101,13 @@ macro_rules! fpu_restore {
     };
 }
 
-#[cfg(not(all(riscv_has_f, feature = "float-save-restore")))]
+#[cfg(not(float_save_restore))]
 macro_rules! fpu_save {
     () => {
         ""
     };
 }
-#[cfg(not(all(riscv_has_f, feature = "float-save-restore")))]
+#[cfg(not(float_save_restore))]
 macro_rules! fpu_restore {
     () => {
         ""
@@ -202,14 +194,10 @@ pub struct CpuContext {
     /// executed.
     pub pc: usize,
     /// Floating-point control and status register.
-    ///
-    /// Must stay at word offset 32, right after `pc`: the trampoline assembly relies on it.
-    #[cfg(all(riscv_has_f, feature = "float-save-restore"))]
+    #[cfg(float_save_restore)]
     pub fcsr: usize,
     /// Floating-point registers `f0..f31`.
-    ///
-    /// Must stay at word offset 33, right after `fcsr`: the trampoline assembly relies on it.
-    #[cfg(all(riscv_has_f, feature = "float-save-restore"))]
+    #[cfg(float_save_restore)]
     pub f: [u32; 32],
 }
 
@@ -291,10 +279,7 @@ pub(crate) fn setup_multitasking() {
 /// set stack pointer inherited from the last scheduled task. We must not save the state of deleted
 /// tasks, or we'll write some of the registers to memory that has been freed.
 ///
-/// When the `float-save-restore` feature is enabled on a target with the F extension, the FPU
-/// state (`fcsr` and `f0..f31`) is saved to / restored from the `CpuContext` of regular tasks as
-/// well. The idle "task" has no `CpuContext`, so its FPU state is not preserved: the idle hook
-/// must not use floating point registers.
+/// The idle "task" has no `CpuContext`, so the trampoline does not save its FPU registers.
 #[unsafe(link_section = ".trap.rust")]
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
@@ -354,8 +339,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
         sw a6, 14*4(tp)
         sw a7, 15*4(tp)
 
-        # Save the FPU state of the interrupted task. This must happen before the scheduler
-        # runs, as Rust code may clobber the FP registers. t1 is free: it was just saved above.
+        # Save the FPU registers before the scheduler runs. Rust code can change them.
 ",
         fpu_save!(),
 "
@@ -448,9 +432,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
         # written to a CpuContext, so there is nothing to reload.
         beqz tp, 6f
 
-        # Restore the FPU state of the selected task (same task or a new one). This uses t1 as
-        # scratch and must run before the integer registers are reloaded and before TP is
-        # overwritten, as it addresses the context through tp.
+        # Restore the FPU registers before the integer registers. The restore changes t1.
 ",
         fpu_restore!(),
 "
