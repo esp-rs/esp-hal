@@ -124,20 +124,26 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
     setup_stack_guard();
 
     unsafe {
+        __esp_bootloader_init();
         main(a0, a1, a2);
     }
 }
 
+#[cfg(feature = "rt")]
+unsafe extern "C" {
+    /// Hardware setup a bootloader support crate needs once `.data` and `.bss` are initialized,
+    /// just before `main`. `hal-defaults.x` maps it to `__esp_bootloader_default_init` unless the
+    /// bootloader support crate defines it.
+    fn __esp_bootloader_init();
+}
+
+#[cfg(feature = "rt")]
+#[unsafe(export_name = "__esp_bootloader_default_init")]
+extern "C" fn esp_bootloader_default_init() {}
+
 #[cfg(all(xtensa, feature = "rt"))]
 mod xtensa {
     use core::arch::{global_asm, naked_asm};
-
-    /// The ESP32 has a first stage bootloader that handles loading program data into the right
-    /// place, so loading is skipped here. Called by xtensa-lx-rt in Reset.
-    #[unsafe(export_name = "__init_data")]
-    extern "C" fn __init_data() -> bool {
-        false
-    }
 
     extern "C" fn __init_persistent() -> bool {
         matches!(
@@ -181,6 +187,8 @@ mod xtensa {
         .literal sym_rtc_slow_bss_end, {_rtc_slow_bss_end}
         .literal sym_rtc_slow_persistent_end, {_rtc_slow_persistent_end}
         .literal sym_rtc_slow_persistent_start, {_rtc_slow_persistent_start}
+
+        .literal sym_esp_bootloader_init, {__esp_bootloader_init}
         ",
         __init_persistent = sym __init_persistent,
         _xtensa_lx_rt_zero_fill = sym _xtensa_lx_rt_zero_fill,
@@ -197,6 +205,8 @@ mod xtensa {
         _rtc_slow_bss_start = sym _rtc_slow_bss_start,
         _rtc_slow_persistent_end = sym _rtc_slow_persistent_end,
         _rtc_slow_persistent_start = sym _rtc_slow_persistent_start,
+
+        __esp_bootloader_init = sym super::__esp_bootloader_init,
     );
 
     #[unsafe(export_name = "__post_init")]
@@ -234,6 +244,8 @@ mod xtensa {
             callx4 a2                                  // Zero-fill
 
         .Lpost_init_return:
+            l32r   a2, sym_esp_bootloader_init         // Let the bootloader support crate finish
+            callx4 a2                                  // its setup
             retw.n
         ",
         )
