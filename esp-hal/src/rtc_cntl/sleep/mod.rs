@@ -423,6 +423,9 @@ impl<'d> LowPower<'d> {
             SleepKind::Deep => 0,
         };
 
+        // After the light-sleep stall, so that the other core cannot force the SAR on again.
+        let sar_power_force = replace_sar_power_force(sar_power_for_sleep(kind));
+
         let rejected = {
             // A chip can keep a guard for the length of the sleep, to restore what sleep entry
             // changed for the sleep only. The guard must therefore outlive the wait below.
@@ -486,6 +489,8 @@ impl<'d> LowPower<'d> {
         }
 
         config.finish_sleep();
+
+        replace_sar_power_force(sar_power_force);
 
         #[cfg(multi_core)]
         unpark_cores(parked);
@@ -613,6 +618,97 @@ fn sleep_uart_prepare() {
                 crate::peripherals::$inst::steal().info().suspend_for_sleep();
             }
         };
+    }
+}
+
+/// Returns the SAR ADC power override for a sleep.
+///
+/// The FSM setting powers the SAR down when nothing samples, and leaves it to a ULP program. On the
+/// ESP32-C2 and ESP32-C3 it hands the SAR to the digital controller, which the ADC driver forces
+/// on, so a light sleep forces the SAR off. A deep sleep keeps the FSM setting, because the
+/// override survives the wake and the ADC driver does not write it.
+#[cfg(sleep_driver_supported)]
+fn sar_power_for_sleep(kind: SleepKind) -> u8 {
+    const FSM: u8 = 0;
+    const OFF: u8 = 0b10;
+
+    match kind {
+        SleepKind::Light if cfg!(any(esp32c2, esp32c3)) => OFF,
+        _ => FSM,
+    }
+}
+
+/// Writes `force` to the SAR ADC power override, and returns the previous value.
+///
+/// The ADC drivers and the TRNG force the SAR on. The override survives a light sleep, and also a
+/// deep sleep where it lives in the RTC or LP domain. Where the radio power detector shares the
+/// SAR, bit 2 of `force` holds the detector drive.
+#[cfg(sleep_driver_supported)]
+fn replace_sar_power_force(force: u8) -> u8 {
+    cfg_select! {
+        adc_sar_power_override => {
+            // A dropped ADC driver leaves the override set and the bus clock gated, which drops
+            // this access. A peripheral guard would reset the peripheral.
+            let bus_clock = crate::peripherals::SYSTEM::regs().saradc_conf();
+            let clocked = bus_clock.read().saradc_reg_clk_en().bit();
+            bus_clock.modify(|_, w| w.saradc_reg_clk_en().set_bit());
+
+            let mut previous = 0;
+            crate::peripherals::APB_SARADC::regs()
+                .ctrl()
+                .modify(|r, w| {
+                    previous =
+                        r.xpd_sar_force().bits() | ((r.saradc2_pwdet_drv().bit() as u8) << 2);
+                    unsafe { w.xpd_sar_force().bits(force & 0b11) };
+                    w.saradc2_pwdet_drv().bit(force & 0b100 != 0)
+                });
+
+            bus_clock.modify(|_, w| w.saradc_reg_clk_en().bit(clocked));
+            previous
+        }
+        esp32s31 => {
+            // SAR1 in bits 0..2, SAR2 in bits 2..4.
+            let regs = crate::peripherals::APB_SARADC::regs();
+            let mut previous = 0;
+            regs.ctrl0().modify(|r, w| {
+                previous = r.xpd_sar1_force().bits();
+                unsafe { w.xpd_sar1_force().bits(force & 0b11) }
+            });
+            regs.ctrl1().modify(|r, w| {
+                previous |= r.xpd_sar2_force().bits() << 2;
+                unsafe { w.xpd_sar2_force().bits(force >> 2) }
+            });
+            previous
+        }
+        esp32p4 => {
+            // SAR1 in bits 0..2, SAR2 in bits 2..4.
+            let mut previous = 0;
+            crate::peripherals::LP_ADC::regs()
+                .force_wpd_sar()
+                .modify(|r, w| {
+                    previous = r.force_xpd_sar1().bits() | (r.force_xpd_sar2().bits() << 2);
+                    unsafe {
+                        w.force_xpd_sar1().bits(force & 0b11);
+                        w.force_xpd_sar2().bits(force >> 2)
+                    }
+                });
+            previous
+        }
+        any(esp32, esp32s2, esp32s3, esp32c2, esp32c3) => {
+            let reg = cfg_select! {
+                esp32 => crate::peripherals::SENS::regs().sar_meas_wait2(),
+                any(esp32s2, esp32s3) => crate::peripherals::SENS::regs().sar_power_xpd_sar(),
+                esp32c2 => LPWR::regs().cntl_sensor_ctrl(),
+                esp32c3 => LPWR::regs().sensor_ctrl(),
+            };
+            let mut previous = 0;
+            reg.modify(|r, w| {
+                previous = r.force_xpd_sar().bits();
+                unsafe { w.force_xpd_sar().bits(force) }
+            });
+            previous
+        }
+        _ => force,
     }
 }
 
