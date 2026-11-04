@@ -43,7 +43,7 @@ use esp_hal::{
     DriverMode,
     delay::Delay,
     main,
-    usb::usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
+    usb::usb_serial_jtag::{Config, UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -111,7 +111,7 @@ fn receive<Dm: DriverMode>(rx: &mut UsbSerialJtagRx<'_, Dm>) -> usize {
     let (mut received, mut wrong) = (0, 0);
     while received < MEBIBYTE {
         let wanted = chunk.len().min(MEBIBYTE - received);
-        let Ok(count) = embedded_io_07::Read::read(rx, &mut chunk[..wanted]);
+        let count = embedded_io_07::Read::read(rx, &mut chunk[..wanted]).unwrap_or(0);
         wrong += chunk[..count]
             .iter()
             .filter(|byte| **byte != pattern.next_byte())
@@ -127,7 +127,9 @@ fn main() -> ! {
     let mut checks = Checks::default();
     let delay = Delay::new();
 
-    let (mut rx, mut tx) = UsbSerialJtag::new(peripherals.USB_DEVICE.reborrow()).split();
+    let (mut rx, mut tx) = UsbSerialJtag::new(peripherals.USB_DEVICE.reborrow(), Config::default())
+        .unwrap()
+        .split();
 
     // The host sends only after it sees the ready line, so earlier bytes are not the host's.
     // The host system may read and drop the output while no program has the port open, so the
@@ -159,7 +161,7 @@ fn main() -> ! {
         "Read::read returns the three bytes",
         read == Ok(3) && &buf[..3] == b"abc",
     );
-    let Ok(count) = read;
+    let count = read.unwrap_or(0);
     say(
         &mut tx,
         format_args!("read {} bytes: {:02x?}\r\n", count, &buf[..count]),
@@ -201,7 +203,8 @@ fn main() -> ! {
     );
 
     drop((rx, tx));
-    let (mut rx, mut tx) = UsbSerialJtag::new(peripherals.USB_DEVICE)
+    let (mut rx, mut tx) = UsbSerialJtag::new(peripherals.USB_DEVICE, Config::default())
+        .unwrap()
         .into_async()
         .split();
 
@@ -291,7 +294,7 @@ async fn send_async(tx: &mut UsbSerialJtagTx<'_, Async>) -> u32 {
         while !data.is_empty() {
             match select(tx.write_async(data), yield_now()).await {
                 Either::First(Ok(written)) => data = &data[written..],
-                Either::First(Err(error)) => match error {},
+                Either::First(Err(error)) => panic!("write_async failed: {error}"),
                 Either::Second(()) => cancelled += 1,
             }
         }
@@ -310,7 +313,7 @@ async fn receive_async(rx: &mut UsbSerialJtagRx<'_, Async>) -> (usize, u32) {
         let wanted = chunk.len().min(MEBIBYTE - received);
         let count = match select(rx.read_async(&mut chunk[..wanted]), yield_now()).await {
             Either::First(Ok(count)) => count,
-            Either::First(Err(error)) => match error {},
+            Either::First(Err(error)) => panic!("read_async failed: {error}"),
             Either::Second(()) => {
                 cancelled += 1;
                 continue;
