@@ -24,6 +24,7 @@ exclude  = [
     "extras/bench-server",
     "extras/esp-wifishark",
     "extras/ieee802154-sniffer",
+    "extras/usb-serial-jtag-host",
     "hil-test",
     "hil-test-radio",
     "xtensa-lx",

@@ -419,6 +419,7 @@ jobs:
             extras/bench-server -> target
             extras/esp-wifishark -> target
             extras/ieee802154-sniffer -> target
+            extras/usb-serial-jtag-host -> target
 
       # Run xtask tests
       - name: Run xtask tests
@@ -473,6 +474,8 @@ jobs:
         run: cd extras/esp-wifishark && cargo build
       - name: Build ieee802154-sniffer
         run: cd extras/ieee802154-sniffer && cargo build
+      - name: Build usb-serial-jtag-host
+        run: cd extras/usb-serial-jtag-host && cargo build
 
   # --------------------------------------------------------------------------
   # Check that the esp-generate template in `template/` renders and builds
