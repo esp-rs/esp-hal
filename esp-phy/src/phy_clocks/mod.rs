@@ -21,7 +21,7 @@ pub(crate) fn enable_phy(enable: bool) {
 /// Without them, `phy_wakeup_init` on the ESP32-C61 stalls on every register access for about
 /// 11 ms. The previous state of the clocks is restored afterwards, because Wi-Fi and BLE own some
 /// of them.
-#[cfg(any(esp32c5, esp32c6, esp32c61))]
+#[cfg(any(esp32c5, esp32c6, esp32c61, esp32s31))]
 pub(crate) fn with_calibration_clocks<R>(f: impl FnOnce() -> R) -> R {
     use phy_clocks_ll::{CALIBRATION_CLK_CONF_MASK, CALIBRATION_CLK_CONF1_MASK};
 
@@ -49,7 +49,7 @@ pub(crate) fn with_calibration_clocks<R>(f: impl FnOnce() -> R) -> R {
 }
 
 /// Runs `f`. On this chip, other code already keeps the clocks running that the PHY accesses.
-#[cfg(not(any(esp32c5, esp32c6, esp32c61)))]
+#[cfg(not(any(esp32c5, esp32c6, esp32c61, esp32s31)))]
 pub(crate) fn with_calibration_clocks<R>(f: impl FnOnce() -> R) -> R {
     f()
 }
