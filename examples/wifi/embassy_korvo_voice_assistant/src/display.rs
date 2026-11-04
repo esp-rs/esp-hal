@@ -44,7 +44,7 @@ use esp_hal::{
     handler,
     interrupt::{self, Priority},
     lcd_cam::lcd::dpi::Dpi,
-    peripherals::Interrupt,
+    peripherals::{AXI_GDMA, Interrupt, LCD_CAM},
 };
 use static_cell::ConstStaticCell;
 
@@ -66,20 +66,8 @@ const REFILLS_PER_FRAME: usize = HEIGHT as usize / BOUNCE_LINES;
 const DESCRIPTOR_BYTES: usize = 2 * LINE_BYTES;
 const DESCRIPTORS_PER_BUFFER: usize = BOUNCE_BYTES / DESCRIPTOR_BYTES;
 
-// Registers that esp-hal does not expose. The DMA ones are those of `DMA_AXI_CH0`, which `main`
-// gives the display.
-/// LCD_CAM `LC_DMA_INT_RAW` and `LC_DMA_INT_CLR`.
-const LCD_INT_RAW: *mut u32 = 0x2039_6068 as _;
-const LCD_INT_CLR: *mut u32 = 0x2039_6070 as _;
-/// The LCD finished a frame.
-const LCD_VSYNC: u32 = 1 << 0;
-/// AXI-DMA `OUT_INT_ENA_CH0`, `OUT_INT_CLR_CH0` and `OUT_DSCR_CH0`, the descriptor the DMA reads.
-const DMA_OUT_INT_ENA: *mut u32 = 0x2034_8140 as _;
-const DMA_OUT_INT_CLR: *mut u32 = 0x2034_8144 as _;
-const DMA_OUT_DESCRIPTOR: *mut u32 = 0x2034_816C as _;
-/// The DMA has read a descriptor. Refills do not use the EOF flag of descriptors, because each EOF
-/// makes the LCD pause, and the LCD then gets a third of the pixel data it needs.
-const DMA_OUT_DONE: u32 = 1 << 0;
+/// The AXI-GDMA channel of `DMA_AXI_CH0`, which `main` gives the display.
+const LCD_CHANNEL: usize = 0;
 
 // The areas of the buttons, for drawing and for touch hit tests.
 pub const TALK_BUTTON: Rectangle = Rectangle::new(Point::new(250, 384), Size::new(300, 72));
@@ -154,26 +142,34 @@ async fn next_screen() -> Option<Screen> {
     }
 }
 
+/// Enables the interrupt when the DMA has read a descriptor. Refills do not use the EOF flag of
+/// descriptors, because each EOF makes the LCD pause, and the LCD then gets a third of the pixel
+/// data it needs.
 fn listen_for_refills(enable: bool) {
-    // SAFETY: Only the display uses the interrupts of its DMA channel.
-    unsafe {
-        DMA_OUT_INT_CLR.write_volatile(DMA_OUT_DONE);
-        let enabled = DMA_OUT_INT_ENA.read_volatile() & !DMA_OUT_DONE;
-        DMA_OUT_INT_ENA.write_volatile(enabled | if enable { DMA_OUT_DONE } else { 0 });
-    }
+    let interrupts = AXI_GDMA::regs().out_ch(LCD_CHANNEL).out_int();
+    interrupts.clr().write(|w| w.out_done().clear_bit_by_one());
+    interrupts.ena().modify(|_, w| w.out_done().bit(enable));
 }
 
 #[handler(priority = Priority::max())]
 fn refill() {
-    // SAFETY: Clears the flags this interrupt handles, and reads the position of the DMA.
-    let (descriptor, vsync) = unsafe {
-        DMA_OUT_INT_CLR.write_volatile(DMA_OUT_DONE);
-        let vsync = LCD_INT_RAW.read_volatile() & LCD_VSYNC != 0;
-        if vsync {
-            LCD_INT_CLR.write_volatile(LCD_VSYNC);
-        }
-        (DMA_OUT_DESCRIPTOR.read_volatile() as usize, vsync)
-    };
+    let channel = AXI_GDMA::regs().out_ch(LCD_CHANNEL);
+    channel
+        .out_int()
+        .clr()
+        .write(|w| w.out_done().clear_bit_by_one());
+    let lcd_cam = LCD_CAM::regs();
+    let vsync = lcd_cam
+        .lc_dma_int_raw()
+        .read()
+        .lcd_vsync_int_raw()
+        .bit_is_set();
+    if vsync {
+        lcd_cam
+            .lc_dma_int_clr()
+            .write(|w| w.lcd_vsync_int_clr().set_bit());
+    }
+    let descriptor = channel.out_dscr().read().outlink_dscr().bits() as usize;
     // SAFETY: The interrupt only runs while the refresh does.
     unsafe { REFILL.get().advance(descriptor, vsync) };
 }
@@ -227,8 +223,10 @@ impl Refill {
         self.reading = 0;
         self.refills = None;
         OUT_OF_STEP.store(false, Ordering::Relaxed);
-        // SAFETY: Clears a stale VSYNC flag of the previous refresh.
-        unsafe { LCD_INT_CLR.write_volatile(LCD_VSYNC) };
+        // Clears a stale VSYNC flag of the previous refresh.
+        LCD_CAM::regs()
+            .lc_dma_int_clr()
+            .write(|w| w.lcd_vsync_int_clr().set_bit());
     }
 
     /// Refills the buffer the DMA has left, once the DMA reads `descriptor`.
