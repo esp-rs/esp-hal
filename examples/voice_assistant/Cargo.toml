@@ -1,5 +1,5 @@
 [package]
-name    = "embassy-korvo-voice-assistant"
+name    = "voice-assistant"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -23,21 +23,21 @@ embedded-io-async = "0.7.0"
 # `rsa` verifies certificates signed with RSA keys, such as the root certificate.
 embedded-tls = { version = "0.18.0", default-features = false, features = ["rsa"] }
 embedded-text = "0.7.2"
-esp-alloc = { path = "../../../esp-alloc" }
-esp-backtrace = { path = "../../../esp-backtrace", features = [
+esp-alloc = { path = "../../esp-alloc" }
+esp-backtrace = { path = "../../esp-backtrace", features = [
     "panic-handler",
     "println",
 ] }
-esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
-esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
-esp-metadata-generated = { path = "../../../esp-metadata-generated" }
-esp-println = { path = "../../../esp-println", features = ["log-04"] }
-esp-radio = { path = "../../../esp-radio", features = [
+esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
+esp-metadata-generated = { path = "../../esp-metadata-generated" }
+esp-println = { path = "../../esp-println", features = ["log-04"] }
+esp-radio = { path = "../../esp-radio", features = [
     "log-04",
     "unstable",
     "wifi",
 ] }
-esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
+esp-rtos = { path = "../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
 esp-sr = { git = "https://github.com/SergioGasquez/esp-sr", rev = "e56a9c6" }
 log = "0.4.27"
 rand_chacha = { version = "0.3.1", default-features = false }
@@ -61,7 +61,7 @@ esp32s31 = [
 
 # esp-sr allocates from the heap of esp-alloc, so it must use the same esp-alloc as this example.
 [patch.crates-io]
-esp-alloc = { path = "../../../esp-alloc" }
+esp-alloc = { path = "../../esp-alloc" }
 
 [profile.release]
 debug            = true

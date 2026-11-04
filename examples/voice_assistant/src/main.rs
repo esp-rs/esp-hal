@@ -1,4 +1,4 @@
-//! Embassy Voice Assistant Example
+//! Voice assistant for the ESP32-S31-Korvo-1 LCD sub-board.
 //!
 //! Set SSID, PASSWORD and one of ANTHROPIC_API_KEY or OPENAI_API_KEY env variables before running
 //! this example. Without an API key, the example only recognizes the
@@ -19,6 +19,7 @@
 //! - Connect the USB-UART port to the computer and switch the board on.
 
 //% CHIP_FILTER: esp32s31
+//% TAG: complex
 
 #![no_std]
 #![no_main]
