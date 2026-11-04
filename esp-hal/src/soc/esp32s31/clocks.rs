@@ -126,7 +126,6 @@ impl ClockConfig {
         BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
 
         update_bus_clocks();
-        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
     }
 }
 
@@ -148,6 +147,9 @@ fn update_bus_clocks() {
     {
         core::hint::spin_loop();
     }
+
+    // `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+    ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
 // BBPLL_CLK
@@ -500,10 +502,6 @@ fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, n
         .mem_freq_ctrl0()
         .modify(|_, w| w.mem_clk_div_num().bit(cpu_clk_frequency() > 160_000_000));
     update_bus_clocks();
-
-    if !BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
-        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
-    }
 }
 
 // MEM_CLK
