@@ -333,6 +333,242 @@ impl<'d> MipiDsi<'d> {
     }
 }
 
+/// DW-GDMA channel configuration readback used by the QA smoke test hook.
+#[doc(hidden)]
+#[instability::unstable]
+#[cfg(mipi_dsi_driver_supported)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DwGdmaChannelConfigReadback {
+    /// Raw `CFG0` register value.
+    pub cfg0_bits: u32,
+    /// Raw `CFG1` register value.
+    pub cfg1_bits: u32,
+    /// Source multi-block transfer mode.
+    pub src_multblk_type: u8,
+    /// Destination multi-block transfer mode.
+    pub dst_multblk_type: u8,
+    /// Transfer direction/flow-control mode.
+    pub transfer_type_flow_control: u8,
+    /// `true` when software handshake is selected for source.
+    pub src_uses_software_handshake: bool,
+    /// `true` when software handshake is selected for destination.
+    pub dst_uses_software_handshake: bool,
+    /// Source peripheral handshake selector.
+    pub src_peripheral: u8,
+    /// Destination peripheral handshake selector.
+    pub dst_peripheral: u8,
+    /// Channel priority.
+    pub priority: u8,
+    /// Source outstanding request limit field.
+    pub src_outstanding_limit: u8,
+    /// Destination outstanding request limit field.
+    pub dst_outstanding_limit: u8,
+}
+
+/// Result payload for the no-transfer DW-GDMA QA smoke test hook.
+#[doc(hidden)]
+#[instability::unstable]
+#[cfg(mipi_dsi_driver_supported)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DwGdmaNoPeripheralSmokeReport {
+    /// `true` when the caller provided channel IDs 0 and 1 in that order.
+    pub expected_channel_ids: bool,
+    /// `true` when both channels are distinct.
+    pub unique_channels: bool,
+    /// Controller `DMAC_EN` bit state.
+    pub controller_enabled: bool,
+    /// Controller `INT_EN` bit state.
+    pub controller_interrupt_enabled: bool,
+    /// Raw controller `CFG0` register value.
+    pub controller_cfg0_bits: u32,
+    /// Channel-0 readback taken immediately after configuring channel 0.
+    pub channel0_after_first_config: DwGdmaChannelConfigReadback,
+    /// Channel-0 readback taken after configuring channel 1.
+    pub channel0_after_channel1_config: DwGdmaChannelConfigReadback,
+    /// Channel-1 readback taken after configuring channel 1.
+    pub channel1_after_config: DwGdmaChannelConfigReadback,
+    /// `true` when channel 0 readback matches the expected channel-0 config.
+    pub channel0_matches_expected: bool,
+    /// `true` when channel 1 readback matches the expected channel-1 config.
+    pub channel1_matches_expected: bool,
+    /// `true` when channel 0 readback is unchanged by channel 1 configuration.
+    pub channel0_unchanged_after_channel1_config: bool,
+    /// Channel-0 enable bit sampled before cleanup.
+    pub channel0_enabled_before_cleanup: bool,
+    /// Channel-1 enable bit sampled before cleanup.
+    pub channel1_enabled_before_cleanup: bool,
+    /// Raw `CHEN0` register sampled before cleanup.
+    pub channel_enable_bits_before_cleanup: u32,
+    /// Raw `CHEN0` register sampled after explicit channel disable.
+    pub channel_enable_bits_after_cleanup: u32,
+}
+
+#[cfg(mipi_dsi_driver_supported)]
+impl DwGdmaNoPeripheralSmokeReport {
+    /// Returns `true` when all smoke-test checks pass.
+    #[inline]
+    pub const fn passed(&self) -> bool {
+        self.expected_channel_ids
+            && self.unique_channels
+            && self.controller_enabled
+            && self.controller_interrupt_enabled
+            && self.channel0_matches_expected
+            && self.channel1_matches_expected
+            && self.channel0_unchanged_after_channel1_config
+            && !self.channel0_enabled_before_cleanup
+            && !self.channel1_enabled_before_cleanup
+            && (self.channel_enable_bits_after_cleanup & 0x3) == 0
+    }
+}
+
+#[cfg(mipi_dsi_driver_supported)]
+fn read_dw_gdma_channel_config(channel_id: u8) -> DwGdmaChannelConfigReadback {
+    let ch = crate::peripherals::VDMA::regs().ch(channel_id as usize);
+    let cfg0 = ch.cfg0().read();
+    let cfg1 = ch.cfg1().read();
+
+    DwGdmaChannelConfigReadback {
+        cfg0_bits: cfg0.bits(),
+        cfg1_bits: cfg1.bits(),
+        src_multblk_type: cfg0.ch1_src_multblk_type().bits(),
+        dst_multblk_type: cfg0.ch1_dst_multblk_type().bits(),
+        transfer_type_flow_control: cfg1.ch1_tt_fc().bits(),
+        src_uses_software_handshake: cfg1.ch1_hs_sel_src().bit_is_set(),
+        dst_uses_software_handshake: cfg1.ch1_hs_sel_dst().bit_is_set(),
+        src_peripheral: cfg1.ch1_src_per().bits(),
+        dst_peripheral: cfg1.ch1_dst_per().bits(),
+        priority: cfg1.ch1_ch_prior().bits(),
+        src_outstanding_limit: cfg1.ch1_src_osr_lmt().bits(),
+        dst_outstanding_limit: cfg1.ch1_dst_osr_lmt().bits(),
+    }
+}
+
+/// Internal QA hook for no-peripheral DW-GDMA channel-isolation validation.
+///
+/// This intentionally configures channels without starting transfers.
+#[doc(hidden)]
+#[instability::unstable]
+#[cfg(mipi_dsi_driver_supported)]
+pub fn __qa_dw_gdma_no_peripheral_smoke<'d>(
+    channel0: impl VdmaDmaChannel + 'd,
+    channel1: impl VdmaDmaChannel + 'd,
+) -> DwGdmaNoPeripheralSmokeReport {
+    use crate::mipi_dw_gdma::{ChannelConfig, DwGdmaChannel, HandshakeSelect, enable_controller};
+
+    const CHANNEL0_CONFIG: ChannelConfig = ChannelConfig {
+        src_multblk_type: 1,
+        dst_multblk_type: 2,
+        transfer_type_flow_control: 0,
+        src_handshake: HandshakeSelect::Software,
+        dst_handshake: HandshakeSelect::Software,
+        src_peripheral: 0,
+        dst_peripheral: 0,
+        priority: 1,
+        src_outstanding_limit: 3,
+        dst_outstanding_limit: 2,
+    };
+    const CHANNEL1_CONFIG: ChannelConfig = ChannelConfig {
+        src_multblk_type: 2,
+        dst_multblk_type: 1,
+        transfer_type_flow_control: 0,
+        src_handshake: HandshakeSelect::Software,
+        dst_handshake: HandshakeSelect::Software,
+        src_peripheral: 0,
+        dst_peripheral: 0,
+        priority: 2,
+        src_outstanding_limit: 1,
+        dst_outstanding_limit: 4,
+    };
+
+    let (owned_channel0, channel0_id) = take_owned_vdma_channel(channel0);
+    let (owned_channel1, channel1_id) = take_owned_vdma_channel(channel1);
+
+    let _owned_channel0 = owned_channel0;
+    let _owned_channel1 = owned_channel1;
+    let expected_channel_ids = channel0_id == 0 && channel1_id == 1;
+    let unique_channels = channel0_id != channel1_id;
+
+    let _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }> =
+        GenericPeripheralGuard::new();
+    enable_controller();
+
+    let channel0 = DwGdmaChannel::new(channel0_id);
+    let channel1 = DwGdmaChannel::new(channel1_id);
+
+    // Ensure both channels are disabled before touching their config.
+    channel0.set_enabled(false);
+    channel1.set_enabled(false);
+
+    channel0.configure(CHANNEL0_CONFIG);
+    let channel0_after_first_config = read_dw_gdma_channel_config(channel0_id);
+
+    channel1.configure(CHANNEL1_CONFIG);
+    let channel0_after_channel1_config = read_dw_gdma_channel_config(channel0_id);
+    let channel1_after_config = read_dw_gdma_channel_config(channel1_id);
+
+    let channel0_matches_expected = channel0_after_first_config.src_multblk_type
+        == CHANNEL0_CONFIG.src_multblk_type
+        && channel0_after_first_config.dst_multblk_type == CHANNEL0_CONFIG.dst_multblk_type
+        && channel0_after_first_config.transfer_type_flow_control
+            == CHANNEL0_CONFIG.transfer_type_flow_control
+        && channel0_after_first_config.src_uses_software_handshake
+        && channel0_after_first_config.dst_uses_software_handshake
+        && channel0_after_first_config.src_peripheral == CHANNEL0_CONFIG.src_peripheral
+        && channel0_after_first_config.dst_peripheral == CHANNEL0_CONFIG.dst_peripheral
+        && channel0_after_first_config.priority == CHANNEL0_CONFIG.priority
+        && channel0_after_first_config.src_outstanding_limit
+            == CHANNEL0_CONFIG.src_outstanding_limit
+        && channel0_after_first_config.dst_outstanding_limit
+            == CHANNEL0_CONFIG.dst_outstanding_limit;
+
+    let channel1_matches_expected = channel1_after_config.src_multblk_type
+        == CHANNEL1_CONFIG.src_multblk_type
+        && channel1_after_config.dst_multblk_type == CHANNEL1_CONFIG.dst_multblk_type
+        && channel1_after_config.transfer_type_flow_control
+            == CHANNEL1_CONFIG.transfer_type_flow_control
+        && channel1_after_config.src_uses_software_handshake
+        && channel1_after_config.dst_uses_software_handshake
+        && channel1_after_config.src_peripheral == CHANNEL1_CONFIG.src_peripheral
+        && channel1_after_config.dst_peripheral == CHANNEL1_CONFIG.dst_peripheral
+        && channel1_after_config.priority == CHANNEL1_CONFIG.priority
+        && channel1_after_config.src_outstanding_limit == CHANNEL1_CONFIG.src_outstanding_limit
+        && channel1_after_config.dst_outstanding_limit == CHANNEL1_CONFIG.dst_outstanding_limit;
+
+    let channel0_unchanged_after_channel1_config =
+        channel0_after_channel1_config == channel0_after_first_config;
+
+    let controller_cfg0 = crate::peripherals::VDMA::regs().cfg0().read();
+    let controller_enabled = controller_cfg0.dmac_en().bit_is_set();
+    let controller_interrupt_enabled = controller_cfg0.int_en().bit_is_set();
+    let channel_enable_bits_before_cleanup = crate::peripherals::VDMA::regs().chen0().read().bits();
+    let channel0_enabled_before_cleanup =
+        ((channel_enable_bits_before_cleanup >> channel0_id) & 1) != 0;
+    let channel1_enabled_before_cleanup =
+        ((channel_enable_bits_before_cleanup >> channel1_id) & 1) != 0;
+
+    channel0.set_enabled(false);
+    channel1.set_enabled(false);
+    let channel_enable_bits_after_cleanup = crate::peripherals::VDMA::regs().chen0().read().bits();
+
+    DwGdmaNoPeripheralSmokeReport {
+        expected_channel_ids,
+        unique_channels,
+        controller_enabled,
+        controller_interrupt_enabled,
+        controller_cfg0_bits: controller_cfg0.bits(),
+        channel0_after_first_config,
+        channel0_after_channel1_config,
+        channel1_after_config,
+        channel0_matches_expected,
+        channel1_matches_expected,
+        channel0_unchanged_after_channel1_config,
+        channel0_enabled_before_cleanup,
+        channel1_enabled_before_cleanup,
+        channel_enable_bits_before_cleanup,
+        channel_enable_bits_after_cleanup,
+    }
+}
+
 // ── D-PHY power ───────────────────────────────────────────────────────────────
 
 /// Powers up the internal LDO that supplies VDD_MIPI_DPHY at 2.5 V.
