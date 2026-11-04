@@ -4,6 +4,7 @@ members  = ["xtask", "xtask-mcp-macros"]
 exclude  = [
     "esp-alloc",
     "esp-backtrace",
+    "esp-bootloader-direct-boot",
     "esp-bootloader-esp-idf",
     "esp-config",
     "esp-hal",

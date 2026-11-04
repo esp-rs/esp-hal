@@ -1,0 +1,64 @@
+[package]
+name          = "esp-bootloader-direct-boot"
+version       = "0.1.0"
+edition       = "2024"
+rust-version  = "1.95.0"
+description   = "Boot esp-hal applications directly from the ROM, without a 2nd-stage bootloader"
+documentation = "https://docs.espressif.com/projects/rust/esp-bootloader-direct-boot/latest/"
+keywords      = ["esp32", "espressif", "no-std"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+links         = "esp-bootloader"
+
+[package.metadata.espressif]
+doc-config = { features = ["esp-hal/unstable"] }
+check-configs = [
+    { features = ["esp-hal/unstable"] },
+]
+clippy-configs = [
+    { features = ["esp-hal/unstable"] },
+]
+
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6", "esp-hal/unstable"]
+
+[lib]
+bench = false
+test  = false
+
+[dependencies]
+document-features = "0.2"
+esp-rom-sys       = { version = "0.1.5", path = "../esp-rom-sys" }
+
+[target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dependencies]
+esp-hal = { version = "~1.2.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
+
+[build-dependencies]
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
+
+[features]
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+##
+esp32c2  = ["esp-hal/esp32c2", "esp-rom-sys/esp32c2"]
+##
+esp32c3  = ["esp-hal/esp32c3", "esp-rom-sys/esp32c3"]
+##
+esp32c5  = ["esp-hal/esp32c5", "esp-rom-sys/esp32c5"]
+##
+esp32c6  = ["esp-hal/esp32c6", "esp-rom-sys/esp32c6"]
+##
+esp32c61 = ["esp-hal/esp32c61", "esp-rom-sys/esp32c61"]
+##
+esp32h2  = ["esp-hal/esp32h2", "esp-rom-sys/esp32h2"]
+##
+esp32h4  = ["esp-hal/esp32h4", "esp-rom-sys/esp32h4"]
+##
+esp32p4  = ["esp-hal/esp32p4", "esp-rom-sys/esp32p4"]
+##
+esp32s3  = ["esp-hal/esp32s3", "esp-rom-sys/esp32s3"]
+##
+esp32s31 = ["esp-hal/esp32s31", "esp-rom-sys/esp32s31"]
