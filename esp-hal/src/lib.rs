@@ -443,6 +443,8 @@ unstable_driver! {
     pub mod usb;
     #[cfg(ethernet_driver_supported)]
     pub mod ethernet;
+    #[cfg(mipi_csi_driver_supported)]
+    pub mod mipi_csi;
     #[cfg(mipi_dsi_driver_supported)]
     pub mod mipi_dsi;
 }
