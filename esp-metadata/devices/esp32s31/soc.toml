@@ -28,12 +28,14 @@ has_md5_bsd = true
 
 [device.soc]
 multi_core_enabled = true
+cpu_pma_needs_core1_setup = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_has_zcmp_workaround = true
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x3f
 cpu_pmp_granularity = 128
+cpu_powers_down_cache = true
 
 has_swd_watchdog = true
 
@@ -117,6 +119,7 @@ peripherals = [
     { name = "TEE" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
+    { name = "TSENS", pac = "LP_TSENS", clock_group = "TSENS" },
     { name = "UART0", interrupts = { peri = "UART0" }, clock_group = "UART", stable = true },
     { name = "UART1", interrupts = { peri = "UART1" }, clock_group = "UART", stable = true },
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART", stable = true },
@@ -430,6 +433,7 @@ support_status = "not_supported"
 support_status = "partial"
 mii_via_gpio_matrix = true
 dma_burst_len = 16
+dma_alignment = 8
 has_rgmii = true
 rx_checksum_offload = true
 tx_checksum_offload = false # TX FIFO is too small for store-and-forward insertion
@@ -511,7 +515,7 @@ support_status = "partial"
 channel_count = 8
 
 [device.temp_sensor]
-support_status = "not_supported"
+register_block = "lp_tsens"
 [device.touch]
 support_status = "not_supported"
 [device.canfd]
@@ -598,6 +602,7 @@ ram_size = 20 # FIXME: placeholder
 support_status = "partial"
 extmem_origin = 0x5000_0000
 octal_spi = true
+has_timing_tuning = true
 
 [device.pixel_accelerator]
 support_status = "partial"

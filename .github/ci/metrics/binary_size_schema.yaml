@@ -4,7 +4,7 @@ properties:
   binary_size:
     type: object
     title: Binary Size Totals
-    description: Total flash and bss sizes per chip and example.
+    description: Total flash and RAM sizes per chip and example.
     properties:
       data:
         type: array
@@ -25,16 +25,16 @@ properties:
               title: Flash size
               description: Total flash usage in bytes.
               unit: bytes
-            bss:
+            ram:
               type: integer
-              title: BSS size
-              description: Total bss usage in bytes.
+              title: RAM size
+              description: Total static RAM usage in bytes, including data and code copied from flash.
               unit: bytes
           required:
             - chip
             - example
             - flash
-            - bss
+            - ram
           additionalProperties: false
     required:
       - data
@@ -66,7 +66,9 @@ properties:
             kind:
               type: string
               title: Memory kind
-              description: Memory region kind, flash or bss (InfluxDB tag).
+              description: >-
+                Where the section lives: flash, ram (copied from flash into RAM at boot)
+                or bss (RAM only) (InfluxDB tag).
             bytes:
               type: integer
               title: Section size

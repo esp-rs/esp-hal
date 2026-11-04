@@ -81,6 +81,11 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "RC_FAST", outputs = "RC_FAST_CLK", default = true },
+        ] },
+    ] },
     { group = "MCPWM", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
             { name = "CRYPTO_PWM_CLK", outputs = "CRYPTO_PWM_CLK", default = true }
@@ -196,6 +201,11 @@ peripheral_clocks = { templates = [
     #{ name = "Adc2Arb" },
     { name = "Systimer", keep_enabled = true },
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
+    { name = "Tsens", template_params = {
+        control = "crate::peripherals::SENS",
+        clk_en_register = "sar_peri_clk_gate_conf", clk_en_field = "tsens_clk_en",
+        rst_register = "sar_peri_reset_conf", rst_field = "sar_tsens_reset"
+    } },
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
     { name = "UsbFs", template_params = { peripheral = "usb" } },
     { name = "I2s1" },

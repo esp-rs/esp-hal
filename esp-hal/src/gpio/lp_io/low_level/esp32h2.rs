@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{AlternateFunction, LpPin, lp_io::LpFunction},
+    gpio::{AlternateFunction, GPIO_LOCK, LpPin, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LP_AON},
 };
 
@@ -27,10 +27,12 @@ pub(crate) fn is_pad_held(lp: u8) -> bool {
 /// Takes or releases the hold of the pad of `gpio`.
 pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
     let mask = 1 << gpio;
-    LP_AON::regs().gpio_hold0().modify(|r, w| unsafe {
-        let bits = r.gpio_hold0().bits();
-        w.gpio_hold0()
-            .bits(if enable { bits | mask } else { bits & !mask })
+    GPIO_LOCK.lock(|| {
+        LP_AON::regs().gpio_hold0().modify(|r, w| unsafe {
+            let bits = r.gpio_hold0().bits();
+            w.gpio_hold0()
+                .bits(if enable { bits | mask } else { bits & !mask })
+        });
     });
 }
 

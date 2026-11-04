@@ -47,23 +47,28 @@ impl I2sInstance {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
         let pcr = PCR::regs();
 
-        // The divider applies twice, unless the coefficients are set in this sequence, with a
-        // small division before the target one.
+        // The divider applies twice, unless each coefficient has a separate register write in
+        // this sequence, with a small division before the target one.
+        // See <https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e>.
         pcr.i2s_tx_clkm_conf()
             .modify(|_, w| unsafe { w.i2s_tx_clkm_div_num().bits(2) });
-        pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
-            w.i2s_tx_clkm_div_yn1().clear_bit();
-            w.i2s_tx_clkm_div_y().bits(1);
-            w.i2s_tx_clkm_div_z().bits(0);
-            w.i2s_tx_clkm_div_x().bits(0)
-        });
+        pcr.i2s_tx_clkm_div_conf()
+            .modify(|_, w| w.i2s_tx_clkm_div_yn1().clear_bit());
+        pcr.i2s_tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_tx_clkm_div_y().bits(1) });
+        pcr.i2s_tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_tx_clkm_div_z().bits(0) });
+        pcr.i2s_tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_tx_clkm_div_x().bits(0) });
 
-        pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
-            w.i2s_tx_clkm_div_yn1().bit(fraction.yn1);
-            w.i2s_tx_clkm_div_z().bits(fraction.z);
-            w.i2s_tx_clkm_div_y().bits(fraction.y);
-            w.i2s_tx_clkm_div_x().bits(fraction.x)
-        });
+        pcr.i2s_tx_clkm_div_conf()
+            .modify(|_, w| w.i2s_tx_clkm_div_yn1().bit(fraction.yn1));
+        pcr.i2s_tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_tx_clkm_div_z().bits(fraction.z) });
+        pcr.i2s_tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_tx_clkm_div_y().bits(fraction.y) });
+        pcr.i2s_tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_tx_clkm_div_x().bits(fraction.x) });
         pcr.i2s_tx_clkm_conf().modify(|_, w| unsafe {
             w.i2s_tx_clkm_sel().bits(clk_sel(new_config.sclk()));
             w.i2s_tx_clkm_div_num().bits(new_config.div_num() as u8)
@@ -87,21 +92,28 @@ impl I2sInstance {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
         let pcr = PCR::regs();
 
+        // The divider applies twice, unless each coefficient has a separate register write in
+        // this sequence, with a small division before the target one.
+        // See <https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e>.
         pcr.i2s_rx_clkm_conf()
             .modify(|_, w| unsafe { w.i2s_rx_clkm_div_num().bits(2) });
-        pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
-            w.i2s_rx_clkm_div_yn1().clear_bit();
-            w.i2s_rx_clkm_div_y().bits(1);
-            w.i2s_rx_clkm_div_z().bits(0);
-            w.i2s_rx_clkm_div_x().bits(0)
-        });
+        pcr.i2s_rx_clkm_div_conf()
+            .modify(|_, w| w.i2s_rx_clkm_div_yn1().clear_bit());
+        pcr.i2s_rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_rx_clkm_div_y().bits(1) });
+        pcr.i2s_rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_rx_clkm_div_z().bits(0) });
+        pcr.i2s_rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_rx_clkm_div_x().bits(0) });
 
-        pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
-            w.i2s_rx_clkm_div_yn1().bit(fraction.yn1);
-            w.i2s_rx_clkm_div_z().bits(fraction.z);
-            w.i2s_rx_clkm_div_y().bits(fraction.y);
-            w.i2s_rx_clkm_div_x().bits(fraction.x)
-        });
+        pcr.i2s_rx_clkm_div_conf()
+            .modify(|_, w| w.i2s_rx_clkm_div_yn1().bit(fraction.yn1));
+        pcr.i2s_rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_rx_clkm_div_z().bits(fraction.z) });
+        pcr.i2s_rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_rx_clkm_div_y().bits(fraction.y) });
+        pcr.i2s_rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.i2s_rx_clkm_div_x().bits(fraction.x) });
         pcr.i2s_rx_clkm_conf().modify(|_, w| unsafe {
             w.i2s_rx_clkm_sel().bits(clk_sel(new_config.sclk()));
             w.i2s_rx_clkm_div_num().bits(new_config.div_num() as u8)

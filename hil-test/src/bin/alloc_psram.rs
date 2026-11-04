@@ -14,6 +14,12 @@ use hil_test as _;
 
 extern crate alloc;
 
+/// A byte pattern that does not repeat at a power-of-two offset, so that an address wrap fails
+/// the read-back.
+fn pattern(i: usize) -> u8 {
+    ((i as u32).wrapping_mul(0x9E37_79B9) >> 24) as u8
+}
+
 #[embedded_test::tests(default_timeout = 30)] // P4 PSRAM can get large
 mod tests {
     use alloc::vec::Vec as AllocVec;
@@ -52,11 +58,11 @@ mod tests {
             let mut vec = AllocVec::with_capacity(free);
 
             for i in 0..free {
-                vec.push((i % 256) as u8);
+                vec.push(crate::pattern(i));
             }
 
             for i in 0..free {
-                assert_eq!(vec[i], (i % 256) as u8);
+                assert_eq!(vec[i], crate::pattern(i));
             }
         }
     }
@@ -113,11 +119,11 @@ mod tests {
             let mut vec = Vec::with_capacity_in(free, ExternalMemory);
 
             for i in 0..free {
-                vec.push((i % 256) as u8);
+                vec.push(crate::pattern(i));
             }
 
             for i in 0..free {
-                assert_eq!(vec[i], (i % 256) as u8);
+                assert_eq!(vec[i], crate::pattern(i));
             }
         }
     }
@@ -130,11 +136,11 @@ mod tests {
             let mut vec = Vec::with_capacity_in(free, AnyMemory);
 
             for i in 0..free {
-                vec.push((i % 256) as u8);
+                vec.push(crate::pattern(i));
             }
 
             for i in 0..free {
-                assert_eq!(vec[i], (i % 256) as u8);
+                assert_eq!(vec[i], crate::pattern(i));
             }
         }
     }
@@ -160,11 +166,11 @@ mod dcache_reclaimed {
         let mut vec = alloc::vec::Vec::with_capacity(16384);
 
         for i in 0..16384 {
-            vec.push((i % 256) as u8);
+            vec.push(crate::pattern(i));
         }
 
         for i in 0..16384 {
-            assert_eq!(vec[i], (i % 256) as u8);
+            assert_eq!(vec[i], crate::pattern(i));
         }
     }
 }

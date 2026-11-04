@@ -538,6 +538,9 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         false
     };
+    ("soc.cpu_pma_needs_core1_setup") => {
+        false
+    };
     ("soc.cpu_csr_prv_mode") => {
         3088
     };
@@ -545,6 +548,9 @@ macro_rules! property {
         stringify!(3088)
     };
     ("soc.internal_memory_cached") => {
+        false
+    };
+    ("soc.cpu_powers_down_cache") => {
         false
     };
     ("soc.has_swd_watchdog") => {

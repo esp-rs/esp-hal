@@ -1,5 +1,6 @@
 use crate::{
     gpio::{
+        GPIO_LOCK,
         LpPin,
         lp_io::{LpFunction, LpInputSignal, LpOutputSignal},
     },
@@ -91,10 +92,12 @@ pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
 
 pub(crate) fn pad_hold(lp: u8, enable: bool) {
     let mask = 1 << lp;
-    LP_IO_MUX::regs().lp_pad_hold().modify(|r, w| unsafe {
-        let bits = r.reg_lp_gpio_hold().bits();
-        w.reg_lp_gpio_hold()
-            .bits(if enable { bits | mask } else { bits & !mask })
+    GPIO_LOCK.lock(|| {
+        LP_IO_MUX::regs().lp_pad_hold().modify(|r, w| unsafe {
+            let bits = r.reg_lp_gpio_hold().bits();
+            w.reg_lp_gpio_hold()
+                .bits(if enable { bits | mask } else { bits & !mask })
+        });
     });
 }
 
@@ -117,21 +120,23 @@ pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
         return;
     };
 
-    if bit < 32 {
-        let mask = 1 << bit;
-        HP_SYS::regs().gpio_o_hold_ctrl0().modify(|r, w| unsafe {
-            let bits = r.reg_gpio_0_hold_low().bits();
-            w.reg_gpio_0_hold_low()
-                .bits(if enable { bits | mask } else { bits & !mask })
-        });
-    } else {
-        let mask = 1 << (bit - 32);
-        HP_SYS::regs().gpio_o_hold_ctrl1().modify(|r, w| unsafe {
-            let bits = r.reg_gpio_0_hold_high().bits();
-            w.reg_gpio_0_hold_high()
-                .bits(if enable { bits | mask } else { bits & !mask })
-        });
-    }
+    GPIO_LOCK.lock(|| {
+        if bit < 32 {
+            let mask = 1 << bit;
+            HP_SYS::regs().gpio_o_hold_ctrl0().modify(|r, w| unsafe {
+                let bits = r.reg_gpio_0_hold_low().bits();
+                w.reg_gpio_0_hold_low()
+                    .bits(if enable { bits | mask } else { bits & !mask })
+            });
+        } else {
+            let mask = 1 << (bit - 32);
+            HP_SYS::regs().gpio_o_hold_ctrl1().modify(|r, w| unsafe {
+                let bits = r.reg_gpio_0_hold_high().bits();
+                w.reg_gpio_0_hold_high()
+                    .bits(if enable { bits | mask } else { bits & !mask })
+            });
+        }
+    });
 }
 
 /// Returns whether something holds the pad of `gpio`.

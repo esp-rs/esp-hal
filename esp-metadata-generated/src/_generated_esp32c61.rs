@@ -448,6 +448,9 @@ macro_rules! property {
     ("psram.hex_spi") => {
         false
     };
+    ("psram.has_timing_tuning") => {
+        true
+    };
     ("psram.extmem_origin") => {
         1107296256
     };
@@ -481,6 +484,9 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         false
     };
+    ("soc.cpu_pma_needs_core1_setup") => {
+        false
+    };
     ("soc.cpu_csr_prv_mode") => {
         2064
     };
@@ -489,6 +495,9 @@ macro_rules! property {
     };
     ("soc.internal_memory_cached") => {
         false
+    };
+    ("soc.cpu_powers_down_cache") => {
+        true
     };
     ("soc.has_swd_watchdog") => {
         true

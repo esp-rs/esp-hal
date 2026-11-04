@@ -7,5 +7,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Set by the `self_cal` configuration of the `adc` test.
     println!("cargo::rustc-check-cfg=cfg(__test_adc_self_cal)");
 
+    println!("cargo::rustc-check-cfg=cfg(float_save_restore)");
+    if std::env::var_os("DEP_ESP_RISCV_RT_FLOAT_SAVE_RESTORE").is_some()
+        || std::env::var_os("DEP_XTENSA_LX_RT_FLOAT_SAVE_RESTORE").is_some()
+    {
+        println!("cargo::rustc-cfg=float_save_restore");
+    }
+
     Ok(())
 }

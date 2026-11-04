@@ -17,6 +17,7 @@ pub(crate) mod sleep;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
+pub(crate) mod temp_sensor;
 pub(crate) mod timergroup;
 pub(crate) mod uart;
 
@@ -38,6 +39,7 @@ pub(crate) use sleep::*;
 pub(crate) use soc::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
+pub(crate) use temp_sensor::*;
 pub(crate) use timergroup::*;
 pub(crate) use uart::*;
 
@@ -742,6 +744,9 @@ driver_configs![
                 /// Programmable DMA burst length (`DMABUSMODE.PBL`). A 32-beat burst
                 /// overflows the AXI bus on some chips.
                 dma_burst_len: u32,
+                /// The alignment, in bytes, that the EMAC DMA needs for each descriptor and
+                /// buffer.
+                dma_alignment: u32,
                 /// When true, the MAC exposes RGMII (1000 Mbps) pads in addition to RMII/MII.
                 #[serde(default)]
                 has_rgmii: bool,
@@ -875,7 +880,10 @@ driver_configs![
         TempProperties {
             driver: temp_sensor,
             name: "Temperature sensor",
-            properties: {}
+            properties: {
+                #[serde(default)]
+                register_block: TempSensorRegisterBlock,
+            }
         },
         TouchProperties {
             driver: touch,
@@ -1142,6 +1150,9 @@ driver_configs![
                 octal_spi: bool,
                 #[serde(default)]
                 hex_spi: bool,
+                /// The MSPI can tune the flash and PSRAM input timing.
+                #[serde(default)]
+                has_timing_tuning: bool,
                 extmem_origin: u32,
             }
         },
@@ -1177,10 +1188,17 @@ driver_configs![
                 cpu_has_zcmp_workaround: bool,
                 #[serde(default)]
                 multi_core_enabled: bool,
+                /// The bootloader sets the PMA entries on core 0 only. Core 1 must copy them.
+                #[serde(default)]
+                cpu_pma_needs_core1_setup: bool,
                 #[serde(default)]
                 cpu_csr_prv_mode: Option<u32>,
                 #[serde(default)]
                 internal_memory_cached: bool,
+                /// Whether the cache is in the CPU power domain. A CPU power-down loses the dirty
+                /// cache lines.
+                #[serde(default)]
+                cpu_powers_down_cache: bool,
                 #[serde(default)]
                 has_swd_watchdog: bool,
                 #[serde(default)]

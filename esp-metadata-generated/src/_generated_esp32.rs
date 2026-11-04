@@ -355,6 +355,12 @@ macro_rules! property {
     ("ethernet.dma_burst_len", str) => {
         stringify!(32)
     };
+    ("ethernet.dma_alignment") => {
+        4
+    };
+    ("ethernet.dma_alignment", str) => {
+        stringify!(4)
+    };
     ("ethernet.has_rgmii") => {
         false
     };
@@ -511,6 +517,9 @@ macro_rules! property {
     ("psram.hex_spi") => {
         false
     };
+    ("psram.has_timing_tuning") => {
+        false
+    };
     ("psram.extmem_origin") => {
         1065353216
     };
@@ -544,7 +553,13 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         true
     };
+    ("soc.cpu_pma_needs_core1_setup") => {
+        false
+    };
     ("soc.internal_memory_cached") => {
+        false
+    };
+    ("soc.cpu_powers_down_cache") => {
         false
     };
     ("soc.has_swd_watchdog") => {

@@ -362,6 +362,15 @@ of configuration can be specified this way.
 This key is additive. The unnamed list is added to named lists, and multiple lists with the
 same name are merged.
 
+### `//% DEFAULT-FEATURES`
+
+Set to `false` to build with `--no-default-features`. This disables only the default features
+of the package that contains the test or example, not the default features of its dependencies.
+
+```
+//% DEFAULT-FEATURES: false
+```
+
 ### Working with multiple metadata configurations
 
 Processing a file will create one configuration, or however many names (that is, the list of
@@ -386,6 +395,10 @@ parameters match multiple files, they will be built or executed in succession.
 For example, running `cargo xtask test esp32 embassy_test` will run both
 `embassy_test_single_integrated` and `embassy_test_multiple_integrated`, but you can also
 run `cargo xtask test esp32 embassy_test_multiple_integrated` to select only one.
+
+To run only some test cases of a binary, add a filter as `binary::filter`. For example,
+`cargo xtask test esp32 gpio::pad_hold` runs the test cases of `gpio` whose name contains
+`pad_hold`.
 
 In this example, running the `cargo xtask build tests esp32 embassy_test` command creates an
 `embassy_test_single_integrated` and an `embassy_test_multiple_integrated` binary.

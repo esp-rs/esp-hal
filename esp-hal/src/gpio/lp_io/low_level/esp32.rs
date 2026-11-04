@@ -1,5 +1,5 @@
 use crate::{
-    gpio::lp_io::LpFunction,
+    gpio::{GPIO_LOCK, lp_io::LpFunction},
     peripherals::{GPIO, LPWR, RTC_IO},
 };
 
@@ -21,20 +21,22 @@ macro_rules! lp_io_analog {
                     output_enable(self.lp_number(), false);
                     set_open_drain_output(self.number(), false);
 
-                    RTC_IO::regs().$pin_reg.modify(|_, w| {
-                        w.[<$prefix fun_ie>]().clear_bit();
-                        w.[<$prefix mux_sel>]().set_bit();
-                        unsafe { w.[<$prefix fun_sel>]().bits(LpFunction::LP_GPIO as u8) };
+                    GPIO_LOCK.lock(|| {
+                        RTC_IO::regs().$pin_reg.modify(|_, w| {
+                            w.[<$prefix fun_ie>]().clear_bit();
+                            w.[<$prefix mux_sel>]().set_bit();
+                            unsafe { w.[<$prefix fun_sel>]().bits(LpFunction::LP_GPIO as u8) };
 
-                        // Only output pins have PU/PD resistors.
-                        for_each_gpio! {
-                            ($n:tt, $pin_peri $in_afs:tt $out_afs:tt ($input:tt [Output])) => {
-                                w.[<$prefix rue>]().bit(false);
-                                w.[<$prefix rde>]().bit(false);
-                            };
-                        }
+                            // Only output pins have PU/PD resistors.
+                            for_each_gpio! {
+                                ($n:tt, $pin_peri $in_afs:tt $out_afs:tt ($input:tt [Output])) => {
+                                    w.[<$prefix rue>]().bit(false);
+                                    w.[<$prefix rde>]().bit(false);
+                                };
+                            }
 
-                        w
+                            w
+                        });
                     });
                 }
             }
@@ -53,13 +55,13 @@ macro_rules! lp_io_analog {
             paste::paste! {
                 match lp {
                     $(
-                        $lp_pin => {
+                        $lp_pin => GPIO_LOCK.lock(|| {
                             RTC_IO::regs().$pin_reg.modify(|_, w| unsafe {
                                 w.[<$prefix fun_ie>]().bit(input_enable);
                                 w.[<$prefix mux_sel>]().bit(mux);
                                 w.[<$prefix fun_sel>]().bits(func as u8)
                             });
-                        }
+                        }),
                     )+
                     _ => unreachable!(),
                 }
@@ -70,21 +72,23 @@ macro_rules! lp_io_analog {
         /// in the always-on register. The pad keeps the bit of the pad register
         /// through a reset, so a release must clear both.
         pub(crate) fn pad_hold(lp: u8, enable: bool) {
-            paste::paste! {
-                match lp {
-                    $(
-                        $lp_pin => {
-                            RTC_IO::regs()
-                                .$pin_reg
-                                .modify(|_, w| w.[<$prefix hold>]().bit(enable));
-                            LPWR::regs()
-                                .hold_force()
-                                .modify(|_, w| w.$hold().bit(enable));
-                        }
-                    )+
-                    _ => unreachable!(),
+            GPIO_LOCK.lock(|| {
+                paste::paste! {
+                    match lp {
+                        $(
+                            $lp_pin => {
+                                RTC_IO::regs()
+                                    .$pin_reg
+                                    .modify(|_, w| w.[<$prefix hold>]().bit(enable));
+                                LPWR::regs()
+                                    .hold_force()
+                                    .modify(|_, w| w.$hold().bit(enable));
+                            }
+                        )+
+                        _ => unreachable!(),
+                    }
                 }
-            }
+            });
         }
 
         /// Returns whether something holds the pad.
@@ -111,9 +115,11 @@ macro_rules! lp_io_analog {
             $(
                 ($lp_pin, $field:ident, $enable:ident) => {{
                     paste::paste! {
-                        RTC_IO::regs()
-                            .$pin_reg
-                            .modify(|_, w|  w.[<$prefix $field>]().bit($enable));
+                        GPIO_LOCK.lock(|| {
+                            RTC_IO::regs()
+                                .$pin_reg
+                                .modify(|_, w|  w.[<$prefix $field>]().bit($enable));
+                        });
                     }
                 }};
             )+
@@ -211,10 +217,12 @@ pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
     };
 
     let mask = 1 << bit;
-    RTC_IO::regs().dig_pad_hold().modify(|r, w| unsafe {
-        let bits = r.dig_pad_hold().bits();
-        w.dig_pad_hold()
-            .bits(if enable { bits | mask } else { bits & !mask })
+    GPIO_LOCK.lock(|| {
+        RTC_IO::regs().dig_pad_hold().modify(|r, w| unsafe {
+            let bits = r.dig_pad_hold().bits();
+            w.dig_pad_hold()
+                .bits(if enable { bits | mask } else { bits & !mask })
+        });
     });
 }
 
