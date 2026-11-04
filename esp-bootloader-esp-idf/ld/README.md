@@ -10,6 +10,10 @@ search path; the application passes `-Tlinkall.x` as usual.
 - `riscv/`, `xtensa/`: `esp_idf_boot.x` (entry point, `.data` handling) and the parts of the shared
   sections that differ per architecture.
 
+`esp-bootloader-direct-boot` is the other bootloader support crate: the ROM starts the
+application directly, and its entry stub copies the RAM sections from flash. Both crates set
+`links = "esp-bootloader"`, so Cargo rejects a dependency graph with both.
+
 ## Contract for bootloader support crates
 
 esp-hal's `OUT_DIR` provides these files, so no script in a bootloader support crate may share a
