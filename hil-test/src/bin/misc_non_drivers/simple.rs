@@ -206,14 +206,19 @@ mod tests {
     }
 
     // These tests need a runner that reads the serial endpoint, as `probe-rs run` does. Without
-    // a reader, the boot messages fill the output FIFO and a write never finishes. Nothing sends
-    // to the board, so the qa example `usb-serial-jtag-io` tests reads.
+    // a reader, the boot messages fill the output FIFO and a write never finishes. The qa example
+    // `usb-serial-jtag-io` tests reads.
+    // The ESP32-S31 HIL runner does not connect the USB port of the board.
     #[test]
-    #[cfg(usb_serial_jtag_driver_supported)]
+    #[cfg(all(usb_serial_jtag_driver_supported, not(esp32s31)))]
     fn usb_serial_jtag_reports_room_and_no_data(ctx: Context) {
         use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
 
         let mut usb_serial = UsbSerialJtag::new(ctx.p.USB_DEVICE);
+
+        // Other programs on the runner can leave bytes in the input FIFO. A chip reset does not
+        // clear the input FIFO.
+        while usb_serial.read_byte().is_ok() {}
 
         assert!(usb_serial.write_ready());
         assert!(!usb_serial.read_ready());
@@ -244,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(usb_serial_jtag_driver_supported)]
+    #[cfg(all(usb_serial_jtag_driver_supported, not(esp32s31)))]
     fn usb_serial_jtag_io_write_returns_after_one_packet(ctx: Context) {
         use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
 
@@ -264,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(usb_serial_jtag_driver_supported)]
+    #[cfg(all(usb_serial_jtag_driver_supported, not(esp32s31)))]
     fn usb_serial_jtag_io_write_returns_a_short_count(ctx: Context) {
         use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
 
@@ -275,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(usb_serial_jtag_driver_supported)]
+    #[cfg(all(usb_serial_jtag_driver_supported, not(esp32s31)))]
     fn usb_serial_jtag_io_flush_and_write_all_finish(ctx: Context) {
         use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
 
