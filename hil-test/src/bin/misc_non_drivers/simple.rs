@@ -218,7 +218,7 @@ mod tests {
 
         // Other programs on the runner can leave bytes in the input FIFO. A chip reset does not
         // clear the input FIFO.
-        while usb_serial.read_byte().is_ok() {}
+        while usb_serial.read_buffered(&mut [0; 64]) != Ok(0) {}
 
         assert!(usb_serial.write_ready());
         assert!(!usb_serial.read_ready());
@@ -293,5 +293,87 @@ mod tests {
             embedded_io::Write::write_all(&mut tx, &[b'-'; 1000]),
             Ok(())
         );
+        assert_eq!(embedded_io::Write::flush(&mut tx), Ok(()));
+    }
+
+    #[test]
+    #[cfg(usb_serial_jtag_driver_supported)]
+    fn usb_serial_jtag_empty_buffers_return_zero(ctx: Context) {
+        use embassy_futures::block_on;
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+
+        let mut usb_serial = UsbSerialJtag::new(ctx.p.USB_DEVICE).into_async();
+
+        assert_eq!(usb_serial.write(&[]), Ok(0));
+        assert_eq!(usb_serial.read(&mut []), Ok(0));
+        assert_eq!(usb_serial.read_buffered(&mut [0; 8]), Ok(0));
+        assert_eq!(block_on(usb_serial.write_async(&[])), Ok(0));
+        assert_eq!(block_on(usb_serial.read_async(&mut [])), Ok(0));
+        assert_eq!(block_on(usb_serial.read_exact_async(&mut [])), Ok(()));
+    }
+
+    #[test]
+    #[cfg(all(usb_serial_jtag_driver_supported, not(esp32s31)))]
+    fn usb_serial_jtag_async_write_returns_after_one_packet(ctx: Context) {
+        use embassy_futures::block_on;
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+
+        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE).into_async().split();
+
+        assert_eq!(
+            block_on(embedded_io_async::Write::write(&mut tx, &[0x55; 100])),
+            Ok(64)
+        );
+        assert_eq!(block_on(tx.write_async(&[0x55; 100])), Ok(64));
+        assert_eq!(block_on(tx.flush_async()), Ok(()));
+    }
+
+    #[test]
+    #[cfg(all(usb_serial_jtag_driver_supported, not(esp32s31)))]
+    fn usb_serial_jtag_write_after_flush_and_wait_finishes(ctx: Context) {
+        use embassy_futures::block_on;
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+
+        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE).into_async().split();
+
+        block_on(tx.wait_for_write_ready());
+        assert_eq!(block_on(tx.write_async(b"hello")), Ok(5));
+        assert_eq!(block_on(tx.flush_async()), Ok(()));
+        block_on(tx.wait_for_write_ready());
+        assert_eq!(block_on(tx.write_async(b"!")), Ok(1));
+        assert_eq!(block_on(tx.flush_async()), Ok(()));
+    }
+
+    #[test]
+    #[cfg(all(usb_serial_jtag_driver_supported, not(esp32s31)))]
+    fn usb_serial_jtag_two_full_packets_without_flush_finish(ctx: Context) {
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+
+        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE).split();
+
+        assert_eq!(tx.write(&[b'-'; 64]), Ok(64));
+        assert_eq!(tx.write(&[b'-'; 64]), Ok(64));
+        assert_eq!(tx.flush(), Ok(()));
+    }
+
+    #[test]
+    #[cfg(all(usb_serial_jtag_driver_supported, not(esp32s31)))]
+    fn usb_serial_jtag_try_flush_sends_a_packet_once(ctx: Context) {
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+
+        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE).split();
+
+        // With nothing pending, a flush sends no packet, so the FIFO stays free.
+        assert!(tx.try_flush());
+        assert!(tx.write_ready());
+
+        assert_eq!(tx.write(b"hello"), Ok(5));
+        assert!(!tx.try_flush());
+        while !tx.try_flush() {}
+
+        assert!(tx.try_flush());
+        assert!(tx.write_ready());
+        assert_eq!(tx.flush(), Ok(()));
+        assert!(tx.write_ready());
     }
 }

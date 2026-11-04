@@ -24,7 +24,7 @@ where
     Dm: DriverMode,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write(s.as_bytes()).map_err(|_| core::fmt::Error)?;
+        self.write_all(s.as_bytes()).map_err(|_| core::fmt::Error)?;
         Ok(())
     }
 }
@@ -56,14 +56,14 @@ where
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write(s.as_bytes())?;
+        self.write_all(s.as_bytes())?;
         Ok(())
     }
 
     #[inline]
     fn write_char(&mut self, ch: char) -> Result<(), Self::Error> {
         let mut buffer = [0u8; 4];
-        self.write(ch.encode_utf8(&mut buffer).as_bytes())?;
+        self.write_all(ch.encode_utf8(&mut buffer).as_bytes())?;
 
         Ok(())
     }
@@ -109,12 +109,7 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        loop {
-            let count = self.drain_rx_fifo(buf);
-            if count > 0 {
-                return Ok(count);
-            }
-        }
+        UsbSerialJtagRx::read(self, buf)
     }
 }
 
@@ -138,11 +133,11 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_packet(buf)
+        UsbSerialJtagTx::write(self, buf)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_tx()
+        UsbSerialJtagTx::flush(self)
     }
 }
 
@@ -226,12 +221,7 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        loop {
-            let count = self.drain_rx_fifo(buf);
-            if count > 0 {
-                return Ok(count);
-            }
-        }
+        UsbSerialJtagRx::read(self, buf)
     }
 }
 
@@ -255,11 +245,11 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_packet(buf)
+        UsbSerialJtagTx::write(self, buf)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_tx()
+        UsbSerialJtagTx::flush(self)
     }
 }
 
@@ -317,13 +307,11 @@ impl embedded_io_async_06::Write for UsbSerialJtag<'_, Async> {
 #[instability::unstable]
 impl embedded_io_async_06::Write for UsbSerialJtagTx<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_async(buf).await?;
-
-        Ok(buf.len())
+        self.write_async(buf).await
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_tx_async().await
+        self.flush_async().await
     }
 }
 
@@ -355,13 +343,11 @@ impl embedded_io_async_07::Write for UsbSerialJtag<'_, Async> {
 #[instability::unstable]
 impl embedded_io_async_07::Write for UsbSerialJtagTx<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_async(buf).await?;
-
-        Ok(buf.len())
+        self.write_async(buf).await
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_tx_async().await
+        self.flush_async().await
     }
 }
 
