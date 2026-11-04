@@ -62,10 +62,8 @@
 //!   stays off for the whole transfer. Split a large transfer when latency matters.
 //! - On a dual-core chip, the multi-core strategy controls the other core for every operation,
 //!   including a read.
-//! - Each operation runs with the caches suspended, and that part must not call code in flash.
-//!   esp-hal must be built at `opt-level` 2 or 3 in each profile that uses [`Flash`]. At other
-//!   levels, the link can fail with `prohibited cross reference from '.rwtext.cache_suspend_safe'`.
-//!   The application can set the level for esp-hal only, with `[profile.dev.package.esp-hal]`.
+//! - Each operation suspends the caches. See [Optimization level](crate#optimization-level) for the
+//!   build requirement.
 
 use core::marker::PhantomData;
 
