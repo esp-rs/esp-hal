@@ -157,6 +157,26 @@ fn main() -> ! {
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_hal_config_table.md"))]
 #![doc = ""]
+//! ## Optimization level
+//!
+//! Some operations suspend the caches. The code that runs while the caches are suspended must not
+//! call code in flash. The documentation of each operation with this requirement links to this
+//! section.
+//!
+//! To use these operations, build esp-hal at `opt-level` 2 or 3 in each profile. At other levels,
+//! the link can fail with `prohibited cross reference from '.rwtext.cache_suspend_safe'` and the
+//! name of a helper function. GNU ld, the default linker for the ESP32, ESP32-S2 and ESP32-S3,
+//! finds only some of these calls. The link can then pass, and the chip locks up at run time. The
+//! `Cargo.toml` of the application can set the level for esp-hal only:
+//!
+//! ```toml
+//! [profile.dev.package.esp-hal]
+//! opt-level = 2
+//!
+//! [profile.release.package.esp-hal]
+//! opt-level = 2
+//! ```
+//!
 //! ## Don't use `core::mem::forget`
 //!
 //! You should never use `core::mem::forget` on any type defined in [esp crates].

@@ -178,7 +178,11 @@ impl<'d> LowPower<'d> {
     ///
     /// A wakeup source cannot refuse this sleep. The wake resets the chip, so the call cannot
     /// return a refusal. [`Self::sleep_light`] reports a refusal.
-    ///
+    #[cfg_attr(
+        cpu_retention = "software",
+        doc = "\n\nDeep sleep shares the entry code of light sleep. See [Optimization \
+               level](crate#optimization-level) for the build requirement.\n"
+    )]
     /// # Panics
     ///
     /// Panics if no wakeup source is enabled, because then nothing can end the sleep. Panics also
@@ -216,7 +220,11 @@ impl<'d> LowPower<'d> {
     /// reach the deep-sleep current, and it cannot know their earlier configuration. Configure
     /// those pads again if this function returns. ESP-IDF has the same limit in
     /// `esp_deep_sleep_try_to_start`.
-    ///
+    #[cfg_attr(
+        cpu_retention = "software",
+        doc = "\n\nDeep sleep shares the entry code of light sleep. See [Optimization \
+               level](crate#optimization-level) for the build requirement.\n"
+    )]
     /// # Panics
     ///
     /// Panics if no wakeup source is enabled.
@@ -247,14 +255,8 @@ impl<'d> LowPower<'d> {
     /// result.
     #[cfg_attr(
         cpu_retention = "software",
-        doc = "\n\nPart of the sleep runs with the caches suspended, and that part must not call \
-               code in flash. esp-hal must be built at `opt-level` 2 or 3 in each profile that \
-               uses light sleep. At other levels, the link can fail with `prohibited cross \
-               reference from '.rwtext.cache_suspend_safe'` and the name of a helper function. \
-               The `Cargo.toml` of the application can set the level for esp-hal \
-               only:\n\n```toml\n\
-               [profile.dev.package.esp-hal]\nopt-level = 2\n\n\
-               [profile.release.package.esp-hal]\nopt-level = 2\n```"
+        doc = "\n\nLight sleep suspends the caches. See [Optimization \
+               level](crate#optimization-level) for the build requirement."
     )]
     #[cfg(sleep_light_sleep)]
     #[cfg(feature = "rt")]
