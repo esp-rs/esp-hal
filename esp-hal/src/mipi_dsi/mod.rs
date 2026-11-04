@@ -33,11 +33,10 @@ pub mod dbi;
 pub mod dpi;
 pub(crate) mod vdma;
 
-use core::marker::PhantomData;
-
 use dpi::DsiDpi;
 use procmacros::BuilderLite;
 pub use vdma::VdmaDmaChannel;
+use vdma::{OwnedVdmaChannel, take_owned_vdma_channel};
 
 use crate::{
     peripherals::{MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, PMU},
@@ -118,11 +117,11 @@ pub enum ConfigError {
 /// Owns the DSI peripheral and one VDMA channel; powers down the D-PHY on drop.
 pub(crate) struct DphyGuard<'d> {
     pub(crate) _dsi: MIPI_DSI<'d>,
+    pub(crate) _vdma_channel: OwnedVdmaChannel<'d>,
     /// The hardware channel index (0–3) of the VDMA channel in use.
     pub(crate) vdma_channel_id: u8,
     pub(crate) _dsi_guard: GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }>,
     pub(crate) _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
-    pub(crate) _phantom: PhantomData<&'d mut ()>,
 }
 
 impl Drop for DphyGuard<'_> {
@@ -164,7 +163,7 @@ impl<'d> MipiDsi<'d> {
             return Err(ConfigError::InvalidLaneBitRate);
         }
 
-        let vdma_channel_id = vdma_channel.channel_id();
+        let (owned_vdma_channel, vdma_channel_id) = take_owned_vdma_channel(vdma_channel);
 
         dphy_ldo_power_on();
 
@@ -192,10 +191,10 @@ impl<'d> MipiDsi<'d> {
 
         let dphy_guard = DphyGuard {
             _dsi: dsi,
+            _vdma_channel: owned_vdma_channel,
             vdma_channel_id,
             _dsi_guard: dsi_guard,
             _vdma_guard: vdma_guard,
-            _phantom: PhantomData,
         };
 
         let host = MIPI_DSI_HOST::regs();
