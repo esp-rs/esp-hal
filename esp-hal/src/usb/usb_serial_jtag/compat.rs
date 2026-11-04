@@ -10,6 +10,7 @@ impl crate::interrupt::InterruptConfigurable for UsbSerialJtag<'_, Blocking> {
     }
 }
 
+#[instability::unstable]
 impl<Dm> core::fmt::Write for UsbSerialJtag<'_, Dm>
 where
     Dm: DriverMode,
@@ -19,6 +20,7 @@ where
     }
 }
 
+#[instability::unstable]
 impl<Dm> core::fmt::Write for UsbSerialJtagTx<'_, Dm>
 where
     Dm: DriverMode,
