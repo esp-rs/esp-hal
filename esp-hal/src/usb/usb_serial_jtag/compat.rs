@@ -1,4 +1,13 @@
-use super::{Error, UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx};
+use super::{
+    Config,
+    ConfigError,
+    IoError,
+    RxError,
+    TxError,
+    UsbSerialJtag,
+    UsbSerialJtagRx,
+    UsbSerialJtagTx,
+};
 use crate::{Async, Blocking, DriverMode};
 
 impl crate::private::Sealed for UsbSerialJtag<'_, Blocking> {}
@@ -7,6 +16,101 @@ impl crate::private::Sealed for UsbSerialJtag<'_, Blocking> {}
 impl crate::interrupt::InterruptConfigurable for UsbSerialJtag<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.set_interrupt_handler(handler);
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embassy_embedded_hal::SetConfig for UsbSerialJtag<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embassy_embedded_hal::SetConfig for UsbSerialJtagTx<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embassy_embedded_hal::SetConfig for UsbSerialJtagRx<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_06::Error for RxError {
+    fn kind(&self) -> embedded_io_06::ErrorKind {
+        match self {
+            RxError::Timeout => embedded_io_06::ErrorKind::TimedOut,
+        }
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_07::Error for RxError {
+    fn kind(&self) -> embedded_io_07::ErrorKind {
+        match self {
+            RxError::Timeout => embedded_io_07::ErrorKind::TimedOut,
+        }
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_06::Error for IoError {
+    fn kind(&self) -> embedded_io_06::ErrorKind {
+        match self {
+            IoError::Tx(e) => embedded_io_06::Error::kind(e),
+            IoError::Rx(e) => embedded_io_06::Error::kind(e),
+        }
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_07::Error for IoError {
+    fn kind(&self) -> embedded_io_07::ErrorKind {
+        match self {
+            IoError::Tx(e) => embedded_io_07::Error::kind(e),
+            IoError::Rx(e) => embedded_io_07::Error::kind(e),
+        }
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_06::Error for TxError {
+    fn kind(&self) -> embedded_io_06::ErrorKind {
+        match self {
+            TxError::Timeout => embedded_io_06::ErrorKind::TimedOut,
+        }
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_07::Error for TxError {
+    fn kind(&self) -> embedded_io_07::ErrorKind {
+        match self {
+            TxError::Timeout => embedded_io_07::ErrorKind::TimedOut,
+        }
     }
 }
 
@@ -36,7 +140,7 @@ impl<Dm> ufmt_write::uWrite for UsbSerialJtag<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = TxError;
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
@@ -54,7 +158,7 @@ impl<Dm> ufmt_write::uWrite for UsbSerialJtagTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = TxError;
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
@@ -76,7 +180,7 @@ impl<Dm> embedded_io_06::ErrorType for UsbSerialJtag<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = IoError;
 }
 
 #[instability::unstable]
@@ -84,7 +188,7 @@ impl<Dm> embedded_io_06::ErrorType for UsbSerialJtagTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = TxError;
 }
 
 #[instability::unstable]
@@ -92,7 +196,7 @@ impl<Dm> embedded_io_06::ErrorType for UsbSerialJtagRx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = RxError;
 }
 
 #[instability::unstable]
@@ -101,7 +205,7 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_06::Read::read(&mut self.rx, buf)
+        embedded_io_06::Read::read(&mut self.rx, buf).map_err(IoError::Rx)
     }
 }
 
@@ -121,11 +225,11 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_06::Write::write(&mut self.tx, buf)
+        embedded_io_06::Write::write(&mut self.tx, buf).map_err(IoError::Tx)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_06::Write::flush(&mut self.tx)
+        embedded_io_06::Write::flush(&mut self.tx).map_err(IoError::Tx)
     }
 }
 
@@ -188,7 +292,7 @@ impl<Dm> embedded_io_07::ErrorType for UsbSerialJtag<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = IoError;
 }
 
 #[instability::unstable]
@@ -196,7 +300,7 @@ impl<Dm> embedded_io_07::ErrorType for UsbSerialJtagTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = TxError;
 }
 
 #[instability::unstable]
@@ -204,7 +308,7 @@ impl<Dm> embedded_io_07::ErrorType for UsbSerialJtagRx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = RxError;
 }
 
 #[instability::unstable]
@@ -213,7 +317,7 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_07::Read::read(&mut self.rx, buf)
+        embedded_io_07::Read::read(&mut self.rx, buf).map_err(IoError::Rx)
     }
 }
 
@@ -233,11 +337,11 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_07::Write::write(&mut self.tx, buf)
+        embedded_io_07::Write::write(&mut self.tx, buf).map_err(IoError::Tx)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_07::Write::flush(&mut self.tx)
+        embedded_io_07::Write::flush(&mut self.tx).map_err(IoError::Tx)
     }
 }
 
@@ -298,11 +402,15 @@ where
 #[instability::unstable]
 impl embedded_io_async_06::Write for UsbSerialJtag<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_06::Write::write(&mut self.tx, buf).await
+        embedded_io_async_06::Write::write(&mut self.tx, buf)
+            .await
+            .map_err(IoError::Tx)
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_async_06::Write::flush(&mut self.tx).await
+        embedded_io_async_06::Write::flush(&mut self.tx)
+            .await
+            .map_err(IoError::Tx)
     }
 }
 
@@ -320,7 +428,9 @@ impl embedded_io_async_06::Write for UsbSerialJtagTx<'_, Async> {
 #[instability::unstable]
 impl embedded_io_async_06::Read for UsbSerialJtag<'_, Async> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_06::Read::read(&mut self.rx, buf).await
+        embedded_io_async_06::Read::read(&mut self.rx, buf)
+            .await
+            .map_err(IoError::Rx)
     }
 }
 
@@ -334,11 +444,15 @@ impl embedded_io_async_06::Read for UsbSerialJtagRx<'_, Async> {
 #[instability::unstable]
 impl embedded_io_async_07::Write for UsbSerialJtag<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_07::Write::write(&mut self.tx, buf).await
+        embedded_io_async_07::Write::write(&mut self.tx, buf)
+            .await
+            .map_err(IoError::Tx)
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_async_07::Write::flush(&mut self.tx).await
+        embedded_io_async_07::Write::flush(&mut self.tx)
+            .await
+            .map_err(IoError::Tx)
     }
 }
 
@@ -356,7 +470,9 @@ impl embedded_io_async_07::Write for UsbSerialJtagTx<'_, Async> {
 #[instability::unstable]
 impl embedded_io_async_07::Read for UsbSerialJtag<'_, Async> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_07::Read::read(&mut self.rx, buf).await
+        embedded_io_async_07::Read::read(&mut self.rx, buf)
+            .await
+            .map_err(IoError::Rx)
     }
 }
 

@@ -44,14 +44,23 @@
 //! The driver must be the only writer to the output FIFO. Other writers, for example ROM
 //! functions or a logger on the same peripheral, can make the flush functions skip a packet.
 //!
+//! ### Timeout
+//!
+//! The host takes a packet only while a program on the host reads the serial port. The blocking
+//! write and flush functions wait for the host for at most [`Config::tx_timeout`], then return
+//! [`TxError::Timeout`]. After a timeout, they return [`TxError::Timeout`] at once until the host
+//! takes the packet. The blocking read functions wait for data for at most
+//! [`Config::rx_timeout`], then return [`RxError::Timeout`]. The async functions do not time
+//! out. Use a timer to cancel them.
+//!
 //! ## Examples
 //!
 //! ### Sending Data
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+//! use esp_hal::usb::usb_serial_jtag::{Config, UsbSerialJtag};
 //!
-//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, Config::default())?;
 //!
 //! // `write` stores at most one packet, so write in a loop.
 //! let mut data: &[u8] = b"Hello, world!";
@@ -66,9 +75,9 @@
 //! ### Splitting the Driver into Transmitter and Receiver
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
+//! use esp_hal::usb::usb_serial_jtag::{Config, UsbSerialJtag};
 //!
-//! let usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
+//! let usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, Config::default())?;
 //! let (mut rx, mut tx) = usb_serial.split();
 //!
 //! tx.write(&[42u8])?;
@@ -82,11 +91,11 @@
 //! ### Receiving Data in an Interrupt Handler
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::{delay::Delay, usb::usb_serial_jtag::UsbSerialJtag, Blocking};
+//! # use esp_hal::{delay::Delay, usb::usb_serial_jtag::{Config, UsbSerialJtag}, Blocking};
 //!
 //! let delay = Delay::new();
 //!
-//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, Config::default())?;
 //! usb_serial.set_interrupt_handler(usb_device);
 //! usb_serial.listen_rx_packet_recv_interrupt();
 //!
@@ -112,7 +121,7 @@
 //!             println!("USB serial interrupt");
 //!
 //!             let mut buffer = [0u8; 64];
-//!             let Ok(count) = usb_serial.read_buffered(&mut buffer);
+//!             let count = usb_serial.read_buffered(&mut buffer).unwrap_or(0);
 //!             println!("Read bytes: {:02x?}", &buffer[..count]);
 //!
 //!             usb_serial.reset_rx_packet_recv_interrupt();
@@ -121,7 +130,7 @@
 //! }
 //! ```
 
-use core::{convert::Infallible, marker::PhantomData, task::Poll};
+use core::{marker::PhantomData, task::Poll};
 
 use esp_sync::RawMutex;
 use procmacros::handler;
@@ -135,12 +144,137 @@ use crate::{
     peripherals::USB_DEVICE,
     rtc_cntl::WakeLock,
     system::{Peripheral, PeripheralClockControl},
+    time::{Duration, Instant},
 };
 
 mod compat;
 
-/// The data path of the peripheral cannot fail.
-type Error = Infallible;
+/// USB Serial/JTAG transmitter error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
+pub enum TxError {
+    /// The host took no packet within [`Config::tx_timeout`].
+    ///
+    /// No program on the host reads the serial port, or the USB cable is disconnected.
+    Timeout,
+}
+
+#[instability::unstable]
+impl core::error::Error for TxError {}
+
+#[instability::unstable]
+impl core::fmt::Display for TxError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TxError::Timeout => write!(f, "The host took no packet within the timeout"),
+        }
+    }
+}
+
+/// USB Serial/JTAG receiver error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
+pub enum RxError {
+    /// The host sent no data within [`Config::rx_timeout`].
+    Timeout,
+}
+
+#[instability::unstable]
+impl core::error::Error for RxError {}
+
+#[instability::unstable]
+impl core::fmt::Display for RxError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            RxError::Timeout => write!(f, "The host sent no data within the timeout"),
+        }
+    }
+}
+
+/// USB Serial/JTAG error of the full-duplex driver.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
+pub enum IoError {
+    /// Transmitter error.
+    Tx(TxError),
+    /// Receiver error.
+    Rx(RxError),
+}
+
+#[instability::unstable]
+impl core::error::Error for IoError {}
+
+#[instability::unstable]
+impl core::fmt::Display for IoError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            IoError::Tx(e) => e.fmt(f),
+            IoError::Rx(e) => e.fmt(f),
+        }
+    }
+}
+
+#[instability::unstable]
+impl From<TxError> for IoError {
+    fn from(e: TxError) -> Self {
+        IoError::Tx(e)
+    }
+}
+
+#[instability::unstable]
+impl From<RxError> for IoError {
+    fn from(e: RxError) -> Self {
+        IoError::Rx(e)
+    }
+}
+
+/// USB Serial/JTAG configuration error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
+pub enum ConfigError {}
+
+#[instability::unstable]
+impl core::error::Error for ConfigError {}
+
+#[instability::unstable]
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match *self {}
+    }
+}
+
+/// USB Serial/JTAG driver configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
+pub struct Config {
+    /// How long a blocking write or flush waits for the host to take a packet.
+    ///
+    /// `None` waits forever. The default is 50 ms.
+    tx_timeout: Option<Duration>,
+    /// How long a blocking read waits for the host to send data.
+    ///
+    /// `None` waits forever. The default is `None`.
+    rx_timeout: Option<Duration>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            tx_timeout: Some(Duration::from_millis(50)),
+            rx_timeout: None,
+        }
+    }
+}
 
 /// USB Serial/JTAG driver with a transmitter and a receiver.
 ///
@@ -165,6 +299,9 @@ pub struct UsbSerialJtagTx<'d, Dm: DriverMode> {
     partial: bool,
     /// The last packet had 64 bytes, and no shorter packet ended the transfer.
     zlp_owed: bool,
+    tx_timeout: Option<Duration>,
+    /// A blocking wait timed out, and the host has taken no packet since.
+    timed_out: bool,
 }
 
 /// USB Serial/JTAG receiver.
@@ -175,13 +312,20 @@ pub struct UsbSerialJtagRx<'d, Dm: DriverMode> {
     peripheral: USB_DEVICE<'d>,
     phantom: PhantomData<Dm>,
     wake_lock: WakeLock,
+    rx_timeout: Option<Duration>,
 }
 
 impl<'d> UsbSerialJtag<'d, Blocking> {
     /// Creates a new USB Serial/JTAG driver in [`Blocking`] mode.
+    ///
+    /// # Errors
+    ///
+    /// This function does not fail. [`ConfigError`] has no variants.
     #[instability::unstable]
-    pub fn new(usb_device: USB_DEVICE<'d>) -> Self {
-        Self::new_inner(usb_device)
+    pub fn new(usb_device: USB_DEVICE<'d>, config: Config) -> Result<Self, ConfigError> {
+        let mut this = Self::new_inner(usb_device);
+        this.apply_config(&config)?;
+        Ok(this)
     }
 
     /// Reconfigures the driver to operate in [`Async`] mode.
@@ -258,11 +402,15 @@ impl<'d> UsbSerialJtag<'d, Async> {
     /// The hardware sends the FIFO to the host when it holds 64 bytes. Call [`Self::flush_async`]
     /// to send fewer bytes.
     ///
+    /// # Errors
+    ///
+    /// This function does not time out. It returns no error.
+    ///
     /// # Cancellation Safety
     ///
     /// Cancellation safe. If the future is dropped, no bytes were written.
     #[instability::unstable]
-    pub async fn write_async(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub async fn write_async(&mut self, data: &[u8]) -> Result<usize, TxError> {
         self.tx.write_async(data).await
     }
 
@@ -270,11 +418,15 @@ impl<'d> UsbSerialJtag<'d, Async> {
     ///
     /// Waits until the host has taken every written byte.
     ///
+    /// # Errors
+    ///
+    /// This function does not time out. It returns no error.
+    ///
     /// # Cancellation Safety
     ///
     /// Cancellation safe. A later flush continues where the dropped future stopped.
     #[instability::unstable]
-    pub async fn flush_async(&mut self) -> Result<(), Error> {
+    pub async fn flush_async(&mut self) -> Result<(), TxError> {
         self.tx.flush_async().await
     }
 
@@ -283,11 +435,15 @@ impl<'d> UsbSerialJtag<'d, Async> {
     /// Waits until the FIFO holds data, then reads bytes until `buf` is full or the FIFO is
     /// empty. Returns the number of bytes read. Returns 0 only if `buf` is empty.
     ///
+    /// # Errors
+    ///
+    /// This function does not time out. It returns no error.
+    ///
     /// # Cancellation Safety
     ///
     /// Cancellation safe. If the future is dropped, no bytes were read.
     #[instability::unstable]
-    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_async(buf).await
     }
 
@@ -295,12 +451,16 @@ impl<'d> UsbSerialJtag<'d, Async> {
     ///
     /// Waits until the host has sent enough bytes.
     ///
+    /// # Errors
+    ///
+    /// This function does not time out. It returns no error.
+    ///
     /// # Cancellation Safety
     ///
     /// **Not** cancellation safe. If the future is dropped, the caller does not know how many
     /// bytes were read.
     #[instability::unstable]
-    pub async fn read_exact_async(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+    pub async fn read_exact_async(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
         self.rx.read_exact_async(buf).await
     }
 }
@@ -346,6 +506,17 @@ where
         }
     }
 
+    /// Applies a new configuration.
+    ///
+    /// # Errors
+    ///
+    /// This function does not fail. [`ConfigError`] has no variants.
+    #[instability::unstable]
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.rx.apply_config(config)?;
+        self.tx.apply_config(config)
+    }
+
     /// Splits the driver into a receiver and a transmitter.
     ///
     /// Separate tasks can then own the receiver and the transmitter.
@@ -369,8 +540,13 @@ where
     ///
     /// The hardware sends the FIFO to the host when it holds 64 bytes. Call [`Self::flush`] to
     /// send fewer bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TxError::Timeout`] if the FIFO has no room within [`Config::tx_timeout`]. No
+    /// bytes were written then.
     #[instability::unstable]
-    pub fn write(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
         self.tx.write(data)
     }
 
@@ -386,8 +562,13 @@ where
     /// Sends the data in the output FIFO to the host.
     ///
     /// Blocks until the host has taken every written byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TxError::Timeout`] if the host takes no packet within [`Config::tx_timeout`].
+    /// The data stays in the FIFO, and a later flush continues.
     #[instability::unstable]
-    pub fn flush(&mut self) -> Result<(), Error> {
+    pub fn flush(&mut self) -> Result<(), TxError> {
         self.tx.flush()
     }
 
@@ -403,8 +584,12 @@ where
     ///
     /// Blocks until the FIFO holds data, then reads bytes until `buf` is full or the FIFO is
     /// empty. Returns the number of bytes read. Returns 0 only if `buf` is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RxError::Timeout`] if the host sends no data within [`Config::rx_timeout`].
     #[instability::unstable]
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read(buf)
     }
 
@@ -412,7 +597,7 @@ where
     ///
     /// Returns the number of bytes read. This can be 0.
     #[instability::unstable]
-    pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_buffered(buf)
     }
 }
@@ -428,6 +613,7 @@ impl UsbSerialJtagTx<'_, Async> {
         while !self.write_ready() {
             UsbSerialJtagFuture::new(self.peripheral.reborrow(), Event::TxPacketSent).await;
         }
+        self.timed_out = false;
     }
 
     /// Writes bytes into the output FIFO.
@@ -438,11 +624,15 @@ impl UsbSerialJtagTx<'_, Async> {
     /// The hardware sends the FIFO to the host when it holds 64 bytes. Call [`Self::flush_async`]
     /// to send fewer bytes.
     ///
+    /// # Errors
+    ///
+    /// This function does not time out. It returns no error.
+    ///
     /// # Cancellation Safety
     ///
     /// Cancellation safe. If the future is dropped, no bytes were written.
     #[instability::unstable]
-    pub async fn write_async(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub async fn write_async(&mut self, data: &[u8]) -> Result<usize, TxError> {
         if data.is_empty() {
             return Ok(0);
         }
@@ -455,11 +645,15 @@ impl UsbSerialJtagTx<'_, Async> {
     ///
     /// Waits until the host has taken every written byte.
     ///
+    /// # Errors
+    ///
+    /// This function does not time out. It returns no error.
+    ///
     /// # Cancellation Safety
     ///
     /// Cancellation safe. A later flush continues where the dropped future stopped.
     #[instability::unstable]
-    pub async fn flush_async(&mut self) -> Result<(), Error> {
+    pub async fn flush_async(&mut self) -> Result<(), TxError> {
         while !self.try_flush() {
             self.wait_for_write_ready().await;
         }
@@ -478,6 +672,8 @@ where
             wake_lock: WakeLock::new(),
             partial: false,
             zlp_owed: false,
+            tx_timeout: None,
+            timed_out: false,
         }
     }
 
@@ -488,11 +684,46 @@ where
             wake_lock: self.wake_lock,
             partial: self.partial,
             zlp_owed: self.zlp_owed,
+            tx_timeout: self.tx_timeout,
+            timed_out: self.timed_out,
         }
     }
 
     fn regs(&self) -> &RegisterBlock {
         USB_DEVICE::regs()
+    }
+
+    /// Applies a new configuration.
+    ///
+    /// # Errors
+    ///
+    /// This function does not fail. [`ConfigError`] has no variants.
+    #[instability::unstable]
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.tx_timeout = config.tx_timeout;
+        self.timed_out = false;
+        Ok(())
+    }
+
+    fn wait_for_write_ready_blocking(&mut self) -> Result<(), TxError> {
+        if !self.write_ready() {
+            let Some(timeout) = self.tx_timeout else {
+                while !self.write_ready() {}
+                return Ok(());
+            };
+            if self.timed_out {
+                return Err(TxError::Timeout);
+            }
+            let start = Instant::now();
+            while !self.write_ready() {
+                if start.elapsed() >= timeout {
+                    self.timed_out = true;
+                    return Err(TxError::Timeout);
+                }
+            }
+        }
+        self.timed_out = false;
+        Ok(())
     }
 
     /// Returns whether the output FIFO has room for at least one byte.
@@ -514,17 +745,22 @@ where
     ///
     /// The hardware sends the FIFO to the host when it holds 64 bytes. Call [`Self::flush`] to
     /// send fewer bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TxError::Timeout`] if the FIFO has no room within [`Config::tx_timeout`]. No
+    /// bytes were written then.
     #[instability::unstable]
-    pub fn write(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
         if data.is_empty() {
             return Ok(0);
         }
-        while !self.write_ready() {}
+        self.wait_for_write_ready_blocking()?;
 
         Ok(self.write_fifo(data))
     }
 
-    fn write_all(&mut self, mut data: &[u8]) -> Result<(), Error> {
+    fn write_all(&mut self, mut data: &[u8]) -> Result<(), TxError> {
         while !data.is_empty() {
             let written = self.write(data)?;
             data = &data[written..];
@@ -566,6 +802,7 @@ where
         if !self.write_ready() {
             return false;
         }
+        self.timed_out = false;
         if self.partial || self.zlp_owed {
             // With an empty FIFO, this sends a zero-length packet, which ends the transfer.
             self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
@@ -579,9 +816,16 @@ where
     /// Sends the data in the output FIFO to the host.
     ///
     /// Blocks until the host has taken every written byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TxError::Timeout`] if the host takes no packet within [`Config::tx_timeout`].
+    /// The data stays in the FIFO, and a later flush continues.
     #[instability::unstable]
-    pub fn flush(&mut self) -> Result<(), Error> {
-        while !self.try_flush() {}
+    pub fn flush(&mut self) -> Result<(), TxError> {
+        while !self.try_flush() {
+            self.wait_for_write_ready_blocking()?;
+        }
         Ok(())
     }
 }
@@ -622,11 +866,15 @@ impl UsbSerialJtagRx<'_, Async> {
     /// Waits until the FIFO holds data, then reads bytes until `buf` is full or the FIFO is
     /// empty. Returns the number of bytes read. Returns 0 only if `buf` is empty.
     ///
+    /// # Errors
+    ///
+    /// This function does not time out. It returns no error.
+    ///
     /// # Cancellation Safety
     ///
     /// Cancellation safe. If the future is dropped, no bytes were read.
     #[instability::unstable]
-    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         if buf.is_empty() {
             return Ok(0);
         }
@@ -641,12 +889,16 @@ impl UsbSerialJtagRx<'_, Async> {
     ///
     /// Waits until the host has sent enough bytes.
     ///
+    /// # Errors
+    ///
+    /// This function does not time out. It returns no error.
+    ///
     /// # Cancellation Safety
     ///
     /// **Not** cancellation safe. If the future is dropped, the caller does not know how many
     /// bytes were read.
     #[instability::unstable]
-    pub async fn read_exact_async(&mut self, mut buf: &mut [u8]) -> Result<(), Error> {
+    pub async fn read_exact_async(&mut self, mut buf: &mut [u8]) -> Result<(), RxError> {
         while !buf.is_empty() {
             let read = self.read_async(buf).await?;
             buf = &mut buf[read..];
@@ -664,6 +916,7 @@ where
             peripheral,
             phantom: PhantomData,
             wake_lock: WakeLock::new(),
+            rx_timeout: None,
         }
     }
 
@@ -672,11 +925,23 @@ where
             peripheral: self.peripheral,
             phantom: PhantomData,
             wake_lock: self.wake_lock,
+            rx_timeout: self.rx_timeout,
         }
     }
 
     fn regs(&self) -> &RegisterBlock {
         USB_DEVICE::regs()
+    }
+
+    /// Applies a new configuration.
+    ///
+    /// # Errors
+    ///
+    /// This function does not fail. [`ConfigError`] has no variants.
+    #[instability::unstable]
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.rx_timeout = config.rx_timeout;
+        Ok(())
     }
 
     /// Returns whether the input FIFO holds data from the host.
@@ -695,12 +960,28 @@ where
     ///
     /// Blocks until the FIFO holds data, then reads bytes until `buf` is full or the FIFO is
     /// empty. Returns the number of bytes read. Returns 0 only if `buf` is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RxError::Timeout`] if the host sends no data within [`Config::rx_timeout`].
     #[instability::unstable]
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         if buf.is_empty() {
             return Ok(0);
         }
-        while !self.read_ready() {}
+        if !self.read_ready() {
+            match self.rx_timeout {
+                None => while !self.read_ready() {},
+                Some(timeout) => {
+                    let start = Instant::now();
+                    while !self.read_ready() {
+                        if start.elapsed() >= timeout {
+                            return Err(RxError::Timeout);
+                        }
+                    }
+                }
+            }
+        }
 
         self.read_buffered(buf)
     }
@@ -709,7 +990,7 @@ where
     ///
     /// Returns the number of bytes read. This can be 0.
     #[instability::unstable]
-    pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         let mut count = 0;
         for byte in buf.iter_mut() {
             if !self.read_ready() {
