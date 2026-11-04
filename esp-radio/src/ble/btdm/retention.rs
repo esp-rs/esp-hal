@@ -3,8 +3,11 @@
 use core::{mem::MaybeUninit, ptr};
 
 use docsplay::Display;
+use esp_sync::NonReentrantMutex;
 use portable_atomic::{AtomicPtr, Ordering};
 use static_cell::ConstStaticCell;
+
+use crate::sys::c_types::c_void;
 
 // The controller requests three buffers of 1100, 300 and 180 bytes, and frees them together.
 const BUFFER_SIZE: usize = 1100 + 300 + 180;
@@ -13,6 +16,15 @@ const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
 const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
 
 static INSTALLED: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
+
+struct Usage {
+    /// Bytes given out from the start of the memory.
+    used: usize,
+    /// Buffers that the controller did not free yet.
+    live: usize,
+}
+
+static USAGE: NonReentrantMutex<Usage> = NonReentrantMutex::new(Usage { used: 0, live: 0 });
 
 /// Storage for [`RetentionMemory`].
 ///
@@ -120,4 +132,44 @@ pub fn install_retention_memory(
         .compare_exchange(ptr::null_mut(), memory, Ordering::AcqRel, Ordering::Acquire)
         .map(|_| ())
         .map_err(|_| RetentionMemoryError::AlreadyInstalled)
+}
+
+/// Allocates a buffer that the backup DMA can reach.
+///
+/// Returns null if no retention memory is installed, or if the memory has no space left.
+pub(crate) extern "C" fn malloc_retention(size: u32) -> *mut c_void {
+    let base = INSTALLED.load(Ordering::Acquire);
+    if base.is_null() {
+        return ptr::null_mut();
+    }
+
+    let size = (size as usize).next_multiple_of(4);
+    USAGE.with(|usage| {
+        if usage.used + size > BUFFER_SIZE {
+            return ptr::null_mut();
+        }
+
+        let buffer = base.wrapping_add(usage.used);
+        usage.used += size;
+        usage.live += 1;
+        buffer.cast()
+    })
+}
+
+/// Frees a buffer that [`malloc_retention`] allocated.
+///
+/// Returns `false` if `ptr` is not in the retention memory.
+pub(crate) fn try_free(ptr: *mut c_void) -> bool {
+    let base = INSTALLED.load(Ordering::Acquire) as usize;
+    if base == 0 || !(base..base + BUFFER_SIZE).contains(&(ptr as usize)) {
+        return false;
+    }
+
+    USAGE.with(|usage| {
+        usage.live -= 1;
+        if usage.live == 0 {
+            usage.used = 0;
+        }
+    });
+    true
 }
