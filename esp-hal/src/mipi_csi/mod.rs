@@ -81,6 +81,8 @@ pub enum ConfigError {
 }
 
 /// D-PHY configuration clock source.
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PhyCfgClockSource {
@@ -95,6 +97,8 @@ pub enum PhyCfgClockSource {
 }
 
 /// Readback of CSI initialization-related configuration registers.
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ConfigReadback {
@@ -131,6 +135,8 @@ pub struct ConfigReadback {
 }
 
 /// CSI host error interrupt summary status.
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct HostErrorStatus {
@@ -156,6 +162,7 @@ pub struct HostErrorStatus {
     pub raw_main_status: u32,
 }
 
+#[cfg(feature = "unstable")]
 impl HostErrorStatus {
     /// Returns true when any host error/status bit is set.
     pub const fn any_error(&self) -> bool {
@@ -172,6 +179,8 @@ impl HostErrorStatus {
 }
 
 /// CSI bridge event summary status.
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct BridgeEventStatus {
@@ -191,6 +200,7 @@ pub struct BridgeEventStatus {
     pub raw_status: u32,
 }
 
+#[cfg(feature = "unstable")]
 impl BridgeEventStatus {
     /// Returns true when any bridge event/status bit is set.
     pub const fn any_event(&self) -> bool {
@@ -204,6 +214,8 @@ impl BridgeEventStatus {
 }
 
 /// Runtime hardware status that is not just static configuration readback.
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct HardwareStatus {
@@ -214,6 +226,8 @@ pub struct HardwareStatus {
 }
 
 /// Full initialization diagnostics snapshot.
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct InitDiagnostics {
@@ -262,6 +276,8 @@ impl<'d> MipiCsi<'d> {
     ///
     /// Register readback is useful to verify software configuration, but it
     /// does not prove a working MIPI CSI physical link.
+    #[cfg(feature = "unstable")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn init_diagnostics(&self) -> InitDiagnostics {
         let host = MIPI_CSI_HOST::regs();
         let bridge = MIPI_CSI_BRIDGE::regs();
@@ -287,13 +303,21 @@ impl<'d> MipiCsi<'d> {
                 bridge_bus_clock_enabled: host_clk.csi_brg_sys_clk_en().bit_is_set(),
                 phy_cfg_clock_enabled: phy_cfg_clk.mipi_csi_dphy_cfg_clk_en().bit_is_set(),
                 phy_cfg_clock_source,
-                bridge_internal_clock_enabled: bridge.host_ctrl().read().csi_enableclk().bit_is_set(),
+                bridge_internal_clock_enabled: bridge
+                    .host_ctrl()
+                    .read()
+                    .csi_enableclk()
+                    .bit_is_set(),
                 host_bus_reset_asserted: rst.rst_en_csi_host().bit_is_set(),
                 bridge_bus_reset_asserted: rst.rst_en_csi_brg().bit_is_set(),
                 bridge_soft_reset_asserted: bridge_csi_en.csi_brig_rst().bit_is_set(),
                 phy_shutdown_asserted: host.phy_shutdownz().read().phy_shutdownz().bit_is_clear(),
                 dphy_reset_asserted: host.dphy_rstz().read().dphy_rstz().bit_is_clear(),
-                csi2_controller_reset_asserted: host.csi2_resetn().read().csi2_resetn().bit_is_clear(),
+                csi2_controller_reset_asserted: host
+                    .csi2_resetn()
+                    .read()
+                    .csi2_resetn()
+                    .bit_is_clear(),
                 configured_data_lanes: host.n_lanes().read().n_lanes().bits() + 1,
                 virtual_channel_extension_enabled: host.vc_extension().read().vcx().bit_is_clear(),
                 scrambling_enabled: host.scrambling().read().scramble_enable().bit_is_set(),
@@ -303,8 +327,12 @@ impl<'d> MipiCsi<'d> {
                 host_errors: HostErrorStatus {
                     phy_fatal: host_int_main.st_status_int_phy_fatal().bit_is_set(),
                     packet_fatal: host_int_main.st_status_int_pkt_fatal().bit_is_set(),
-                    boundary_frame_fatal: host_int_main.st_status_int_bndry_frame_fatal().bit_is_set(),
-                    sequence_frame_fatal: host_int_main.st_status_int_seq_frame_fatal().bit_is_set(),
+                    boundary_frame_fatal: host_int_main
+                        .st_status_int_bndry_frame_fatal()
+                        .bit_is_set(),
+                    sequence_frame_fatal: host_int_main
+                        .st_status_int_seq_frame_fatal()
+                        .bit_is_set(),
                     crc_frame_fatal: host_int_main.st_status_int_crc_frame_fatal().bit_is_set(),
                     payload_crc_fatal: host_int_main.st_status_int_pld_crc_fatal().bit_is_set(),
                     data_id_error: host_int_main.st_status_int_data_id().bit_is_set(),
@@ -328,10 +356,9 @@ impl<'d> MipiCsi<'d> {
     fn init_phy_cfg_clock(&self) {
         // Match IDF CSI LL default: select PLL_F20M for CSI D-PHY cfg clock,
         // then pulse cfg-clk gate low -> high.
-        HP_SYS_CLKRST::regs().peri_clk_ctrl03().modify(|_, w| unsafe {
-            w.mipi_csi_dphy_clk_src_sel()
-                .bits(PHY_CFG_CLK_SRC_PLL_F20M)
-        });
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl03()
+            .modify(|_, w| unsafe { w.mipi_csi_dphy_clk_src_sel().bits(PHY_CFG_CLK_SRC_PLL_F20M) });
         HP_SYS_CLKRST::regs()
             .peri_clk_ctrl03()
             .modify(|_, w| w.mipi_csi_dphy_cfg_clk_en().clear_bit());

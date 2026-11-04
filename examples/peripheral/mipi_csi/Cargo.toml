@@ -14,6 +14,12 @@ esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-println = { path = "../../../esp-println", default-features = false, features = ["esp32p4", "log-04", "auto", "critical-section", "colors"] }
 
 [features]
+default = ["diagnostics"]
+
+# Enable detailed CSI initialization readback/status logging via
+# `MipiCsi::init_diagnostics()`.
+diagnostics = []
+
 esp32p4 = [
     "esp-backtrace/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
