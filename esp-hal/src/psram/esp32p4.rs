@@ -9,6 +9,9 @@ use crate::{
 
 mod oct_hex;
 
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+pub(crate) use oct_hex::low_speed;
+
 /// PSRAM interface mode (line count of the data bus).
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

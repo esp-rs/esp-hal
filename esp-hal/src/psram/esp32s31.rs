@@ -1,5 +1,7 @@
 //! PSRAM driver for ESP32-S31.
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
     clock::ll::{ClockTree, PsramFunctionClockConfig, PsramInstance},
@@ -7,6 +9,21 @@ use crate::{
 };
 
 mod oct_hex;
+
+pub(crate) use oct_hex::low_speed;
+
+/// Whether light sleep switches PSRAM to [`low_speed`] while the CPU runs from XTAL_CLK.
+static SLOW_IN_LIGHT_SLEEP: AtomicBool = AtomicBool::new(false);
+
+/// Returns whether light sleep switches PSRAM to [`low_speed`] while the CPU runs from XTAL_CLK.
+///
+/// In light sleep, the AXI clock is the 40 MHz XTAL_CLK. The PSRAM clock must not exceed four
+/// times the AXI clock, so PSRAM above 160 MHz must slow down.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/clk_utils.c#L26-L46>.
+#[inline(always)]
+pub(crate) fn slow_in_light_sleep() -> bool {
+    SLOW_IN_LIGHT_SLEEP.load(Ordering::Relaxed)
+}
 
 /// PSRAM configuration.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -135,6 +152,10 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     if !oct_hex::set_bus_clock(config.timing.clock) {
         return false;
     }
+    SLOW_IN_LIGHT_SLEEP.store(
+        config.timing.clock > 4 * crate::soc::clocks::XTAL_MHZ,
+        Ordering::Relaxed,
+    );
     oct_hex::enable_dll();
     oct_hex::psram_pad_init(false); // required for DDR strobe latch
     oct_hex::set_cs_timing();
