@@ -341,6 +341,12 @@ fn configure_soc_root_clk_impl(
             SocRootClkConfig::RcFast => 2,
         })
     });
+    update_rom_cpu_frequency();
+}
+
+/// `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+fn update_rom_cpu_frequency() {
+    esp_rom_sys::rom::ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
 // CPU_HS_DIV
@@ -357,6 +363,7 @@ fn configure_cpu_hs_div_impl(
     PCR::regs()
         .cpu_freq_conf()
         .modify(|_, w| unsafe { w.cpu_hs_div_num().bits(new_config.divisor() as u8) });
+    update_rom_cpu_frequency();
 }
 
 // CPU_LS_DIV
@@ -373,6 +380,7 @@ fn configure_cpu_ls_div_impl(
     PCR::regs()
         .cpu_freq_conf()
         .modify(|_, w| unsafe { w.cpu_ls_div_num().bits(new_config.divisor() as u8) });
+    update_rom_cpu_frequency();
 }
 
 // AHB_HS_DIV
