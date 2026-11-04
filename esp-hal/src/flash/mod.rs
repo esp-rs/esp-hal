@@ -66,12 +66,8 @@
 use core::marker::PhantomData;
 
 use procmacros::{BuilderLite, ram};
-#[cfg(xtensa)]
-use xtensa_lx::interrupt::free;
 
-#[cfg(not(xtensa))]
-use crate::interrupt::free;
-use crate::{Blocking, DriverMode, peripherals::FLASH, soc::is_slice_in_dram};
+use crate::{Blocking, DriverMode, interrupt::free, peripherals::FLASH, soc::is_slice_in_dram};
 
 mod cache;
 mod mmu;
