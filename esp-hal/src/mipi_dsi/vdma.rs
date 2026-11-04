@@ -17,25 +17,61 @@ use crate::{
 /// Provides the hardware channel index without exposing the full DMA trait
 /// surface, since VDMA uses DW-GDMA linked-list mode which is incompatible
 /// with the standard GDMA channel traits.
-pub trait VdmaDmaChannel: Sealed {
+pub trait VdmaDmaChannel: Sealed + IntoOwnedVdmaChannel {
     /// Zero-based hardware channel index (0–3).
     fn channel_id(&self) -> u8;
 }
 
+/// Internal conversion from a concrete channel singleton to a type-erased
+/// owned token.
+///
+/// This trait is intentionally hidden. It is `pub` only because
+/// [`VdmaDmaChannel`] is public and needs this as a supertrait.
+#[doc(hidden)]
+pub trait IntoOwnedVdmaChannel: Sealed {
+    /// Converts the concrete singleton into a type-erased owned token.
+    fn into_owned_vdma_channel<'d>(self) -> OwnedVdmaChannel<'d>
+    where
+        Self: Sized + 'd;
+}
+
 #[allow(non_camel_case_types)]
+#[doc(hidden)]
 #[allow(
     dead_code,
     reason = "Singleton token is intentionally held to preserve exclusive ownership"
 )]
-pub(crate) enum OwnedVdmaChannel<'d> {
+pub enum OwnedVdmaChannel<'d> {
     VDMA_CH0(crate::peripherals::VDMA_CH0<'d>),
     VDMA_CH1(crate::peripherals::VDMA_CH1<'d>),
     VDMA_CH2(crate::peripherals::VDMA_CH2<'d>),
     VDMA_CH3(crate::peripherals::VDMA_CH3<'d>),
 }
 
+impl OwnedVdmaChannel<'_> {
+    #[inline]
+    pub(crate) const fn channel_id(&self) -> u8 {
+        match self {
+            Self::VDMA_CH0(_) => 0,
+            Self::VDMA_CH1(_) => 1,
+            Self::VDMA_CH2(_) => 2,
+            Self::VDMA_CH3(_) => 3,
+        }
+    }
+}
+
 for_each_dma_channel! {
     ("VDMA", $ch:ident, $num:literal, compatible = [$($compatible:ident),*]) => {
+        impl IntoOwnedVdmaChannel for crate::peripherals::$ch<'_> {
+            #[inline]
+            fn into_owned_vdma_channel<'d>(self) -> OwnedVdmaChannel<'d>
+            where
+                Self: Sized + 'd,
+            {
+                OwnedVdmaChannel::$ch(self)
+            }
+        }
+
         impl VdmaDmaChannel for crate::peripherals::$ch<'_> {
             #[inline]
             fn channel_id(&self) -> u8 {
@@ -48,23 +84,8 @@ for_each_dma_channel! {
 pub(crate) fn take_owned_vdma_channel<'d>(
     channel: impl VdmaDmaChannel + 'd,
 ) -> (OwnedVdmaChannel<'d>, u8) {
-    let channel_id = channel.channel_id();
-    drop(channel);
-
-    // SAFETY: `channel` is consumed by value, so in safe code there is no
-    // remaining alias after `drop(channel)`. `VdmaDmaChannel` is sealed and is
-    // only implemented for `VDMA_CH0..VDMA_CH3`, so this reconstructs the same
-    // singleton token in type-erased form.
-    let owned = unsafe {
-        match channel_id {
-            0 => OwnedVdmaChannel::VDMA_CH0(crate::peripherals::VDMA_CH0::steal()),
-            1 => OwnedVdmaChannel::VDMA_CH1(crate::peripherals::VDMA_CH1::steal()),
-            2 => OwnedVdmaChannel::VDMA_CH2(crate::peripherals::VDMA_CH2::steal()),
-            3 => OwnedVdmaChannel::VDMA_CH3(crate::peripherals::VDMA_CH3::steal()),
-            _ => unreachable!("invalid VDMA channel id: {channel_id}"),
-        }
-    };
-
+    let owned: OwnedVdmaChannel<'d> = channel.into_owned_vdma_channel();
+    let channel_id = owned.channel_id();
     (owned, channel_id)
 }
 
