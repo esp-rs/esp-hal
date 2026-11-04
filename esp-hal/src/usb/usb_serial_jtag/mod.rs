@@ -39,6 +39,20 @@
 //! available. See the examples below for more information on how to interact
 //! with this driver.
 //!
+//! ### Packets and flushing
+//!
+//! The driver sends data to the host in packets of up to 64 bytes. When the output FIFO holds 64
+//! bytes, the hardware sends them as one packet. Fewer bytes stay in the FIFO until you call
+//! [`UsbSerialJtagTx::flush`] or [`UsbSerialJtagTx::flush_async`]. The write functions do not
+//! flush. The [`core::fmt::Write`] and [`ufmt_write::uWrite`] implementations flush after each
+//! string, so the host gets the output of `write!` and `uwrite!` at once.
+//!
+//! The host can hold back a 64-byte packet until the transfer ends. A flush ends the transfer,
+//! so always flush when the host must see the data.
+//!
+//! The driver assumes that it is the only writer to the output FIFO. Other writers, for example
+//! ROM functions or a logger on the same peripheral, can make the flush functions skip a packet.
+//!
 //! ## Examples
 //!
 //! ### Sending and Receiving Data
@@ -49,7 +63,12 @@
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
-//! usb_serial.write(b"Hello, world!")?;
+//! let mut data: &[u8] = b"Hello, world!";
+//! while !data.is_empty() {
+//!     let written = usb_serial.write(data)?;
+//!     data = &data[written..];
+//! }
+//! usb_serial.flush()?;
 //! # {after_snippet}
 //! ```
 //!
@@ -66,7 +85,10 @@
 //! // Each component can be used individually to interact with the USB
 //! // Serial/JTAG:
 //! tx.write(&[42u8])?;
-//! let byte = rx.read_byte()?;
+//! tx.flush()?;
+//!
+//! let mut buffer = [0u8; 64];
+//! let count = rx.read(&mut buffer)?;
 //! # {after_snippet}
 //! ```
 //!
@@ -102,9 +124,9 @@
 //!         if let Some(usb_serial) = usb_serial.as_mut() {
 //!             println!("USB serial interrupt");
 //!
-//!             while let nb::Result::Ok(c) = usb_serial.read_byte() {
-//!                 println!("Read byte: {:02x}", c);
-//!             }
+//!             let mut buffer = [0u8; 64];
+//!             let Ok(count) = usb_serial.read_buffered(&mut buffer);
+//!             println!("Read bytes: {:02x?}", &buffer[..count]);
 //!
 //!             usb_serial.reset_rx_packet_recv_interrupt();
 //!         }
@@ -140,9 +162,6 @@ mod compat;
 /// Custom USB serial error type
 type Error = Infallible;
 
-/// The largest packet of the serial endpoints, the maximum of a full-speed USB bulk endpoint.
-const MAX_PACKET_SIZE: usize = 64;
-
 /// USB Serial/JTAG (Full-duplex)
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -158,6 +177,9 @@ pub struct UsbSerialJtagTx<'d, Dm: DriverMode> {
     peripheral: USB_DEVICE<'d>,
     phantom: PhantomData<Dm>,
     wake_lock: WakeLock,
+    /// The host has not seen the end of the transfer: the FIFO holds bytes, or the last packet
+    /// had 64 bytes.
+    transfer_open: bool,
 }
 
 /// USB Serial/JTAG (Receive)
@@ -178,6 +200,16 @@ where
             peripheral,
             phantom: PhantomData,
             wake_lock: WakeLock::new(),
+            transfer_open: false,
+        }
+    }
+
+    fn into_mode<Dm2: DriverMode>(self) -> UsbSerialJtagTx<'d, Dm2> {
+        UsbSerialJtagTx {
+            peripheral: self.peripheral,
+            phantom: PhantomData,
+            wake_lock: self.wake_lock,
+            transfer_open: self.transfer_open,
         }
     }
 
@@ -185,26 +217,9 @@ where
         USB_DEVICE::regs()
     }
 
-    /// Writes data to the serial output in chunks of up to 64 bytes.
-    pub fn write(&mut self, data: &[u8]) -> Result<(), Error> {
-        for chunk in data.chunks(MAX_PACKET_SIZE) {
-            for byte in chunk {
-                nb::block!(self.write_byte_nb(*byte))?;
-            }
-            self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
-
-            // FIXME: raw register access
-            while self.regs().ep1_conf().read().bits() & 0b011 == 0b000 {
-                // wait
-            }
-        }
-
-        Ok(())
-    }
-
     /// Returns whether the output FIFO has room for at least one byte.
     ///
-    /// If this function returns `true`, [`Self::write_byte_nb`] does not return `WouldBlock`.
+    /// If this function returns `true`, [`Self::write`] does not block.
     #[instability::unstable]
     pub fn write_ready(&self) -> bool {
         self.regs()
@@ -214,65 +229,74 @@ where
             .bit_is_set()
     }
 
-    /// Writes data to the serial output in a non-blocking manner.
-    /// Requires manual flushing (automatically flushed every 64 bytes).
-    pub fn write_byte_nb(&mut self, word: u8) -> nb::Result<(), Error> {
-        if self.write_ready() {
-            // the FIFO is not full
-            unsafe { self.regs().ep1().write(|w| w.rdwr_byte().bits(word)) };
-
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
-    }
-
-    /// Flushes the output FIFO and blocks until it has been sent.
-    pub fn flush_tx(&mut self) -> Result<(), Error> {
-        self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
-
-        // FIXME: raw register access
-        while self.regs().ep1_conf().read().bits() & 0b011 == 0b000 {
-            // wait
-        }
-
-        Ok(())
-    }
-
-    /// Flushes the output FIFO but does not block if it is not ready immediately.
-    pub fn flush_tx_nb(&mut self) -> nb::Result<(), Error> {
-        self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
-
-        // FIXME: raw register access
-        if self.regs().ep1_conf().read().bits() & 0b011 == 0b000 {
-            Err(nb::Error::WouldBlock)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Writes one packet of at most [`MAX_PACKET_SIZE`] bytes and returns the number of bytes
-    /// written.
+    /// Writes bytes into the output FIFO.
     ///
-    /// `WriteReady` promises that a write after it reports room does not block. So this function
-    /// waits only while the FIFO is full when it is called, then writes while the FIFO has room.
-    /// Unlike [`Self::write`], it does not wait for the host to take the packet.
-    fn write_packet(&mut self, data: &[u8]) -> Result<usize, Error> {
+    /// Blocks until the FIFO has room, then writes bytes until the data ends or the FIFO is full.
+    /// Returns the number of bytes written, at most 64. Returns 0 only if `data` is empty.
+    ///
+    /// The hardware sends the FIFO to the host when it holds 64 bytes. Call [`Self::flush`] to
+    /// send fewer bytes.
+    #[instability::unstable]
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, Error> {
         if data.is_empty() {
             return Ok(0);
         }
         while !self.write_ready() {}
 
+        Ok(self.write_fifo(data))
+    }
+
+    fn write_all(&mut self, mut data: &[u8]) -> Result<(), Error> {
+        while !data.is_empty() {
+            let written = self.write(data)?;
+            data = &data[written..];
+        }
+        Ok(())
+    }
+
+    fn write_fifo(&mut self, data: &[u8]) -> usize {
         let mut written = 0;
-        for byte in data.iter().take(MAX_PACKET_SIZE) {
-            if self.write_byte_nb(*byte).is_err() {
+        // The host can take a full packet before the next `write_ready` check.
+        for &byte in data.iter().take(64) {
+            if !self.write_ready() {
                 break;
             }
+            unsafe { self.regs().ep1().write(|w| w.rdwr_byte().bits(byte)) };
             written += 1;
         }
-        self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
-        Ok(written)
+        if written > 0 {
+            self.transfer_open = true;
+        }
+
+        written
+    }
+
+    /// Takes one step to send the data in the output FIFO to the host, without waiting.
+    ///
+    /// Returns `true` when the host has taken every written byte. Call this function until it
+    /// returns `true`. Extra calls do not send extra packets.
+    #[instability::unstable]
+    pub fn try_flush(&mut self) -> bool {
+        if !self.write_ready() {
+            return false;
+        }
+        if self.transfer_open {
+            // With an empty FIFO, this sends a zero-length packet, which ends the transfer.
+            self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
+            self.transfer_open = false;
+            return false;
+        }
+        true
+    }
+
+    /// Sends the data in the output FIFO to the host.
+    ///
+    /// Blocks until the host has taken every written byte.
+    #[instability::unstable]
+    pub fn flush(&mut self) -> Result<(), Error> {
+        while !self.try_flush() {}
+        Ok(())
     }
 }
 
@@ -288,13 +312,21 @@ where
         }
     }
 
+    fn into_mode<Dm2: DriverMode>(self) -> UsbSerialJtagRx<'d, Dm2> {
+        UsbSerialJtagRx {
+            peripheral: self.peripheral,
+            phantom: PhantomData,
+            wake_lock: self.wake_lock,
+        }
+    }
+
     fn regs(&self) -> &RegisterBlock {
         USB_DEVICE::regs()
     }
 
     /// Returns whether the input FIFO holds data from the host.
     ///
-    /// If this function returns `true`, [`Self::read_byte`] does not return `WouldBlock`.
+    /// If this function returns `true`, [`Self::read`] does not block.
     #[instability::unstable]
     pub fn read_ready(&self) -> bool {
         self.regs()
@@ -304,30 +336,34 @@ where
             .bit_is_set()
     }
 
-    /// Reads a byte from USB Serial/JTAG in a non-blocking manner.
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        if self.read_ready() {
-            let value = self.regs().ep1().read().rdwr_byte().bits();
-
-            Ok(value)
-        } else {
-            Err(nb::Error::WouldBlock)
+    /// Reads bytes from the input FIFO.
+    ///
+    /// Blocks until the FIFO holds data, then reads bytes until `buf` is full or the FIFO is
+    /// empty. Returns the number of bytes read. Returns 0 only if `buf` is empty.
+    #[instability::unstable]
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        if buf.is_empty() {
+            return Ok(0);
         }
+        while !self.read_ready() {}
+
+        self.read_buffered(buf)
     }
 
-    /// Reads all available bytes from the RX FIFO into the provided buffer and
-    /// returns the number of read bytes. Never blocks. May stop early if the
-    /// number of bytes in the FIFO is larger than `buf`.
-    pub fn drain_rx_fifo(&mut self, buf: &mut [u8]) -> usize {
+    /// Reads the bytes that the input FIFO holds, without waiting.
+    ///
+    /// Returns the number of bytes read. This can be 0.
+    #[instability::unstable]
+    pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         let mut count = 0;
-        while let Ok(value) = self.read_byte() {
-            buf[count] = value;
-            count += 1;
-            if count == buf.len() {
+        for byte in buf.iter_mut() {
+            if !self.read_ready() {
                 break;
             }
+            *byte = self.regs().ep1().read().rdwr_byte().bits();
+            count += 1;
         }
-        count
+        Ok(count)
     }
 }
 
@@ -373,16 +409,8 @@ impl<'d> UsbSerialJtag<'d, Blocking> {
         self.set_interrupt_handler(async_interrupt_handler);
 
         UsbSerialJtag {
-            rx: UsbSerialJtagRx {
-                peripheral: self.rx.peripheral,
-                phantom: PhantomData,
-                wake_lock: self.rx.wake_lock,
-            },
-            tx: UsbSerialJtagTx {
-                peripheral: self.tx.peripheral,
-                phantom: PhantomData,
-                wake_lock: self.tx.wake_lock,
-            },
+            rx: self.rx.into_mode(),
+            tx: self.tx.into_mode(),
         }
     }
 
@@ -467,46 +495,66 @@ where
         (self.rx, self.tx)
     }
 
-    /// Writes data to the serial output in chunks of up to 64 bytes.
-    pub fn write(&mut self, data: &[u8]) -> Result<(), Error> {
-        self.tx.write(data)
-    }
-
-    /// Writes data to the serial output in a non-blocking manner.
-    /// Requires manual flushing (automatically flushed every 64 bytes).
-    pub fn write_byte_nb(&mut self, word: u8) -> nb::Result<(), Error> {
-        self.tx.write_byte_nb(word)
-    }
-
-    /// Flushes the output FIFO and blocks until it has been sent.
-    pub fn flush_tx(&mut self) -> Result<(), Error> {
-        self.tx.flush_tx()
-    }
-
-    /// Flushes the output FIFO but does not block if it is not ready immediately.
-    pub fn flush_tx_nb(&mut self) -> nb::Result<(), Error> {
-        self.tx.flush_tx_nb()
-    }
-
-    /// Reads a single byte but does not block if it is not ready immediately.
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        self.rx.read_byte()
-    }
-
     /// Returns whether the output FIFO has room for at least one byte.
     ///
-    /// If this function returns `true`, [`Self::write_byte_nb`] does not return `WouldBlock`.
+    /// If this function returns `true`, [`Self::write`] does not block.
     #[instability::unstable]
     pub fn write_ready(&self) -> bool {
         self.tx.write_ready()
     }
 
+    /// Writes bytes into the output FIFO.
+    ///
+    /// Blocks until the FIFO has room, then writes bytes until the data ends or the FIFO is full.
+    /// Returns the number of bytes written, at most 64. Returns 0 only if `data` is empty.
+    ///
+    /// The hardware sends the FIFO to the host when it holds 64 bytes. Call [`Self::flush`] to
+    /// send fewer bytes.
+    #[instability::unstable]
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, Error> {
+        self.tx.write(data)
+    }
+
+    /// Takes one step to send the data in the output FIFO to the host, without waiting.
+    ///
+    /// Returns `true` when the host has taken every written byte. Call this function until it
+    /// returns `true`. Extra calls do not send extra packets.
+    #[instability::unstable]
+    pub fn try_flush(&mut self) -> bool {
+        self.tx.try_flush()
+    }
+
+    /// Sends the data in the output FIFO to the host.
+    ///
+    /// Blocks until the host has taken every written byte.
+    #[instability::unstable]
+    pub fn flush(&mut self) -> Result<(), Error> {
+        self.tx.flush()
+    }
+
     /// Returns whether the input FIFO holds data from the host.
     ///
-    /// If this function returns `true`, [`Self::read_byte`] does not return `WouldBlock`.
+    /// If this function returns `true`, [`Self::read`] does not block.
     #[instability::unstable]
     pub fn read_ready(&self) -> bool {
         self.rx.read_ready()
+    }
+
+    /// Reads bytes from the input FIFO.
+    ///
+    /// Blocks until the FIFO holds data, then reads bytes until `buf` is full or the FIFO is
+    /// empty. Returns the number of bytes read. Returns 0 only if `buf` is empty.
+    #[instability::unstable]
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        self.rx.read(buf)
+    }
+
+    /// Reads the bytes that the input FIFO holds, without waiting.
+    ///
+    /// Returns the number of bytes read. This can be 0.
+    #[instability::unstable]
+    pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        self.rx.read_buffered(buf)
     }
 }
 
@@ -618,69 +666,162 @@ impl<'d> UsbSerialJtag<'d, Async> {
     pub fn into_blocking(self) -> UsbSerialJtag<'d, Blocking> {
         self.rx.peripheral.disable_peri_interrupt_on_all_cores();
         UsbSerialJtag {
-            rx: UsbSerialJtagRx {
-                peripheral: self.rx.peripheral,
-                phantom: PhantomData,
-                wake_lock: self.rx.wake_lock,
-            },
-            tx: UsbSerialJtagTx {
-                peripheral: self.tx.peripheral,
-                phantom: PhantomData,
-                wake_lock: self.tx.wake_lock,
-            },
+            rx: self.rx.into_mode(),
+            tx: self.tx.into_mode(),
         }
+    }
+
+    /// Waits until the output FIFO has room for at least one byte.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Cancellation safe.
+    #[instability::unstable]
+    pub async fn wait_for_write_ready(&mut self) {
+        self.tx.wait_for_write_ready().await
+    }
+
+    /// Writes bytes into the output FIFO.
+    ///
+    /// Waits until the FIFO has room, then writes bytes until the data ends or the FIFO is full.
+    /// Returns the number of bytes written, at most 64. Returns 0 only if `data` is empty.
+    ///
+    /// The hardware sends the FIFO to the host when it holds 64 bytes. Call [`Self::flush_async`]
+    /// to send fewer bytes.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Cancellation safe. If the future is dropped, no bytes were written.
+    #[instability::unstable]
+    pub async fn write_async(&mut self, data: &[u8]) -> Result<usize, Error> {
+        self.tx.write_async(data).await
+    }
+
+    /// Sends the data in the output FIFO to the host.
+    ///
+    /// Waits until the host has taken every written byte.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Cancellation safe. A later flush continues where the dropped future stopped.
+    #[instability::unstable]
+    pub async fn flush_async(&mut self) -> Result<(), Error> {
+        self.tx.flush_async().await
+    }
+
+    /// Reads bytes from the input FIFO.
+    ///
+    /// Waits until the FIFO holds data, then reads bytes until `buf` is full or the FIFO is
+    /// empty. Returns the number of bytes read. Returns 0 only if `buf` is empty.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Cancellation safe. If the future is dropped, no bytes were read.
+    #[instability::unstable]
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        self.rx.read_async(buf).await
+    }
+
+    /// Fills `buf` with bytes from the input FIFO.
+    ///
+    /// Waits until the host has sent enough bytes.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// **Not** cancellation safe. If the future is dropped, the caller does not know how many
+    /// bytes were read.
+    #[instability::unstable]
+    pub async fn read_exact_async(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+        self.rx.read_exact_async(buf).await
     }
 }
 
 impl UsbSerialJtagTx<'_, Async> {
-    async fn wait_tx_ready(&mut self) {
+    /// Waits until the output FIFO has room for at least one byte.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Cancellation safe.
+    #[instability::unstable]
+    pub async fn wait_for_write_ready(&mut self) {
         while !self.write_ready() {
             UsbSerialJtagFuture::new(self.peripheral.reborrow(), Event::TxPacketSent).await;
         }
     }
 
-    async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-        for chunk in words.chunks(MAX_PACKET_SIZE) {
-            for byte in chunk {
-                loop {
-                    match self.write_byte_nb(*byte) {
-                        Ok(()) => break,
-                        Err(nb::Error::WouldBlock) => self.wait_tx_ready().await,
-                        Err(nb::Error::Other(error)) => match error {},
-                    }
-                }
-            }
-            self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
-
-            self.wait_tx_ready().await;
+    /// Writes bytes into the output FIFO.
+    ///
+    /// Waits until the FIFO has room, then writes bytes until the data ends or the FIFO is full.
+    /// Returns the number of bytes written, at most 64. Returns 0 only if `data` is empty.
+    ///
+    /// The hardware sends the FIFO to the host when it holds 64 bytes. Call [`Self::flush_async`]
+    /// to send fewer bytes.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Cancellation safe. If the future is dropped, no bytes were written.
+    #[instability::unstable]
+    pub async fn write_async(&mut self, data: &[u8]) -> Result<usize, Error> {
+        if data.is_empty() {
+            return Ok(0);
         }
+        self.wait_for_write_ready().await;
 
-        Ok(())
+        Ok(self.write_fifo(data))
     }
 
-    async fn flush_tx_async(&mut self) -> Result<(), Error> {
-        // If write_async transfers a multiple of 64 bytes, flush needs to trigger sending a
-        // zero-length packet for the host to consider the transfer complete
-        self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
-        self.wait_tx_ready().await;
-
+    /// Sends the data in the output FIFO to the host.
+    ///
+    /// Waits until the host has taken every written byte.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Cancellation safe. A later flush continues where the dropped future stopped.
+    #[instability::unstable]
+    pub async fn flush_async(&mut self) -> Result<(), Error> {
+        while !self.try_flush() {
+            self.wait_for_write_ready().await;
+        }
         Ok(())
     }
 }
 
 impl UsbSerialJtagRx<'_, Async> {
-    async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    /// Reads bytes from the input FIFO.
+    ///
+    /// Waits until the FIFO holds data, then reads bytes until `buf` is full or the FIFO is
+    /// empty. Returns the number of bytes read. Returns 0 only if `buf` is empty.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Cancellation safe. If the future is dropped, no bytes were read.
+    #[instability::unstable]
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if buf.is_empty() {
             return Ok(0);
         }
-
-        loop {
-            let read = self.drain_rx_fifo(buf);
-            if read > 0 {
-                return Ok(read);
-            }
+        while !self.read_ready() {
             UsbSerialJtagFuture::new(self.peripheral.reborrow(), Event::RxPacketReceived).await;
         }
+
+        self.read_buffered(buf)
+    }
+
+    /// Fills `buf` with bytes from the input FIFO.
+    ///
+    /// Waits until the host has sent enough bytes.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// **Not** cancellation safe. If the future is dropped, the caller does not know how many
+    /// bytes were read.
+    #[instability::unstable]
+    pub async fn read_exact_async(&mut self, mut buf: &mut [u8]) -> Result<(), Error> {
+        while !buf.is_empty() {
+            let read = self.read_async(buf).await?;
+            buf = &mut buf[read..];
+        }
+        Ok(())
     }
 }
 
