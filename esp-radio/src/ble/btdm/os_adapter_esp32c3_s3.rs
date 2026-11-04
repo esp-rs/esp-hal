@@ -670,13 +670,13 @@ pub(crate) unsafe extern "C" fn esp_hw_power_up() {
     todo!();
 }
 
-pub(crate) unsafe extern "C" fn ets_backup_dma_copy(
-    _reg: u32,
-    _mem_addr: u32,
-    _num: u32,
-    _to_rem: i32,
-) {
-    todo!();
+extern "C" fn ets_backup_dma_copy(reg: u32, mem_addr: u32, num: u32, to_mem: i32) {
+    unsafe extern "C" {
+        #[link_name = "ets_backup_dma_copy"]
+        fn rom_ets_backup_dma_copy(reg: u32, mem_addr: u32, num: u32, to_mem: bool);
+    }
+
+    unsafe { rom_ets_backup_dma_copy(reg, mem_addr, num, to_mem != 0) }
 }
 
 #[cfg(esp32c3)]
