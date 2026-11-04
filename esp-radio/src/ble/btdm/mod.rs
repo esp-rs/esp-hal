@@ -19,6 +19,9 @@ use crate::{
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod chip_specific;
 
+#[cfg(any(esp32c3, esp32s3))]
+mod retention;
+
 use chip_specific::{G_OSI_FUNCS, osi_funcs_s};
 
 pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {

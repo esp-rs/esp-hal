@@ -181,7 +181,7 @@ use esp_hal as hal;
 #[instability::unstable]
 pub use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi", all(feature = "ble", any(esp32c3, esp32s3))))]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
 pub(crate) mod sys {

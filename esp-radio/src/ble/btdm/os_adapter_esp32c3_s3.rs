@@ -1,5 +1,11 @@
 use procmacros::BuilderLite;
 
+pub use super::retention::{
+    RetentionMemory,
+    RetentionMemoryError,
+    RetentionStorage,
+    install_retention_memory,
+};
 #[cfg(multi_core)]
 use crate::hal::system::Cpu;
 use crate::{
