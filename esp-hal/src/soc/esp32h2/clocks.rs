@@ -96,6 +96,11 @@ fn clk_ll_bus_update() {
     {}
 }
 
+/// `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+fn update_rom_cpu_frequency() {
+    esp_rom_sys::rom::ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+}
+
 // XTAL_CLK
 
 fn configure_xtal_clk_impl(
@@ -255,6 +260,7 @@ fn configure_hp_root_clk_impl(
     // "When selecting the clock source of HP_ROOT_CLK, or configuring the clock divisor for CPU_CLK
     // and AHB_CLK ..."
     clk_ll_bus_update();
+    update_rom_cpu_frequency();
 }
 
 // CPU_CLK
@@ -275,6 +281,7 @@ fn configure_cpu_clk_impl(
     // "When selecting the clock source of HP_ROOT_CLK, or configuring the clock divisor for CPU_CLK
     // and AHB_CLK ..."
     clk_ll_bus_update();
+    update_rom_cpu_frequency();
 }
 
 // AHB_CLK

@@ -142,7 +142,7 @@ impl ClockConfig {
         DIVIDER_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
 
         update_divider();
-        ets_update_cpu_frequency_rom(Rate::from_hz(cpu_clk_frequency()).as_mhz());
+        update_rom_cpu_frequency();
     }
 }
 
@@ -274,6 +274,10 @@ fn configure_cpu_root_clk_impl(
     LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_clk_ctrl()
         .modify(|_, w| unsafe { w.lp_aonclkrst_hp_root_clk_src_sel().bits(sel) });
+
+    if !DIVIDER_UPDATE_DEFERRED.load(Ordering::Relaxed) {
+        update_rom_cpu_frequency();
+    }
 }
 
 // CPU_CLK divider
@@ -295,8 +299,13 @@ fn configure_cpu_clk_impl(
     update_divider();
 
     if !DIVIDER_UPDATE_DEFERRED.load(Ordering::Relaxed) {
-        ets_update_cpu_frequency_rom(Rate::from_hz(cpu_clk_frequency()).as_mhz());
+        update_rom_cpu_frequency();
     }
+}
+
+/// `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+fn update_rom_cpu_frequency() {
+    ets_update_cpu_frequency_rom(Rate::from_hz(cpu_clk_frequency()).as_mhz());
 }
 
 static DIVIDER_UPDATE_DEFERRED: AtomicBool = AtomicBool::new(false);

@@ -96,9 +96,6 @@ impl ClockConfig {
         BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
 
         update_bus_clocks();
-
-        // esp_rom_set_cpu_ticks_per_us(), the ROM delay functions need this.
-        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
     }
 }
 
@@ -121,6 +118,9 @@ fn update_bus_clocks() {
         .bus_clock_update()
         .bit_is_set()
     {}
+
+    // `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+    ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
 /// Powers up and configures the BBPLL and the XTAL frequency doubler again, if a clock uses them.

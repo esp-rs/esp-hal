@@ -294,6 +294,7 @@ fn configure_hp_root_clk_impl(
     });
 
     bus_clock_update();
+    update_rom_cpu_frequency();
 }
 
 /// Applies the new `soc_clk_sel`, `cpu_div_num` and `ahb_div_num` values.
@@ -307,6 +308,11 @@ fn bus_clock_update() {
         .bus_clock_update()
         .bit_is_set()
     {}
+}
+
+/// `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+fn update_rom_cpu_frequency() {
+    esp_rom_sys::rom::ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
 // CPU_CLK
@@ -325,6 +331,7 @@ fn configure_cpu_clk_impl(
         .modify(|_, w| unsafe { w.cpu_div_num().bits(new_config.divisor() as u8) });
 
     bus_clock_update();
+    update_rom_cpu_frequency();
 }
 
 // AHB_CLK
