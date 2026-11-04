@@ -18,9 +18,8 @@ use crate::{
         MipiDsi,
         vdma::{VdmaChannel, VdmaLinkItem},
     },
-    peripherals::{Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
+    peripherals::{Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST},
     soc::clocks::{ClockTree, MipiDsiDpiClkConfig, MipiDsiInstance},
-    system::Cpu,
 };
 
 /// Channel index used by the static VDMA block-done ISR.
@@ -142,9 +141,8 @@ pub struct DpiConfig {
 #[crate::ram]
 #[crate::handler]
 fn vdma_block_done_isr() {
-    let channel_id = VDMA_ISR_CHANNEL.load(atomic::Ordering::Relaxed) as usize;
-    let ch = VDMA::regs().ch(channel_id);
-    ch.intclear0().write(|w| unsafe { w.bits(0xFFFFFFFF) });
+    let channel_id = VDMA_ISR_CHANNEL.load(atomic::Ordering::Relaxed);
+    VdmaChannel::from_channel_id(channel_id).clear_all_interrupts();
 
     LLI_STORAGE.with(|storage| {
         let mut storage = storage.get_mut();
@@ -187,19 +185,10 @@ pub struct DsiDpi<'d> {
 
 impl Drop for DsiDpi<'_> {
     fn drop(&mut self) {
-        // Disable the block-done interrupt before shutting down.
-        let channel_id = self._guard.vdma_channel_id as usize;
-        let ch = VDMA::regs().ch(channel_id);
-        unsafe {
-            ch.intsignal_enable0().write_with_zero(|w| w);
-            ch.intstatus_enable0().write_with_zero(|w| w);
-        }
-        interrupt::disable(Cpu::current(), Interrupt::DMA);
-
-        // Disable the VDMA channel itself.
-        let shift = channel_id as u32;
-        let val: u32 = 0x0100 << shift; // ch_en_we only (clears ch_en)
-        unsafe { VDMA::regs().chen0().write(|w| w.bits(val)) };
+        // Disable block-done IRQ generation and stop only this channel.
+        let channel = VdmaChannel::from_channel_id(self._guard.vdma_channel_id);
+        channel.set_block_done_interrupt(false);
+        channel.stop();
 
         MIPI_DSI_BRIDGE::regs()
             .dpi_misc_config()
@@ -402,13 +391,7 @@ impl<'d> DsiDpi<'d> {
         // ── VDMA block-done interrupt ──────────────────────────────────────
         // Enable the block-transfer-done signal so the ISR fires after every
         // frame block and re-arms the consumed LLI.
-        {
-            let ch = VDMA::regs().ch(vdma_channel_id as usize);
-            ch.intstatus_enable0()
-                .write(|w| w.ch1_enable_block_tfr_done_intstat().set_bit());
-            ch.intsignal_enable0()
-                .write(|w| w.ch1_enable_block_tfr_done_intsignal().set_bit());
-        }
+        VdmaChannel::from_channel_id(vdma_channel_id).set_block_done_interrupt(true);
         interrupt::bind_handler(Interrupt::DMA, vdma_block_done_isr);
 
         // ── Enable video mode ──────────────────────────────────────────────
