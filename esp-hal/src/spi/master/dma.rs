@@ -1852,6 +1852,8 @@ impl DmaDriver {
             self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
             self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
         }
+        #[cfg(spi_master_version = "1")]
+        crate::dma::connect_spi_dma(self.dma_peripheral, false);
     }
 
     fn regs(&self) -> &RegisterBlock {
@@ -1926,6 +1928,8 @@ impl DmaDriver {
     fn enable_dma(&self) {
         cfg_select! {
             any(spi_master_version = "1", spi_master_version = "2") => {
+                #[cfg(spi_master_version = "1")]
+                crate::dma::connect_spi_dma(self.dma_peripheral, true);
                 self.reset_dma();
             }
             _ => {
