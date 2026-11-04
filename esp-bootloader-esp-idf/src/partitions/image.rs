@@ -48,7 +48,6 @@ const PARTITION_HASH_LEN: usize = 32;
 const IMAGE_HEADER_MAGIC: u8 = 0xE9;
 const IMAGE_HEADER_LEN: u32 = 24;
 const IMAGE_MAX_SEGMENTS: u8 = 16;
-const IMAGE_MAX_FLASH_ADDR_SIZE: u32 = 16 * 1024 * 1024;
 
 /// Subset of ESP-IDF `esp_image_metadata_t` for partition SHA-256 convenience.
 struct ImageMetadata {
@@ -69,10 +68,6 @@ fn get_image_metadata<F: FlashAccess>(
     part_size: u32,
     encrypted: bool,
 ) -> Result<ImageMetadata, Error> {
-    if part_size == 0 || part_size > IMAGE_MAX_FLASH_ADDR_SIZE {
-        return Err(Error::InvalidArgument);
-    }
-
     // process_image_header()
     let mut hdr = [0u8; IMAGE_HEADER_LEN as usize];
     flash_read(flash, address, &mut hdr, encrypted)?;
@@ -89,7 +84,9 @@ fn get_image_metadata<F: FlashAccess>(
         flash_read(flash, address + image_len, &mut seg, encrypted)?;
         // seg[0..4] - load address
         let data_len = u32::from_le_bytes(unwrap!(seg[4..8].try_into()));
-        if data_len % 4 != 0 || data_len >= IMAGE_MAX_FLASH_ADDR_SIZE {
+        // ESP-IDF caps this at 16 MiB only on chips that cannot map more flash;
+        // the partition size bounds it on every chip.
+        if data_len % 4 != 0 || data_len >= part_size {
             return Err(Error::InvalidImage);
         }
         image_len = image_len
@@ -273,6 +270,22 @@ mod tests {
             factory.sha256(&mut flash).unwrap(),
             IMAGE_DIGEST_WITHOUT_HASH_FLAG
         );
+    }
+
+    #[test]
+    fn image_metadata_accepts_segment_larger_than_16_mib() {
+        let mut flash = test_flash();
+        let data_len: u32 = 17 * 1024 * 1024;
+
+        let mut image = [0u8; 32];
+        image[0] = IMAGE_HEADER_MAGIC;
+        image[1] = 1;
+        image[28..32].copy_from_slice(&data_len.to_le_bytes());
+        flash.write(0x20000, &image).unwrap();
+
+        let data = get_image_metadata(&mut flash, 0x20000, 32 * 1024 * 1024, false).unwrap();
+
+        assert_eq!(data.image_len, (24 + 8 + data_len + 1 + 15) & !15);
     }
 
     #[test]
