@@ -134,6 +134,11 @@ pub fn install_retention_memory(
         .map_err(|_| RetentionMemoryError::AlreadyInstalled)
 }
 
+/// Returns whether retention memory is installed.
+pub(crate) fn is_installed() -> bool {
+    !INSTALLED.load(Ordering::Acquire).is_null()
+}
+
 /// Allocates a buffer that the backup DMA can reach.
 ///
 /// Returns null if no retention memory is installed, or if the memory has no space left.

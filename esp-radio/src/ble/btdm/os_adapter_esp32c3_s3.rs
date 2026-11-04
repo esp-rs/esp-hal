@@ -1,3 +1,4 @@
+use portable_atomic::{AtomicU32, Ordering};
 use procmacros::BuilderLite;
 
 pub use super::retention::{
@@ -677,6 +678,35 @@ extern "C" fn ets_backup_dma_copy(reg: u32, mem_addr: u32, num: u32, to_mem: i32
     }
 
     unsafe { rom_ets_backup_dma_copy(reg, mem_addr, num, to_mem != 0) }
+}
+
+/// The chip has one backup DMA, so two copies must not run at the same time.
+static BACKUP_DMA_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+/// The interrupt state for [`backup_dma_unlock`], because the ROM gives the unlock no argument.
+static BACKUP_DMA_TOKEN: AtomicU32 = AtomicU32::new(0);
+
+/// The ROM calls this before a backup DMA copy.
+extern "C" fn backup_dma_lock() {
+    let token = unsafe { BACKUP_DMA_LOCK.acquire().inner() };
+    BACKUP_DMA_TOKEN.store(token, Ordering::Relaxed);
+}
+
+/// The ROM calls this after a backup DMA copy.
+extern "C" fn backup_dma_unlock() {
+    let token = BACKUP_DMA_TOKEN.load(Ordering::Relaxed);
+    unsafe { BACKUP_DMA_LOCK.release(esp_sync::RestoreState::new(token)) };
+}
+
+/// Gives the ROM the lock that it takes around a backup DMA copy.
+///
+/// Call this before the first copy. The ROM calls the lock without a check, so a copy without it
+/// jumps to address zero.
+pub(super) fn init_backup_dma() {
+    unsafe extern "C" {
+        fn ets_apb_backup_init_lock_func(lock: extern "C" fn(), unlock: extern "C" fn());
+    }
+
+    unsafe { ets_apb_backup_init_lock_func(backup_dma_lock, backup_dma_unlock) };
 }
 
 #[cfg(esp32c3)]

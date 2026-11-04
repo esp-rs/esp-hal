@@ -20,6 +20,8 @@ use crate::{
 pub(crate) mod chip_specific;
 
 #[cfg(any(esp32c3, esp32s3))]
+mod mac_bb;
+#[cfg(any(esp32c3, esp32s3))]
 mod retention;
 
 use chip_specific::{G_OSI_FUNCS, osi_funcs_s};
@@ -472,6 +474,11 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         chip_specific::disable_sleep_mode();
 
+        #[cfg(any(esp32c3, esp32s3))]
+        if config.modem_sleep() && super::lp_clk::light_sleep_supported() {
+            mac_bb::init();
+        }
+
         let res = btdm_controller_init(
             #[cfg(esp32)]
             {
@@ -533,6 +540,9 @@ pub(crate) fn ble_deinit() {
     unsafe {
         btdm_controller_deinit();
     }
+
+    #[cfg(any(esp32c3, esp32s3))]
+    mac_bb::deinit();
 
     super::lp_clk::release();
     // Disabling the PHY happens automatically, when the BLEController gets dropped.
