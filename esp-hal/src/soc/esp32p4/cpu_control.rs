@@ -101,7 +101,6 @@ pub(crate) fn restart_core1_after_wake() {
 }
 
 /// Starts Core 1 at `entry_point`. Core 1 stays stalled until the caller unstalls it.
-#[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     // The stall holds Core 1 until the ROM can read the new entry point.
     unsafe { internal_park_core(Cpu::AppCpu, true) };
