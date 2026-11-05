@@ -60,6 +60,15 @@ options:
       - type:
           validator: non_negative_integer
 
+  - name: isr-stack-size
+    description: "The size of the interrupt stack of each CPU, in bytes. Interrupt handlers run on
+      this stack. Must be a multiple of 16."
+    default:
+      - value: 4096
+    constraints:
+      - type:
+          validator: positive_integer
+
   - name: init-stack-ptr-range-check
     description: Check that the stack pointer is in range during initialization.
     default:
@@ -245,3 +254,4 @@ options:
 
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"
+  - "ESP_HAL_CONFIG_ISR_STACK_SIZE % 16 == 0"
