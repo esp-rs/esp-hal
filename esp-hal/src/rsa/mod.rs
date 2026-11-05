@@ -53,14 +53,10 @@ pub struct Rsa<'d, Dm: DriverMode> {
 }
 
 /// RSA accelerator configuration.
-#[cfg_attr(
-    rsa_version = "1",
-    doc = "\nThis hardware has no configurable options."
-)]
-#[cfg_attr(
-    not(rsa_version = "1"),
-    doc = "\nBy default, constant-time operation is enabled and search acceleration is disabled."
-)]
+#[doc = cfg_select! {
+    rsa_version = "1" => "\nThis hardware has no configurable options.",
+    _ => "\nBy default, constant-time operation is enabled and search acceleration is disabled.",
+}]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
