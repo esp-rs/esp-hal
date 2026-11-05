@@ -188,10 +188,8 @@ mod tests {
 
         hil_test::assert!(cpu == Cpu::AppCpu);
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        core::mem::forget(esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu));
     }
 
     #[test]
@@ -591,10 +589,8 @@ mod tests {
         test_context.ready_semaphore.take(None);
         test_context.ready_semaphore.take(None);
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        core::mem::forget(esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu));
     }
 
     #[test]
@@ -680,10 +676,8 @@ mod tests {
             );
         }
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        core::mem::forget(esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu));
     }
 
     /// State that the victim and the waker of `woken_task_runs_on_one_core` share.
@@ -786,10 +780,8 @@ mod tests {
             "The victim never woke up"
         );
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        core::mem::forget(esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu));
     }
 
     #[test]
@@ -832,10 +824,8 @@ mod tests {
 
         SIGNAL.wait().await;
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        core::mem::forget(esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu));
     }
 
     #[test]
@@ -885,10 +875,8 @@ mod tests {
             );
         }
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        core::mem::forget(esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu));
     }
 
     #[test]

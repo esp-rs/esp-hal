@@ -304,10 +304,8 @@ mod interrupt_executor {
             response.wait().await;
         }
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        core::mem::forget(CpuControl::new(unsafe { CPU_CTRL::steal() }).park_core(Cpu::AppCpu));
         embedded_test::export::check_outcome(());
     }
 
@@ -679,9 +677,7 @@ mod interrupt_spi_dma {
         STOP_INTERRUPT_TASK.store(true, portable_atomic::Ordering::Relaxed);
         while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Relaxed) {}
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        core::mem::forget(CpuControl::new(unsafe { CPU_CTRL::steal() }).park_core(Cpu::AppCpu));
     }
 }

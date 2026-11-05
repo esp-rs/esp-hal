@@ -671,10 +671,8 @@ mod tests {
 
         assert_eq!(edge_counter, EDGE_COUNT);
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        core::mem::forget(CpuControl::new(unsafe { CPU_CTRL::steal() }).park_core(Cpu::AppCpu));
     }
 
     #[test]

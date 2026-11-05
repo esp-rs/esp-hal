@@ -674,3 +674,23 @@ macro_rules! if_unstable_hal {
 macro_rules! if_unstable_hal {
     ($($tt:tt)*) => {};
 }
+
+/// Macro to allow using HAL features that need the runtime conditionally. Other crates can
+/// use this to "detect" the esp-hal/rt feature.
+#[macro_export]
+#[doc(hidden)]
+#[cfg(feature = "rt")]
+macro_rules! if_rt_hal {
+    ($($tt:tt)*) => {
+        $($tt)*
+    };
+}
+
+/// Macro to allow using HAL features that need the runtime conditionally. Other crates can
+/// use this to "detect" the esp-hal/rt feature.
+#[macro_export]
+#[doc(hidden)]
+#[cfg(not(feature = "rt"))]
+macro_rules! if_rt_hal {
+    ($($tt:tt)*) => {};
+}
