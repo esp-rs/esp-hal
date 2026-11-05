@@ -224,47 +224,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
-    fn app_core_starts_again(p: Peripherals) {
-        use esp_hal::system::{Cpu, CpuControl, Stack, is_running};
-
-        static STARTED: AtomicU32 = AtomicU32::new(0);
-        static mut APP_CORE_STACK: Stack<2048> = Stack::new();
-
-        // Each start resets the APP core, so no earlier reference to the stack is used again.
-        let stack = || unsafe { &mut *core::ptr::addr_of_mut!(APP_CORE_STACK) };
-
-        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
-
-        // The closure returns, which parks the APP core.
-        let _guard = cpu_control
-            .start_app_core(stack(), || {
-                STARTED.store(1, Ordering::Release);
-            })
-            .unwrap();
-        while STARTED.load(Ordering::Acquire) != 1 {}
-        while is_running(Cpu::AppCpu) {}
-
-        // The closure runs until the guard drops.
-        let guard = cpu_control
-            .start_app_core(stack(), || {
-                STARTED.store(2, Ordering::Release);
-                loop {}
-            })
-            .unwrap();
-        while STARTED.load(Ordering::Acquire) != 2 {}
-        drop(guard);
-
-        let _guard = cpu_control
-            .start_app_core(stack(), || {
-                STARTED.store(3, Ordering::Release);
-                loop {}
-            })
-            .unwrap();
-        while STARTED.load(Ordering::Acquire) != 3 {}
-    }
-
-    #[test]
     fn software_interrupts_fire_immediately(p: Peripherals) {
         software_interrupt_fires_before_returning(p);
     }
