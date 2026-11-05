@@ -159,7 +159,7 @@ impl Temperature {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TemperatureSensor<'d> {
     range: MeasurementRange,
-    stabilization: Option<(Instant, Duration)>,
+    ready_at: Instant,
     calibration: Option<i16>,
     _peripheral: TSENS<'d>,
     _clock_guard: TsensClockGuard,
@@ -178,7 +178,7 @@ impl<'d> TemperatureSensor<'d> {
 
         let mut tsens = Self {
             range: config.range,
-            stabilization: None,
+            ready_at: Instant::EPOCH,
             calibration: crate::efuse::temperature_sensor_calibration(),
             _peripheral: peripheral,
             _clock_guard: TsensClockGuard::new(config.clock_source),
@@ -204,7 +204,7 @@ impl<'d> TemperatureSensor<'d> {
         const STABILIZATION_CYCLES: u64 = 20_000;
         let delay_us = (STABILIZATION_CYCLES * 1_000_000)
             .div_ceil(u64::from(TsensInstance::Tsens.sclk_frequency()));
-        self.stabilization = Some((Instant::now(), Duration::from_micros(delay_us)));
+        self.ready_at = Instant::now() + Duration::from_micros(delay_us);
     }
 
     fn power_up(&mut self) {
@@ -274,9 +274,7 @@ impl<'d> TemperatureSensor<'d> {
             soc_clock_node_tsens_sclk_is_configurable => ClockTree::with(|clocks| {
                 let tsens = TsensInstance::Tsens;
                 let restart = tsens.sclk_config(clocks) != Some(config.clock_source)
-                    && self
-                        .stabilization
-                        .is_some_and(|(start, duration)| start.elapsed() < duration);
+                    && Instant::now() < self.ready_at;
                 tsens.configure_sclk(clocks, config.clock_source);
                 restart
             }),
@@ -300,8 +298,9 @@ impl<'d> TemperatureSensor<'d> {
     /// Waits for any remaining stabilization time after power-up or a range change.
     #[inline]
     pub fn get_temperature(&mut self) -> Temperature {
-        if let Some((start, duration)) = self.stabilization.take() {
-            while start.elapsed() < duration {}
+        if self.ready_at != Instant::EPOCH {
+            while Instant::now() < self.ready_at {}
+            self.ready_at = Instant::EPOCH;
         }
 
         let raw_value = cfg_select! {
