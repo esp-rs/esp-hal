@@ -685,6 +685,10 @@ impl RtcSleepConfig {
                     // calibration. The MPLL must be calibrated again before the next PSRAM
                     // access.
                     clocks::recalibrate_mpll(clocks);
+                    // Light sleep powers XTAL_CLK down, so the CPLL loses its calibration. The
+                    // CPLL must be calibrated again before the CPU or the flash controller runs
+                    // from it.
+                    clocks::recalibrate_cpll(clocks);
                     if let Some(old) = old_cpu_root_clk {
                         clocks::configure_cpu_root_clk(clocks, old);
                     }

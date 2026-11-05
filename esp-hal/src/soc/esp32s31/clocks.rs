@@ -245,21 +245,7 @@ fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
             w.hp_active_xpd_pll().set_bit()
         });
 
-        HP_SYS_CLKRST::regs()
-            .ana_pll_ctrl0()
-            .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
-        while HP_SYS_CLKRST::regs()
-            .ana_pll_ctrl0()
-            .read()
-            .cpu_pll_cal_end()
-            .bit_is_clear()
-        {
-            core::hint::spin_loop();
-        }
-        crate::rom::ets_delay_us(10);
-        HP_SYS_CLKRST::regs()
-            .ana_pll_ctrl0()
-            .modify(|_, w| w.cpu_pll_cal_stop().set_bit());
+        calibrate_cpll();
     } else {
         PMU::regs()
             .imm_hp_ck_power_1()
@@ -275,6 +261,36 @@ fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
             w.hp_active_xpd_pll_i2c().clear_bit();
             w.hp_active_xpd_pll().clear_bit()
         });
+    }
+}
+
+/// Runs the self-calibration of the CPLL. The CPLL must have power.
+fn calibrate_cpll() {
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
+    while HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .read()
+        .cpu_pll_cal_end()
+        .bit_is_clear()
+    {
+        core::hint::spin_loop();
+    }
+    crate::rom::ets_delay_us(10);
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.cpu_pll_cal_stop().set_bit());
+}
+
+/// Calibrates the CPLL again, if a clock uses it.
+///
+/// A CPLL that no clock uses is off, and turning it on calibrates it.
+///
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182e3dabf6355160166fe007df775629/components/esp_hw_support/port/esp32s31/rtc_clk.c#L542-L554>.
+pub(crate) fn recalibrate_cpll(clocks: &ClockTree) {
+    if clocks.cpll_clk_refcount > 0 {
+        calibrate_cpll();
     }
 }
 
