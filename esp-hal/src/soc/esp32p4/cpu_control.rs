@@ -101,7 +101,26 @@ pub(crate) fn restart_core1_after_wake() {
         .modify(|_, w| w.rst_en_core1_global().clear_bit());
 }
 
+/// Starts Core 1 at `entry_point`. Core 1 stays stalled until the caller unstalls it.
 pub(crate) fn start_core1(entry_point: *const u32) {
+    // The stall holds Core 1 until the ROM can read the new entry point.
+    unsafe { internal_park_core(Cpu::AppCpu, true) };
+
+    // A release from global reset does not restart a core that ran before.
+    if HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .read()
+        .rst_en_core1_global()
+        .bit_is_clear()
+    {
+        LP_AON_CLKRST::regs()
+            .lp_aonclkrst_hpcpu_reset_ctrl0()
+            .modify(|_, w| w.lp_aonclkrst_hpcore1_sw_reset().set_bit());
+    }
+
+    // Hand the entry point to the ROM, which Core 1 polls after its reset.
+    crate::rom::ets_set_appcpu_boot_addr(entry_point as u32);
+
     // Enable Core 1's CPU clock.
     HP_SYS_CLKRST::regs()
         .soc_clk_ctrl0()
@@ -111,7 +130,4 @@ pub(crate) fn start_core1(entry_point: *const u32) {
     HP_SYS_CLKRST::regs()
         .hp_rst_en0()
         .modify(|_, w| w.rst_en_core1_global().clear_bit());
-
-    // Hand the entry point to the ROM, which Core 1 is polling.
-    crate::rom::ets_set_appcpu_boot_addr(entry_point as u32);
 }
