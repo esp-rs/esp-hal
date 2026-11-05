@@ -352,6 +352,9 @@ pub struct Config {
     /// The low-power clock source comes from the clock tree (`BLE_LP_CLK`).
     /// While the controller sleeps, the chip can also enter automatic light
     /// sleep. Set this before the controller starts. The default is off.
+    ///
+    /// With [`install_retention_memory`], the controller also powers the MAC and
+    /// baseband down while it sleeps.
     modem_sleep: bool,
 
     /// The priority of the RTOS task.
@@ -663,12 +666,33 @@ pub(crate) unsafe extern "C" fn coex_wifi_sleep_set(sleep: i32) {
     );
 }
 
-pub(crate) unsafe extern "C" fn esp_hw_power_down() {
-    todo!();
+// The ESP32-S3 has no BT power domain, the modem domain powers its BT MAC.
+extern "C" fn esp_hw_power_down() {
+    #[cfg(esp32c3)]
+    {
+        regs!(RTC_CNTL)
+            .dig_iso()
+            .modify(|_, w| w.bt_force_iso().set_bit());
+        regs!(RTC_CNTL)
+            .dig_pwc()
+            .modify(|_, w| w.bt_force_pd().set_bit());
+    }
+
+    super::mac_bb::modem_power_down();
 }
 
-pub(crate) unsafe extern "C" fn esp_hw_power_up() {
-    todo!();
+extern "C" fn esp_hw_power_up() {
+    #[cfg(esp32c3)]
+    {
+        regs!(RTC_CNTL)
+            .dig_pwc()
+            .modify(|_, w| w.bt_force_pd().clear_bit());
+        regs!(RTC_CNTL)
+            .dig_iso()
+            .modify(|_, w| w.bt_force_iso().clear_bit());
+    }
+
+    super::mac_bb::modem_power_up();
 }
 
 extern "C" fn ets_backup_dma_copy(reg: u32, mem_addr: u32, num: u32, to_mem: i32) {

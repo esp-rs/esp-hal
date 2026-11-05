@@ -61,6 +61,12 @@ impl Refcount {
         }
     }
 
+    /// Returns whether exactly one reference is held.
+    #[cfg(all(feature = "ble", any(esp32c3, esp32s3)))]
+    pub fn is_single(&self) -> bool {
+        self.0.load(Ordering::Acquire) == 2
+    }
+
     pub fn decrement(&self, on_last: impl FnOnce()) {
         loop {
             let op = self

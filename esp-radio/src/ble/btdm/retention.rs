@@ -100,6 +100,10 @@ impl core::error::Error for RetentionMemoryError {}
 /// Gives the BLE controller the memory that it uses to retain the MAC and baseband.
 /// The memory stays with the controller for the life of the program.
 ///
+/// With modem sleep on, the controller then powers the MAC and baseband down while it sleeps.
+/// The power-down also takes 768 bytes of internal heap for the PHY state. Install the memory
+/// before the controller starts.
+///
 /// # Examples
 ///
 /// ```rust, no_run

@@ -25,6 +25,8 @@ mod mac_bb;
 mod retention;
 
 use chip_specific::{G_OSI_FUNCS, osi_funcs_s};
+#[cfg(any(esp32c3, esp32s3))]
+pub(super) use mac_bb::{power_down as power_down_mac_bb, power_up as power_up_mac_bb};
 
 pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
     unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
@@ -350,6 +352,8 @@ pub(super) fn time_until_controller_wakes() -> esp_hal::time::Duration {
 }
 
 unsafe extern "C" fn btdm_sleep_enter_phase2() {
+    #[cfg(any(esp32c3, esp32s3))]
+    mac_bb::controller_sleeps();
     if super::modem_sleep_enabled() {
         super::modem_phy_release();
     }
