@@ -49,6 +49,10 @@ mod dma_mem2mem;
 #[path = "misc_non_drivers/init.rs"]
 mod init;
 
+#[path = "misc_non_drivers/multi_core.rs"]
+#[cfg(all(multi_core, soc_has_cpu_ctrl))]
+mod multi_core;
+
 #[path = "misc_non_drivers/simple.rs"]
 mod simple;
 
