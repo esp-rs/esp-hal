@@ -292,7 +292,8 @@ SECTIONS {
     _rodata_end = ABSOLUTE(.);
   } > RODATA
 
-  /* RAM the ROM uses during boot, free afterwards. Never initialized. */
+  /* `#[ram(reclaimed)]` is not available with direct boot, these stay empty. They define the
+     symbols the runtime reads. */
   .dram2_uninit.bss (NOLOAD) : ALIGN(4)
   {
     _dram2_uninit_bss_start = ABSOLUTE(.);

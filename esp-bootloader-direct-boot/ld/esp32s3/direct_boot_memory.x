@@ -19,9 +19,10 @@ MEMORY
   vectors_seg ( RX )     : ORIGIN = 0x40378000, len = 0x400
   iram_seg ( RX )        : ORIGIN = 0x40378400, len = 0x403C2000 - 0x40378400
 
-  dram_seg ( RW )        : ORIGIN = 0x3FC88000, len = 0x3FCDB700 - 0x3FC88000
-  /* used by the ROM during boot, free afterwards */
-  dram2_seg ( RW )       : ORIGIN = 0x3FCDB700, len = 0x3FCED710 - 0x3FCDB700
+  /* Ends at SOC_ROM_STACK_START, the top of the PRO CPU's ROM stack. */
+  dram_seg ( RW )        : ORIGIN = 0x3FC88000, len = 0x3FCEB710 - 0x3FC88000
+  /* `#[ram(reclaimed)]` is not available with direct boot. */
+  dram2_seg ( RW )       : ORIGIN = 0x3FCEB710, len = 0
 
   dcache_reclaimed_seg ( RW ) : ORIGIN = 0x3FCF0000, len = 0x3FD00000 - 0x3FCF0000 - ESP_HAL_DATA_CACHE_SIZE
 

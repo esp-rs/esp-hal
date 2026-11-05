@@ -7,11 +7,13 @@ IRAM_DRAM_OFFSET = 0;
 
 MEMORY
 {
-    /* HP SRAM, shared instruction and data memory. */
-    RAM : ORIGIN = 0x2F000000, LENGTH = 0x6CFB0
+    /* HP SRAM, shared instruction and data memory. Ends at the top of the first core's ROM
+       stack: ESP-IDF v6.1 puts it at 0x2F07CFB0, the v0.0 ROM at 0x2F07C600, the lower one is
+       used. */
+    RAM : ORIGIN = 0x2F000000, LENGTH = 0x2F07C600 - 0x2F000000
 
-    /* Used by the ROM during boot, free afterwards. Upper bound is SOC_ROM_STACK_START. */
-    dram2_seg ( RW ) : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x2f07cfb0 - (ORIGIN(RAM) + LENGTH(RAM))
+    /* `#[ram(reclaimed)]` is not available with direct boot. */
+    dram2_seg ( RW ) : ORIGIN = 0x2F07C600, len = 0
 
     ROM : ORIGIN = 0x40000000, LENGTH = 0x4000000
 

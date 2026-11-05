@@ -5,12 +5,13 @@ IROM_BASE = 0x42000000;
 DROM_BASE = 0x42000000;
 IRAM_DRAM_OFFSET = 0;
 
+/* RAM ends at SOC_ROM_STACK_START. */
 MEMORY
 {
-    RAM : ORIGIN = 0x40800000, LENGTH = 0x4E5A0
+    RAM : ORIGIN = 0x40800000, LENGTH = 0x4085E5A0 - 0x40800000
 
-    /* used by the ROM during boot, free afterwards */
-    dram2_seg ( RW ) : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4085e5a0 - (ORIGIN(RAM) + LENGTH(RAM))
+    /* `#[ram(reclaimed)]` is not available with direct boot. */
+    dram2_seg ( RW ) : ORIGIN = 0x4085E5A0, len = 0
 
     ROM : ORIGIN = 0x42000000, LENGTH = 0x1000000
 
