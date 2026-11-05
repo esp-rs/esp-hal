@@ -95,15 +95,15 @@ impl<const SIZE: usize> RetentionSlot<SIZE> {
         &self,
         memory: &'static mut RetentionMemory<SIZE>,
     ) -> Result<(), RetentionMemoryError> {
-        let memory = memory.storage.as_mut_ptr().cast::<u8>();
+        let base = memory.storage.as_mut_ptr().cast::<u8>();
 
-        let start = memory as usize;
+        let start = base as usize;
         if start < MEM_START || start + SIZE > MEM_END {
             return Err(RetentionMemoryError::OutOfRange);
         }
 
         self.base
-            .compare_exchange(ptr::null_mut(), memory, Ordering::AcqRel, Ordering::Acquire)
+            .compare_exchange(ptr::null_mut(), base, Ordering::AcqRel, Ordering::Acquire)
             .map(|_| ())
             .map_err(|_| RetentionMemoryError::AlreadyInstalled)
     }

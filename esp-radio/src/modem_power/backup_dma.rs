@@ -40,13 +40,12 @@ impl State {
 /// Prepares the PHY memory and the backup DMA. Returns whether they are ready.
 pub(super) fn enable(state: &mut State) -> bool {
     if state.phy_memory.is_none() {
-        state.phy_memory = Box::try_new_in([0; PHY_MEMORY_WORDS], InternalMemory).ok();
+        let Ok(phy_memory) = Box::try_new_in([0; PHY_MEMORY_WORDS], InternalMemory) else {
+            return false;
+        };
+        state.phy_memory = Some(phy_memory);
+        init_backup_dma();
     }
-    if state.phy_memory.is_none() {
-        return false;
-    }
-
-    init_backup_dma();
     true
 }
 

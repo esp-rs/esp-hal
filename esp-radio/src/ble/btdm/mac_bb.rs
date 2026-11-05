@@ -45,12 +45,17 @@ static STATE: NonReentrantMutex<State> = NonReentrantMutex::new(State {
 /// installed. Call this before `btdm_controller_init`.
 pub(crate) fn init(power_down: bool) {
     modem_power::start(Radio::Ble);
-    if !power_down || !retention::is_installed() || !modem_power::enable_power_down(Radio::Ble) {
+    if !power_down || !retention::is_installed() {
         return;
     }
 
     if !unsafe { btdm_deep_sleep_mem_init() } {
         warn!("The retention memory is too small, the BLE MAC and baseband stay powered in sleep");
+        return;
+    }
+
+    if !modem_power::enable_power_down(Radio::Ble) {
+        unsafe { btdm_deep_sleep_mem_deinit() };
         return;
     }
 

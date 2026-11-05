@@ -91,8 +91,8 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     if !station_idle || SLEEP_LOCK.load(Ordering::Relaxed) > 0 || tsf_active {
         config.reject_sleep();
     } else {
-        // Not on this refusal, because the blob still uses the MAC and baseband then. A refusal by
-        // a later hook runs the exit hook, which restores them.
+        // Only when the blob accepts the sleep, because it still uses the MAC and baseband
+        // otherwise. If a later hook refuses the sleep, the exit hook restores them.
         #[cfg(modem_retention = "backup_dma")]
         super::mac_bb::power_down();
     }
