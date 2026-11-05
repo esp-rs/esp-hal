@@ -156,8 +156,9 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     }
     let is_hex = matches!(config.mode, PsramMode::Hex);
     oct_hex::enable_dll();
-    oct_hex::psram_pad_init(is_hex); // required for DDR strobe latch
+    oct_hex::psram_pad_init(is_hex);
     oct_hex::set_cs_timing();
+    set_psram_page_size_2kb();
 
     // SoC MR init (via MSPI3 SPI direct)
     oct_hex::init_mr_registers(&config.timing, is_hex);
@@ -250,6 +251,19 @@ fn reset_psram_mspi() {
         w.rst_en_dual_mspi_axi().clear_bit();
         w.rst_en_dual_mspi_apb().clear_bit()
     });
+}
+
+/// Match IDF's `psram_ctrlr_ll_set_page_size(..., 2048)` for AP octal/hex PSRAM.
+///
+/// `smem_page_size` defaults to 1024 bytes after reset, while both IDF and our
+/// MR8 setup use a 2048-byte PSRAM page size.
+fn set_psram_page_size_2kb() {
+    const SMEM_PAGE_SIZE_MASK: u32 = 0b11 << 18;
+    const SMEM_PAGE_SIZE_2KB: u32 = 0b11 << 18;
+
+    MEMSPI2::regs()
+        .smem_ecc_ctrl()
+        .modify(|r, w| unsafe { w.bits((r.bits() & !SMEM_PAGE_SIZE_MASK) | SMEM_PAGE_SIZE_2KB) });
 }
 
 /// ESP32-P4 silicon revision 3.0 workaround.

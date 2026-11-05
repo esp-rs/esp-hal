@@ -33,5 +33,9 @@ api-baseline/
 .mcp.json
 .cursor/
 
+# Local agent notes (Cursor project-understanding skill)
+.cursor_project_understanding/
+
 # Ignore compile tests
 compile-tests/
+.DS_Store
