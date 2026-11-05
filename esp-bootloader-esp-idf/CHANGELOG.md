@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The crate sets `links = "esp-bootloader"`, so Cargo rejects a dependency graph that contains two bootloader support crates. (#6694)
 
 ### Fixed
 
