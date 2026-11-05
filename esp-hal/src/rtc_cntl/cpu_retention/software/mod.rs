@@ -403,8 +403,8 @@ critical_regs_asm!(
     mintthresh_csr = const 0x347,
 );
 
-// The S31 critical frame also holds the interrupt threshold and the FPU.
-#[cfg(cpu_retention_frame = "s31")]
+// The S31 and H4 critical frames also hold the interrupt threshold and the FPU.
+#[cfg(any(cpu_retention_frame = "s31", cpu_retention_frame = "h4"))]
 critical_regs_asm!(
     fpu,
     save_extra: ["csrr t2, {mintthresh_csr}", "sw t2, {mintthresh}(t0)"],
@@ -614,6 +614,18 @@ saved_region_map! {
 #[cfg(any(esp32c5, esp32c61))]
 saved_region_map! {
     { CACHE, [cache_autoload_ctrl()], 5 },
+    { CLIC, [int_config()], 3 },
+    { CLIC, [int_ip(0)], 48 },
+    { CLINT, [msip()], 1 },
+    { CLINT, [mtimecmp()], 2 },
+    { CLINT, [mtimectl()], 1 },
+    { CLINT, [mtime()], 2 },
+}
+
+#[cfg(esp32h4)]
+saved_region_map! {
+    { CACHE, [l1_icache_ctrl()], 2 },
+    { CACHE, [l1_cache_wrap_around_ctrl()], 1 },
     { CLIC, [int_config()], 3 },
     { CLIC, [int_ip(0)], 48 },
     { CLINT, [msip()], 1 },

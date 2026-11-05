@@ -1693,13 +1693,11 @@ impl<'lt> AnyPin<'lt> {
     /// other pad has a bit in a register of the digital pads.
     #[cfg(lp_io_driver_supported)]
     pub(crate) fn set_pad_hold(&self, enable: bool) {
-        GPIO_LOCK.lock(|| {
-            if let Some(lp) = lp_io::lp_number(self.number()) {
-                lp_io::low_level::pad_hold(lp, enable);
-            } else {
-                lp_io::low_level::digital_pad_hold(self.number(), enable);
-            }
-        })
+        if let Some(lp) = lp_io::lp_number(self.number()) {
+            lp_io::low_level::pad_hold(lp, enable);
+        } else {
+            lp_io::low_level::digital_pad_hold(self.number(), enable);
+        }
     }
 
     /// Returns whether something holds the pad.

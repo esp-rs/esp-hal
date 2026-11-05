@@ -411,6 +411,8 @@ impl Drop for EccMemoryPowerGuard {
 }
 
 /// ECC peripheral configuration.
+///
+/// The default turns enhanced security on, where the chip supports it.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
@@ -423,6 +425,17 @@ pub struct Config {
 
     /// Enables constant time operation and minimized power consumption variation for
     /// point-multiplication operations.
+    ///
+    /// Turning it off makes a point multiplication faster by an amount that depends on the
+    /// scalar's bit pattern. The time then exposes the scalar to timing-based side-channel
+    /// attacks. Turn it off only for a public scalar.
+    ///
+    /// `None` enables the mode where the chip revision supports it. Where it does not, `None`
+    /// logs a warning and `Some(true)` is refused with
+    /// [`ConfigError::EnhancedSecurityUnsupported`]. A caller that needs constant time passes
+    /// `true`.
+    ///
+    /// Default value: `None`.
     #[cfg_attr(
         esp32h2,
         doc = r"
@@ -430,7 +443,52 @@ pub struct Config {
 Only available on chip revision 1.2 and above."
     )]
     #[cfg(ecc_supports_enhanced_security)]
-    enhanced_security: bool,
+    enhanced_security: Option<bool>,
+}
+
+/// ECC configuration error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// The configuration asks for enhanced security, and this chip revision does not support it.
+    ///
+    /// Only the ESP32-H2 below revision 1.2 lacks it. The default configuration is accepted there,
+    /// turns the mode off and logs a warning.
+    #[cfg(ecc_supports_enhanced_security)]
+    EnhancedSecurityUnsupported,
+}
+
+/// Returns whether this chip revision has the enhanced security mode.
+#[cfg(ecc_supports_enhanced_security)]
+fn enhanced_security_supported() -> bool {
+    !cfg!(esp32h2) || crate::soc::chip_revision_above(ChipRevision::from_combined(102))
+}
+
+/// Returns whether `config` turns enhanced security on, with `None` resolved for this chip
+/// revision.
+#[cfg(ecc_supports_enhanced_security)]
+fn enhanced_security(config: &Config) -> Result<bool, ConfigError> {
+    match config.enhanced_security {
+        None if !enhanced_security_supported() => {
+            warn!(
+                "No ECC enhanced security on this chip revision: point multiplication exposes a private scalar to a timing side channel"
+            );
+            Ok(false)
+        }
+        None => Ok(true),
+        Some(true) if !enhanced_security_supported() => {
+            Err(ConfigError::EnhancedSecurityUnsupported)
+        }
+        Some(on) => Ok(on),
+    }
+}
+
+fn check_config(_config: &Config) -> Result<(), ConfigError> {
+    #[cfg(ecc_supports_enhanced_security)]
+    enhanced_security(_config)?;
+
+    Ok(())
 }
 
 /// ECC operation error.
@@ -524,8 +582,8 @@ for_each_ecc_working_mode! {
 }
 
 impl<'d> Ecc<'d, Blocking> {
-    /// Creates a new instance in [Blocking] mode.
-    pub fn new(ecc: ECC<'d>, config: Config) -> Self {
+    /// Creates a new instance in [Blocking] mode, with the given configuration.
+    pub fn new(ecc: ECC<'d>, config: Config) -> Result<Self, ConfigError> {
         let clock_guard = CryptoClockGuard::new();
         let this = Self {
             _ecc: ecc,
@@ -535,9 +593,9 @@ impl<'d> Ecc<'d, Blocking> {
             _clock_guard: clock_guard,
         };
 
-        this.info().apply_config(&config);
+        this.info().apply_config(&config)?;
 
-        this
+        Ok(this)
     }
 }
 
@@ -559,7 +617,10 @@ impl Info {
         self.regs.mult_conf().reset()
     }
 
-    fn apply_config(&self, config: &Config) {
+    fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
+        #[cfg(ecc_supports_enhanced_security)]
+        let enhanced_security = enhanced_security(config)?;
+
         self.regs.mult_conf().modify(|_, w| {
             w.clk_en().bit(config.force_enable_reg_clock);
 
@@ -568,12 +629,14 @@ impl Info {
                 .bit(config.force_enable_mem_clock);
 
             #[cfg(ecc_supports_enhanced_security)]
-            if !cfg!(esp32h2) || crate::soc::chip_revision_above(ChipRevision::from_combined(102)) {
-                w.security_mode().bit(config.enhanced_security);
+            if enhanced_security_supported() {
+                w.security_mode().bit(enhanced_security);
             }
 
             w
         });
+
+        Ok(())
     }
 
     fn check_point_verification_result(&self) -> Result<(), OperationError> {
@@ -773,8 +836,8 @@ for_each_ecc_working_mode! {
             }
 
             /// Applies the given configuration to the ECC peripheral.
-            pub fn apply_config(&mut self, config: &Config) {
-                self.info().apply_config(config);
+            pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+                self.info().apply_config(config)
             }
 
             /// Resets the ECC peripheral.
@@ -1037,7 +1100,8 @@ const ECC_VTABLE: VTable<EccWorkItem> = VTable {
 
         // Ensure driver is initialized
         if let DriverState::Uninitialized(ecc) = &driver.driver {
-            let mut ecc = Ecc::new(unsafe { ecc.clone_unchecked() }, driver.config);
+            // `EccBackend::new` checked the configuration.
+            let mut ecc = unwrap!(Ecc::new(unsafe { ecc.clone_unchecked() }, driver.config));
             ecc.set_interrupt_handler(ecc_work_queue_handler);
             driver.driver = DriverState::Initialized(ecc);
         };
@@ -1072,14 +1136,16 @@ pub struct EccBackend<'d> {
 }
 
 impl<'d> EccBackend<'d> {
-    /// Creates a new ECC backend.
+    /// Creates a new ECC backend, with the given configuration.
     ///
     /// The backend must be started with [`Self::start`] before it can execute ECC operations.
-    pub fn new(ecc: ECC<'d>, config: Config) -> Self {
-        Self {
+    pub fn new(ecc: ECC<'d>, config: Config) -> Result<Self, ConfigError> {
+        check_config(&config)?;
+
+        Ok(Self {
             driver: DriverState::Uninitialized(ecc),
             config,
-        }
+        })
     }
 
     /// Registers the ECC driver to process ECC operations.

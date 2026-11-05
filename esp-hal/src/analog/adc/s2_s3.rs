@@ -115,11 +115,17 @@ fn init_hardware<ADCX: RegisterAccess>() {
     sensors
         .sar_meas1_ctrl1()
         .modify(|_, w| unsafe { w.force_xpd_amp().bits(0b11) });
-    sensors.sar_amp_ctrl3().modify(|_, w| unsafe {
-        w.amp_rst_fb_fsm().bits(0);
-        w.amp_short_ref_fsm().bits(0);
-        w.amp_short_ref_gnd_fsm().bits(0)
-    });
+    let configure_amp = || {
+        sensors.sar_amp_ctrl3().modify(|_, w| unsafe {
+            w.amp_rst_fb_fsm().bits(0);
+            w.amp_short_ref_fsm().bits(0);
+            w.amp_short_ref_gnd_fsm().bits(0)
+        });
+    };
+    cfg_select! {
+        esp32s2 => crate::analog::ADC_DAC_LOCK.lock(configure_amp),
+        _ => configure_amp(),
+    }
     sensors.sar_amp_ctrl1().modify(|_, w| unsafe {
         w.sar_amp_wait1().bits(1);
         w.sar_amp_wait2().bits(1)

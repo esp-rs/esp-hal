@@ -574,6 +574,28 @@ mod camera_tests {
     }
 
     #[test]
+    fn test_camera_receives_whole_frame_after_dpi_restart(ctx: Context) {
+        let (camera, dpi, dma_tx_buf, dma_rx_buf, _) = loopback(ctx);
+
+        // A frame takes about 8.5 ms. Stop in the middle of it, while pixels are still in flight.
+        let dpi_transfer = dpi.send(true, dma_tx_buf).map_err(|e| e.0).unwrap();
+        esp_hal::delay::Delay::new().delay_millis(2);
+        let (dpi, dma_tx_buf) = dpi_transfer.stop();
+
+        let camera_transfer = camera.receive(dma_rx_buf).map_err(|e| e.0).unwrap();
+        let dpi_transfer = dpi.send(true, dma_tx_buf).map_err(|e| e.0).unwrap();
+        let (result, _, dma_rx_buf) = camera_transfer.wait();
+        let (_, dma_tx_buf) = dpi_transfer.stop();
+
+        hil_test::assert_eq!(result, Ok(()));
+        hil_test::assert_eq!(dma_rx_buf.number_of_received_bytes(), FRAME_BYTES);
+        hil_test::assert_eq!(
+            &dma_tx_buf.as_slice()[..FRAME_BYTES],
+            &dma_rx_buf.as_slice()[..FRAME_BYTES]
+        );
+    }
+
+    #[test]
     async fn test_camera_dma_eof(ctx: Context) {
         let (camera, mut dpi, mut sent, mut received, pclk) = loopback(ctx);
         let mut camera = camera

@@ -16,13 +16,13 @@ pins = [
     { pin =  3,                            analog = { 0 = "ZCD3" },       lp = { 1 = "LP_GPIO3" } },
     { pin =  4,                            analog = { 0 = "XTAL_32K_N" }, lp = { 1 = "LP_GPIO4" } },
     { pin =  5,                            analog = { 0 = "XTAL_32K_P" }, lp = { 1 = "LP_GPIO5" } },
-    { pin =  6,                                                            limitations = ["spi_flash"] }, # SPICS1
+    { pin =  6,                                                            limitations = ["spi_psram"] }, # SPICS1
     { pin =  7,                                                            limitations = ["spi_flash"] }, # SPICS0
-    { pin =  8,                                                            limitations = ["spi_flash"] }, # SPIQ
-    { pin =  9,                                                            limitations = ["spi_flash"] }, # SPIWP
-    { pin = 10,                                                            limitations = ["spi_flash"] }, # SPIHD
-    { pin = 11,                                                            limitations = ["spi_flash"] }, # SPICLK
-    { pin = 12,                                                            limitations = ["spi_flash"] }, # SPID
+    { pin =  8,                                                            limitations = ["spi_flash", "spi_psram"] }, # SPIQ
+    { pin =  9,                                                            limitations = ["spi_flash", "spi_psram"] }, # SPIWP
+    { pin = 10,                                                            limitations = ["spi_flash", "spi_psram"] }, # SPIHD
+    { pin = 11,                                                            limitations = ["spi_flash", "spi_psram"] }, # SPICLK
+    { pin = 12,                                                            limitations = ["spi_flash", "spi_psram"] }, # SPID
     { pin = 13,                            analog = { 0 = "USJ_DM" } },
     { pin = 14,                            analog = { 0 = "USJ_DP" } },
     { pin = 15, functions = { 2 = "FSPIQ"    } },
@@ -291,4 +291,8 @@ output_signals = [
 
     { name = "MTDO" },
 ]
+
+[device.lp_io]
+support_status = "partial"
+version = "v4"
 

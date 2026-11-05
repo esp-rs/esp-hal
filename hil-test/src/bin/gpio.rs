@@ -894,6 +894,10 @@ mod pad_hold {
         #[cfg(not(esp32))]
         hp_probe: AnyPin<'static>,
         delay: Delay,
+        #[cfg(multi_core)]
+        cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
+        #[cfg(esp32)]
+        shared_register_pads: (AnyPin<'static>, AnyPin<'static>),
     }
 
     #[init]
@@ -912,6 +916,10 @@ mod pad_hold {
             #[cfg(not(esp32))]
             hp_probe: hp_probe.degrade(),
             delay: Delay::new(),
+            #[cfg(multi_core)]
+            cpu_ctrl: peripherals.CPU_CTRL,
+            #[cfg(esp32)]
+            shared_register_pads: (peripherals.GPIO32.degrade(), peripherals.GPIO33.degrade()),
         }
     }
 
@@ -961,6 +969,72 @@ mod pad_hold {
     #[cfg(not(esp32))]
     fn creating_a_driver_releases_the_hold_of_an_hp_pad(ctx: Context) {
         creating_a_driver_releases_the_hold(ctx.hp_pad, ctx.hp_probe, ctx.delay);
+    }
+
+    #[test]
+    #[timeout(10)]
+    #[cfg(multi_core)]
+    fn creating_a_driver_on_the_other_core_keeps_the_hold_of_an_lp_pad(ctx: Context) {
+        creating_a_driver_on_the_other_core_keeps_the_hold(ctx.lp_pad, ctx.lp_probe, ctx.cpu_ctrl);
+    }
+
+    // GPIO32 and GPIO33 share one pad register, which also stores the hold of both pads.
+    #[test]
+    #[timeout(10)]
+    #[cfg(esp32)]
+    fn creating_a_driver_on_the_other_core_keeps_the_hold_of_a_pad_in_a_shared_register(
+        ctx: Context,
+    ) {
+        creating_a_driver_on_the_other_core_keeps_the_hold(
+            ctx.shared_register_pads.0,
+            ctx.shared_register_pads.1,
+            ctx.cpu_ctrl,
+        );
+    }
+
+    #[cfg(multi_core)]
+    fn creating_a_driver_on_the_other_core_keeps_the_hold(
+        held: AnyPin<'static>,
+        mut other: AnyPin<'static>,
+        cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
+    ) {
+        use core::sync::atomic::{AtomicBool, Ordering};
+
+        use esp_hal::system::{CpuControl, Stack};
+        use hil_test::mk_static;
+
+        static STOP: AtomicBool = AtomicBool::new(false);
+        static STOPPED: AtomicBool = AtomicBool::new(false);
+
+        let mut held = Flex::new(held);
+
+        let mut cpu_control = CpuControl::new(cpu_ctrl);
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(app_core_stack, move || {
+                while !STOP.load(Ordering::Relaxed) {
+                    let _ = Flex::new(other.reborrow());
+                }
+                STOPPED.store(true, Ordering::Release);
+                loop {}
+            })
+            .unwrap();
+
+        let mut lost_updates = 0u32;
+        for _ in 0..100_000 {
+            held.set_pad_hold(true);
+            lost_updates += u32::from(!held.is_pad_held());
+            held.set_pad_hold(false);
+            lost_updates += u32::from(held.is_pad_held());
+        }
+
+        STOP.store(true, Ordering::Relaxed);
+        while !STOPPED.load(Ordering::Acquire) {}
+
+        assert_eq!(
+            lost_updates, 0,
+            "the other core overwrote the hold of the pad"
+        );
     }
 }
 

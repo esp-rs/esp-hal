@@ -110,6 +110,7 @@ embassy-sync       = "0.8.0"
 embassy-time       = "0.5.0"
 embedded-hal       = "1.0.0"
 embedded-io        = "0.7.1"
+embedded-io-06     = { package = "embedded-io", version = "0.6" }
 embedded-io-async  = "0.7.0"
 embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
@@ -123,7 +124,7 @@ esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
 portable-atomic    = "1.11"
 static_cell        = { version = "2.1.1" }
-semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
+semihosting        = { version = "0.1", features= ["stdio"] }
 
 trouble-host = { version = "0.8.0", features = [
     "default-packet-pool-mtu-255",
@@ -152,6 +153,14 @@ sdio                  = "0.5"
 block-device-adapters = "0.2.0"
 embedded-fatfs        = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112", default-features = false }
 embedded-partitions   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+# Only the build script uses the `links` metadata of `esp-riscv-rt`.
+esp-riscv-rt = { path = "../esp-riscv-rt" }
+
+[target.'cfg(target_arch = "xtensa")'.dependencies]
+# Only the build script uses the `links` metadata of `xtensa-lx-rt`.
+xtensa-lx-rt = { path = "../xtensa-lx-rt" }
 
 [build-dependencies]
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
@@ -292,3 +301,6 @@ debug            = 0
 [patch.crates-io]
 block-device-driver   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
 block-device-adapters = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+
+[package.metadata.cargo-machete]
+ignored = ["esp-riscv-rt", "xtensa-lx-rt"]

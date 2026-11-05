@@ -19,6 +19,8 @@ embassy-net = { version = "0.9.0", features = [ "tcp", "udp", "dhcpv4", "medium-
 embassy-sync = "0.8.0"
 embedded-graphics = "0.8.1"
 embedded-hal-async = "1.0.0"
+embedded-io-06 = { package = "embedded-io", version = "0.6" }
+embedded-io-07 = { package = "embedded-io", version = "0.7" }
 embedded-io-async = "0.7.0"
 esp-alloc = { path = "../../esp-alloc" }
 esp-backtrace = { path = "../../esp-backtrace", features = [
@@ -26,7 +28,12 @@ esp-backtrace = { path = "../../esp-backtrace", features = [
     "println",
 ] }
 esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
-esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
+esp-hal = { path = "../../esp-hal", default-features = false, features = [
+    "rt",
+    "exception-handler",
+    "log-04",
+    "unstable",
+] }
 esp-metadata-generated = { path = "../../esp-metadata-generated" }
 esp-rtos = { path = "../../esp-rtos", optional = true, features = [
     "log-04",
@@ -55,7 +62,9 @@ log = "0.4"
 libm = "0.2"
 
 [features]
+default = ["float-save-restore"]
 unstable = []
+float-save-restore = ["esp-hal/float-save-restore"]
 
 esp-radio = [
     "dep:esp-radio",

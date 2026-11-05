@@ -9,7 +9,7 @@ use super::{Config, ReceivedPacket};
 use crate::sys::include;
 use crate::{
     asynch::AtomicWaker,
-    compat::common::str_from_c,
+    compat::common::{str_from_c, task_core},
     hal::ram,
     sys::{c_types::*, include::*},
 };
@@ -167,7 +167,7 @@ unsafe extern "C" fn task_create(
             task_func,
             param,
             prio,
-            if core_id < 2 { Some(core_id) } else { None },
+            Some(task_core(core_id)),
             stack_depth as usize,
         );
         *(handle as *mut usize) = task.as_ptr() as usize;

@@ -1,6 +1,6 @@
 use crate::{
-    gpio::{LpPin, lp_io::LpFunction},
-    peripherals::LP_AON,
+    gpio::{GPIO_LOCK, LpPin, lp_io::LpFunction},
+    peripherals::{LP_AON, LP_PERI},
 };
 
 cfg_select! {
@@ -44,15 +44,17 @@ pub(crate) fn is_pad_held(lp: u8) -> bool {
 /// Takes or releases the hold of the pad of `gpio`.
 pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
     let update = |bits: u32, mask: u32| if enable { bits | mask } else { bits & !mask };
-    if gpio < 32 {
-        LP_AON::regs()
-            .gpio_hold0()
-            .modify(|r, w| unsafe { w.bits(update(r.bits(), 1 << gpio)) });
-    } else {
-        LP_AON::regs()
-            .gpio_hold1()
-            .modify(|r, w| unsafe { w.bits(update(r.bits(), 1 << (gpio - 32))) });
-    }
+    GPIO_LOCK.lock(|| {
+        if gpio < 32 {
+            LP_AON::regs()
+                .gpio_hold0()
+                .modify(|r, w| unsafe { w.bits(update(r.bits(), 1 << gpio)) });
+        } else {
+            LP_AON::regs()
+                .gpio_hold1()
+                .modify(|r, w| unsafe { w.bits(update(r.bits(), 1 << (gpio - 32))) });
+        }
+    });
 }
 
 /// Returns whether something holds the pad of `gpio`.
@@ -64,11 +66,24 @@ pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
     }
 }
 
+// A CPU reset does not reset this clock gate. The previous program can leave the gate closed. An
+// access to the LP IO MUX then causes a bus error.
+fn enable_io_clock() {
+    LP_PERI::regs()
+        .clk_en()
+        .modify(|_, w| w.lp_io_ck_en().set_bit());
+    while LP_PERI::regs().clk_en().read().lp_io_ck_en().bit_is_clear() {}
+}
+
 pub(crate) fn set_config(lp: u8, input_enable: bool, mux: bool, func: LpFunction) {
+    enable_io_clock();
+
     let mask = 1 << lp;
-    LP_AON::regs().gpio_mux().modify(|r, w| unsafe {
-        let bits = r.sel().bits();
-        w.sel().bits(if mux { bits | mask } else { bits & !mask })
+    GPIO_LOCK.lock(|| {
+        LP_AON::regs().gpio_mux().modify(|r, w| unsafe {
+            let bits = r.sel().bits();
+            w.sel().bits(if mux { bits | mask } else { bits & !mask })
+        });
     });
 
     LP_IO_MUX::regs().gpio(lp as usize).modify(|_, w| unsafe {
@@ -111,12 +126,14 @@ pub(crate) fn input_enable(lp: u8, enable: bool) {
 }
 
 pub(crate) fn pullup_enable(lp: u8, enable: bool) {
+    enable_io_clock();
     LP_IO_MUX::regs()
         .gpio(lp as usize)
         .modify(|_, w| w.fun_wpu().bit(enable));
 }
 
 pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
+    enable_io_clock();
     LP_IO_MUX::regs()
         .gpio(lp as usize)
         .modify(|_, w| w.fun_wpd().bit(enable));
@@ -144,7 +161,9 @@ pub(crate) fn reset_pin(lp: u8) {
     LP_IO_MUX::regs().gpio(lp as usize).reset();
 
     // Hand the pad back to the digital IO MUX.
-    LP_AON::regs()
-        .gpio_mux()
-        .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() & !(1 << lp)) });
+    GPIO_LOCK.lock(|| {
+        LP_AON::regs()
+            .gpio_mux()
+            .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() & !(1 << lp)) });
+    });
 }

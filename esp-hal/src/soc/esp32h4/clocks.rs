@@ -96,9 +96,6 @@ impl ClockConfig {
         BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
 
         update_bus_clocks();
-
-        // esp_rom_set_cpu_ticks_per_us(), the ROM delay functions need this.
-        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
     }
 }
 
@@ -121,6 +118,9 @@ fn update_bus_clocks() {
         .bus_clock_update()
         .bit_is_set()
     {}
+
+    // `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+    ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
 /// Powers up and configures the BBPLL and the XTAL frequency doubler again, if a clock uses them.
@@ -550,5 +550,53 @@ impl TimgInstance {
                 .timergroup1_wdt_clk_conf()
                 .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(sel) }),
         };
+    }
+}
+
+impl ParlIoInstance {
+    // PARL_IO_RX_CLOCK
+
+    fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .parl_clk_rx_conf()
+            .modify(|_, w| w.parl_clk_rx_en().bit(en));
+    }
+
+    fn configure_rx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
+    ) {
+        PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
+            w.parl_clk_rx_sel().bits(match new_config {
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 1,
+                ParlIoClkConfig::PllF96m => 2,
+            })
+        });
+    }
+
+    // PARL_IO_TX_CLOCK
+
+    fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .parl_clk_tx_conf()
+            .modify(|_, w| w.parl_clk_tx_en().bit(en));
+    }
+
+    fn configure_tx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
+    ) {
+        PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
+            w.parl_clk_tx_sel().bits(match new_config {
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 1,
+                ParlIoClkConfig::PllF96m => 2,
+            })
+        });
     }
 }

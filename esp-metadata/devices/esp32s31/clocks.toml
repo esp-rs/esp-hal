@@ -52,6 +52,8 @@ system_clocks = { clock_tree = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
+    # LP_DYN_FAST uses LP_SLOW_CLK in LP_SLEEP mode and LP_FAST_CLK otherwise.
+    { name = "LP_PERI_CLK", type = "generic", always_on = true, params = { divisor = "0..8" }, output = "LP_FAST_CLK / (divisor + 1)" },
     # BLE RTC timer (MODEM_LPCON). Independent of LP_SLOW_CLK.
     { name = "BLE_LP_XTAL_CLK", type = "derived", from = "XTAL_CLK", output = "100_000" },
     { name = "BLE_LP_CLK", type = "mux", variants = [
@@ -83,6 +85,11 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "LP_PERI", outputs = "LP_PERI_CLK", default = true },
+        ] },
+    ] },
     { group = "PSRAM", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL", outputs = "XTAL_CLK", default = true },
@@ -162,6 +169,25 @@ system_clocks = { clock_tree = [
     { group = "SDM", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
     ] },
+    # HP_SYS_CLKRST.parlio_{rx,tx}_ctrl0.clk_src_sel, see SOC_PARLIO_CLKS. The driver selects
+    # source 3, the clock from the pad.
+    { group = "PARL_IO",
+      presets = {
+        CLK = {
+          type = "mux",
+          wake_locking = true,
+          variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F160M",   outputs = "PLL_F160M", default = true },
+          ],
+        },
+      },
+      clocks = [
+        { name = "RX_CLOCK", preset = "CLK" },
+        { name = "TX_CLOCK", preset = "CLK" },
+      ],
+    },
     # Function clocks live in HP_SYS_CLKRST. The divider register stores N - 1.
     { group = "LCD_CAM", clocks = [
         { name = "LCD_CLOCK", type = "generic", wake_locking = true, output = "(sclk * div_a) / (div_num * div_a + div_b)", params = { sclk = [
@@ -254,7 +280,12 @@ peripheral_clocks = { templates = [
         clk_en_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_clk_en().bit(enable));",
         rst_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_rst_en().bit(reset));"
     } },
+    { name = "Tsens", template_params = {
+        clk_en_template = "crate::peripherals::LP_PERI::regs().tsens_ctrl().modify(|_, w| w.lp_tsens_clk_en().bit(enable));",
+        rst_template = "crate::peripherals::LP_PERI::regs().tsens_ctrl().modify(|_, w| w.lp_tsens_rst_en().bit(reset));"
+    } },
     { name = "Rmt", template_params = { clk_en = "{{sys_clk}}" } },
+    { name = "ParlIo", template_params = { peripheral = "parlio" } },
     { name = "LcdCam", template_params = { peripheral = "lcdcam", rst_en = ".apb_rst_en().bit(reset).rst_en().bit(reset)" } },
     { name = "Pcnt", template_params = { clk_en = ".pcnt0_apb_clk_en().bit(enable)", rst_en = ".pcnt0_rst_en().bit(reset)" } },
     { name = "Pcnt1", template_params = { ctrl_reg = "pcnt_ctrl0()", clk_en = ".pcnt1_apb_clk_en().bit(enable)", rst_en = ".pcnt1_rst_en().bit(reset)" } },

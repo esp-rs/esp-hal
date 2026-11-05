@@ -1,0 +1,8 @@
+[toolchain]
+#%if chip.riscv
+channel    = "{{ rust_toolchain }}"
+components = ["rust-src"]
+targets = ["{{ chip.rust_target }}"]
+#%else if chip.xtensa
+#+channel = "{{ rust_toolchain }}"
+#%endif

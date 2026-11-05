@@ -37,8 +37,11 @@ MEMORY
     */
     dram2_seg ( RW ): ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4ffbefc0 - (ORIGIN(RAM) + LENGTH(RAM))
 
-    /* External flash (XIP via cache); +0x20 skips the IDF app image header. */
-    ROM : ORIGIN = 0x40000000 + 0x20, LENGTH = 0x400000 - 0x20
+    /* External flash (XIP via cache); +0x20 skips the IDF app image header.
+       The MMU maps up to 1024 pages of 64 KB of NOR flash, 64 MB from 0x40000000.
+       See <https://github.com/espressif/esp-idf/blob/24272610b29d/components/soc/esp32p4/include/soc/ext_mem_defs.h#L34-L35>.
+    */
+    ROM : ORIGIN = 0x40000000 + 0x20, LENGTH = 0x4000000 - 0x20
 
     /* LP SRAM (32 KB, persists over deep sleep).
 

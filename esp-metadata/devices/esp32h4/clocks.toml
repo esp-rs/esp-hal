@@ -119,6 +119,25 @@ system_clocks = { clock_tree = [
         ] },
       ],
     },
+    # PCR.parl_clk_{rx,tx}_conf.parl_clk_{rx,tx}_sel, see SOC_PARLIO_CLKS. The driver selects
+    # source 3, the clock from the pad.
+    { group = "PARL_IO",
+      presets = {
+        CLK = {
+          type = "mux",
+          wake_locking = true,
+          variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F96M",    outputs = "PLL_F96M_CLK", default = true },
+          ],
+        },
+      },
+      clocks = [
+        { name = "RX_CLOCK", preset = "CLK" },
+        { name = "TX_CLOCK", preset = "CLK" },
+      ],
+    },
     # PCR.i2cX_sclk_conf.i2cX_sclk_sel: 0 = XTAL, 1 = RC_FAST, see SOC_I2C_CLKS.
     { group = "I2C", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk / (div_num + 1)", params = { sclk = [

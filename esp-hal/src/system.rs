@@ -254,20 +254,18 @@ impl Cpu {
     /// ```
     #[inline(always)]
     pub fn current() -> Self {
-        // This works for both RISCV and Xtensa because both
-        // get_raw_core functions return zero, _or_ something
-        // greater than zero; 1 in the case of RISCV and 0x2000
-        // in the case of Xtensa.
-        match raw_core() {
-            0 => Cpu::ProCpu,
-
-            #[cfg(all(multi_core, riscv))]
-            1 => Cpu::AppCpu,
-
-            #[cfg(all(multi_core, xtensa))]
-            0x2000 => Cpu::AppCpu,
-
-            other => unreachable!("unknown core id: {}", other),
+        // `raw_core` returns 0 on the first core, and 1 (RISC-V) or 0x2000 (Xtensa) on the
+        // second core. Code that runs with the caches suspended calls this function, so it
+        // must not panic.
+        cfg_select! {
+            multi_core => {
+                if raw_core() == 0 {
+                    Cpu::ProCpu
+                } else {
+                    Cpu::AppCpu
+                }
+            }
+            _ => Cpu::ProCpu,
         }
     }
 

@@ -47,6 +47,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        lp_peri_clk: None,
         ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -64,6 +65,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        lp_peri_clk: None,
         ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -81,6 +83,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        lp_peri_clk: None,
         ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -117,7 +120,18 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(self, clocks: &mut ClockTree) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
+        if self.lp_peri_clk.is_none() {
+            // Keep the LP peripheral divider configured by the bootloader.
+            self.lp_peri_clk = Some(LpPeriClkConfig::new(
+                LP_AON_CLK_RST::regs()
+                    .lproot_clk_div()
+                    .read()
+                    .lpperi_clk_div_num()
+                    .bits() as u32,
+            ));
+        }
+
         // CPU_ROOT_CLK and the CPU, memory, AHB, and APB dividers share one
         // update signal. Write the complete configuration before latching it;
         // applying each change separately can temporarily overclock the buses.
@@ -126,7 +140,6 @@ impl ClockConfig {
         BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
 
         update_bus_clocks();
-        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
     }
 }
 
@@ -148,6 +161,9 @@ fn update_bus_clocks() {
     {
         core::hint::spin_loop();
     }
+
+    // `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+    ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
 // BBPLL_CLK
@@ -186,6 +202,26 @@ fn enable_bbpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     HP_ALIVE_SYS::regs()
         .hp_clk_ctrl()
         .modify(|_, w| w.hp_spll_480m_clk_en().bit(en));
+}
+
+/// Requests the clock source of the flash controller for the life of the program.
+///
+/// The bootloader selects the clock source of the flash controller: XTAL_CLK, the BBPLL or the
+/// CPLL. The flash controller must keep that clock while the program runs. The clock tree does
+/// not count the flash controller as a user of that clock, so a reference that nothing releases
+/// keeps the PLL on when the CPU moves to another clock.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/esp_clk_tree.c#L412-L413>.
+pub(crate) fn request_flash_clock_source(clocks: &mut ClockTree) {
+    match HP_SYS_CLKRST::regs()
+        .flash_ctrl0()
+        .read()
+        .clk_src_sel()
+        .bits()
+    {
+        1 => request_bbpll_clk(clocks),
+        2 => request_cpll_clk(clocks),
+        _ => {}
+    }
 }
 
 // CPLL_CLK
@@ -500,10 +536,6 @@ fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, n
         .mem_freq_ctrl0()
         .modify(|_, w| w.mem_clk_div_num().bit(cpu_clk_frequency() > 160_000_000));
     update_bus_clocks();
-
-    if !BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
-        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
-    }
 }
 
 // MEM_CLK
@@ -553,6 +585,16 @@ fn configure_apb_clk_impl(_clocks: &mut ClockTree, _old: Option<ApbClkConfig>, n
 
 fn enable_lp_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do here
+}
+
+fn configure_lp_peri_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<LpPeriClkConfig>,
+    new: LpPeriClkConfig,
+) {
+    LP_AON_CLK_RST::regs()
+        .lproot_clk_div()
+        .modify(|_, w| unsafe { w.lpperi_clk_div_num().bits(new.divisor() as u8) });
 }
 
 fn configure_lp_fast_clk_impl(
@@ -790,6 +832,66 @@ impl SdmInstance {
         crate::peripherals::GPIO_SD::regs()
             .sigmadelta_misc()
             .modify(|_, w| w.sigmadelta_clk_en().bit(en));
+    }
+}
+
+impl ParlIoInstance {
+    // PARL_IO_RX_CLOCK
+
+    fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .parlio_rx_ctrl0()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_rx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
+    ) {
+        // The driver selects the pad clock (3) itself.
+        HP_ALIVE_SYS::regs()
+            .hp_pad_parlio_ctrl()
+            .modify(|_, w| w.hp_pad_parlio_rx_clk_en().clear_bit());
+        HP_SYS_CLKRST::regs()
+            .parlio_rx_ctrl0()
+            .modify(|_, w| unsafe {
+                w.clk_src_sel().bits(match new_config {
+                    ParlIoClkConfig::XtalClk => 0,
+                    ParlIoClkConfig::RcFastClk => 1,
+                    ParlIoClkConfig::PllF160m => 2,
+                })
+            });
+    }
+
+    // PARL_IO_TX_CLOCK
+
+    fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .parlio_tx_ctrl0()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_tx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
+    ) {
+        // The driver selects the pad clock (3) itself.
+        HP_ALIVE_SYS::regs()
+            .hp_pad_parlio_ctrl()
+            .modify(|_, w| w.hp_pad_parlio_tx_clk_en().clear_bit());
+        HP_SYS_CLKRST::regs()
+            .parlio_tx_ctrl0()
+            .modify(|_, w| unsafe {
+                w.clk_src_sel().bits(match new_config {
+                    ParlIoClkConfig::XtalClk => 0,
+                    ParlIoClkConfig::RcFastClk => 1,
+                    ParlIoClkConfig::PllF160m => 2,
+                })
+            });
     }
 }
 

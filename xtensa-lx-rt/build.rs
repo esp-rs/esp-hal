@@ -146,6 +146,18 @@ fn handle_esp32() -> Result<()> {
 
     inject_cfgs(&isa_config, &features_to_disable);
     inject_cpu_cfgs(&isa_config);
+
+    // Crates that depend directly on `xtensa-lx-rt` read this value as
+    // `DEP_XTENSA_LX_RT_FLOAT_SAVE_RESTORE`.
+    let has_fp = isa_config
+        .get("XCHAL_HAVE_FP")
+        .and_then(Value::as_integer)
+        .is_some_and(|value| value != 0)
+        && !features_to_disable.contains("XCHAL_HAVE_FP");
+    if has_fp && env::var_os("CARGO_FEATURE_FLOAT_SAVE_RESTORE").is_some() {
+        println!("cargo::metadata=float_save_restore=1");
+    }
+
     generate_exception_x(out, &isa_config)?;
     generate_interrupt_level_masks(out, &isa_config)?;
 

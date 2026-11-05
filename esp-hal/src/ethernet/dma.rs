@@ -91,6 +91,7 @@ pub enum OwnedBy {
 /// Layout matches the Synopsys DesignWare GMAC databook for enhanced mode.
 /// Words 4–7 are reserved for hardware use (TX timestamp, etc.).
 #[repr(C)]
+#[cfg_attr(ethernet_dma_alignment = "8", repr(align(8)))]
 pub struct TDes {
     pub(super) tdes0: VolatileCell<u32>,
     pub(super) tdes1: VolatileCell<u32>,
@@ -169,6 +170,7 @@ impl TDes {
 ///
 /// Words 4–7 are reserved for hardware use (RX timestamp, VLAN, etc.).
 #[repr(C)]
+#[cfg_attr(ethernet_dma_alignment = "8", repr(align(8)))]
 pub struct RDes {
     pub(super) rdes0: VolatileCell<u32>,
     pub(super) rdes1: VolatileCell<u32>,
@@ -273,6 +275,18 @@ impl RDes {
 
 // ── Static DMA storage ──────────────────────────────────────────────────────
 
+/// The DMA buffer of one frame.
+#[repr(C)]
+#[cfg_attr(ethernet_dma_alignment = "8", repr(align(8)))]
+pub(crate) struct Buffer([u8; MAX_FRAME_SIZE]);
+
+cfg_select! {
+    any(ethernet_dma_alignment = "4", ethernet_dma_alignment = "8") => {}
+    _ => {
+        compile_error!("unsupported Ethernet DMA alignment");
+    }
+}
+
 /// Static backing storage for all DMA descriptor rings and packet buffers.
 ///
 /// `TX` is the number of transmit slots; `RX` is the number of receive slots.
@@ -280,8 +294,8 @@ impl RDes {
 pub struct EthernetDmaStorage<const RX: usize, const TX: usize> {
     pub(super) rx_descs: [InternalMemory<RDes>; RX],
     pub(super) tx_descs: [InternalMemory<TDes>; TX],
-    pub(super) rx_bufs: [InternalMemory<[u8; MAX_FRAME_SIZE]>; RX],
-    pub(super) tx_bufs: [InternalMemory<[u8; MAX_FRAME_SIZE]>; TX],
+    pub(super) rx_bufs: [InternalMemory<Buffer>; RX],
+    pub(super) tx_bufs: [InternalMemory<Buffer>; TX],
 }
 
 impl<const RX: usize, const TX: usize> Default for EthernetDmaStorage<RX, TX> {
@@ -296,8 +310,8 @@ impl<const RX: usize, const TX: usize> EthernetDmaStorage<RX, TX> {
         Self {
             rx_descs: [const { InternalMemory::new(RDes::new_zeroed()) }; RX],
             tx_descs: [const { InternalMemory::new(TDes::new_zeroed()) }; TX],
-            rx_bufs: [const { InternalMemory::new([0u8; MAX_FRAME_SIZE]) }; RX],
-            tx_bufs: [const { InternalMemory::new([0u8; MAX_FRAME_SIZE]) }; TX],
+            rx_bufs: [const { InternalMemory::new(Buffer([0u8; MAX_FRAME_SIZE])) }; RX],
+            tx_bufs: [const { InternalMemory::new(Buffer([0u8; MAX_FRAME_SIZE])) }; TX],
         }
     }
 }
@@ -312,7 +326,7 @@ unsafe impl<const RX: usize, const TX: usize> Sync for EthernetDmaStorage<RX, TX
 /// TX descriptor ring backed by references into `EthernetDmaStorage`.
 pub struct TDesRing<'a> {
     descriptors: &'a mut [InternalMemory<TDes>],
-    buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
+    buffers: &'a mut [InternalMemory<Buffer>],
     index: usize,
 }
 
@@ -320,7 +334,7 @@ impl<'a> TDesRing<'a> {
     /// Creates a new TX ring from the given descriptor and buffer slices.
     pub fn new(
         descriptors: &'a mut [InternalMemory<TDes>],
-        buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
+        buffers: &'a mut [InternalMemory<Buffer>],
     ) -> Self {
         assert!(!descriptors.is_empty());
         assert_eq!(descriptors.len(), buffers.len());
@@ -401,7 +415,7 @@ impl<'a> TDesRing<'a> {
     pub fn available_buf(&mut self) -> Option<&mut [u8; MAX_FRAME_SIZE]> {
         if self.has_capacity() {
             let idx = self.index;
-            Some(self.buffers[idx].get_mut().into_inner())
+            Some(&mut self.buffers[idx].get_mut().into_inner().0)
         } else {
             None
         }
@@ -445,7 +459,7 @@ pub enum TxError {
 /// RX descriptor ring backed by references into `EthernetDmaStorage`.
 pub struct RDesRing<'a> {
     descriptors: &'a mut [InternalMemory<RDes>],
-    buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
+    buffers: &'a mut [InternalMemory<Buffer>],
     index: usize,
 }
 
@@ -453,7 +467,7 @@ impl<'a> RDesRing<'a> {
     /// Creates a new RX ring from the given descriptor and buffer slices.
     pub fn new(
         descriptors: &'a mut [InternalMemory<RDes>],
-        buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
+        buffers: &'a mut [InternalMemory<Buffer>],
     ) -> Self {
         assert!(!descriptors.is_empty());
         assert_eq!(descriptors.len(), buffers.len());
@@ -481,7 +495,7 @@ impl<'a> RDesRing<'a> {
 
             let mut desc = self.descriptors[i].get_mut();
             desc.rdes0.set(0);
-            desc.configure_buffer(MAX_FRAME_SIZE);
+            desc.configure_buffer(core::mem::size_of::<Buffer>());
             desc.set_buffer_addr(buf_addr);
             desc.set_next_desc(next);
             desc.set_owned_by(OwnedBy::Dma);
@@ -551,7 +565,7 @@ impl<'a> RDesRing<'a> {
             #[cfg(soc_internal_memory_cached)]
             self.buffers[idx].get_mut().invalidate();
             fence(Ordering::Acquire);
-            return Some(&mut self.buffers[idx].get_mut().into_inner()[..len]);
+            return Some(&mut self.buffers[idx].get_mut().into_inner().0[..len]);
         }
     }
 

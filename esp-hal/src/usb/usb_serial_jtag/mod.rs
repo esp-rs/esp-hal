@@ -135,8 +135,13 @@ use crate::{
     system::{Peripheral, PeripheralClockControl},
 };
 
+mod compat;
+
 /// Custom USB serial error type
 type Error = Infallible;
+
+/// The largest packet of the serial endpoints, the maximum of a full-speed USB bulk endpoint.
+const MAX_PACKET_SIZE: usize = 64;
 
 /// USB Serial/JTAG (Full-duplex)
 pub struct UsbSerialJtag<'d, Dm: DriverMode> {
@@ -176,7 +181,7 @@ where
 
     /// Writes data to the serial output in chunks of up to 64 bytes.
     pub fn write(&mut self, data: &[u8]) -> Result<(), Error> {
-        for chunk in data.chunks(64) {
+        for chunk in data.chunks(MAX_PACKET_SIZE) {
             for byte in chunk {
                 nb::block!(self.write_byte_nb(*byte))?;
             }
@@ -191,16 +196,22 @@ where
         Ok(())
     }
 
-    /// Writes data to the serial output in a non-blocking manner.
-    /// Requires manual flushing (automatically flushed every 64 bytes).
-    pub fn write_byte_nb(&mut self, word: u8) -> nb::Result<(), Error> {
-        if self
-            .regs()
+    /// Returns whether the output FIFO has room for at least one byte.
+    ///
+    /// If this function returns `true`, [`Self::write_byte_nb`] does not return `WouldBlock`.
+    #[instability::unstable]
+    pub fn write_ready(&self) -> bool {
+        self.regs()
             .ep1_conf()
             .read()
             .serial_in_ep_data_free()
             .bit_is_set()
-        {
+    }
+
+    /// Writes data to the serial output in a non-blocking manner.
+    /// Requires manual flushing (automatically flushed every 64 bytes).
+    pub fn write_byte_nb(&mut self, word: u8) -> nb::Result<(), Error> {
+        if self.write_ready() {
             // the FIFO is not full
             unsafe { self.regs().ep1().write(|w| w.rdwr_byte().bits(word)) };
 
@@ -233,6 +244,30 @@ where
             Ok(())
         }
     }
+
+    /// Writes one packet of at most [`MAX_PACKET_SIZE`] bytes and returns the number of bytes
+    /// written.
+    ///
+    /// `WriteReady` promises that a write after it reports room does not block. So this function
+    /// waits only while the FIFO is full when it is called, then writes while the FIFO has room.
+    /// Unlike [`Self::write`], it does not wait for the host to take the packet.
+    fn write_packet(&mut self, data: &[u8]) -> Result<usize, Error> {
+        if data.is_empty() {
+            return Ok(0);
+        }
+        while !self.write_ready() {}
+
+        let mut written = 0;
+        for byte in data.iter().take(MAX_PACKET_SIZE) {
+            if self.write_byte_nb(*byte).is_err() {
+                break;
+            }
+            written += 1;
+        }
+        self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
+
+        Ok(written)
+    }
 }
 
 impl<'d, Dm> UsbSerialJtagRx<'d, Dm>
@@ -251,16 +286,21 @@ where
         self.peripheral.register_block()
     }
 
-    /// Reads a byte from USB Serial/JTAG in a non-blocking manner.
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        // Check if there are any bytes to read
-        if self
-            .regs()
+    /// Returns whether the input FIFO holds data from the host.
+    ///
+    /// If this function returns `true`, [`Self::read_byte`] does not return `WouldBlock`.
+    #[instability::unstable]
+    pub fn read_ready(&self) -> bool {
+        self.regs()
             .ep1_conf()
             .read()
             .serial_out_ep_data_avail()
             .bit_is_set()
-        {
+    }
+
+    /// Reads a byte from USB Serial/JTAG in a non-blocking manner.
+    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+        if self.read_ready() {
             let value = self.regs().ep1().read().rdwr_byte().bits();
 
             Ok(value)
@@ -341,15 +381,6 @@ impl<'d> UsbSerialJtag<'d, Blocking> {
     }
 }
 
-impl crate::private::Sealed for UsbSerialJtag<'_, Blocking> {}
-
-#[instability::unstable]
-impl crate::interrupt::InterruptConfigurable for UsbSerialJtag<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        self.set_interrupt_handler(handler);
-    }
-}
-
 impl<'d, Dm> UsbSerialJtag<'d, Dm>
 where
     Dm: DriverMode,
@@ -421,6 +452,22 @@ where
         self.rx.read_byte()
     }
 
+    /// Returns whether the output FIFO has room for at least one byte.
+    ///
+    /// If this function returns `true`, [`Self::write_byte_nb`] does not return `WouldBlock`.
+    #[instability::unstable]
+    pub fn write_ready(&self) -> bool {
+        self.tx.write_ready()
+    }
+
+    /// Returns whether the input FIFO holds data from the host.
+    ///
+    /// If this function returns `true`, [`Self::read_byte`] does not return `WouldBlock`.
+    #[instability::unstable]
+    pub fn read_ready(&self) -> bool {
+        self.rx.read_ready()
+    }
+
     /// Listens for RX-PACKET-RECV interrupts.
     pub fn listen_rx_packet_recv_interrupt(&mut self) {
         self.rx.listen_rx_packet_recv_interrupt()
@@ -484,223 +531,6 @@ impl Instance for USB_DEVICE<'_> {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         USB_DEVICE::regs()
-    }
-}
-
-impl<Dm> core::fmt::Write for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        core::fmt::Write::write_str(&mut self.tx, s)
-    }
-}
-
-impl<Dm> core::fmt::Write for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write(s.as_bytes()).map_err(|_| core::fmt::Error)?;
-        Ok(())
-    }
-}
-
-#[instability::unstable]
-impl<Dm> ufmt_write::uWrite for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-
-    #[inline]
-    fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        ufmt_write::uWrite::write_str(&mut self.tx, s)
-    }
-
-    #[inline]
-    fn write_char(&mut self, ch: char) -> Result<(), Self::Error> {
-        ufmt_write::uWrite::write_char(&mut self.tx, ch)
-    }
-}
-
-#[instability::unstable]
-impl<Dm> ufmt_write::uWrite for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-
-    #[inline]
-    fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write(s.as_bytes())?;
-        Ok(())
-    }
-
-    #[inline]
-    fn write_char(&mut self, ch: char) -> Result<(), Self::Error> {
-        let mut buffer = [0u8; 4];
-        self.write(ch.encode_utf8(&mut buffer).as_bytes())?;
-
-        Ok(())
-    }
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_06::ErrorType for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_06::ErrorType for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_06::ErrorType for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_06::Read for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_06::Read::read(&mut self.rx, buf)
-    }
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_06::Read for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        loop {
-            let count = self.drain_rx_fifo(buf);
-            if count > 0 {
-                return Ok(count);
-            }
-        }
-    }
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_06::Write for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_06::Write::write(&mut self.tx, buf)
-    }
-
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_06::Write::flush(&mut self.tx)
-    }
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_06::Write for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write(buf)?;
-
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_tx()
-    }
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_07::ErrorType for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_07::ErrorType for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_07::ErrorType for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_07::Read for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_07::Read::read(&mut self.rx, buf)
-    }
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_07::Read for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        loop {
-            let count = self.drain_rx_fifo(buf);
-            if count > 0 {
-                return Ok(count);
-            }
-        }
-    }
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_07::Write for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_07::Write::write(&mut self.tx, buf)
-    }
-
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_07::Write::flush(&mut self.tx)
-    }
-}
-
-#[instability::unstable]
-impl<Dm> embedded_io_07::Write for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write(buf)?;
-
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_tx()
     }
 }
 
@@ -844,13 +674,13 @@ impl UsbSerialJtagTx<'_, Async> {
     }
 
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-        for chunk in words.chunks(64) {
+        for chunk in words.chunks(MAX_PACKET_SIZE) {
             for byte in chunk {
                 loop {
                     match self.write_byte_nb(*byte) {
                         Ok(()) => break,
                         Err(nb::Error::WouldBlock) => self.wait_tx_ready().await,
-                        Err(nb::Error::Other(error)) => return Err(error),
+                        Err(nb::Error::Other(error)) => match error {},
                     }
                 }
             }
@@ -885,81 +715,6 @@ impl UsbSerialJtagRx<'_, Async> {
             }
             UsbSerialJtagReadFuture::new(self.peripheral.reborrow()).await;
         }
-    }
-}
-
-#[instability::unstable]
-impl embedded_io_async_06::Write for UsbSerialJtag<'_, Async> {
-    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_06::Write::write(&mut self.tx, buf).await
-    }
-
-    async fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_async_06::Write::flush(&mut self.tx).await
-    }
-}
-
-#[instability::unstable]
-impl embedded_io_async_06::Write for UsbSerialJtagTx<'_, Async> {
-    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_async(buf).await?;
-
-        Ok(buf.len())
-    }
-
-    async fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_tx_async().await
-    }
-}
-
-#[instability::unstable]
-impl embedded_io_async_06::Read for UsbSerialJtag<'_, Async> {
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_06::Read::read(&mut self.rx, buf).await
-    }
-}
-
-#[instability::unstable]
-impl embedded_io_async_06::Read for UsbSerialJtagRx<'_, Async> {
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        self.read_async(buf).await
-    }
-}
-#[instability::unstable]
-impl embedded_io_async_07::Write for UsbSerialJtag<'_, Async> {
-    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_07::Write::write(&mut self.tx, buf).await
-    }
-
-    async fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_async_07::Write::flush(&mut self.tx).await
-    }
-}
-
-#[instability::unstable]
-impl embedded_io_async_07::Write for UsbSerialJtagTx<'_, Async> {
-    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_async(buf).await?;
-
-        Ok(buf.len())
-    }
-
-    async fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_tx_async().await
-    }
-}
-
-#[instability::unstable]
-impl embedded_io_async_07::Read for UsbSerialJtag<'_, Async> {
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_07::Read::read(&mut self.rx, buf).await
-    }
-}
-
-#[instability::unstable]
-impl embedded_io_async_07::Read for UsbSerialJtagRx<'_, Async> {
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        self.read_async(buf).await
     }
 }
 

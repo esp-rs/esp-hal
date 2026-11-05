@@ -795,6 +795,10 @@ pub fn generate_build_command(
         builder.add_arg(arg);
     }
 
+    if !app.default_features() {
+        builder.add_arg("--no-default-features");
+    }
+
     if !app.configuration().is_empty() {
         log::info!("  Configuration: {}", app.configuration());
     }

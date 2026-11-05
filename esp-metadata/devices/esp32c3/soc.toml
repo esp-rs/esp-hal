@@ -344,6 +344,7 @@ channel_count = 6
 ## Miscellaneous
 [device.io_mux]
 [device.temp_sensor]
+register_block = "apb_saradc"
 [device.systimer]
 [device.lp_timer]
 

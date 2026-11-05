@@ -18,4 +18,10 @@ pub(crate) use esp32 as pac;
 
 pub(crate) unsafe fn configure_cpu_caches() {}
 
-pub(crate) fn pre_init() {}
+pub(crate) fn pre_init() {
+    // A debugger reset can leave the APP CPU running ROM code. That code fails when the
+    // application uses the memory of the ROM. Matches ESP-IDF's single-core startup.
+    crate::peripherals::DPORT::regs()
+        .appcpu_ctrl_b()
+        .modify(|_, w| w.appcpu_clkgate_en().clear_bit());
+}

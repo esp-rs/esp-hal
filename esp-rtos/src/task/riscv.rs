@@ -7,6 +7,113 @@ use crate::{
     task::{IdleFn, Task},
 };
 
+// `fcsr` is at word 32 of `CpuContext`, and `f0..f31` are at words 33 to 64.
+
+/// Saves `fcsr` and `f0..f31` into the `CpuContext` at `tp`. Clobbers `t1`.
+#[cfg(float_save_restore)]
+macro_rules! fpu_save {
+    () => {
+        "
+        .option push
+        .option arch, +f
+        frcsr t1
+        sw t1, 32*4(tp)
+        fsw f0,  33*4(tp)
+        fsw f1,  34*4(tp)
+        fsw f2,  35*4(tp)
+        fsw f3,  36*4(tp)
+        fsw f4,  37*4(tp)
+        fsw f5,  38*4(tp)
+        fsw f6,  39*4(tp)
+        fsw f7,  40*4(tp)
+        fsw f8,  41*4(tp)
+        fsw f9,  42*4(tp)
+        fsw f10, 43*4(tp)
+        fsw f11, 44*4(tp)
+        fsw f12, 45*4(tp)
+        fsw f13, 46*4(tp)
+        fsw f14, 47*4(tp)
+        fsw f15, 48*4(tp)
+        fsw f16, 49*4(tp)
+        fsw f17, 50*4(tp)
+        fsw f18, 51*4(tp)
+        fsw f19, 52*4(tp)
+        fsw f20, 53*4(tp)
+        fsw f21, 54*4(tp)
+        fsw f22, 55*4(tp)
+        fsw f23, 56*4(tp)
+        fsw f24, 57*4(tp)
+        fsw f25, 58*4(tp)
+        fsw f26, 59*4(tp)
+        fsw f27, 60*4(tp)
+        fsw f28, 61*4(tp)
+        fsw f29, 62*4(tp)
+        fsw f30, 63*4(tp)
+        fsw f31, 64*4(tp)
+        .option pop
+        "
+    };
+}
+
+/// Restores `fcsr` and `f0..f31` from the `CpuContext` at `tp`. Clobbers `t1`.
+#[cfg(float_save_restore)]
+macro_rules! fpu_restore {
+    () => {
+        "
+        .option push
+        .option arch, +f
+        lw t1, 32*4(tp)
+        fscsr t1
+        flw f0,  33*4(tp)
+        flw f1,  34*4(tp)
+        flw f2,  35*4(tp)
+        flw f3,  36*4(tp)
+        flw f4,  37*4(tp)
+        flw f5,  38*4(tp)
+        flw f6,  39*4(tp)
+        flw f7,  40*4(tp)
+        flw f8,  41*4(tp)
+        flw f9,  42*4(tp)
+        flw f10, 43*4(tp)
+        flw f11, 44*4(tp)
+        flw f12, 45*4(tp)
+        flw f13, 46*4(tp)
+        flw f14, 47*4(tp)
+        flw f15, 48*4(tp)
+        flw f16, 49*4(tp)
+        flw f17, 50*4(tp)
+        flw f18, 51*4(tp)
+        flw f19, 52*4(tp)
+        flw f20, 53*4(tp)
+        flw f21, 54*4(tp)
+        flw f22, 55*4(tp)
+        flw f23, 56*4(tp)
+        flw f24, 57*4(tp)
+        flw f25, 58*4(tp)
+        flw f26, 59*4(tp)
+        flw f27, 60*4(tp)
+        flw f28, 61*4(tp)
+        flw f29, 62*4(tp)
+        flw f30, 63*4(tp)
+        flw f31, 64*4(tp)
+        .option pop
+        "
+    };
+}
+
+#[cfg(not(float_save_restore))]
+macro_rules! fpu_save {
+    () => {
+        ""
+    };
+}
+#[cfg(not(float_save_restore))]
+macro_rules! fpu_restore {
+    () => {
+        ""
+    };
+}
+
 /// Registers saved / restored
 #[derive(Debug, Default, Clone)]
 #[repr(C)]
@@ -86,6 +193,12 @@ pub struct CpuContext {
     /// Program counter, stores the address of the next instruction to be
     /// executed.
     pub pc: usize,
+    /// Floating-point control and status register.
+    #[cfg(float_save_restore)]
+    pub fcsr: usize,
+    /// Floating-point registers `f0..f31`.
+    #[cfg(float_save_restore)]
+    pub f: [u32; 32],
 }
 
 impl CpuContext {
@@ -165,12 +278,14 @@ pub(crate) fn setup_multitasking() {
 /// We must not save the state of the idle task, or we'll risk running code with an incorrectly
 /// set stack pointer inherited from the last scheduled task. We must not save the state of deleted
 /// tasks, or we'll write some of the registers to memory that has been freed.
+///
+/// The idle "task" has no `CpuContext`, so the trampoline does not save its FPU registers.
 #[unsafe(link_section = ".trap.rust")]
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
 #[rustfmt::skip]
 unsafe extern "C" fn swint_handler_trampoline() {
-    core::arch::naked_asm! {"
+    core::arch::naked_asm! {concat!("
         .cfi_startproc
         # Restore t0. The HAL stub stored the interrupted t0 in mscratch.
         csrr t0, mscratch
@@ -224,6 +339,10 @@ unsafe extern "C" fn swint_handler_trampoline() {
         sw a6, 14*4(tp)
         sw a7, 15*4(tp)
 
+        # Save the FPU registers before the scheduler runs. Rust code can change them.
+",
+        fpu_save!(),
+"
 2:
         # Let's run the interrupt handler, which runs the scheduler. If the scheduler
         # decides we need to switch context, it will change the thread pointer to the new context.
@@ -313,6 +432,10 @@ unsafe extern "C" fn swint_handler_trampoline() {
         # written to a CpuContext, so there is nothing to reload.
         beqz tp, 6f
 
+        # Restore the FPU registers before the integer registers. The restore changes t1.
+",
+        fpu_restore!(),
+"
         lw ra, 0*4(tp)
         lw t0, 1*4(tp)
         lw t1, 2*4(tp)
@@ -336,7 +459,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
 6:
         mret
         .cfi_endproc
-        ",
+        "),
         scheduler_interrupt_handler = sym swint_handler,
     }
 }
