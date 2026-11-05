@@ -2,7 +2,7 @@
 //!
 //! Reproduces https://github.com/esp-rs/esp-hal/issues/3873 for the ESP32-C6.
 
-//% FEATURES: esp-radio esp-radio/ble esp-radio/unstable esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/ble esp-radio/unstable esp-hal/unstable esp-println/uart
 //% CHIP_FILTER: bt_driver_supported && sleep_driver_supported
 
 #![no_std]

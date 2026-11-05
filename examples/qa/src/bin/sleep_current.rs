@@ -2,7 +2,7 @@
 //!
 //! The program holds every case for [`HOLD`], then moves to the next. The console
 //! prints the case name before the hold, so you can align the meter with the
-//! UART log. Use a UART port. USB Serial/JTAG stops across sleep.
+//! UART log. The console is on the UART, because USB Serial/JTAG stops across sleep.
 //!
 //! Active cases combine CPU clock (default and maximum), core count, and either a
 //! busy loop or WAITI/WFI. Sleep cases are light sleep without CPU power-down,
@@ -18,6 +18,7 @@
 //! checks the pattern after the wake. The program then writes and checks the inverted
 //! pattern. The program panics if a pattern does not read back.
 
+//% FEATURES: esp-println/uart
 //% CHIP_FILTER: sleep_driver_supported && sleep_deep_sleep
 
 #![no_std]

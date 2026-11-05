@@ -7,9 +7,9 @@
 //! receive and transmit to work. It counts beacon timeouts and disconnects. A disconnect with
 //! reason 200 is a beacon timeout.
 //!
-//! Use the UART port. USB Serial/JTAG stops when the chip sleeps.
+//! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
-//% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable esp-println/uart
 //% CHIP_FILTER: wifi_driver_supported && sleep_light_sleep
 
 #![no_std]
