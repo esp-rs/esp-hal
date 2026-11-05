@@ -11,8 +11,8 @@ search path; the application passes `-Tlinkall.x` as usual.
   sections that differ per architecture.
 
 `esp-bootloader-direct-boot` is the other bootloader support crate: the ROM starts the
-application directly, and its entry stub copies the RAM sections from flash. Both crates set
-`links = "esp-bootloader"`, so Cargo rejects a dependency graph with both.
+application directly, and its entry stub copies the RAM sections from flash. An application uses
+exactly one bootloader support crate.
 
 ## Contract for bootloader support crates
 
