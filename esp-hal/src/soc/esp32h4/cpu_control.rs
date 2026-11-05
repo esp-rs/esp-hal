@@ -105,7 +105,6 @@ pub(crate) fn enable_core1_interrupt_matrix() {
     });
 }
 
-#[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     // cpu_utility_ll_enable_clock_and_reset_app_cpu()
     PCR::regs().core1_conf().modify(|_, w| {
