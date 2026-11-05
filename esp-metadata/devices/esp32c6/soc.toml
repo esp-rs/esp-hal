@@ -418,6 +418,7 @@ instances = {
 support_status = "not_supported"
 [device.twai]
 [device.usb_serial_jtag]
+phy_pads = ["USJ"]
 
 ## Miscellaneous
 [device.etm]

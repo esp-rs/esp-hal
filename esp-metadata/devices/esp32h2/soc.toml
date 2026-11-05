@@ -406,6 +406,7 @@ instances = {
 }
 [device.twai]
 [device.usb_serial_jtag]
+phy_pads = ["USJ"]
 
 ## Miscellaneous
 [device.etm]

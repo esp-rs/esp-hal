@@ -127,9 +127,24 @@ fn main() -> ! {
     let mut checks = Checks::default();
     let delay = Delay::new();
 
-    let (mut rx, mut tx) = UsbSerialJtag::new(peripherals.USB_DEVICE.reborrow(), Config::default())
-        .unwrap()
-        .split();
+    let (mut dp, mut dm) = cfg_select! {
+        feature = "esp32c3" => (peripherals.GPIO19, peripherals.GPIO18),
+        any(feature = "esp32c5", feature = "esp32h4") => (peripherals.GPIO14, peripherals.GPIO13),
+        any(feature = "esp32c6", feature = "esp32c61") => (peripherals.GPIO13, peripherals.GPIO12),
+        feature = "esp32h2" => (peripherals.GPIO27, peripherals.GPIO26),
+        feature = "esp32p4" => (peripherals.GPIO25, peripherals.GPIO24),
+        feature = "esp32s3" => (peripherals.GPIO20, peripherals.GPIO19),
+        feature = "esp32s31" => (peripherals.GPIO34, peripherals.GPIO33),
+    };
+
+    let (mut rx, mut tx) = UsbSerialJtag::new(
+        peripherals.USB_DEVICE.reborrow(),
+        dp.reborrow(),
+        dm.reborrow(),
+        Config::default(),
+    )
+    .unwrap()
+    .split();
 
     // The host sends only after it sees the ready line, so earlier bytes are not the host's.
     // The host system may read and drop the output while no program has the port open, so the
@@ -203,7 +218,7 @@ fn main() -> ! {
     );
 
     drop((rx, tx));
-    let (mut rx, mut tx) = UsbSerialJtag::new(peripherals.USB_DEVICE, Config::default())
+    let (mut rx, mut tx) = UsbSerialJtag::new(peripherals.USB_DEVICE, dp, dm, Config::default())
         .unwrap()
         .into_async()
         .split();

@@ -340,6 +340,7 @@ version = 2
 channel_count = 6
 [device.twai]
 [device.usb_serial_jtag]
+phy_pads = ["USJ"]
 
 ## Miscellaneous
 [device.io_mux]

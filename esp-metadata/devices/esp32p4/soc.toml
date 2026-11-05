@@ -581,6 +581,7 @@ fifo_depth_words = 200
 fifo_depth_words = 896
 
 [device.usb_serial_jtag]
+phy_pads = ["USJ", "USB_FS"]
 
 [device.ecc]
 support_status = "partial"

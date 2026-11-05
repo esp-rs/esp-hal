@@ -417,6 +417,7 @@ instances = [
 ]
 
 [device.usb_serial_jtag]
+phy_pads = ["USJ"]
 support_status = "partial"
 
 [device.camera]

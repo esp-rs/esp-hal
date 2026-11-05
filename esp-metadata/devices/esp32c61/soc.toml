@@ -209,6 +209,7 @@ zero_extend_writes = true
 
 [device.systimer]
 [device.usb_serial_jtag]
+phy_pads = ["USJ"]
 
 [device.ledc]
 version = 3
