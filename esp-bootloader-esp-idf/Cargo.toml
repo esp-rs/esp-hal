@@ -51,6 +51,7 @@ sha2 = { version = "0.11", default-features = false }
 jiff       = { version = "0.2.13", default-features = false, features = ["std"] }
 esp-config = { version = "0.8.0", path = "../esp-config", features = ["build"] }
 esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
+
 [target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dependencies]
 esp-hal = { version = "~1.2.0", path = "../esp-hal", default-features = false, features = ["unstable"] }
 

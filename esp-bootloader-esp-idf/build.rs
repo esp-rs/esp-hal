@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Ensure that exactly one chip has been specified (unless the "std" feature is enabled)
     let chip = if !cfg!(feature = "std") {
-        Some(esp_metadata_generated::Chip::from_cargo_feature().unwrap())
+        Some(Chip::from_cargo_feature().unwrap())
     } else {
         None
     };
