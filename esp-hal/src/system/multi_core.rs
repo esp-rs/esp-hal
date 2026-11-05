@@ -3,7 +3,7 @@
 use core::{
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
-    sync::atomic::{AtomicBool, AtomicPtr, Ordering},
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
 #[instability::unstable]
@@ -255,7 +255,7 @@ impl<'d> CpuControl<'d> {
 
         setup_second_core_stack(stack, stack_guard_offset, entry);
 
-        APP_CORE_TAKES_IPC.store(false, Ordering::Release);
+        app_core_starting();
         crate::soc::cpu_control::start_core1(start_core1_init::<F> as *const u32);
 
         self.unpark_core(Cpu::AppCpu);
@@ -500,8 +500,6 @@ where
             crate::debugger::set_stack_watchpoint(guard as usize);
         }
         crate::interrupt::init_vectoring();
-        #[cfg(feature = "rt")]
-        crate::interrupt::ipc::install_app();
     }
 
     enable_app_core_interrupts();
@@ -515,13 +513,48 @@ fn enable_app_core_interrupts() {
         #[cfg(riscv)]
         core::arch::asm!("csrsi mstatus, 8", options(nomem, nostack));
     }
-    APP_CORE_TAKES_IPC.store(true, Ordering::Release);
+    app_core_started();
 }
 
-static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
+// A build can hold esp-hal versions without the `rt` feature. Those versions call the functions
+// below by symbol name. The names and signatures must stay stable.
+cfg_select! {
+    feature = "rt" => {
+        use core::sync::atomic::AtomicBool;
 
-/// Returns `true` if [`CpuControl`] started the APP core in this boot. That core takes IPC
-/// interrupts unless it masks them.
-pub(crate) fn app_core_takes_ipc() -> bool {
-    APP_CORE_TAKES_IPC.load(Ordering::Acquire)
+        static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
+
+        /// Marks the APP core as not running code of this program before the APP core starts.
+        #[unsafe(export_name = "esp_hal_app_core_starting")]
+        fn app_core_starting() {
+            APP_CORE_TAKES_IPC.store(false, Ordering::Release);
+        }
+
+        /// Lets the APP core take IPC interrupts. The APP core calls this function after it
+        /// enables its interrupts.
+        #[unsafe(export_name = "esp_hal_app_core_started")]
+        fn app_core_started() {
+            debug_assert_eq!(Cpu::current(), Cpu::AppCpu);
+            #[cfg(riscv)]
+            crate::interrupt::ipc::install_app();
+            APP_CORE_TAKES_IPC.store(true, Ordering::Release);
+        }
+
+        /// Returns `true` if [`CpuControl`] started the APP core in this boot. That core takes IPC
+        /// interrupts unless it masks them.
+        #[unsafe(export_name = "esp_hal_app_core_takes_ipc")]
+        pub(crate) fn app_core_takes_ipc() -> bool {
+            APP_CORE_TAKES_IPC.load(Ordering::Acquire)
+        }
+    }
+    _ => {
+        unsafe extern "Rust" {
+            #[link_name = "esp_hal_app_core_starting"]
+            safe fn app_core_starting();
+            #[link_name = "esp_hal_app_core_started"]
+            safe fn app_core_started();
+            #[link_name = "esp_hal_app_core_takes_ipc"]
+            pub(crate) safe fn app_core_takes_ipc() -> bool;
+        }
+    }
 }
