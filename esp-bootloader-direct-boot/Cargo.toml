@@ -9,7 +9,6 @@ keywords      = ["esp32", "espressif", "no-std"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
-links         = "esp-bootloader"
 
 [package.metadata.espressif]
 doc-config = { features = ["esp-hal/unstable"] }
