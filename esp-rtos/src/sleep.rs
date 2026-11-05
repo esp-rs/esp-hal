@@ -10,7 +10,7 @@ use esp_hal::{
     peripherals::LPWR,
     rtc_cntl::{
         WakeLock,
-        sleep::{LightSleep, LowPower, RtcSleepConfig},
+        sleep::{LowPower, RtcSleepConfig, SleepKind},
     },
     time::{Duration, Instant},
 };
@@ -115,13 +115,11 @@ impl DeepSleep {
 /// - all cores are idle,
 /// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
 ///
-/// If all hold, it releases the lock and calls [`LowPower::sleep_light`] with interrupts still
-/// disabled. [`LowPower::sleep_light`] disables interrupts for the whole sleep path. A sleep that
-/// keeps the CPU domain powered hardware-stalls every other running core for the duration of the
-/// sleep. A sleep that powers the domain down instead asks the other core to save itself, and that
-/// core keeps running. After the sleep, the hook takes the scheduler lock again to rearm the time
-/// driver and to wake the scheduler on the other cores, then it enables interrupts and falls back
-/// to `WFI`.
+/// If all hold, it releases the lock and enters light sleep with interrupts still disabled. The
+/// sleep path keeps interrupts disabled, and parks every other running core for the duration of
+/// the sleep. Then it checks the first two conditions again, and a failed check refuses the sleep.
+/// After the sleep, the hook takes the scheduler lock again to rearm the time driver and to wake
+/// the scheduler on the other cores, then it enables interrupts and falls back to `WFI`.
 ///
 /// A wakeup source can refuse the sleep. The hook then falls back to `WFI`, as it does when a
 /// check above fails. A wakeup source can also bound the sleep. The driver clamps the wake timer
@@ -138,13 +136,6 @@ impl DeepSleep {
 ///
 /// [`start_with_idle_hook`]: crate::start_with_idle_hook
 pub fn configure(lpwr: LPWR<'static>) -> Sleep {
-    // SAFETY: the handler only reads scheduler state, it takes the scheduler lock, which no core
-    // holds across a sleep, and it lives as long as this crate.
-    #[cfg(multi_core)]
-    unsafe {
-        esp_hal::rtc_cntl::sleep::__rtos_implementation::set_can_sleep_handler(can_sleep)
-    };
-
     #[cfg(not(sleep_deep_sleep))]
     let _ = lpwr;
 
@@ -155,20 +146,19 @@ pub fn configure(lpwr: LPWR<'static>) -> Sleep {
     }
 }
 
-/// Answers whether this core agrees to a light sleep that the other core requests.
+/// Answers whether the sleep that the idle hook decided on may start.
 ///
-/// esp-hal calls this from the rendezvous of the sleep, after it disabled the interrupts of this
-/// core. A task that became ready after the other core decided, and a [`WakeLock`] that any core
-/// took after that decision, both stop the sleep here.
-#[cfg(multi_core)]
-fn can_sleep() -> bool {
-    if WakeLock::is_active() {
-        return false;
-    }
-
-    SCHEDULER.with(|scheduler| {
-        !scheduler.run_queue.has_ready_tasks() && scheduler.cpu_idle(Cpu::current())
-    })
+/// esp-hal calls this after it parked the other cores. Until the sleep ends, no other core can then
+/// take a [`WakeLock`] or make a task ready.
+fn may_sleep() -> bool {
+    !WakeLock::is_active()
+        && cfg_select! {
+            multi_core => SCHEDULER.with(|scheduler| {
+                !scheduler.run_queue.has_ready_tasks()
+                    && Cpu::all().all(|cpu| scheduler.cpu_idle(cpu))
+            }),
+            _ => true,
+        }
 }
 
 extern "C" fn auto_light_sleep_hook() -> ! {
@@ -192,11 +182,6 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                         return false;
                     }
                 }
-
-                // Every core is ready to sleep. The other core can make a task ready again after
-                // this function gives the lock back. The rendezvous of esp-hal closes that
-                // window: it asks the other core through [`can_sleep`] before it powers the CPU
-                // domain down, and that core answers with its interrupts already off.
             }
 
             let Some(time_driver) = scheduler.time_driver.as_mut() else {
@@ -224,17 +209,18 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             true
         });
 
-        // The other core can take a `WakeLock` in the window that the release of the lock opens.
-        // This read closes most of that window, and [`can_sleep`] closes the rest for a sleep
-        // that powers the CPU domain down.
-        if sleep && !WakeLock::is_active() {
+        if sleep {
             // Each driver enables the wakeup source it owns. This hook does not know which
             // sources are enabled. `sleep_light` returns immediately when none are enabled.
             // It also returns immediately when a source refuses the sleep. Do not call it
             // again here. The refusal is still true, and a retry would spin. `WFI` below
             // waits for an interrupt.
-            let result =
-                LowPower::new(unsafe { LPWR::steal() }).sleep_light(RtcSleepConfig::default());
+            let refused = LowPower::new(unsafe { LPWR::steal() }).sleep(
+                RtcSleepConfig::default(),
+                SleepKind::Light,
+                true,
+                Some(may_sleep),
+            );
 
             SCHEDULER.with(|scheduler| {
                 let Some(time_driver) = scheduler.time_driver.as_mut() else {
@@ -245,7 +231,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 // stale. Force a re-arm against the restored time base so the tick handler
                 // fires promptly and drains the timer queue. A refusal leaves the timer
                 // running, so its alarm is still valid.
-                if result == LightSleep::Ended {
+                if !refused {
                     time_driver.rearm(crate::now());
                 }
 
