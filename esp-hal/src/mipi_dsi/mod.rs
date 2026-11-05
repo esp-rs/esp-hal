@@ -421,6 +421,162 @@ impl DwGdmaNoPeripheralSmokeReport {
     }
 }
 
+// DW-GDMA mem2mem constants (DW-AXI-DMAC register encoding).
+#[cfg(mipi_dsi_driver_supported)]
+const DW_GDMA_TT_FC_M2M_DMAC: u8 = 0;
+#[cfg(mipi_dsi_driver_supported)]
+const DW_GDMA_WIDTH_64_BITS: u8 = 3;
+#[cfg(mipi_dsi_driver_supported)]
+const DW_GDMA_BURST_SIZE_512_ITEMS: u8 = 8;
+#[cfg(mipi_dsi_driver_supported)]
+const DW_GDMA_AXI_BURST_LEN_16: u8 = 16;
+#[cfg(mipi_dsi_driver_supported)]
+const DW_GDMA_CHANNEL_PRIORITY: u8 = 1;
+#[cfg(mipi_dsi_driver_supported)]
+const DW_GDMA_OSR_LIMIT_5_REQUESTS: u8 = 4;
+#[cfg(mipi_dsi_driver_supported)]
+const DW_GDMA_DISABLE_TIMEOUT_MS: u64 = 20;
+#[cfg(mipi_dsi_driver_supported)]
+const DW_GDMA_SUSPEND_TIMEOUT_MS: u64 = 5;
+#[cfg(mipi_dsi_driver_supported)]
+const DW_GDMA_ABORT_TIMEOUT_MS: u64 = 5;
+#[cfg(mipi_dsi_driver_supported)]
+const DMA_STATUS_BLOCK_TRANSFER_DONE: u32 = 1 << 0;
+#[cfg(mipi_dsi_driver_supported)]
+const DMA_STATUS_DMA_TRANSFER_DONE: u32 = 1 << 1;
+#[cfg(mipi_dsi_driver_supported)]
+const DMA_STATUS_SRC_TRANSACTION_DONE: u32 = 1 << 3;
+#[cfg(mipi_dsi_driver_supported)]
+const DMA_STATUS_DST_TRANSACTION_DONE: u32 = 1 << 4;
+#[cfg(mipi_dsi_driver_supported)]
+const DMA_STATUS_CH_SUSPENDED: u32 = 1 << 29;
+#[cfg(mipi_dsi_driver_supported)]
+const DMA_STATUS_ERROR_MASK: u32 = (1 << 5)
+    | (1 << 6)
+    | (1 << 7)
+    | (1 << 8)
+    | (1 << 9)
+    | (1 << 10)
+    | (1 << 11)
+    | (1 << 12)
+    | (1 << 13)
+    | (1 << 14)
+    | (1 << 16)
+    | (1 << 17)
+    | (1 << 18)
+    | (1 << 19)
+    | (1 << 20)
+    | (1 << 21)
+    | (1 << 25);
+#[cfg(mipi_dsi_driver_supported)]
+const DMA_STATUS_ENABLE_MASK: u32 = DMA_STATUS_BLOCK_TRANSFER_DONE
+    | DMA_STATUS_DMA_TRANSFER_DONE
+    | DMA_STATUS_SRC_TRANSACTION_DONE
+    | DMA_STATUS_DST_TRANSACTION_DONE
+    | DMA_STATUS_ERROR_MASK
+    | (1 << 28)
+    | (1 << 29)
+    | (1 << 30)
+    | (1 << 31);
+
+/// Channel-stop result for the DW-GDMA mem2mem QA hook.
+#[doc(hidden)]
+#[instability::unstable]
+#[cfg(mipi_dsi_driver_supported)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DwGdmaStopOutcome {
+    AlreadyStopped,
+    Disabled,
+    Aborted,
+    AbortTimedOut,
+}
+
+/// Result payload for the DW-GDMA mem2mem QA hook.
+#[doc(hidden)]
+#[instability::unstable]
+#[cfg(mipi_dsi_driver_supported)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DwGdmaMem2MemReport {
+    pub channel_id: u8,
+    pub src_addr: u32,
+    pub dst_addr: u32,
+    pub dar_end: u32,
+    pub transfer_units: u32,
+    pub transfer_bytes: u32,
+    pub bytes_written: u32,
+    pub width: u8,
+    pub burst_size: u8,
+    pub axi_burst_len: u8,
+    pub transfer_type_flow_control: u8,
+    pub src_outstanding_limit: u8,
+    pub dst_outstanding_limit: u8,
+    pub intstatus_enable0: u32,
+    pub intstatus_before: u32,
+    pub intstatus_after: u32,
+    pub cfg1_bits: u32,
+    pub ctl0_bits: u32,
+    pub ctl1_bits: u32,
+    pub block_ts0_bits: u32,
+    pub status0_after: u32,
+    pub status1_after: u32,
+    pub chen0_after_stop: u32,
+    pub chen1_after_stop: u32,
+    pub completed: bool,
+    pub dma_error: bool,
+    pub timed_out: bool,
+    pub poll_count: u32,
+    pub elapsed_us: u64,
+    pub stop_outcome: DwGdmaStopOutcome,
+    pub channel_enabled_after_stop: bool,
+    pub abort_in_progress_after_stop: bool,
+    pub buffers_safe_for_cpu: bool,
+}
+
+#[cfg(mipi_dsi_driver_supported)]
+fn wait_until(timeout_ms: u64, mut condition: impl FnMut() -> bool) -> bool {
+    let deadline = crate::time::Instant::now() + crate::time::Duration::from_millis(timeout_ms);
+    while crate::time::Instant::now() <= deadline {
+        if condition() {
+            return true;
+        }
+    }
+    condition()
+}
+
+#[cfg(mipi_dsi_driver_supported)]
+fn stop_dw_gdma_channel(channel: crate::mipi_dw_gdma::DwGdmaChannel) -> DwGdmaStopOutcome {
+    info!("STEP 120: stop_dma enter enabled={}", channel.is_enabled());
+    if !channel.is_enabled() {
+        info!("STEP 121: stop_dma already stopped");
+        return DwGdmaStopOutcome::AlreadyStopped;
+    }
+
+    info!("STEP 122: stop_dma disable requested");
+    channel.set_enabled(false);
+    if wait_until(DW_GDMA_DISABLE_TIMEOUT_MS, || !channel.is_enabled()) {
+        info!("STEP 123: stop_dma disable completed");
+        return DwGdmaStopOutcome::Disabled;
+    }
+
+    info!("STEP 124: stop_dma suspend requested");
+    channel.set_suspended(true);
+    let _ = wait_until(DW_GDMA_SUSPEND_TIMEOUT_MS, || {
+        !channel.is_enabled() || (channel.interrupt_status() & DMA_STATUS_CH_SUSPENDED != 0)
+    });
+
+    info!("STEP 125: stop_dma abort requested");
+    channel.trigger_abort();
+    if wait_until(DW_GDMA_ABORT_TIMEOUT_MS, || {
+        !channel.is_enabled() && !channel.abort_in_progress()
+    }) {
+        info!("STEP 126: stop_dma abort completed");
+        DwGdmaStopOutcome::Aborted
+    } else {
+        info!("STEP 127: stop_dma abort timed out");
+        DwGdmaStopOutcome::AbortTimedOut
+    }
+}
+
 #[cfg(mipi_dsi_driver_supported)]
 fn read_dw_gdma_channel_config(channel_id: u8) -> DwGdmaChannelConfigReadback {
     let ch = crate::peripherals::VDMA::regs().ch(channel_id as usize);
@@ -463,6 +619,8 @@ pub fn __qa_dw_gdma_no_peripheral_smoke<'d>(
         dst_handshake: HandshakeSelect::Software,
         src_peripheral: 0,
         dst_peripheral: 0,
+        src_status_fetch_addr: 0,
+        dst_status_fetch_addr: 0,
         priority: 1,
         src_outstanding_limit: 3,
         dst_outstanding_limit: 2,
@@ -475,6 +633,8 @@ pub fn __qa_dw_gdma_no_peripheral_smoke<'d>(
         dst_handshake: HandshakeSelect::Software,
         src_peripheral: 0,
         dst_peripheral: 0,
+        src_status_fetch_addr: 0,
+        dst_status_fetch_addr: 0,
         priority: 2,
         src_outstanding_limit: 1,
         dst_outstanding_limit: 4,
@@ -566,6 +726,231 @@ pub fn __qa_dw_gdma_no_peripheral_smoke<'d>(
         channel1_enabled_before_cleanup,
         channel_enable_bits_before_cleanup,
         channel_enable_bits_after_cleanup,
+    }
+}
+
+/// Internal QA hook for one-shot DW-GDMA mem2mem transfer.
+///
+/// Programs channel shadow registers in contiguous mode and polls for
+/// `DMA_TFR_DONE` or error conditions.
+#[doc(hidden)]
+#[instability::unstable]
+#[cfg(mipi_dsi_driver_supported)]
+pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
+    channel: impl VdmaDmaChannel + 'd,
+    src_addr: u32,
+    dst_addr: u32,
+    transfer_units: u32,
+    timeout_ms: u64,
+    dst_awlen_auto: bool,
+) -> DwGdmaMem2MemReport {
+    use crate::mipi_dw_gdma::{
+        AddressIncrementMode,
+        BlockTransferConfig,
+        BlockTransferEndpointConfig,
+        ChannelConfig,
+        DwGdmaChannel,
+        HandshakeSelect,
+        LlPointerMasterSelect,
+        MAX_BLOCK_TRANSFER_SIZE_UNITS,
+        enable_controller,
+    };
+
+    assert!(transfer_units > 0);
+    assert!(transfer_units <= MAX_BLOCK_TRANSFER_SIZE_UNITS);
+
+    const CHANNEL_CONFIG: ChannelConfig = ChannelConfig {
+        src_multblk_type: 0,
+        dst_multblk_type: 0,
+        transfer_type_flow_control: DW_GDMA_TT_FC_M2M_DMAC,
+        src_handshake: HandshakeSelect::Software,
+        dst_handshake: HandshakeSelect::Software,
+        src_peripheral: 0,
+        dst_peripheral: 0,
+        src_status_fetch_addr: 0,
+        dst_status_fetch_addr: 0,
+        priority: DW_GDMA_CHANNEL_PRIORITY,
+        src_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
+        dst_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
+    };
+
+    info!(
+        "STEP 100: helper enter src=0x{src_addr:08x} dst=0x{dst_addr:08x} units={transfer_units} timeout_ms={timeout_ms} dst_awlen_auto={dst_awlen_auto}"
+    );
+    info!("STEP 101: take VDMA channel ownership");
+    let (owned_channel, channel_id) = take_owned_vdma_channel(channel);
+    let _owned_channel = owned_channel;
+    info!("STEP 102: channel_id={channel_id}");
+
+    info!("STEP 103: acquire VDMA peripheral guard");
+    let vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }> =
+        GenericPeripheralGuard::new();
+    info!("STEP 104: enable VDMA controller");
+    enable_controller();
+    info!("STEP 105: VDMA controller enabled");
+
+    let channel = DwGdmaChannel::new(channel_id);
+    info!("STEP 106: clear/enable interrupts + configure channel");
+    channel.set_enabled(false);
+    channel.clear_all_interrupts();
+    channel.set_interrupt_status_enable(DMA_STATUS_ENABLE_MASK);
+    channel.set_interrupt_signal_enable(0);
+    channel.configure(CHANNEL_CONFIG);
+    info!("STEP 107: configure transfer block");
+    channel.configure_block_transfer(BlockTransferConfig {
+        src: BlockTransferEndpointConfig {
+            addr: src_addr,
+            ll_pointer_master: LlPointerMasterSelect::Memory,
+            addr_inc_mode: AddressIncrementMode::Increment,
+            burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
+            axi_burst_len: DW_GDMA_AXI_BURST_LEN_16,
+            width: DW_GDMA_WIDTH_64_BITS,
+        },
+        dst: BlockTransferEndpointConfig {
+            addr: dst_addr,
+            ll_pointer_master: LlPointerMasterSelect::Memory,
+            addr_inc_mode: AddressIncrementMode::Increment,
+            burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
+            axi_burst_len: DW_GDMA_AXI_BURST_LEN_16,
+            width: DW_GDMA_WIDTH_64_BITS,
+        },
+        transfer_size_in_units: transfer_units,
+        interrupt_on_block_done: false,
+    });
+    if dst_awlen_auto {
+        info!("STEP 107.5: destination awlen auto mode enabled");
+        let ch = crate::peripherals::VDMA::regs().ch(channel_id as usize);
+        ch.ctl1().modify(|_, w| unsafe {
+            w.ch1_awlen_en().clear_bit();
+            w.ch1_awlen().bits(0)
+        });
+    }
+    info!("STEP 108: transfer block configured");
+    let ch = crate::peripherals::VDMA::regs().ch(channel_id as usize);
+    let cfg1_bits = ch.cfg1().read().bits();
+    let ctl0_bits = ch.ctl0().read().bits();
+    let ctl1_bits = ch.ctl1().read().bits();
+    let block_ts0_bits = ch.block_ts0().read().bits();
+    info!(
+        "STEP 108.5: cfg1=0x{:08x} ctl0=0x{:08x} ctl1=0x{:08x} block_ts0=0x{:08x}",
+        cfg1_bits, ctl0_bits, ctl1_bits, block_ts0_bits
+    );
+
+    let intstatus_before = channel.interrupt_status();
+    let start = crate::time::Instant::now();
+    info!("STEP 109: start DMA channel");
+    channel.set_enabled(true);
+    info!("STEP 110: DMA started, entering wait loop");
+
+    let intstatus_after;
+    let mut completed = false;
+    let mut dma_error = false;
+    let mut timed_out = false;
+    let mut poll_count = 0u32;
+    let mut next_poll_log = 2_000_000u32;
+    let deadline = start + crate::time::Duration::from_millis(timeout_ms);
+    loop {
+        poll_count = poll_count.saturating_add(1);
+        let status = channel.interrupt_status();
+        if status & DMA_STATUS_DMA_TRANSFER_DONE != 0 {
+            intstatus_after = status;
+            completed = true;
+            break;
+        }
+        if status & DMA_STATUS_ERROR_MASK != 0 {
+            intstatus_after = status;
+            dma_error = true;
+            break;
+        }
+        if crate::time::Instant::now() >= deadline {
+            intstatus_after = status;
+            timed_out = true;
+            break;
+        }
+        if poll_count == next_poll_log {
+            info!(
+                "STEP 111: still waiting poll_count={} status=0x{:08x}",
+                poll_count, status
+            );
+            next_poll_log = next_poll_log.saturating_add(2_000_000);
+        }
+    }
+    info!(
+        "STEP 112: wait finished completed={} dma_error={} timed_out={} poll_count={}",
+        completed, dma_error, timed_out, poll_count
+    );
+
+    let elapsed_us = start.elapsed().as_micros();
+    let dar_end = channel.destination_address();
+    let bytes_written = dar_end.saturating_sub(dst_addr);
+    info!(
+        "STEP 113: dar_end=0x{:08x} bytes_written={} elapsed_us={}",
+        dar_end, bytes_written, elapsed_us
+    );
+    info!("STEP 114: begin DMA channel stop");
+    let stop_outcome = stop_dw_gdma_channel(channel);
+    info!("STEP 115: stop outcome={:?}", stop_outcome);
+
+    let ch = crate::peripherals::VDMA::regs().ch(channel_id as usize);
+    let intstatus_enable0 = ch.intstatus_enable0().read().bits();
+    let status0_after = ch.status0().read().bits();
+    let status1_after = ch.status1().read().bits();
+    let chen0_after_stop = crate::peripherals::VDMA::regs().chen0().read().bits();
+    let chen1_after_stop = crate::peripherals::VDMA::regs().chen1().read().bits();
+    let channel_enabled_after_stop = channel.is_enabled();
+    let abort_in_progress_after_stop = channel.abort_in_progress();
+    let buffers_safe_for_cpu = !channel_enabled_after_stop
+        && !abort_in_progress_after_stop
+        && stop_outcome != DwGdmaStopOutcome::AbortTimedOut;
+    info!(
+        "STEP 115.5: buffers_safe_for_cpu={} ch_enabled_after_stop={} abort_in_progress_after_stop={}",
+        buffers_safe_for_cpu, channel_enabled_after_stop, abort_in_progress_after_stop
+    );
+
+    if buffers_safe_for_cpu {
+        channel.clear_all_interrupts();
+    } else {
+        // Keep VDMA clock ownership pinned when channel shutdown is unresolved.
+        // This avoids dropping peripheral guards while DMA may still be active.
+        info!("STEP 115.6: unresolved DMA ownership, pinning VDMA guard");
+        core::mem::forget(vdma_guard);
+    }
+    info!("STEP 116: helper return");
+
+    DwGdmaMem2MemReport {
+        channel_id,
+        src_addr,
+        dst_addr,
+        dar_end,
+        transfer_units,
+        transfer_bytes: transfer_units * 8,
+        bytes_written,
+        width: DW_GDMA_WIDTH_64_BITS,
+        burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
+        axi_burst_len: DW_GDMA_AXI_BURST_LEN_16,
+        transfer_type_flow_control: DW_GDMA_TT_FC_M2M_DMAC,
+        src_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
+        dst_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
+        intstatus_enable0,
+        intstatus_before,
+        intstatus_after,
+        cfg1_bits,
+        ctl0_bits,
+        ctl1_bits,
+        block_ts0_bits,
+        status0_after,
+        status1_after,
+        chen0_after_stop,
+        chen1_after_stop,
+        completed,
+        dma_error,
+        timed_out,
+        poll_count,
+        elapsed_us,
+        stop_outcome,
+        channel_enabled_after_stop,
+        abort_in_progress_after_stop,
+        buffers_safe_for_cpu,
     }
 }
 
