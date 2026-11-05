@@ -27,14 +27,19 @@ pub(crate) fn ensure_randomness() {
             .modify(|_, w| w.dig_clk8m_en().set_bit());
 
         // Enable SAR ADC to read a disconnected input for additional entropy
-        // Reset ADC clock
         system
             .perip_clk_en0()
             .modify(|_, w| w.apb_saradc_clk_en().set_bit());
 
         system
-            .perip_clk_en0()
-            .modify(|_, w| w.apb_saradc_clk_en().clear_bit());
+            .perip_rst_en0()
+            .modify(|_, w| w.apb_saradc_rst().clear_bit());
+
+        // SAR I2C must be powered before ADC sampling starts.
+        regi2c::ADC_SAR1_ENCAL_REF.write_field(1);
+        regi2c::ADC_SAR_ENT_TSENS.write_field(1);
+        regi2c::ADC_SAR_ENT_RTC.write_field(1);
+        regi2c::ADC_SAR_DTEST_RTC.write_field(1);
 
         apb_saradc.clkm_conf().modify(|_, w| w.clk_sel().bits(2));
         apb_saradc.ctrl().modify(|_, w| w.sar_clk_gated().set_bit());
@@ -85,11 +90,6 @@ pub(crate) fn ensure_randomness() {
 
         apb_saradc.ctrl2().modify(|_, w| w.timer_sel().set_bit());
         apb_saradc.ctrl2().modify(|_, w| w.timer_en().set_bit());
-
-        regi2c::ADC_SAR1_ENCAL_REF.write_field(1);
-        regi2c::ADC_SAR_ENT_TSENS.write_field(1);
-        regi2c::ADC_SAR_ENT_RTC.write_field(1);
-        regi2c::ADC_SAR_DTEST_RTC.write_field(1);
     }
 }
 
