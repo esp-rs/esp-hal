@@ -1,8 +1,10 @@
-# ROM functions
+# Linker scripts
 
-Files in the `rom` subdirectories are taken from esp-idf
+esp-hal provides `hal-defaults.x`: runtime defaults (interrupt handlers, riscv-rt symbols, the
+`__esp_bootloader_init` hook) and the PAC's `device.x`. `fragments/` holds the parts of the
+memory layout that depend on esp-hal's configuration and features. They are templates: `#IF` /
+`${...}` are evaluated against the chip's esp-metadata symbols, esp-hal's configuration
+(`ESP_HAL_CONFIG_*`) and esp-hal's cargo features (`CARGO_FEATURE(...)`).
 
-- DON'T include any `*newlib*` functions
-- systimer, wdt and mbedtls shouldn't be included
-- make sure to align the version you take the files from with esp-wifi-sys - NEVER randomly sync the files with other versions
-- some additional functions are needed from ROM - see `additional.ld` (these are usually defined in the `*newlib*` files)
+The memory layout belongs to the bootloader support crate, see
+`esp-bootloader-esp-idf/ld/README.md`.

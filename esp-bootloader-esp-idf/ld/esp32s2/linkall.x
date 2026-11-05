@@ -1,0 +1,6 @@
+INCLUDE "esp_hal_config.x"
+INCLUDE "memory.x"
+INCLUDE "alias.x"
+INCLUDE "esp32s2.x"
+INCLUDE "hal-defaults.x"
+INCLUDE "esp_idf_boot.x"
