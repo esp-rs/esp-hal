@@ -586,6 +586,7 @@ fifo_depth_words = 896
 
 [device.usb_serial_jtag]
 support_status = { status = "partial", issue = 6787 }
+phy_pads = ["USJ", "USB_FS"]
 
 [device.ecc]
 support_status = "partial"

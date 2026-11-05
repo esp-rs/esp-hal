@@ -1,4 +1,13 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dp_pin" => {
+        cfg(not(usb_serial_jtag_phy_pads_usj)) => gpio_for_signal!(USB_FS_DP),
+        _ => gpio_for_signal!(USJ_DP),
+    },
+    "dm_pin" => {
+        cfg(not(usb_serial_jtag_phy_pads_usj)) => gpio_for_signal!(USB_FS_DM),
+        _ => gpio_for_signal!(USJ_DM),
+    },
+))]
 //! # USB Serial/JTAG Controller (USB_SERIAL_JTAG)
 //!
 //! ## Overview
@@ -20,6 +29,10 @@
 //! - An internal PHY, so the connection to the host needs few or no external components
 //!
 //! ## Usage
+//!
+//! The driver takes the D+ and D- pins of the PHY that the controller uses. On some chips, the
+//! `USB_PHY_SEL` eFuse or a PHY selection register moves the controller to another PHY. Then pass
+//! the pins of that PHY. [`UsbSerialJtag::new`] returns [`ConfigError::WrongPins`] for other pins.
 //!
 //! The driver implements these traits:
 //!
@@ -60,7 +73,12 @@
 //! # {before_snippet}
 //! use esp_hal::usb::usb_serial_jtag::{Config, UsbSerialJtag};
 //!
-//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, Config::default())?;
+//! let mut usb_serial = UsbSerialJtag::new(
+//!     peripherals.USB_DEVICE,
+//!     peripherals.__dp_pin__,
+//!     peripherals.__dm_pin__,
+//!     Config::default(),
+//! )?;
 //!
 //! // `write` stores at most one packet, so write in a loop.
 //! let mut data: &[u8] = b"Hello, world!";
@@ -77,7 +95,12 @@
 //! # {before_snippet}
 //! use esp_hal::usb::usb_serial_jtag::{Config, UsbSerialJtag};
 //!
-//! let usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, Config::default())?;
+//! let usb_serial = UsbSerialJtag::new(
+//!     peripherals.USB_DEVICE,
+//!     peripherals.__dp_pin__,
+//!     peripherals.__dm_pin__,
+//!     Config::default(),
+//! )?;
 //! let (mut rx, mut tx) = usb_serial.split();
 //!
 //! tx.write(&[42u8])?;
@@ -95,7 +118,12 @@
 //!
 //! let delay = Delay::new();
 //!
-//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE, Config::default())?;
+//! let mut usb_serial = UsbSerialJtag::new(
+//!     peripherals.USB_DEVICE,
+//!     peripherals.__dp_pin__,
+//!     peripherals.__dm_pin__,
+//!     Config::default(),
+//! )?;
 //! usb_serial.set_interrupt_handler(usb_device);
 //! usb_serial.listen_rx_packet_recv_interrupt();
 //!
@@ -148,6 +176,9 @@ use crate::{
 };
 
 mod compat;
+mod pins;
+
+pub use pins::UsbSerialJtagPin;
 
 /// USB Serial/JTAG transmitter error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -239,15 +270,35 @@ impl From<RxError> for IoError {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 #[non_exhaustive]
-pub enum ConfigError {}
+pub enum ConfigError {
+    /// The pins are not the pins of the PHY that the controller uses.
+    ///
+    /// The `USB_PHY_SEL` eFuse and the PHY selection registers select the PHY.
+    WrongPins,
+    /// The controller uses a PHY that the driver does not support, for example an external PHY.
+    UnsupportedPhy,
+}
 
 #[instability::unstable]
 impl core::error::Error for ConfigError {}
 
 #[instability::unstable]
 impl core::fmt::Display for ConfigError {
-    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match *self {}
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ConfigError::WrongPins => {
+                write!(
+                    f,
+                    "The pins are not the pins of the PHY that the controller uses"
+                )
+            }
+            ConfigError::UnsupportedPhy => {
+                write!(
+                    f,
+                    "The controller uses a PHY that the driver does not support"
+                )
+            }
+        }
     }
 }
 
@@ -318,11 +369,24 @@ pub struct UsbSerialJtagRx<'d, Dm: DriverMode> {
 impl<'d> UsbSerialJtag<'d, Blocking> {
     /// Creates a new USB Serial/JTAG driver in [`Blocking`] mode.
     ///
+    /// `dp` and `dm` are the D+ and D- pins of the PHY that the controller uses. The driver
+    /// borrows them, so the program cannot use them as GPIOs. The driver does not check the order
+    /// of the pins, because the `USB_EXCHG_PINS` eFuse swaps D+ and D-.
+    ///
     /// # Errors
     ///
-    /// This function does not fail. [`ConfigError`] has no variants.
+    /// Returns [`ConfigError::WrongPins`] if the pins are not the pins of the PHY that the
+    /// controller uses. Returns [`ConfigError::UnsupportedPhy`] if the controller uses a PHY that
+    /// the driver does not support.
     #[instability::unstable]
-    pub fn new(usb_device: USB_DEVICE<'d>, config: Config) -> Result<Self, ConfigError> {
+    pub fn new(
+        usb_device: USB_DEVICE<'d>,
+        dp: impl UsbSerialJtagPin + 'd,
+        dm: impl UsbSerialJtagPin + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
+        let pads = pins::validate_pins(&dp, &dm)?;
+        pins::enable_pads(pads);
         let mut this = Self::new_inner(usb_device);
         this.apply_config(&config)?;
         Ok(this)
@@ -510,7 +574,7 @@ where
     ///
     /// # Errors
     ///
-    /// This function does not fail. [`ConfigError`] has no variants.
+    /// This function does not fail.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
@@ -697,7 +761,7 @@ where
     ///
     /// # Errors
     ///
-    /// This function does not fail. [`ConfigError`] has no variants.
+    /// This function does not fail.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.tx_timeout = config.tx_timeout;
@@ -937,7 +1001,7 @@ where
     ///
     /// # Errors
     ///
-    /// This function does not fail. [`ConfigError`] has no variants.
+    /// This function does not fail.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx_timeout = config.rx_timeout;
