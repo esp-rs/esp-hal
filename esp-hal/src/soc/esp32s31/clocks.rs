@@ -633,9 +633,12 @@ fn configure_lp_slow_clk_impl(
 }
 
 fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    HP_SYS_CLKRST::regs()
-        .timergrp0_tgrt_ctrl0()
-        .modify(|_, w| w.clk_en().bit(en));
+    // Do not gate the clock. After the gate opens, the calibration can start too late and time out.
+    if en {
+        HP_SYS_CLKRST::regs()
+            .timergrp0_tgrt_ctrl0()
+            .modify(|_, w| w.clk_en().set_bit());
+    }
 }
 
 fn configure_timg_calibration_clock_impl(
