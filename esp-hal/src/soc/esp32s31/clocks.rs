@@ -362,6 +362,16 @@ fn set_mpll_frequency(mpll_mhz: u32) {
         .modify(|_, w| w.mspi_cal_stop().set_bit());
 }
 
+/// Calibrates the MPLL again at the rate the clock tree holds, if a clock uses it.
+///
+/// The rate comes from the clock tree and not from the dividers, so that a calibration cannot
+/// change it.
+pub(crate) fn recalibrate_mpll(clocks: &ClockTree) {
+    if clocks.mpll_clk_refcount > 0 {
+        set_mpll_frequency(unwrap!(clocks.mpll_clk).value() / 1_000_000);
+    }
+}
+
 fn configure_mpll_clk_impl(
     _clocks: &mut ClockTree,
     _old_config: Option<MpllClkConfig>,
