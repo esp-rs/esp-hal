@@ -343,10 +343,10 @@ mod tests {
     fn read_custom_types() {
         let pt = PartitionTable::new(CUSTOM).unwrap();
 
-        assert_eq!(7, pt.len());
+        assert_eq!(8, pt.len());
 
         assert_eq!(
-            PartitionType::Unknown {
+            PartitionType::Custom {
                 raw_type: 0x40,
                 raw_subtype: 0x30
             },
@@ -359,9 +359,16 @@ mod tests {
             },
             pt.get_partition(3).unwrap().partition_type()
         );
+        assert_eq!(
+            PartitionType::Unknown {
+                raw_type: 0x3F,
+                raw_subtype: 0x06
+            },
+            pt.get_partition(4).unwrap().partition_type()
+        );
 
         let custom = pt
-            .find_partition(PartitionType::Unknown {
+            .find_partition(PartitionType::Custom {
                 raw_type: 0x40,
                 raw_subtype: 0x30,
             })

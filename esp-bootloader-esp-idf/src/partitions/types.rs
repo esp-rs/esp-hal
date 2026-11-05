@@ -14,8 +14,15 @@ pub enum PartitionType {
     Bootloader(BootloaderPartitionSubType),
     /// Partition table.
     PartitionTable(PartitionTablePartitionSubType),
-    /// A type or sub-type that this crate does not know, for example an
-    /// application-defined type (0x40–0xFE).
+    /// An application-defined type (0x40–0xFE) and its sub-type.
+    Custom {
+        /// The raw type.
+        raw_type: u8,
+        /// The raw sub-type.
+        raw_subtype: u8,
+    },
+    /// A type or sub-type that this crate does not know, for example a type that
+    /// ESP-IDF reserves (0x04–0x3F) or a sub-type that is new in ESP-IDF.
     Unknown {
         /// The raw type.
         raw_type: u8,

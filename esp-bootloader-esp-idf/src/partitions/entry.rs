@@ -113,7 +113,8 @@ impl PartitionEntry {
 
     /// Returns the partition type (type and sub-type).
     ///
-    /// Returns [`PartitionType::Unknown`] if this crate does not know the type or the sub-type.
+    /// Returns [`PartitionType::Custom`] for an application-defined type, and
+    /// [`PartitionType::Unknown`] if this crate does not know the type or the sub-type.
     pub fn partition_type(&self) -> PartitionType {
         let (raw_type, raw_subtype) = (self.raw_type(), self.raw_subtype());
         let known = match raw_type {
@@ -121,6 +122,10 @@ impl PartitionEntry {
             1 => raw_subtype.try_into().map(PartitionType::Data),
             2 => raw_subtype.try_into().map(PartitionType::Bootloader),
             3 => raw_subtype.try_into().map(PartitionType::PartitionTable),
+            0x40..=0xFE => Ok(PartitionType::Custom {
+                raw_type,
+                raw_subtype,
+            }),
             _ => Err(Error::Invalid),
         };
         known.unwrap_or(PartitionType::Unknown {
