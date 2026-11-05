@@ -226,8 +226,12 @@ pub(crate) fn request_context_switch(core: Cpu) {
 }
 
 fn assert_target_runs(core: Cpu) {
+    // The core that runs this code is running. `is_running` can still read false
+    // while the APP CPU starts and sends an IPC to itself.
     debug_assert!(
-        core != Cpu::AppCpu || crate::soc::cpu_control::is_running(Cpu::AppCpu),
+        core != Cpu::AppCpu
+            || core == Cpu::current()
+            || crate::soc::cpu_control::is_running(Cpu::AppCpu),
         "IPC target APP core is not running"
     );
 }
