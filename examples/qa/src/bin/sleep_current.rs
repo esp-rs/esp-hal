@@ -382,7 +382,7 @@ fn main() -> ! {
     }
 
     #[cfg(multi_core)]
-    let mut cpu_control = {
+    let cpu_control = {
         use esp_hal::system::{CpuControl, Stack};
 
         static mut APP_CORE_STACK: Stack<8192> = Stack::new();
@@ -393,8 +393,17 @@ fn main() -> ! {
             })
             .unwrap();
         core::mem::forget(guard);
-        unsafe { cpu_control.park_core(Cpu::AppCpu) };
         cpu_control
+    };
+    #[cfg(multi_core)]
+    let mut app_core_parked = Some(cpu_control.park_core(Cpu::AppCpu));
+    #[cfg(multi_core)]
+    let mut set_app_core_parked = |parked: bool| {
+        if !parked {
+            app_core_parked = None;
+        } else if app_core_parked.is_none() {
+            app_core_parked = Some(cpu_control.park_core(Cpu::AppCpu));
+        }
     };
 
     #[cfg(supports_cpu_power_down)]
@@ -444,11 +453,7 @@ fn main() -> ! {
                 #[cfg(multi_core)]
                 {
                     set_app_waiti(waiti);
-                    if two_cores {
-                        cpu_control.unpark_core(Cpu::AppCpu);
-                    } else {
-                        unsafe { cpu_control.park_core(Cpu::AppCpu) };
-                    }
+                    set_app_core_parked(!two_cores);
                     delay.delay_millis(50);
                 }
                 #[cfg(not(multi_core))]
@@ -467,11 +472,7 @@ fn main() -> ! {
                 #[cfg(multi_core)]
                 {
                     set_app_waiti(true);
-                    if two_cores {
-                        cpu_control.unpark_core(Cpu::AppCpu);
-                    } else {
-                        unsafe { cpu_control.park_core(Cpu::AppCpu) };
-                    }
+                    set_app_core_parked(!two_cores);
                     delay.delay_millis(50);
                 }
                 #[cfg(not(multi_core))]
@@ -517,9 +518,7 @@ fn main() -> ! {
                 let _ = periodic.cancel();
 
                 #[cfg(multi_core)]
-                unsafe {
-                    cpu_control.park_core(Cpu::AppCpu);
-                }
+                set_app_core_parked(true);
 
                 let next = ((phase + 1) % CASES.len()) as u32;
                 store_phase(next);

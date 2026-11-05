@@ -224,6 +224,44 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    fn park_does_not_stop_a_core_in_a_critical_section(p: Peripherals) {
+        use esp_hal::system::{Cpu, CpuControl, Stack};
+        use hil_test::mk_static;
+
+        static IN_SECTION: AtomicU32 = AtomicU32::new(0);
+
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+
+        // The APP core is in a critical section nearly all the time. A raw stall thus stops the APP
+        // core in the critical section, and the critical section below waits forever.
+        let _guard = cpu_control
+            .start_app_core(app_core_stack, || {
+                loop {
+                    critical_section::with(|_| {
+                        IN_SECTION.fetch_add(1, Ordering::Relaxed);
+                        for _ in 0..1000 {
+                            core::hint::spin_loop();
+                        }
+                    });
+                }
+            })
+            .unwrap();
+
+        while IN_SECTION.load(Ordering::Relaxed) == 0 {}
+
+        for _ in 0..1000 {
+            let parked = cpu_control.park_core(Cpu::AppCpu);
+            critical_section::with(|_| {});
+            drop(parked);
+        }
+
+        let before = IN_SECTION.load(Ordering::Relaxed);
+        while IN_SECTION.load(Ordering::Relaxed) == before {}
+    }
+
+    #[test]
     fn software_interrupts_fire_immediately(p: Peripherals) {
         software_interrupt_fires_before_returning(p);
     }

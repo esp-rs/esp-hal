@@ -37,8 +37,7 @@ pub(crate) unsafe fn internal_park_core(core: Cpu, park: bool) {
 }
 
 /// Returns whether the specified core is currently running (not stalled).
-#[instability::unstable]
-pub fn is_running(core: Cpu) -> bool {
+pub(crate) fn is_running(core: Cpu) -> bool {
     if core == Cpu::AppCpu {
         let dport = DPORT::regs();
         // DPORT_APPCPU_CLKGATE_EN in APPCPU_CTRL_B bit 0 -> needs to be 1 to even be enabled
