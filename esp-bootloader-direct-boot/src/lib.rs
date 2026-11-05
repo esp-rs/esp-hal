@@ -39,7 +39,8 @@
 //! ## Limitations
 //!
 //! - There is no partition table, OTA, app descriptor or secure boot.
-//! - `#[ram(reclaimed)]` is not available.
+//! - `#[ram(reclaimed)]` is not available. The memory the 2nd-stage bootloader would occupy is
+//!   regular RAM instead.
 //! - Direct boot can be disabled permanently with the `DIS_DIRECT_BOOT` eFuse.
 //! - When switching from an ESP-IDF image, erase the flash once, so a stale bootloader or partition
 //!   table cannot get in the way.

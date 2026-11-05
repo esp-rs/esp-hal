@@ -26,6 +26,12 @@ magic | entry stub, copy table | RAM section images | .text | .rodata
 - `.text` and `.rodata` execute in place: their addresses are `IROM_BASE` / `DROM_BASE` plus their
   flash offset.
 
+RAM extends over everything the ESP-IDF 2nd-stage bootloader would occupy, the ROM's download-mode
+buffers and the ROM's stack, up to the ROM's own `.bss`/`.data`. There is no 2nd-stage bootloader,
+and the entry stub copies without a stack. On chips with two cores, RAM ends below the second
+core's ROM stack: the ROM runs on it when esp-hal starts that core. `dram2_seg` is empty, as
+`#[ram(reclaimed)]` is not available.
+
 The RAM sections come before `.text` in the scripts. The linker assigns an input section to the
 first output section in the script that matches it, so this way `.rwtext` claims what esp-hal's
 `esp_hal_rwtext.x` places in RAM before the `.text` catch-all does.

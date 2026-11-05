@@ -6,8 +6,9 @@ DROM_BASE = 0x40000000;
 IRAM_DRAM_OFFSET = 0;
 
 /* The 768 KB L2MEM is shared between L2 cache (low end) and L2 RAM (rest). The entry stub
-   programs the split ESP_HAL_CONFIG_L2_CACHE_SIZE selects, see `src/riscv/mod.rs`. Top is fixed
-   at 0x4FFAE000 to leave the v3.x ROM BSS/stack region (top ~72 KB of L2MEM) untouched. */
+   programs the split ESP_HAL_CONFIG_L2_CACHE_SIZE selects, see `src/riscv/mod.rs`. RAM ends at
+   `__stack` of the v3.0 ROM, the top of the first core's ROM stack. The entry stub runs
+   `Cache_Set_L2_Cache_Mode` on that stack before it copies anything. */
 ASSERT(ESP_HAL_L2_CACHE_SIZE != 0, "
 ERROR(esp-bootloader-direct-boot): ESP_HAL_CONFIG_L2_CACHE_SIZE=0KB is not supported");
 
@@ -16,13 +17,13 @@ _direct_boot_l2_cache_size = ESP_HAL_L2_CACHE_SIZE == 0x80000 ? 11 : ESP_HAL_L2_
 
 MEMORY
 {
-    RAM : ORIGIN = 0x4FF00000 + ESP_HAL_L2_CACHE_SIZE, LENGTH = 0xADFC0 - ESP_HAL_L2_CACHE_SIZE
+    RAM : ORIGIN = 0x4FF00000 + ESP_HAL_L2_CACHE_SIZE, LENGTH = 0xBCFC0 - ESP_HAL_L2_CACHE_SIZE
 
     /* L1-bypass alias of RAM. The address is the RAM address + 0x40000000. */
-    UNCACHE (RW) : ORIGIN = 0x8FF00000 + ESP_HAL_L2_CACHE_SIZE, LENGTH = 0xADFC0 - ESP_HAL_L2_CACHE_SIZE
+    UNCACHE (RW) : ORIGIN = 0x8FF00000 + ESP_HAL_L2_CACHE_SIZE, LENGTH = 0xBCFC0 - ESP_HAL_L2_CACHE_SIZE
 
-    /* Used by the ROM during boot, free afterwards. Upper bound is __stack_app = 0x4ffbefc0. */
-    dram2_seg ( RW ) : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4ffbefc0 - (ORIGIN(RAM) + LENGTH(RAM))
+    /* `#[ram(reclaimed)]` is not available with direct boot. */
+    dram2_seg ( RW ) : ORIGIN = 0x4FFBCFC0, len = 0
 
     /* The MMU maps up to 1024 pages of 64 KB of NOR flash, 64 MB from 0x40000000. */
     ROM : ORIGIN = 0x40000000, LENGTH = 0x4000000

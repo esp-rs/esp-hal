@@ -3,20 +3,20 @@ MEMORY
      /* MEMORY_MAP = [
         [0x42000000, 0x46000000, "DROM"],
         [0x40800000, 0x40850000, "DRAM"],
-        [0x40800000, 0x4084ea70, "BYTE_ACCESSIBLE"],
+        [0x40800000, 0x4084e670, "BYTE_ACCESSIBLE"],
         [0x42000000, 0x44000000, "IROM"],
         [0x40800000, 0x40850000, "IRAM"],
     ] */
 
     /* 320K of on-chip SRAM, portion reserved for cache */
     /* Instruction and Data RAM
-    0x4083ea70 = 2nd stage bootloader iram_loader_seg start address
-    see https://github.com/espressif/esp-idf/blob/master/components/esp_system/ld/esp32c61/memory.ld.in
+    0x4083e670 = 2nd stage bootloader iram_loader_seg start address
+    see https://github.com/espressif/esp-idf/blob/v6.1/components/bootloader/subproject/main/ld/esp32c61/bootloader.memory.ld.in
     */
-    RAM : ORIGIN = 0x40800000, LENGTH = 0x3EA70
+    RAM : ORIGIN = 0x40800000, LENGTH = 0x3E670
 
-    /* memory available after the 2nd stage bootloader is finished */
-    dram2_seg ( RW )       : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4084EA70 - (ORIGIN(RAM) + LENGTH(RAM))
+    /* memory available after the 2nd stage bootloader is finished, up to SOC_ROM_STACK_START */
+    dram2_seg ( RW )       : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4084E670 - (ORIGIN(RAM) + LENGTH(RAM))
 
     /* External flash
      The 0x20 offset is a convenience for the app binary image generation.
