@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+use embassy_sync::lazy_lock::LazyLock;
+use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphoreKind};
+
 use crate::{
     compat::{common::*, semaphore::*},
     hal::{self, ram},
@@ -302,6 +305,23 @@ unsafe extern "C" fn __esp_radio_misc_nvs_init() -> i32 {
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
+}
+
+/// Makes threads that use the PHY wait on a scheduler mutex.
+pub(crate) fn install_phy_mutex() {
+    // Recursive, so that a nested use of the PHY during calibration panics instead of deadlocking.
+    static SEMAPHORE: LazyLock<SemaphoreHandle> =
+        LazyLock::new(|| SemaphoreHandle::new(SemaphoreKind::RecursiveMutex));
+    static MUTEX: esp_phy::PhyMutex = esp_phy::PhyMutex {
+        lock: || {
+            SEMAPHORE.get().take(None);
+        },
+        unlock: || {
+            SEMAPHORE.get().give();
+        },
+    };
+
+    esp_phy::set_phy_mutex(&MUTEX);
 }
 
 #[cfg_attr(not(any(esp32, esp32s2)), expect(unused))]
