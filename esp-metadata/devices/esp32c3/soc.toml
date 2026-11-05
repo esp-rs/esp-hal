@@ -303,6 +303,7 @@ wakeup_sources = {
 
 [device.sleep.retention]
 cpu_retention = "rtc_cntl"
+modem_retention = "backup_dma"
 cpu_retention_mem_size = 1744
 cpu_retention_mem_align = 16
 cpu_retention_mem_start = 0x3FCC0000

@@ -19,13 +19,13 @@ use crate::{
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod chip_specific;
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(modem_retention = "backup_dma")]
 mod mac_bb;
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(modem_retention = "backup_dma")]
 mod retention;
 
 use chip_specific::{G_OSI_FUNCS, osi_funcs_s};
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(modem_retention = "backup_dma")]
 pub(super) use mac_bb::{power_down as power_down_mac_bb, power_up as power_up_mac_bb};
 
 pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
@@ -352,7 +352,7 @@ pub(super) fn time_until_controller_wakes() -> esp_hal::time::Duration {
 }
 
 unsafe extern "C" fn btdm_sleep_enter_phase2() {
-    #[cfg(any(esp32c3, esp32s3))]
+    #[cfg(modem_retention = "backup_dma")]
     mac_bb::controller_sleeps();
     if super::modem_sleep_enabled() {
         super::modem_phy_release();
@@ -478,10 +478,8 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         chip_specific::disable_sleep_mode();
 
-        #[cfg(any(esp32c3, esp32s3))]
-        if config.modem_sleep() && super::lp_clk::light_sleep_supported() {
-            mac_bb::init();
-        }
+        #[cfg(modem_retention = "backup_dma")]
+        mac_bb::init(config.modem_sleep() && super::lp_clk::light_sleep_supported());
 
         let res = btdm_controller_init(
             #[cfg(esp32)]
@@ -545,7 +543,7 @@ pub(crate) fn ble_deinit() {
         btdm_controller_deinit();
     }
 
-    #[cfg(any(esp32c3, esp32s3))]
+    #[cfg(modem_retention = "backup_dma")]
     mac_bb::deinit();
 
     super::lp_clk::release();

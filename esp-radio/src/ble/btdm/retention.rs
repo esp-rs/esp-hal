@@ -1,21 +1,30 @@
 //! Memory that the backup DMA uses to retain the BLE MAC and baseband while they have no power.
 
-use core::{mem::MaybeUninit, ptr};
+use core::ptr;
 
-use docsplay::Display;
 use esp_sync::NonReentrantMutex;
-use portable_atomic::{AtomicPtr, Ordering};
-use static_cell::ConstStaticCell;
 
-use crate::sys::c_types::c_void;
+#[instability::unstable]
+pub use crate::retention::RetentionMemoryError;
+use crate::{retention::RetentionSlot, sys::c_types::c_void};
 
 // The controller requests three buffers of 1100, 300 and 180 bytes, and frees them together.
 const BUFFER_SIZE: usize = 1100 + 300 + 180;
 
-const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
-const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
+/// Storage for [`RetentionMemory`].
+///
+/// This storage must be placed in `#[ram(reclaimed, unstable(zeroed))]`, then a static mutable
+/// reference to [`RetentionMemory`] can be taken out of it.
+#[instability::unstable]
+pub type RetentionStorage = crate::retention::RetentionStorage<BUFFER_SIZE>;
 
-static INSTALLED: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
+/// Memory that the BLE controller uses to retain the MAC and baseband while they have no power.
+///
+/// Install the memory with [`install_retention_memory`].
+#[instability::unstable]
+pub type RetentionMemory = crate::retention::RetentionMemory<BUFFER_SIZE>;
+
+static MEMORY: RetentionSlot<BUFFER_SIZE> = RetentionSlot::new();
 
 struct Usage {
     /// Bytes given out from the start of the memory.
@@ -25,76 +34,6 @@ struct Usage {
 }
 
 static USAGE: NonReentrantMutex<Usage> = NonReentrantMutex::new(Usage { used: 0, live: 0 });
-
-/// Storage for [`RetentionMemory`].
-///
-/// This storage must be placed in `#[ram(reclaimed, unstable(zeroed))]`, then a static mutable
-/// reference to [`RetentionMemory`] can be taken out of it.
-#[instability::unstable]
-pub struct RetentionStorage {
-    inner: ConstStaticCell<RetentionMemory>,
-}
-
-impl RetentionStorage {
-    /// Creates storage for the retention memory.
-    #[instability::unstable]
-    pub const fn new() -> Self {
-        Self {
-            inner: ConstStaticCell::new(RetentionMemory {
-                storage: MaybeUninit::uninit(),
-            }),
-        }
-    }
-
-    /// Takes the reference to the retention memory.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the reference is taken already.
-    #[instability::unstable]
-    pub fn take(&'static self) -> &'static mut RetentionMemory {
-        self.inner.take()
-    }
-}
-
-#[instability::unstable]
-impl Default for RetentionStorage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// SAFETY: `ConstStaticCell` holds a `MaybeUninit` buffer and an `AtomicBool`, and both are valid
-// when zeroed.
-unsafe impl bytemuck::Zeroable for RetentionStorage {}
-
-/// Memory that the BLE controller uses to retain the MAC and baseband while they have no power.
-///
-/// The backup DMA writes this memory, so the type gives no way to read or write its contents.
-///
-/// Install the memory with [`install_retention_memory`]. The memory must be in internal RAM that
-/// the backup DMA can reach. The [`#[ram(reclaimed)]`][esp_hal::ram] attribute places a static
-/// inside that range.
-#[repr(align(4))]
-#[instability::unstable]
-pub struct RetentionMemory {
-    storage: MaybeUninit<[u8; BUFFER_SIZE]>,
-}
-
-/// The reason why [`install_retention_memory`] refused the memory.
-#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[instability::unstable]
-#[non_exhaustive]
-pub enum RetentionMemoryError {
-    /// The memory is outside the range that the backup DMA can reach.
-    OutOfRange,
-    /// The controller has retention memory already.
-    AlreadyInstalled,
-}
-
-#[instability::unstable]
-impl core::error::Error for RetentionMemoryError {}
 
 #[procmacros::doc_replace]
 /// Gives the BLE controller the memory that it uses to retain the MAC and baseband.
@@ -125,29 +64,19 @@ impl core::error::Error for RetentionMemoryError {}
 pub fn install_retention_memory(
     memory: &'static mut RetentionMemory,
 ) -> Result<(), RetentionMemoryError> {
-    let memory = memory.storage.as_mut_ptr().cast::<u8>();
-
-    let start = memory as usize;
-    if start < MEM_START || start + BUFFER_SIZE > MEM_END {
-        return Err(RetentionMemoryError::OutOfRange);
-    }
-
-    INSTALLED
-        .compare_exchange(ptr::null_mut(), memory, Ordering::AcqRel, Ordering::Acquire)
-        .map(|_| ())
-        .map_err(|_| RetentionMemoryError::AlreadyInstalled)
+    MEMORY.install(memory)
 }
 
 /// Returns whether retention memory is installed.
 pub(crate) fn is_installed() -> bool {
-    !INSTALLED.load(Ordering::Acquire).is_null()
+    MEMORY.is_installed()
 }
 
 /// Allocates a buffer that the backup DMA can reach.
 ///
 /// Returns null if no retention memory is installed, or if the memory has no space left.
 pub(crate) extern "C" fn malloc_retention(size: u32) -> *mut c_void {
-    let base = INSTALLED.load(Ordering::Acquire);
+    let base = MEMORY.base();
     if base.is_null() {
         return ptr::null_mut();
     }
@@ -169,7 +98,7 @@ pub(crate) extern "C" fn malloc_retention(size: u32) -> *mut c_void {
 ///
 /// Returns `false` if `ptr` is not in the retention memory.
 pub(crate) fn try_free(ptr: *mut c_void) -> bool {
-    let base = INSTALLED.load(Ordering::Acquire) as usize;
+    let base = MEMORY.base() as usize;
     if base == 0 || !(base..base + BUFFER_SIZE).contains(&(ptr as usize)) {
         return false;
     }

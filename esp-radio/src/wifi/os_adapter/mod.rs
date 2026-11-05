@@ -643,6 +643,11 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut c_void {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn free(p: *mut c_void) {
+    #[cfg(modem_retention = "backup_dma")]
+    if super::retention::try_free(p) {
+        return;
+    }
+
     unsafe {
         crate::compat::malloc::free(p.cast());
     }
@@ -944,22 +949,28 @@ pub unsafe extern "C" fn wifi_clock_disable() {
 /// Name: wifi_rtc_enable_iso
 ///
 /// Description:
-///   Don't support
+///   The blob saved the MAC and baseband, and they can lose power
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_rtc_enable_iso() {
-    todo!("wifi_rtc_enable_iso")
+    cfg_select! {
+        modem_retention = "backup_dma" => crate::modem_power::sleep(crate::modem_power::Radio::Wifi),
+        _ => todo!("wifi_rtc_enable_iso"),
+    }
 }
 
 /// **************************************************************************
 /// Name: wifi_rtc_disable_iso
 ///
 /// Description:
-///   Don't support
+///   The blob restores the MAC and baseband, and they need power
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_rtc_disable_iso() {
-    todo!("wifi_rtc_disable_iso")
+    cfg_select! {
+        modem_retention = "backup_dma" => crate::modem_power::wake(crate::modem_power::Radio::Wifi),
+        _ => todo!("wifi_rtc_disable_iso"),
+    }
 }
 
 /// **************************************************************************
@@ -1280,6 +1291,14 @@ pub unsafe extern "C" fn log_timestamp() -> u32 {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut c_void {
+    #[cfg(modem_retention = "backup_dma")]
+    {
+        let memory = super::retention::malloc(size);
+        if !memory.is_null() {
+            return memory;
+        }
+    }
+
     unsafe { crate::compat::malloc::malloc_internal(size).cast() }
 }
 

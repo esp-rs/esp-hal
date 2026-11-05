@@ -77,7 +77,7 @@ pub(crate) fn claim_wake_source() {
         WakeupSource::Bt.enable_with_hooks(
             Some(sleep_entry),
             cfg_select! {
-                any(esp32c3, esp32s3) => Some(sleep_exit),
+                modem_retention = "backup_dma" => Some(sleep_exit),
                 _ => None,
             },
         );
@@ -118,7 +118,7 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
                 return;
             }
             // After the refusals, because a refused sleep must leave the MAC and baseband powered.
-            #[cfg(any(esp32c3, esp32s3))]
+            #[cfg(modem_retention = "backup_dma")]
             let remaining = super::porting::power_down_mac_bb(remaining);
             config.limit_sleep(remaining);
         }
@@ -139,7 +139,7 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     }
 }
 
-#[cfg(all(sleep_driver_supported, any(esp32c3, esp32s3)))]
+#[cfg(all(sleep_driver_supported, modem_retention = "backup_dma"))]
 fn sleep_exit() {
     super::porting::power_up_mac_bb();
 }
