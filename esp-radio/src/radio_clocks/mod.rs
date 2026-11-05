@@ -64,17 +64,17 @@ impl Refcount {
 #[cfg(feature = "wifi")]
 pub(crate) fn enable_wifi(en: bool) {
     static REFCOUNT: Refcount = Refcount::new();
-    REFCOUNT.update(en, clocks_ll::enable_wifi);
+    esp_phy::with_phy_lock(|| REFCOUNT.update(en, clocks_ll::enable_wifi));
 }
 
 #[cfg(feature = "ble")]
 pub(crate) fn enable_bt(en: bool) {
     static REFCOUNT: Refcount = Refcount::new();
-    REFCOUNT.update(en, clocks_ll::enable_bt);
+    esp_phy::with_phy_lock(|| REFCOUNT.update(en, clocks_ll::enable_bt));
 }
 
 #[cfg(feature = "ieee802154")]
 pub(crate) fn enable_ieee802154(en: bool) {
     static REFCOUNT: Refcount = Refcount::new();
-    REFCOUNT.update(en, clocks_ll::enable_ieee802154);
+    esp_phy::with_phy_lock(|| REFCOUNT.update(en, clocks_ll::enable_ieee802154));
 }
