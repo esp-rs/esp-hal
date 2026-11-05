@@ -105,14 +105,30 @@ pub(crate) fn enable_core1_interrupt_matrix() {
     });
 }
 
+/// Starts Core 1 at `entry_point`. Core 1 stays stalled until the caller unstalls it.
 #[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
+    // The stall holds Core 1 until the ROM can read the new entry point.
+    unsafe { internal_park_core(Cpu::AppCpu, true) };
+
+    // A release from reset does not restart a core that ran before.
+    if PCR::regs()
+        .core1_conf()
+        .read()
+        .core1_rst_en()
+        .bit_is_clear()
+    {
+        LP_AON::regs()
+            .cpucore_cfg()
+            .modify(|_, w| w.cpu_core1_sw_reset().set_bit());
+    }
+
+    // Core 1's ROM waits for this address before handing control to the app.
+    crate::rom::ets_set_appcpu_boot_addr(entry_point as u32);
+
     // cpu_utility_ll_enable_clock_and_reset_app_cpu()
     PCR::regs().core1_conf().modify(|_, w| {
         w.core1_clk_en().set_bit();
         w.core1_rst_en().clear_bit()
     });
-
-    // Core 1's ROM waits for this address before handing control to the app.
-    crate::rom::ets_set_appcpu_boot_addr(entry_point as u32);
 }
