@@ -325,6 +325,8 @@ impl SchedulerState {
         }
 
         let mut arm_next_timeslice_tick = false;
+        #[cfg(multi_core)]
+        let mut arm_peer_timeslice = false;
 
         #[cfg(multi_core)]
         let other_core_task = self.per_cpu[1 - current_cpu].current_task;
@@ -347,14 +349,18 @@ impl SchedulerState {
                 // while it might try to restore a partially saved context.
                 #[cfg(multi_core)]
                 let current_ref = unsafe { current.as_ref() };
-                // The other core can only pick up the task we switch away from if it runs the
-                // scheduler, too.
                 #[cfg(multi_core)]
                 if self.active_cores.is_smp()
+                    && current.state() == TaskState::Ready
                     && current_ref.pinned_to.is_none()
-                    && current_ref.priority >= Self::priority_of_task(other_core_task)
                 {
-                    task::schedule_other_core();
+                    let peer_priority = Self::priority_of_task(other_core_task);
+                    if other_core_task.is_null() || current_ref.priority > peer_priority {
+                        task::schedule_other_core();
+                    } else if current_ref.priority == peer_priority {
+                        // An immediate switch can cause the cores to keep interrupting each other.
+                        arm_peer_timeslice = true;
+                    }
                 }
 
                 unsafe { &raw mut (*current.as_ptr()).cpu_context }
@@ -415,6 +421,12 @@ impl SchedulerState {
         let time_driver = unwrap!(self.time_driver.as_mut());
         let now = crate::now();
         time_driver.set_time_slice(cpu, now, arm_next_timeslice_tick);
+        #[cfg(multi_core)]
+        if arm_peer_timeslice {
+            for peer in Cpu::other() {
+                time_driver.ensure_time_slice(peer, now);
+            }
+        }
         time_driver.arm_next_wakeup(now);
 
         #[cfg(feature = "rtos-trace")]
