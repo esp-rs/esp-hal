@@ -512,7 +512,7 @@ pub(crate) fn priority_to_cpu_interrupt(_interrupt: Interrupt, level: Priority) 
 /// # Safety
 ///
 /// Must be called only during core startup.
-#[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
+#[cfg(any(feature = "rt", multi_core))]
 pub(crate) unsafe fn init_vectoring() {
     use riscv::register::mtvec;
 

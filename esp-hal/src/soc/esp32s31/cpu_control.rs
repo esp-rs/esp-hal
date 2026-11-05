@@ -99,7 +99,6 @@ pub(crate) fn disable_core1() {
     });
 }
 
-#[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     // Enable both clocks and release Core 1 from global reset.
     HP_SYS_CLKRST::regs().hpcore1_ctrl0().modify(|_, w| {

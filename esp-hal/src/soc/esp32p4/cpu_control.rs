@@ -101,7 +101,6 @@ pub(crate) fn restart_core1_after_wake() {
         .modify(|_, w| w.rst_en_core1_global().clear_bit());
 }
 
-#[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     // Enable Core 1's CPU clock.
     HP_SYS_CLKRST::regs()

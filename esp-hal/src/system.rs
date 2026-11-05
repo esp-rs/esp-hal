@@ -4,13 +4,10 @@
 
 use esp_sync::NonReentrantMutex;
 
-cfg_select! {
-    all(soc_multi_core_enabled, feature = "unstable") => {
-        pub(crate) mod multi_core;
-        pub use multi_core::*;
-    }
-    _ => {}
-}
+#[cfg(soc_multi_core_enabled)]
+pub(crate) mod multi_core;
+#[cfg(all(soc_multi_core_enabled, feature = "unstable"))]
+pub use multi_core::*;
 
 // Implements the Peripheral enum based on esp-metadata/device.soc/peripheral_clocks
 implement_peripheral_clocks!();
