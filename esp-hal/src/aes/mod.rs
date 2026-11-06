@@ -942,6 +942,13 @@ pub mod dma {
 
                     driver.clear_interrupt();
 
+                    // The CPU must not read a stale line of the output the DMA wrote.
+                    #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                    crate::dma::invalidate_received(NonNull::slice_from_raw_parts(
+                        item.buffers.output.cast::<u8>(),
+                        item.buffers.output.len() - remaining_bytes,
+                    ));
+
                     // Write out PSRAM data if needed:
                     #[cfg(dma_can_access_psram)]
                     for buffer in self.unaligned_data_buffers.iter_mut() {

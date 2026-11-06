@@ -909,10 +909,8 @@ impl<'a> MaybeCopyRxBuf<'a> {
                 align_buffer,
                 ..
             } => {
-                #[cfg(soc_internal_memory_cached)]
-                unsafe {
-                    crate::soc::cache_invalidate_addr(chunk.as_ptr() as u32, chunk.len() as u32);
-                }
+                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                crate::dma::invalidate_received(NonNull::from(&*chunk));
 
                 #[cfg(dma_can_access_psram)]
                 for buffer in align_buffer.iter_mut() {

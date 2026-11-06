@@ -130,7 +130,7 @@ fn validate_dma_alignment(addr: usize, size: usize) -> Result<(), DmaBufError> {
 /// Returns whether the value at `addr` spanning `size` bytes occupies a
 /// cached memory region and therefore needs explicit cache maintenance.
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-fn region_needs_cache_op(addr: usize, size: usize) -> bool {
+pub(crate) fn region_needs_cache_op(addr: usize, size: usize) -> bool {
     // Do not do cache operations on zero-sized values.
     if size == 0 {
         return false;
