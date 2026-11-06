@@ -38,6 +38,23 @@ fn check_atan_q31(cordic: &mut Cordic<'_>) {
     check_q31(cordic.atan_q31(ATAN_INPUT_Q31).unwrap(), ATAN_EXPECTED_Q31);
 }
 
+fn check_hyperbolic_vectoring<'d>(
+    cordic: &mut Cordic<'d>,
+    opcode: u8,
+    calculate_q15: fn(&mut Cordic<'d>, i16) -> Result<i16, Error>,
+    calculate_q31: fn(&mut Cordic<'d>, i32) -> Result<i32, Error>,
+) {
+    let csr = CORDIC::regs().csr_cfg();
+    check_q31(calculate_q31(cordic, -865_435_910).unwrap(), -1_197_765_218);
+    assert_eq!(csr.read().func().bits(), opcode, "Q31");
+
+    check_q15(calculate_q15(cordic, -13_205).unwrap(), -18_275);
+    assert_eq!(csr.read().func().bits(), opcode, "Q15");
+
+    assert_eq!(calculate_q15(cordic, -13_206), Err(Error::InvalidInput));
+    assert_eq!(calculate_q31(cordic, 865_435_911), Err(Error::InvalidInput));
+}
+
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
@@ -267,5 +284,50 @@ mod tests {
         check_q15(cordic.sqrt_q15(0x4000).unwrap(), 23_170);
         check_q31(cordic.sqrt_q31(0x4000_0000).unwrap(), 1_518_500_250);
         assert_eq!(csr.read().pres().bits(), 2);
+    }
+
+    #[test]
+    fn hyperbolic() {
+        const ATANH_FUNC: u8 = 7;
+
+        let p = esp_hal::init(esp_hal::Config::default());
+        let mut cordic = Cordic::new(p.CORDIC, Config::default()).unwrap();
+
+        let input_q15 = -18_317;
+        let input_q31 = 1_200_443_359;
+
+        let (sinh, cosh) = cordic.sinh_cosh_q15(input_q15).unwrap();
+        check_q15(sinh, -22_378);
+        check_q15(cosh, 27_735);
+        assert_eq!(
+            cordic.sinh_cosh_q15(input_q15 - 1),
+            Err(Error::InvalidInput)
+        );
+        check_q15(cordic.sinh_q15(input_q15).unwrap(), sinh);
+
+        let (sinh, cosh) = cordic.sinh_cosh_q31(input_q31).unwrap();
+        check_q31(sinh, 1_466_622_676);
+        check_q31(cosh, 1_817_664_319);
+
+        let csr = CORDIC::regs().csr_cfg();
+        check_q31(cordic.sinh_q31(input_q31).unwrap(), sinh);
+        assert_eq!(csr.read().func().bits(), 6);
+        assert!(csr.read().res_num().bit_is_clear());
+
+        check_q31(cordic.cosh_q31(input_q31).unwrap(), 1_817_664_319);
+        assert_eq!(csr.read().func().bits(), 5);
+        assert_eq!(cordic.cosh_q31(input_q31 + 1), Err(Error::InvalidInput));
+        check_q15(cordic.cosh_q15(input_q15).unwrap(), 27_735);
+
+        check_hyperbolic_vectoring(
+            &mut cordic,
+            ATANH_FUNC,
+            Cordic::atanh_q15,
+            Cordic::atanh_q31,
+        );
+        let (sinh, cosh) = cordic.sinh_cosh_q15(0).unwrap();
+        check_q15(sinh, 0);
+        check_q15(cosh, 16_384);
+        check_atan_q31(&mut cordic);
     }
 }

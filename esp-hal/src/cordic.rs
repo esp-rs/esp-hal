@@ -1,8 +1,8 @@
 //! # Coordinate Rotation Digital Computer (CORDIC)
 //!
 //! ## Overview
-//! The CORDIC peripheral computes trigonometric functions and square roots.
-//! It also converts Cartesian vectors to polar coordinates.
+//! The CORDIC peripheral computes trigonometric and hyperbolic functions and
+//! square roots. It also converts Cartesian vectors to polar coordinates.
 //!
 //! The driver uses signed Q1.15 and Q1.31 values in `[-1, 1)`.
 //! Angle formulas use radians.
@@ -196,10 +196,25 @@ enum Function {
     Phase   = 2,
     Modulus = 3,
     Atan    = 4,
+    Cosh    = 5,
+    Sinh    = 6,
+    Atanh   = 7,
     Sqrt    = 9,
 }
 
-impl Function {}
+// These hardware input limits apply with SCALE = 1.
+// See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/docs/en/api-reference/peripherals/cordic.rst#L79-L93>.
+const SINH_COSH_MAX_INPUT_Q31: u32 = (559 * (1_u64 << 31) / 1000) as u32;
+const HYPERBOLIC_VECTOR_MAX_INPUT_Q31: u32 = (403 * (1_u64 << 31) / 1000) as u32;
+
+impl Function {
+    const fn scale_exponent(self) -> u8 {
+        match self {
+            Self::Cosh | Self::Sinh | Self::Atanh => 1,
+            _ => 0,
+        }
+    }
+}
 
 struct Arguments {
     arg1_word: u32,
@@ -244,6 +259,13 @@ fn validate_vector(
     let squared_modulus = (x * x) as u64 + (y * y) as u64;
     let one_squared = 1 << (2 * fractional_bits);
     if squared_modulus >= one_squared || (requires_phase && squared_modulus == 0) {
+        return Err(Error::InvalidInput);
+    }
+    Ok(())
+}
+
+fn validate_magnitude(input: i32, limit: u32) -> Result<(), Error> {
+    if input.unsigned_abs() > limit {
         return Err(Error::InvalidInput);
     }
     Ok(())
@@ -466,6 +488,102 @@ impl<'d> Cordic<'d, Blocking> {
         self.calculate_q31(Function::Atan, x, None)
     }
 
+    /// Returns `(sinh(x) / 2, cosh(x) / 2)` in Q1.15 for input `x / 2`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|x / 2| > 0.559`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn sinh_cosh_q15(&mut self, x_over_two: i16) -> Result<(i16, i16), Error> {
+        validate_magnitude(i32::from(x_over_two), SINH_COSH_MAX_INPUT_Q31 >> 16)?;
+        self.calculate_q15_pair(Function::Sinh, x_over_two, None)
+    }
+
+    /// Returns `(sinh(x) / 2, cosh(x) / 2)` in Q1.31 for input `x / 2`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|x / 2| > 0.559`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn sinh_cosh_q31(&mut self, x_over_two: i32) -> Result<(i32, i32), Error> {
+        validate_magnitude(x_over_two, SINH_COSH_MAX_INPUT_Q31)?;
+        self.calculate_q31_pair(Function::Sinh, x_over_two, None)
+    }
+
+    /// Returns `sinh(x) / 2` in Q1.15 for input `x / 2`.
+    ///
+    /// [`Self::sinh_cosh_q15`] computes sinh and cosh in one operation.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|x / 2| > 0.559`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn sinh_q15(&mut self, x_over_two: i16) -> Result<i16, Error> {
+        validate_magnitude(i32::from(x_over_two), SINH_COSH_MAX_INPUT_Q31 >> 16)?;
+        self.calculate_q15(Function::Sinh, x_over_two, None)
+    }
+
+    /// Returns `sinh(x) / 2` in Q1.31 for input `x / 2`.
+    ///
+    /// [`Self::sinh_cosh_q31`] computes sinh and cosh in one operation.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|x / 2| > 0.559`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn sinh_q31(&mut self, x_over_two: i32) -> Result<i32, Error> {
+        validate_magnitude(x_over_two, SINH_COSH_MAX_INPUT_Q31)?;
+        self.calculate_q31(Function::Sinh, x_over_two, None)
+    }
+
+    /// Returns `cosh(x) / 2` in Q1.15 for input `x / 2`.
+    ///
+    /// [`Self::sinh_cosh_q15`] computes sinh and cosh in one operation.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|x / 2| > 0.559`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn cosh_q15(&mut self, x_over_two: i16) -> Result<i16, Error> {
+        validate_magnitude(i32::from(x_over_two), SINH_COSH_MAX_INPUT_Q31 >> 16)?;
+        self.calculate_q15(Function::Cosh, x_over_two, None)
+    }
+
+    /// Returns `cosh(x) / 2` in Q1.31 for input `x / 2`.
+    ///
+    /// [`Self::sinh_cosh_q31`] computes sinh and cosh in one operation.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|x / 2| > 0.559`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn cosh_q31(&mut self, x_over_two: i32) -> Result<i32, Error> {
+        validate_magnitude(x_over_two, SINH_COSH_MAX_INPUT_Q31)?;
+        self.calculate_q31(Function::Cosh, x_over_two, None)
+    }
+
+    /// Returns `atanh(x) / 2` in Q1.15 for input `x / 2`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|x / 2| > 0.403`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn atanh_q15(&mut self, x_over_two: i16) -> Result<i16, Error> {
+        validate_magnitude(i32::from(x_over_two), HYPERBOLIC_VECTOR_MAX_INPUT_Q31 >> 16)?;
+        self.calculate_q15(Function::Atanh, x_over_two, None)
+    }
+
+    /// Returns `atanh(x) / 2` in Q1.31 for input `x / 2`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|x / 2| > 0.403`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn atanh_q31(&mut self, x_over_two: i32) -> Result<i32, Error> {
+        validate_magnitude(x_over_two, HYPERBOLIC_VECTOR_MAX_INPUT_Q31)?;
+        self.calculate_q31(Function::Atanh, x_over_two, None)
+    }
+
     /// Returns `sqrt(x)` in Q1.15.
     ///
     /// # Errors
@@ -593,6 +711,8 @@ impl<'d> Cordic<'d, Blocking> {
                 .bits(function as u8)
                 .pres()
                 .bits(iterations / 4 - 1)
+                .scale()
+                .bits(function.scale_exponent())
                 .arg_num()
                 .bit(two_inputs)
                 .res_num()
