@@ -268,6 +268,7 @@ peripheral_clocks = { templates = [
     { name = "AhbGdma", template_params = { peripheral = "ahb_pdma", clk_en = "{{sys_clk}}" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Dma2d", template_params = { peripheral = "dma2d", clk_en = "{{sys_clk}}" } },
+    { name = "Jpeg", template_params = { peripheral = "jpeg", clk_en = "{{sys_clk}}" } },
     { name = "Ppa", template_params = { peripheral = "ppa", clk_en = "{{sys_clk}}" } },
     # USB
     { name = "UsbHs", template_params = { peripheral = "usb_otghs", rst_template = "{{no_rst}}" } },

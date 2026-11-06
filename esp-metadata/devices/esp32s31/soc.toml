@@ -81,6 +81,7 @@ peripherals = [
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
+    { name = "JPEG", interrupts = { peri = "JPEG" } },
     { name = "LCD_CAM", interrupts = { peri = "LCD_CAM" }, clock_group = "LCD_CAM" },
     { name = "IOMUX_MSPI_PIN", hidden = true },
     { name = "LP_AON_CLK_RST", pac = "LP_AON_CLKRST" },
@@ -621,4 +622,4 @@ support_status = "not_supported"
 support_status = "partial"
 
 [device.jpeg]
-support_status = "not_supported"
+support_status = "partial"

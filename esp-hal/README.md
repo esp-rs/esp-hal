@@ -138,7 +138,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | Bit Scrambler                | ❌     |
 | Image Signal Processor       | ❌     |
 | Pixel Processing Accelerator | 🚧     |
-| JPEG Codec                   | ❌     |
+| JPEG Codec                   | 🚧     |
 | H.264 encoder                | ❌     |
 | Audio Sample Rate Converter  | ❌     |
 | CORDIC accelerator           | 🚧     |
