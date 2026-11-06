@@ -21,16 +21,14 @@ pub(crate) fn reset_wifi_mac() {
 }
 
 pub(crate) fn init_clocks() {
-    const SYSTEM_WIFI_CLK_I2C_CLK_EN: u32 = 1 << 5;
-    const SYSTEM_WIFI_CLK_UNUSED_BIT12: u32 = 1 << 12;
-    const SYSTEM_WIFI_CLK_SDIO_HOST_EN: u32 = 1 << 13;
-
-    const WIFI_BT_SDIO_CLK: u32 =
-        SYSTEM_WIFI_CLK_I2C_CLK_EN | SYSTEM_WIFI_CLK_UNUSED_BIT12 | SYSTEM_WIFI_CLK_SDIO_HOST_EN;
-
+    regs!(APB_CTRL).wifi_clk_en().modify(|_, w| {
+        w.i2c_clk_en().clear_bit();
+        w.unused_bit12().clear_bit();
+        w.sdio_host_clk_en().clear_bit()
+    });
     regs!(APB_CTRL)
         .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
+        .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_EN) });
 }
 
 pub(crate) fn deinit_clocks() {
