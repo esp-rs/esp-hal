@@ -690,7 +690,14 @@ pub(crate) mod rt {
         // the cycles it takes to enable nesting unnecessarily.
         if prio != Priority::max() as u8 {
             unsafe {
+                // `nested` doesn't save `tcontrol`, and a nested trap overwrites `mpte`. The CLIC
+                // cores don't set it again on `mret`, which would leave the triggers, e.g. the
+                // stack guard watchpoints, disabled after this handler returns.
+                let triggers_enabled = crate::debugger::triggers_enabled_on_mret();
                 riscv::interrupt::nested(handle_interrupts);
+                if triggers_enabled {
+                    crate::debugger::enable_triggers_on_mret();
+                }
             }
         } else {
             handle_interrupts();
