@@ -1,7 +1,7 @@
 //! Light- and deep-sleep support for the ESP32-S31.
 use core::{
     ops::Not,
-    sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    sync::atomic::{AtomicU32, Ordering},
 };
 
 use crate::{
@@ -685,13 +685,12 @@ impl RtcSleepConfig {
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
             // The sleep steps run with the caches suspended and cannot read the clock tree. The
             // clock tree does not change while the chip sleeps.
-            BBPLL_IN_CLOCK_TREE.store(clocks::bbpll_requested(clocks), Ordering::Relaxed);
             MPLL_MHZ_IN_CLOCK_TREE.store(
                 clocks::requested_mpll_mhz(clocks).unwrap_or(0),
                 Ordering::Relaxed,
             );
-            PSRAM_IN_SLEEP.store(!psram_range().is_empty(), Ordering::Relaxed);
 
+            let deep = self.deep;
             DropGuard::new((), move |_| {
                 ClockTree::with(|clocks| {
                     // Light sleep powers XTAL_CLK down, so the MPLL that clocks PSRAM loses its
@@ -704,6 +703,9 @@ impl RtcSleepConfig {
                     clocks::recalibrate_cpll(clocks);
                     if let Some(old) = old_cpu_root_clk {
                         clocks::configure_cpu_root_clk(clocks, old);
+                    }
+                    if !deep {
+                        update_modem_after_wake(clocks);
                     }
                 });
             })
@@ -788,12 +790,6 @@ impl RtcSleepConfig {
 /// MPLL.
 static MPLL_MHZ_IN_CLOCK_TREE: AtomicU32 = AtomicU32::new(0);
 
-/// Whether PSRAM is mapped during the sleep.
-static PSRAM_IN_SLEEP: AtomicBool = AtomicBool::new(false);
-
-/// Whether the clock tree had the BBPLL on during the sleep.
-static BBPLL_IN_CLOCK_TREE: AtomicBool = AtomicBool::new(false);
-
 /// Holds the PSRAM pins at their levels, or releases the pins.
 ///
 /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_mspi/esp32s31/include/hal/mspi_ll.h#L686-L720>.
@@ -832,7 +828,6 @@ fn set_psram_clock_for_sleep(asleep: bool) {
 /// Sets the modem's PLL clock gate.
 ///
 /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_clock/esp32s31/include/hal/clk_gate_ll.h#L367-L376>.
-#[inline(always)]
 fn set_modem_pll_clock_gate(enable: bool) {
     let modem_conf = HP_SYS_CLKRST::regs().modem_conf();
     let (first, second) = if enable { (0x15, 0x1d) } else { (0x2d, 0x25) };
@@ -843,7 +838,6 @@ fn set_modem_pll_clock_gate(enable: bool) {
 /// Powers the BBPLL down.
 ///
 /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_clock/esp32s31/include/hal/clk_tree_ll.h#L169-L175>.
-#[inline(always)]
 fn disable_bbpll() {
     let pmu = PMU::regs();
     pmu.imm_hp_ck_power_1()
@@ -870,7 +864,7 @@ fn disable_bbpll() {
 /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L355-L398>.
 #[crate::ram(unstable(cache_suspend_safe))]
 pub(crate) fn pmu_sleep_start() -> bool {
-    let psram = PSRAM_IN_SLEEP.load(Ordering::Relaxed);
+    let psram = !psram_range().is_empty();
     if psram {
         // Bits 26–31 are the six FIFO-empty bits.
         const ALL_TRANSACTION_DONE: u32 = 0xfc00_0000;
@@ -896,15 +890,12 @@ pub(crate) fn pmu_sleep_start() -> bool {
 /// This function must run before the caches resume, so that PSRAM is back on the MPLL before the
 /// cache accesses PSRAM.
 ///
-/// This function does not check that the modem PLL clock gate and the modem clock source agree. A
-/// panic cannot print while the caches are suspended.
-///
 /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L409-L465>.
 #[crate::ram(unstable(cache_suspend_safe))]
 pub(crate) fn pmu_sleep_finish() {
     wait_for_efuse_idle();
 
-    let psram = PSRAM_IN_SLEEP.load(Ordering::Relaxed);
+    let psram = !psram_range().is_empty();
     let mpll_mhz = MPLL_MHZ_IN_CLOCK_TREE.load(Ordering::Relaxed);
     if mpll_mhz != 0 {
         // The MPLL must have power before the rate is set.
@@ -918,6 +909,14 @@ pub(crate) fn pmu_sleep_finish() {
         hold_psram_pins(false);
     }
 
+    disable_apm_filters();
+}
+
+/// Starts the modem register update after a light-sleep wake, and powers the BBPLL down if no
+/// clock uses it.
+///
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L436-L455>.
+fn update_modem_after_wake(clocks: &ClockTree) {
     // After a wake that does not retain the modem clock, the modem updates the block-ack bitmap
     // and the start sequence registers only when the PLL clock reaches the modem. A pulse on the
     // modem PLL clock gate starts the update.
@@ -933,10 +932,8 @@ pub(crate) fn pmu_sleep_finish() {
         if !ref_160m_on {
             ref_160m.modify(|_, w| w.clk_en().clear_bit());
         }
-        if !BBPLL_IN_CLOCK_TREE.load(Ordering::Relaxed) {
+        if !clocks::bbpll_requested(clocks) {
             disable_bbpll();
         }
     }
-
-    disable_apm_filters();
 }
