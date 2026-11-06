@@ -864,6 +864,46 @@ impl SdmInstance {
     }
 }
 
+impl CordicInstance {
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, enabled: bool) {
+        HP_SYS_CLKRST::regs()
+            .cordic_ctrl0()
+            .modify(|_, w| w.clk_en().bit(enabled));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<CordicFunctionClockConfig>,
+        config: CordicFunctionClockConfig,
+    ) {
+        let clocks = HP_SYS_CLKRST::regs();
+        let ctrl = clocks.cordic_ctrl0();
+        let enabled = ctrl.read().clk_en().bit_is_set();
+        ctrl.modify(|_, w| w.clk_en().clear_bit());
+
+        clocks.cordic_ctrl1().write(|w| unsafe {
+            let numerator = config.numerator() as u8;
+            w.clk_div_num().bits((config.divider() - 1) as u8);
+            w.clk_div_numerator().bits(numerator);
+            // The hardware uses 0/0 to disable the fractional divider.
+            // See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_hal_cordic/esp32s31/include/hal/cordic_ll.h#L94-L109>.
+            let denominator = if numerator == 0 {
+                0
+            } else {
+                config.denominator()
+            };
+            w.clk_div_denonimator().bits(denominator as u8)
+        });
+        let source = match config.source() {
+            CordicFunctionClockSource::Xtal => 0,
+            CordicFunctionClockSource::RcFast => 1,
+            CordicFunctionClockSource::PllF160m => 2,
+        };
+        ctrl.modify(|_, w| unsafe { w.clk_src_sel().bits(source).clk_en().bit(enabled) });
+    }
+}
+
 impl ParlIoInstance {
     // PARL_IO_RX_CLOCK
 

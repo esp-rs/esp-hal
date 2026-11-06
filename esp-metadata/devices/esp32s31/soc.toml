@@ -59,6 +59,7 @@ peripherals = [
     { name = "CLINT_OTHER_CORE" },
     { name = "CNNT_SYS", hidden = true },
     { name = "CNNT_IO_MUX", hidden = true },
+    { name = "CORDIC", interrupts = { peri = "CORDIC" }, clock_group = "CORDIC" },
     { name = "DMA2D" },
     { name = "ETH", virtual = true, interrupts = { peri = "SBD" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
@@ -611,7 +612,7 @@ support_status = "partial"
 support_status = "not_supported"
 
 [device.cordic]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.jpeg]
 support_status = "not_supported"
