@@ -73,6 +73,7 @@ fn generate(workspace: &Path, check: bool) -> Result<()> {
 
     log::info!("Updating esp-metadata-generated and README tables...");
 
+    warn_partial_support_without_issue();
     update_readme_tables(workspace)?;
 
     let out_path = workspace.join("esp-metadata-generated").join("src");
@@ -114,6 +115,25 @@ fn generate(workspace: &Path, check: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Partially supported drivers should link to an issue that says what is missing, so
+/// that the support table shows it.
+fn warn_partial_support_without_issue() {
+    let unlinked = esp_metadata::partial_support_without_issue();
+    if unlinked.is_empty() {
+        return;
+    }
+
+    log::warn!(
+        "{} partially supported drivers do not link to a tracking issue. Set \
+         `support_status = {{ status = \"partial\", issue = <number> }}` in their \
+         `[device.<driver>]` table. Run with `RUST_LOG=debug` to list them.",
+        unlinked.len()
+    );
+    for (chip, driver) in unlinked {
+        log::debug!("{}: {driver}", chip.pretty_name());
+    }
 }
 
 fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {

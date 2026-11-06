@@ -1634,6 +1634,24 @@ fn visible_driver_groups() -> Vec<(&'static str, Vec<&'static SupportItem>)> {
     groups
 }
 
+/// Returns the `(chip, driver name)` pairs of the support table that are marked as
+/// partially supported, but do not link to an issue that says what is missing.
+pub fn partial_support_without_issue() -> Vec<(Chip, &'static str)> {
+    let mut unlinked = Vec::new();
+    for driver in PeriConfig::drivers()
+        .iter()
+        .filter(|driver| !driver.hide_from_peri_table)
+    {
+        for chip in Chip::iter() {
+            let status = driver.chip_status(chip);
+            if status.status == SupportStatusLevel::Partial && status.issue.is_none() {
+                unlinked.push((chip, driver.name));
+            }
+        }
+    }
+    unlinked
+}
+
 const PERIPHERAL_SUPPORT_INDEX_URL: &str =
     "https://docs.espressif.com/projects/rust/esp-hal/main/index.html";
 

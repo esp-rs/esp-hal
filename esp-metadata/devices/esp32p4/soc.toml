@@ -430,7 +430,7 @@ max_data_width = 16
 has_tx_cs = true
 
 [device.rng]
-support_status = { status = "partial", issue = 5982 }
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16  # TODO
 
