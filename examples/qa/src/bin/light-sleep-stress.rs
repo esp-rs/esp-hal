@@ -109,7 +109,7 @@ impl Rng {
 // The load that core 1 adds during the sleeps.
 //
 // Core 1 writes and checks a separate PSRAM region all the time. For every 16 sleeps, core 1 also
-// writes one flash sector. `light-sleep-multi-core` checks that core 1 can request a sleep.
+// writes one flash sector. `sleep-checks` checks that core 1 can request a sleep.
 //
 // Core 1 writes flash with the default `AutoPark` strategy. Each write stalls core 0. Core 0 enters
 // the stall loop, which runs from RAM with interrupts masked. Core 1 starts the erase only after
