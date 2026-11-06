@@ -17,6 +17,9 @@ pub(crate) mod regi2c;
 
 pub use esp32s3 as pac;
 
+// GPIO, ADC and RTC I2C share SENS.SAR_PERI_CLK_GATE_CONF.
+pub(crate) static SENS_PERI_CLK_GATE_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+
 pub(crate) const CONFIG_INSTRUCTION_CACHE_SIZE: usize = cfg_select! {
     instruction_cache_size_32kb => 0x8000,
     instruction_cache_size_16kb => 0x4000,

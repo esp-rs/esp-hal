@@ -288,9 +288,11 @@ fn enable_iomux_clk_gate() {
                 .modify(|_, w| w.iomux_clk_gate_en().set_bit());
         }
         esp32s3 => {
-            SENS::regs()
-                .sar_peri_clk_gate_conf()
-                .modify(|_, w| w.iomux_clk_en().set_bit());
+            crate::soc::SENS_PERI_CLK_GATE_LOCK.lock(|| {
+                SENS::regs()
+                    .sar_peri_clk_gate_conf()
+                    .modify(|_, w| w.iomux_clk_en().set_bit());
+            });
         }
     }
 }

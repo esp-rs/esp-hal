@@ -98,9 +98,11 @@ fn init_hardware<ADCX: RegisterAccess>() {
                 .modify(|_, w| w.rtc_saradc_clkgate_en().set_bit());
         }
         _ => {
-            sensors
-                .sar_peri_clk_gate_conf()
-                .modify(|_, w| w.saradc_clk_en().set_bit());
+            crate::soc::SENS_PERI_CLK_GATE_LOCK.lock(|| {
+                sensors
+                    .sar_peri_clk_gate_conf()
+                    .modify(|_, w| w.saradc_clk_en().set_bit());
+            });
         }
     }
 
