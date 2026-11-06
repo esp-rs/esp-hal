@@ -10,7 +10,10 @@
 //! then starts the regular runtime.
 //!
 //! Direct boot is supported on all chips except the ESP32 and the ESP32-S2. The magic sits at
-//! flash offset `0x0`, except on the ESP32-S3, where it is at `0x400`.
+//! flash offset `0x0`, except on the ESP32-S3, where it is at `0x400`. On the ESP32-C3 direct boot
+//! needs chip revision v0.3 or later. The ESP32-P4 needs chip revision v3.0 or later: the entry
+//! stub runs before `esp_hal::init` checks the revision, so an older chip hangs without an error
+//! message.
 //!
 //! ## Usage
 //!
@@ -44,6 +47,10 @@
 //! - Direct boot can be disabled permanently with the `DIS_DIRECT_BOOT` eFuse.
 //! - When switching from an ESP-IDF image, erase the flash once, so a stale bootloader or partition
 //!   table cannot get in the way.
+//! - The image must fit into the flash the linker scripts map: 4 MB on the ESP32-C2 and ESP32-S3
+//!   (the ESP32-S3 ROM maps no more for direct boot), 8 MB on the ESP32-C3, 16 MB on the ESP32-C5,
+//!   -C6, -C61, -H2 and -H4, and 64 MB on the ESP32-P4 and ESP32-S31.
+//! - On the ESP32-P4, `ESP_HAL_CONFIG_L2_CACHE_SIZE` must not be `0KB`.
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
@@ -67,6 +74,39 @@ static BOOTLOADER_NAME: [u8; 11] = *b"DIRECT-BOOT";
 #[unsafe(export_name = "__init_data")]
 extern "C" fn __init_data() -> bool {
     false
+}
+
+/// Copies the RTC memory images, unless the chip woke up from deep sleep: RTC memory keeps its
+/// contents then, and initialized RTC statics keep their values, as with the ESP-IDF bootloader.
+///
+/// Runs before `.bss` is zeroed, so this must not touch any statics.
+///
+/// See <https://github.com/espressif/esp-idf/blob/fff9895c82d744c7237be8847347bdd1b07c6643/components/bootloader_support/src/esp_image_format.c#L931-L970>.
+#[inline(always)]
+fn load_rtc_memory() {
+    const RESET_REASON_CORE_DEEP_SLEEP: u32 = 5;
+
+    unsafe extern "C" {
+        static _direct_boot_rtc_copy_table_start: [u32; 3];
+        static _direct_boot_rtc_copy_table_end: [u32; 3];
+    }
+
+    if esp_rom_sys::rom::rtc_get_reset_reason(0) == RESET_REASON_CORE_DEEP_SLEEP {
+        return;
+    }
+
+    let mut entry = &raw const _direct_boot_rtc_copy_table_start;
+    while entry < &raw const _direct_boot_rtc_copy_table_end {
+        unsafe {
+            let [mut src, mut dst, end] = entry.read();
+            while dst < end {
+                (dst as *mut u32).write_volatile((src as *const u32).read_volatile());
+                src += 4;
+                dst += 4;
+            }
+            entry = entry.add(1);
+        }
+    }
 }
 
 #[doc(hidden)]

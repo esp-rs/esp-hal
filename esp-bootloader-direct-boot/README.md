@@ -28,7 +28,8 @@ links with `-Tlinkall.x` and invokes `esp_bootloader_direct_boot::direct_boot!()
 | ESP32-S31 | `0x0`        |
 
 The ESP32 and the ESP32-S2 do not support direct boot. On the ESP32-C3 direct boot needs chip
-revision v0.3 or later.
+revision v0.3 or later. The ESP32-P4 needs chip revision v3.0 or later: the entry stub runs before
+`esp_hal::init` checks the revision, so an older chip hangs without an error message.
 
 ## Flashing
 

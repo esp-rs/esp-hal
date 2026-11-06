@@ -2,8 +2,8 @@
 //!
 //! The ROM jumps to `_esp_bootloader_entry` (flash offset of the magic + 8) with nothing loaded
 //! into RAM. The stub copies every entry of the linker-generated copy table from flash to RAM
-//! without using a stack, sets up the stack, runs [`early_init`] and continues with `_start` of
-//! riscv-rt.
+//! without using a stack, sets up the stack, runs [`early_init`] (which loads RTC memory) and
+//! continues with `_start` of riscv-rt.
 
 #[cfg(rom_pma)]
 mod pma;
@@ -78,6 +78,8 @@ _esp_bootloader_entry:
 /// Runs from flash with a stack, but before riscv-rt initialized anything else: `.bss` is not
 /// zeroed yet and `gp` is not set up, so this must not touch any statics.
 extern "C" fn early_init() {
+    crate::load_rtc_memory();
+
     #[cfg(esp32p4)]
     cache::sync_copied_sections();
 
@@ -98,11 +100,23 @@ mod cache {
         fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
         static _direct_boot_copy_table_start: [u32; 3];
         static _direct_boot_copy_table_end: [u32; 3];
+        static _direct_boot_rtc_copy_table_start: [u32; 3];
+        static _direct_boot_rtc_copy_table_end: [u32; 3];
     }
 
     pub(super) fn sync_copied_sections() {
-        let mut entry = &raw const _direct_boot_copy_table_start;
-        while entry < &raw const _direct_boot_copy_table_end {
+        sync_table(
+            &raw const _direct_boot_copy_table_start,
+            &raw const _direct_boot_copy_table_end,
+        );
+        sync_table(
+            &raw const _direct_boot_rtc_copy_table_start,
+            &raw const _direct_boot_rtc_copy_table_end,
+        );
+    }
+
+    fn sync_table(mut entry: *const [u32; 3], table_end: *const [u32; 3]) {
+        while entry < table_end {
             unsafe {
                 let [_, start, end] = entry.read();
                 if end > start {
