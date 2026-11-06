@@ -377,6 +377,8 @@ unstable_driver! {
     #[cfg(canfd_driver_supported)]
     pub mod canfd;
     pub mod delay;
+    #[cfg(dma2d_driver_supported)]
+    pub mod dma2d;
     #[cfg(ecc_driver_supported)]
     pub mod ecc;
     #[cfg(flash_driver_supported)]
