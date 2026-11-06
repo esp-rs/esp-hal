@@ -1,15 +1,14 @@
-//! Shared CPU retention buffer types and the one-shot install API.
+//! The CPU retention memory and its one-shot install API.
 
-use core::{
-    cell::UnsafeCell,
-    mem::MaybeUninit,
-    ptr::{self, NonNull},
+use core::ptr::NonNull;
+
+use crate::rtc_cntl::{
+    RetentionMemory,
+    RetentionMemoryError,
+    RetentionSlot,
+    RetentionStorage,
+    sleep::LowPower,
 };
-
-use portable_atomic::{AtomicPtr, Ordering};
-use static_cell::ConstStaticCell;
-
-use crate::rtc_cntl::sleep::LowPower;
 
 cfg_select! {
     cpu_retention = "software" => {
@@ -21,53 +20,17 @@ cfg_select! {
         /// `repr(align)` takes a literal, so the buffer takes the strictest alignment of every
         /// chip. The alignment then needs no check at run time.
         const _: () = ::core::assert!(property!("sleep.cpu_retention_mem_align") <= 16);
-
-        const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
-        const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
     }
 }
 
-static INSTALLED: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
+static INSTALLED: RetentionSlot<BUFFER_SIZE> = RetentionSlot::new();
 
-/// Memory that light sleep uses to retain the CPU domain.
+/// Storage for [`CpuRetentionMemory`].
 ///
 /// This storage must be placed to `#[ram(reclaimed, unstable(zeroed))]`, then
 /// a static mutable reference to [`CpuRetentionMemory`] can be taken out of it.
 #[instability::unstable]
-pub struct CpuRetentionStorage {
-    inner: ConstStaticCell<CpuRetentionMemory>,
-}
-
-impl CpuRetentionStorage {
-    /// Creates storage for the retention memory.
-    #[instability::unstable]
-    pub const fn new() -> Self {
-        Self {
-            inner: ConstStaticCell::new(CpuRetentionMemory {
-                storage: UnsafeCell::new(MaybeUninit::uninit()),
-            }),
-        }
-    }
-
-    /// Takes the reference to the retention memory.
-    ///
-    /// Can only be called once.
-    #[instability::unstable]
-    pub fn take(&'static self) -> &'static mut CpuRetentionMemory {
-        self.inner.take()
-    }
-}
-
-#[instability::unstable]
-impl Default for CpuRetentionStorage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// SAFETY: ConstStaticCell is a `MaybeUninit` buffer, and an AtomicBool strapped together,
-// both are safe to be zero-initialized.
-unsafe impl bytemuck::Zeroable for CpuRetentionStorage {}
+pub type CpuRetentionStorage = RetentionStorage<BUFFER_SIZE>;
 
 /// Memory that light sleep uses to retain the CPU domain.
 ///
@@ -77,47 +40,12 @@ unsafe impl bytemuck::Zeroable for CpuRetentionStorage {}
 /// Install the buffer with [`LowPower::install_cpu_retention_memory`]. The buffer must live in
 /// internal RAM that stays powered across light sleep. The [`#[ram(reclaimed)]`][crate::ram]
 /// attribute places a static inside the reachable range on chips that use the retention DMA.
-#[repr(align(16))]
 #[instability::unstable]
-pub struct CpuRetentionMemory {
-    storage: UnsafeCell<MaybeUninit<[u8; BUFFER_SIZE]>>,
-}
-
-impl CpuRetentionMemory {
-    pub(crate) fn as_mut_ptr(&self) -> *mut u8 {
-        self.storage.get().cast()
-    }
-}
+pub type CpuRetentionMemory = RetentionMemory<BUFFER_SIZE>;
 
 /// The reason why [`LowPower::install_cpu_retention_memory`] refused a buffer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-#[non_exhaustive]
-pub enum CpuRetentionMemoryError {
-    /// The buffer is not inside the range that retention needs.
-    #[cfg(not(cpu_retention = "software"))]
-    OutOfRange,
-    /// The driver holds a retention buffer already.
-    AlreadyInstalled,
-}
-
-#[instability::unstable]
-impl core::error::Error for CpuRetentionMemoryError {}
-
-#[instability::unstable]
-impl core::fmt::Display for CpuRetentionMemoryError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            #[cfg(not(cpu_retention = "software"))]
-            Self::OutOfRange => write!(
-                f,
-                "the buffer is outside the retention memory range (0x{MEM_START:X}..0x{MEM_END:X})"
-            ),
-            Self::AlreadyInstalled => write!(f, "a retention buffer is installed already"),
-        }
-    }
-}
+pub type CpuRetentionMemoryError = RetentionMemoryError;
 
 impl LowPower<'_> {
     #[procmacros::doc_replace]
@@ -152,25 +80,10 @@ impl LowPower<'_> {
         &mut self,
         memory: &'static mut CpuRetentionMemory,
     ) -> Result<(), CpuRetentionMemoryError> {
-        let memory = memory.as_mut_ptr();
-
-        #[cfg(not(cpu_retention = "software"))]
-        {
-            let start = memory as usize;
-            if start < MEM_START || start + BUFFER_SIZE > MEM_END {
-                return Err(CpuRetentionMemoryError::OutOfRange);
-            }
-        }
-
-        INSTALLED
-            .compare_exchange(ptr::null_mut(), memory, Ordering::AcqRel, Ordering::Acquire)
-            .map(|_| ())
-            .map_err(|_| CpuRetentionMemoryError::AlreadyInstalled)
+        INSTALLED.install(memory)
     }
 }
 
 pub(crate) fn installed_buffer_ptr() -> Option<NonNull<u8>> {
-    let memory = INSTALLED.load(Ordering::Acquire);
-
-    NonNull::new(memory.cast::<u8>())
+    INSTALLED.get()
 }

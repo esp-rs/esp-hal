@@ -2,7 +2,8 @@
 //!
 //! The blob wakes the chip for each beacon through the TSF hardware and the `Wifi` wakeup source,
 //! or with software timers on the ESP32. The entry hook refuses every sleep that the blob is not
-//! ready for.
+//! ready for. With the MAC and baseband power-down, the hooks also let the blob save and restore
+//! them.
 
 use esp_hal::rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig};
 use portable_atomic::{AtomicBool, AtomicU32, Ordering};
@@ -60,7 +61,15 @@ pub(crate) fn claim_wake_source() {
         crate::sys::include::esp_wifi_internal_update_light_sleep_default_params(mhz, mhz);
     }
 
-    WakeupSource::Wifi.enable_with_hooks(Some(sleep_entry), None);
+    WakeupSource::Wifi.enable_with_hooks(
+        Some(sleep_entry),
+        cfg_select! {
+            all(modem_retention = "backup_dma", feature = "unstable") => {
+                Some(super::mac_bb::power_up)
+            }
+            _ => None,
+        },
+    );
 }
 
 /// Releases the claim taken by [`claim_wake_source`].
@@ -83,5 +92,10 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
 
     if !station_idle || SLEEP_LOCK.load(Ordering::Relaxed) > 0 || tsf_active {
         config.reject_sleep();
+    } else {
+        // Only when the blob accepts the sleep, because it still uses the MAC and baseband
+        // otherwise. If a later hook refuses the sleep, the exit hook restores them.
+        #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+        super::mac_bb::power_down();
     }
 }

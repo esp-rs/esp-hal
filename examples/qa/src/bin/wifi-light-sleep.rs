@@ -7,6 +7,9 @@
 //! receive and transmit to work. It counts beacon timeouts and disconnects. A disconnect with
 //! reason 200 is a beacon timeout.
 //!
+//! On the ESP32-C3 and ESP32-S3, the example installs Wi-Fi retention memory, so light sleep also
+//! powers the Wi-Fi MAC and baseband down.
+//!
 //! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable esp-println/uart
@@ -50,12 +53,34 @@ const PASSWORD: &str = env!("PASSWORD");
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 
+cfg_select! {
+    modem_retention = "backup_dma" => {
+        // The retention memory takes part of the reclaimed RAM.
+        const RECLAIMED_HEAP_SIZE: usize =
+            DRAM2_UNINIT_SIZE - core::mem::size_of::<esp_radio::wifi::RetentionStorage>();
+
+        fn install_wifi_retention_memory() {
+            use esp_radio::wifi::{RetentionStorage, install_retention_memory};
+
+            #[ram(reclaimed, unstable(zeroed))]
+            static WIFI_RETENTION_MEMORY: RetentionStorage = RetentionStorage::new();
+
+            install_retention_memory(WIFI_RETENTION_MEMORY.take()).unwrap();
+        }
+    }
+    _ => {
+        const RECLAIMED_HEAP_SIZE: usize = DRAM2_UNINIT_SIZE;
+
+        fn install_wifi_retention_memory() {}
+    }
+}
+
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: RECLAIMED_HEAP_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
@@ -69,6 +94,8 @@ async fn main(spawner: Spawner) -> ! {
                 PASSWORD.try_into().unwrap(),
             )),
     );
+
+    install_wifi_retention_memory();
 
     let wifi_interface = Interface::station();
     let mut controller = WifiController::new(

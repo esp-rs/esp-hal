@@ -74,7 +74,13 @@ pub(crate) fn claim_wake_source() {
             root.map_or(0, |source| EnumSet::only(source).as_u32()),
             Ordering::Relaxed,
         );
-        WakeupSource::Bt.enable_with_hooks(Some(sleep_entry), None);
+        WakeupSource::Bt.enable_with_hooks(
+            Some(sleep_entry),
+            cfg_select! {
+                modem_retention = "backup_dma" => Some(sleep_exit),
+                _ => None,
+            },
+        );
     }
 }
 
@@ -111,6 +117,9 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
                 config.reject_sleep();
                 return;
             }
+            // After the refusals, because a refused sleep must leave the MAC and baseband powered.
+            #[cfg(modem_retention = "backup_dma")]
+            let remaining = super::porting::power_down_mac_bb(remaining);
             config.limit_sleep(remaining);
         }
         // The BLE timer wakes the chip through the `Bt` source. The controller refuses the sleep
@@ -128,6 +137,11 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     for source in EnumSet::<ClockSource>::from_u32_truncated(WAKE_CLOCK.load(Ordering::Relaxed)) {
         config.keep_clock_running(source);
     }
+}
+
+#[cfg(all(sleep_driver_supported, modem_retention = "backup_dma"))]
+fn sleep_exit() {
+    super::porting::power_up_mac_bb();
 }
 
 /// Returns whether the clock node's root source is an internal RC oscillator.

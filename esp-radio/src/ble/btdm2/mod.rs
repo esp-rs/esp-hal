@@ -11,7 +11,7 @@
 use core::{
     mem::{size_of, transmute},
     ptr::NonNull,
-    sync::atomic::{AtomicU8, AtomicU16, AtomicU32, Ordering},
+    sync::atomic::{AtomicU16, AtomicU32, Ordering},
 };
 
 use esp_phy::PhyInitGuard;
@@ -36,6 +36,7 @@ use crate::{
         },
         semaphore,
     },
+    counting_lock::CountingLock,
     drop_guard::DropGuard,
     hal::ram,
     sys::{
@@ -918,8 +919,7 @@ const BTDM_OSAL_INVALID_PARM: i32 = 3;
 const BTDM_OSAL_TIMEOUT: i32 = 6;
 
 static EVENTQ_DEPTH: AtomicU16 = AtomicU16::new(16);
-static CRITICAL_NEST: AtomicU8 = AtomicU8::new(0);
-static CRITICAL_TOKEN: AtomicU32 = AtomicU32::new(0);
+static CRITICAL: CountingLock = CountingLock::new(&crate::ble::ESP_RADIO_LOCK);
 
 #[repr(C)]
 #[derive(Default, Clone, Copy)]
@@ -1473,30 +1473,20 @@ extern "C" fn wr_btdm_osal_get_time_forever() -> u32 {
 extern "C" fn wr_btdm_osal_hw_enter_critical() -> u32 {
     // We count calls because in at least one place, the blob doesn't pass the returned number back
     // to `exit_critical`.
-    let last = CRITICAL_NEST.fetch_add(1, Ordering::Release);
-    if last == 0 {
-        let token = unsafe { crate::ble::ESP_RADIO_LOCK.acquire().inner() };
-        CRITICAL_TOKEN.store(token, Ordering::Relaxed);
-    }
+    unsafe { CRITICAL.acquire() };
     0
 }
 
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_hw_exit_critical(_ctx: u32) {
-    if CRITICAL_NEST.fetch_sub(1, Ordering::Release) == 1 {
-        let last = CRITICAL_TOKEN.load(Ordering::Relaxed);
-
-        unsafe {
-            crate::ble::ESP_RADIO_LOCK.release(esp_sync::RestoreState::new(last));
-        }
-    }
+    unsafe { CRITICAL.release() };
 }
 
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_hw_is_in_critical() -> u8 {
-    CRITICAL_NEST.load(Ordering::Acquire)
+    CRITICAL.nesting() as u8
 }
 
 #[unsafe(no_mangle)]
