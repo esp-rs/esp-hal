@@ -26,6 +26,16 @@ const READY: &str = "usb-serial-jtag-io ready";
 /// How long the port may stay silent before the run fails.
 const SILENCE: Duration = Duration::from_secs(10);
 
+/// The port timeout while the host program reads.
+const READ_TIMEOUT: Duration = Duration::from_millis(200);
+
+/// The port timeout while the host program sends a block to the board.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// The longest time a `TIMED` transfer may take. The board sends nothing for 500 ms after it, so
+/// a packet that waits for later data takes longer.
+const TIMED_LIMIT: Duration = Duration::from_millis(250);
+
 /// A xorshift32 byte stream, so a lost, repeated or reordered byte breaks every byte after it.
 struct Pattern(u32);
 
@@ -103,7 +113,7 @@ fn count_in(line: &str, prefix: &str) -> Option<usize> {
 
 fn run(port_name: &str) -> io::Result<bool> {
     let port = serialport::new(port_name, 115_200)
-        .timeout(Duration::from_millis(200))
+        .timeout(READ_TIMEOUT)
         .open()?;
     let mut device = Device {
         port,
@@ -128,11 +138,29 @@ fn run(port_name: &str) -> io::Result<bool> {
             let wrong = device.compare(count, &mut Pattern(DEVICE_TO_HOST_SEED))?;
             println!("host: {count} bytes from the board, {wrong} wrong");
             ok &= wrong == 0;
+        } else if let Some(count) = count_in(&line, "TIMED ") {
+            let start = Instant::now();
+            let wrong = device.compare(count, &mut Pattern(DEVICE_TO_HOST_SEED))?;
+            let elapsed = start.elapsed();
+            let on_time = elapsed <= TIMED_LIMIT;
+            println!(
+                "{} host: {count} bytes from the board after {} ms, {wrong} wrong",
+                if on_time && wrong == 0 {
+                    "PASS"
+                } else {
+                    "FAIL"
+                },
+                elapsed.as_millis()
+            );
+            ok &= on_time && wrong == 0;
         } else if let Some(count) = count_in(&line, "RX ") {
             let mut pattern = Pattern(HOST_TO_DEVICE_SEED);
             let bytes: Vec<u8> = (0..count).map(|_| pattern.next_byte()).collect();
+            // On Windows, the timeout limits the whole write, and 1 MiB takes seconds.
+            device.port.set_timeout(WRITE_TIMEOUT)?;
             device.port.write_all(&bytes)?;
             device.port.flush()?;
+            device.port.set_timeout(READ_TIMEOUT)?;
             println!("host: {count} bytes sent to the board");
         } else if line.starts_with("usb-serial-jtag-io:") {
             return Ok(ok);

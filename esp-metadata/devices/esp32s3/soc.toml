@@ -484,6 +484,7 @@ slot_config = [
 fifo_depth_words = 256
 
 [device.usb_serial_jtag]
+phy_pads = ["USB_FS"]
 
 ## Miscellaneous
 [device.io_mux]

@@ -418,6 +418,7 @@ instances = {
     },
 }
 [device.usb_serial_jtag]
+phy_pads = ["USJ"]
 
 [device.parl_io]
 support_status = "partial"
