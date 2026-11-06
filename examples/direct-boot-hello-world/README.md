@@ -3,7 +3,8 @@
 A hello world that the ROM starts directly, without the ESP-IDF 2nd-stage bootloader, a partition
 table or an app image header. It uses `esp-bootloader-direct-boot` instead of
 `esp-bootloader-esp-idf`, and checks what direct boot is responsible for: `.data` copied from
-flash, `.bss` zeroed, `#[ram]` code running, and interrupts handled.
+flash, `.bss` zeroed, `#[ram]` code running, and interrupts handled. It then enters deep sleep for
+5 seconds, to check that initialized RTC fast memory statics keep their values over deep sleep.
 
 Direct boot works on every chip except the ESP32 and the ESP32-S2.
 
@@ -71,16 +72,35 @@ espflash write-bin 0x400 direct-boot-hello-world.bin
 espflash monitor --elf target/riscv32imac-unknown-none-elf/release/direct-boot-hello-world
 ```
 
-Expected output:
+Use a UART port: the USB Serial/JTAG connection drops during deep sleep. Expected output after a
+power-on (other resets print their own reset reason):
 
 ```text
 Hello from direct boot!
+reset reason: Some(ChipPowerOn)
 [ OK ] .data copied from flash
 [ OK ] .bss zeroed
+[ OK ] RTC .data copied from flash
 [ OK ] .rwtext copied from flash
 [ OK ] software interrupt handled
 Bing!
+Bing!
+Bing!
+Entering deep sleep for 5 seconds
 ```
 
-`Bing!` repeats every 5 seconds. A reset after a few seconds means a watchdog the ROM armed is still
-running.
+`Bing!` repeats every 5 seconds. A reset during that time means a watchdog the ROM armed is still
+running. After the deep-sleep wakeup, the RTC check changes:
+
+```text
+Hello from direct boot!
+reset reason: Some(CoreDeepSleep)
+[ OK ] .data copied from flash
+[ OK ] .bss zeroed
+[ OK ] RTC .data kept over deep sleep
+deep-sleep wakeups since the last reset: 1
+...
+```
+
+The number of wakeups counts up with every cycle, and starts over after a reset. The ESP32-C2,
+ESP32-C61 and ESP32-H4 skip the RTC check.

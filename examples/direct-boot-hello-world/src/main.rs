@@ -2,6 +2,10 @@
 //!
 //! Besides printing, this checks what direct boot is responsible for: nothing but the entry stub
 //! of `esp-bootloader-direct-boot` loads RAM.
+//!
+//! After a few seconds the chip enters deep sleep and wakes up again, so every other boot is a
+//! deep-sleep wakeup. Initialized RTC fast memory statics are loaded from flash after any other
+//! reset, and keep their values over deep sleep.
 
 //% CHIP_FILTER: !esp32 && !esp32s2
 
@@ -20,6 +24,12 @@ use esp_hal::{
     main,
     peripherals::FROM_CPU_INTR2,
     ram,
+    rtc_cntl::{
+        SocResetReason,
+        reset_reason,
+        sleep::{LowPower, RtcSleepConfig},
+    },
+    system::Cpu,
     time::{Duration, Instant},
 };
 use esp_println::println;
@@ -31,6 +41,12 @@ const DATA_PATTERN: u32 = 0xC0FF_EE42;
 // Both are also written below, so the compiler can't turn them into constants.
 static mut DATA_CHECK: u32 = DATA_PATTERN;
 static mut BSS_CHECK: u32 = 0;
+
+// The pattern, and a counter of the boots since the last reset that was not a deep-sleep wakeup.
+// The linker scripts of these chips have no RTC fast memory.
+#[cfg(not(any(feature = "esp32c2", feature = "esp32c61", feature = "esp32h4")))]
+#[ram(unstable(rtc_fast))]
+static mut RTC_DATA_CHECK: [u32; 2] = [DATA_PATTERN, 0];
 
 static SWINT_FIRED: AtomicBool = AtomicBool::new(false);
 
@@ -57,6 +73,10 @@ fn main() -> ! {
 
     println!("Hello from direct boot!");
 
+    let reason = reset_reason(Cpu::ProCpu);
+    println!("reset reason: {:?}", reason);
+    let deep_sleep_wakeup = reason == Some(SocResetReason::CoreDeepSleep);
+
     // SAFETY: single-threaded, no references are created.
     let (data, bss) = unsafe {
         let data = addr_of!(DATA_CHECK).read_volatile();
@@ -67,6 +87,28 @@ fn main() -> ! {
     };
     report(".data copied from flash", data == DATA_PATTERN);
     report(".bss zeroed", bss == 0);
+
+    #[cfg(not(any(feature = "esp32c2", feature = "esp32c61", feature = "esp32h4")))]
+    {
+        // SAFETY: single-threaded, no references are created.
+        let [pattern, boots] = unsafe {
+            let rtc_data = addr_of!(RTC_DATA_CHECK).read_volatile();
+            addr_of_mut!(RTC_DATA_CHECK).write_volatile([rtc_data[0], rtc_data[1].wrapping_add(1)]);
+            rtc_data
+        };
+        if deep_sleep_wakeup {
+            report(
+                "RTC .data kept over deep sleep",
+                pattern == DATA_PATTERN && boots > 0,
+            );
+            println!("deep-sleep wakeups since the last reset: {}", boots);
+        } else {
+            report(
+                "RTC .data copied from flash",
+                pattern == DATA_PATTERN && boots == 0,
+            );
+        }
+    }
 
     let ram_fn: fn(u32) -> u32 = ram_function;
     report(".rwtext copied from flash", ram_fn(41) == 124);
@@ -81,10 +123,19 @@ fn main() -> ! {
         SWINT_FIRED.load(Ordering::Acquire),
     );
 
-    loop {
+    // Long enough for a watchdog the ROM armed to reset the chip.
+    for _ in 0..3 {
         println!("Bing!");
 
         let now = Instant::now();
         while now.elapsed() < Duration::from_millis(5000) {}
     }
+
+    println!("Entering deep sleep for 5 seconds");
+    let mut lpwr = LowPower::new(peripherals.LPWR);
+    lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(5));
+    // Let the UART finish the message.
+    let now = Instant::now();
+    while now.elapsed() < Duration::from_millis(100) {}
+    lpwr.sleep_deep(RtcSleepConfig::deep());
 }

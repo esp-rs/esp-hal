@@ -79,7 +79,7 @@ _esp_bootloader_entry:
 /// The ROM jumps to the entry point with cache operations still in flight. esp-hal reconfigures
 /// the caches in `__pre_init`, before `__esp_bootloader_init` runs, through the ROM's
 /// `Cache_Suspend_DCache`. That returns before the cache is idle, and the data cache then hangs on
-/// the next miss.
+/// the next miss. Once the caches are idle, this loads RTC memory.
 ///
 /// Runs from RAM while the caches may still be busy, and before `.bss` is zeroed, so this must
 /// not touch any statics.
@@ -94,4 +94,6 @@ extern "C" fn early_init() {
             break;
         }
     }
+
+    crate::load_rtc_memory();
 }

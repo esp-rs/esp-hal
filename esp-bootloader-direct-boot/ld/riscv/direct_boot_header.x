@@ -33,9 +33,14 @@ SECTIONS {
     LONG(_direct_boot_uncached_data_src) LONG(_direct_boot_uncached_data_dst) LONG(_direct_boot_uncached_data_end)
     LONG(_direct_boot_rwtext_src) LONG(_direct_boot_rwtext_dst) LONG(_direct_boot_rwtext_end)
     LONG(_direct_boot_data_src) LONG(_direct_boot_data_dst) LONG(_direct_boot_data_end)
+    _direct_boot_copy_table_end = ABSOLUTE(.) - IROM_BASE + DROM_BASE;
+
+    /* RTC memory keeps its contents over deep sleep, so `early_init` copies these only when the
+       chip did not wake up from it. */
+    _direct_boot_rtc_copy_table_start = ABSOLUTE(.) - IROM_BASE + DROM_BASE;
     LONG(_direct_boot_rtc_fast_text_src) LONG(_direct_boot_rtc_fast_text_dst) LONG(_direct_boot_rtc_fast_text_end)
     LONG(_direct_boot_rtc_fast_data_src) LONG(_direct_boot_rtc_fast_data_dst) LONG(_direct_boot_rtc_fast_data_end)
-    _direct_boot_copy_table_end = ABSOLUTE(.) - IROM_BASE + DROM_BASE;
+    _direct_boot_rtc_copy_table_end = ABSOLUTE(.) - IROM_BASE + DROM_BASE;
   } > ROTEXT
 }
 
