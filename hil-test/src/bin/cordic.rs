@@ -330,4 +330,20 @@ mod tests {
         check_q15(cosh, 16_384);
         check_atan_q31(&mut cordic);
     }
+
+    #[test]
+    fn natural_logarithm() {
+        const LN_FUNC: u8 = 8;
+
+        let p = esp_hal::init(esp_hal::Config::default());
+        let mut cordic = Cordic::new(p.CORDIC, Config::default()).unwrap();
+
+        // The logarithm's input ratio gives ln(x) / 4 = atanh(2 * ratio) / 2.
+        check_hyperbolic_vectoring(
+            &mut cordic,
+            LN_FUNC,
+            Cordic::ln_from_ratio_q15,
+            Cordic::ln_from_ratio_q31,
+        );
+    }
 }

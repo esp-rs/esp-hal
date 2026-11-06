@@ -1,8 +1,9 @@
 //! # Coordinate Rotation Digital Computer (CORDIC)
 //!
 //! ## Overview
-//! The CORDIC peripheral computes trigonometric and hyperbolic functions and
-//! square roots. It also converts Cartesian vectors to polar coordinates.
+//! The CORDIC peripheral computes trigonometric and hyperbolic functions,
+//! square roots, and natural logarithms. It also converts Cartesian vectors
+//! to polar coordinates.
 //!
 //! The driver uses signed Q1.15 and Q1.31 values in `[-1, 1)`.
 //! Angle formulas use radians.
@@ -199,18 +200,19 @@ enum Function {
     Cosh    = 5,
     Sinh    = 6,
     Atanh   = 7,
+    Ln      = 8,
     Sqrt    = 9,
 }
 
 // These hardware input limits apply with SCALE = 1.
-// See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/docs/en/api-reference/peripherals/cordic.rst#L79-L93>.
+// See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/docs/en/api-reference/peripherals/cordic.rst#L79-L98>.
 const SINH_COSH_MAX_INPUT_Q31: u32 = (559 * (1_u64 << 31) / 1000) as u32;
 const HYPERBOLIC_VECTOR_MAX_INPUT_Q31: u32 = (403 * (1_u64 << 31) / 1000) as u32;
 
 impl Function {
     const fn scale_exponent(self) -> u8 {
         match self {
-            Self::Cosh | Self::Sinh | Self::Atanh => 1,
+            Self::Cosh | Self::Sinh | Self::Atanh | Self::Ln => 1,
             _ => 0,
         }
     }
@@ -582,6 +584,30 @@ impl<'d> Cordic<'d, Blocking> {
     pub fn atanh_q31(&mut self, x_over_two: i32) -> Result<i32, Error> {
         validate_magnitude(x_over_two, HYPERBOLIC_VECTOR_MAX_INPUT_Q31)?;
         self.calculate_q31(Function::Atanh, x_over_two, None)
+    }
+
+    /// Returns `ln(x) / 4` from the ratio `(x - 1) / (2 * (x + 1))`
+    /// for positive `x`, with the input and result in Q1.15.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|ratio| > 0.403`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn ln_from_ratio_q15(&mut self, ratio: i16) -> Result<i16, Error> {
+        validate_magnitude(i32::from(ratio), HYPERBOLIC_VECTOR_MAX_INPUT_Q31 >> 16)?;
+        self.calculate_q15(Function::Ln, ratio, None)
+    }
+
+    /// Returns `ln(x) / 4` from the ratio `(x - 1) / (2 * (x + 1))`
+    /// for positive `x`, with the input and result in Q1.31.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `|ratio| > 0.403`.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn ln_from_ratio_q31(&mut self, ratio: i32) -> Result<i32, Error> {
+        validate_magnitude(ratio, HYPERBOLIC_VECTOR_MAX_INPUT_Q31)?;
+        self.calculate_q31(Function::Ln, ratio, None)
     }
 
     /// Returns `sqrt(x)` in Q1.15.
