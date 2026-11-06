@@ -379,6 +379,14 @@ impl BandMode {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Config {
+    /// Neither station nor access point (NULL mode).
+    #[cfg_attr(
+        feature = "sniffer",
+        doc = "\n\nCall [`Sniffer::set_promiscuous_mode`] with `true` before [`WifiController::set_channel`]."
+    )]
+    #[cfg(feature = "unstable")]
+    None,
+
     /// Station configuration.
     Station(StationConfig),
 
@@ -398,6 +406,8 @@ pub enum Config {
 impl Config {
     fn validate(&self) -> Result<(), WifiError> {
         match self {
+            #[cfg(feature = "unstable")]
+            Config::None => Ok(()),
             Config::Station(station_configuration) => station_configuration.validate(),
             #[cfg(wifi_softap_support)]
             Config::AccessPoint(access_point_configuration) => {
@@ -498,11 +508,13 @@ impl AuthenticationMethod {
     }
 }
 
-/// Wi-Fi Mode (Station and/or AccessPoint).
+/// Wi-Fi operation mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 enum WifiMode {
+    /// Neither station nor access point.
+    None,
     /// Station mode.
     Station,
     /// Access Point mode.
@@ -523,14 +535,14 @@ impl WifiMode {
     fn is_station(&self) -> bool {
         match self {
             Self::Station | Self::AccessPointStation => true,
-            Self::AccessPoint => false,
+            Self::None | Self::AccessPoint => false,
         }
     }
 
     /// Returns true if this mode works as an access point.
     fn is_access_point(&self) -> bool {
         match self {
-            Self::Station => false,
+            Self::None | Self::Station => false,
             Self::AccessPoint | Self::AccessPointStation => true,
         }
     }
@@ -539,6 +551,7 @@ impl WifiMode {
     fn from_raw(value: wifi_mode_t) -> Self {
         #[allow(non_upper_case_globals)]
         match value {
+            include::wifi_mode_t_WIFI_MODE_NULL => Self::None,
             include::wifi_mode_t_WIFI_MODE_STA => Self::Station,
             include::wifi_mode_t_WIFI_MODE_AP => Self::AccessPoint,
             include::wifi_mode_t_WIFI_MODE_APSTA => Self::AccessPointStation,
@@ -550,6 +563,8 @@ impl WifiMode {
 impl From<&Config> for WifiMode {
     fn from(config: &Config) -> Self {
         match config {
+            #[cfg(feature = "unstable")]
+            Config::None => Self::None,
             #[cfg(wifi_softap_support)]
             Config::AccessPoint(_) => Self::AccessPoint,
             Config::Station(_) => Self::Station,
@@ -2706,6 +2721,7 @@ impl Drop for WifiRefGuard {
 pub struct WifiController<'d> {
     _guard: WifiRefGuard,
     _phantom: PhantomData<&'d ()>,
+    max_tx_power: i8,
 }
 
 impl<'d> WifiController<'d> {
@@ -2838,6 +2854,7 @@ impl<'d> WifiController<'d> {
                 _radio_guard: radio_guard,
             },
             _phantom: Default::default(),
+            max_tx_power: 20,
         };
 
         controller.set_country_info(&config.country_info)?;
@@ -2845,9 +2862,6 @@ impl<'d> WifiController<'d> {
         controller.set_power_saving(PowerSaveMode::default())?;
 
         controller.set_config(&config.initial_config)?;
-
-        // Set a default TX power
-        esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(20) })?;
 
         Ok(controller)
     }
@@ -3131,6 +3145,8 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_get_mode(&mut previous_mode) })?;
 
         let mode = match conf {
+            #[cfg(feature = "unstable")]
+            Config::None => wifi_mode_t_WIFI_MODE_NULL,
             Config::Station(_) => wifi_mode_t_WIFI_MODE_STA,
             #[cfg(wifi_softap_support)]
             Config::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
@@ -3147,6 +3163,8 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
         match conf {
+            #[cfg(feature = "unstable")]
+            Config::None => {}
             Config::Station(config) => {
                 self.apply_sta_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)?;
@@ -3174,12 +3192,15 @@ impl WifiController<'_> {
             sleep::set_station_only(mode == wifi_mode_t_WIFI_MODE_STA);
         }
 
-        if previous_mode != mode {
+        if previous_mode != mode && mode != wifi_mode_t_WIFI_MODE_NULL {
             set_access_point_state(WifiAccessPointState::Starting);
             set_station_state(WifiStationState::Starting);
 
             // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
             esp_wifi_result!(unsafe { esp_wifi_start() })?;
+
+            // Requires a started interface.
+            esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(self.max_tx_power) })?;
 
             // Default for all scans, including connect scans. Requires a started station.
             // `wifi_start_scan` only overrides the active or passive time for a single scan and
@@ -3292,6 +3313,8 @@ band.
     }
 
     /// Sets the primary and secondary Wi-Fi channel.
+    ///
+    /// A station or access point must be started, or promiscuous mode must be enabled.
     #[cfg_attr(
         wifi_has_5g,
         doc = r"
@@ -3311,15 +3334,25 @@ ignored."
         Ok(())
     }
 
-    /// Set maximum transmitting power after WiFi start.
+    /// Set maximum transmitting power.
     ///
     /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm. The default is
     /// 20 (5dBm). Values above roughly 65 (~16dBm) have been reported to cause authentication
     /// failures on some hardware. See the
     /// [module-level troubleshooting section](self#troubleshooting) for details.
+    ///
+    /// In NULL mode, the limit takes effect when an interface starts.
+    /// The configured limit persists across interface configuration changes.
     #[instability::unstable]
     pub fn set_max_tx_power(&mut self, power: i8) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
+        if !(8..=84).contains(&power) {
+            return Err(WifiError::InvalidArguments);
+        }
+        if self.mode()? != WifiMode::None {
+            esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })?;
+        }
+        self.max_tx_power = power;
+        Ok(())
     }
 
     fn stop_impl() -> Result<(), WifiError> {
