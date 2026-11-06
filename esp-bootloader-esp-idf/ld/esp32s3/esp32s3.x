@@ -34,7 +34,7 @@ INSERT BEFORE .text;
 SECTIONS {
   .rwdata_dummy (NOLOAD) : ALIGN(4)
   {
-    . = . + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.vectors);
+    . = . + SIZEOF(.vectors) + _rwtext_len;
   } > RWDATA
 }
 INSERT BEFORE .data;

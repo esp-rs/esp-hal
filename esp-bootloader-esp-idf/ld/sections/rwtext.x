@@ -1,10 +1,10 @@
 INCLUDE "trap.x"
 
+INCLUDE "esp_hal_rwtext_sections.x"
+
 .rwtext : ALIGN(4)
 {
   . = ALIGN (4);
-
-  _rwtext_start = .;
 
   /* Keep each object's literal pool adjacent to its code (see comment in `text.x`). */
   *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
@@ -36,5 +36,5 @@ INCLUDE "trap.x"
   . = ALIGN(4);
 
   _rwtext_end = .;
-  _rwtext_len = . - ORIGIN(RWTEXT);
+  _rwtext_len = ABSOLUTE(. - ORIGIN(RWTEXT));
 } > RWTEXT
