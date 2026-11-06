@@ -304,6 +304,7 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",
@@ -378,7 +379,7 @@ version = "lp_i2c"
 fifo_size = 16
 
 [device.rng]
-support_status = { status = "partial", issue = 5980 }
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = true

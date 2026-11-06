@@ -288,6 +288,10 @@ Implementing further peripheral support boils down to a relatively simple loop o
 - Check the driver in `esp-hal` for the presence of `cfg`-gates that restrict your chip, or implement the missing parts of the functionality for it.
 - Enable and run the relevant tests and examples.
 - If it didn't work and errors were returned, fix them. 
+- Set the support status of the driver. If the driver is only partially supported, link it to the
+  driver's tracking issue: `support_status = { status = "partial", issue = <number> }`. A tracking
+  issue covers one driver on all chips and lists what is missing on each chip. Add the new chip to
+  the existing tracking issue. If the driver has no tracking issue yet, open one.
 
 ## Troubleshooting
 

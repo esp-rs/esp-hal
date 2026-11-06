@@ -225,7 +225,7 @@ has_sp_monitor = false
 has_region_monitor = true
 
 [device.rng]
-support_status = { status = "partial", issue = 5977 }
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = false
@@ -282,7 +282,7 @@ instances = [
 ]
 
 [device.spi_slave]
-support_status = "partial"
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",

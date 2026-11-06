@@ -100,7 +100,7 @@ The metadata provides different kinds of symbols:
 - `xtensa` and `riscv` depending on the chip's architecture.
 - `[device.symbols]`: Legacy symbols which are defined verbatim. These are being slowly phased out.
 - `[device.peripherals]`: For each peripheral, it defines a `soc_has_<peripheral>` symbol. This can be used to conditionally compile code based on the presence of a peripheral.
-- `[device.<driver_name>]`: If a driver is defined and it is not set as `support_status = "not_supported"`, it defines a `<driver_name>_driver_supported` symbol.
+- `[device.<driver_name>]`: If a driver is defined and it is not set as `support_status = "not_supported"`, it defines a `<driver_name>_driver_supported` symbol. A `"partial"` driver should link to the driver's tracking issue, which lists what is missing on each chip, with `support_status = { status = "partial", issue = <number> }`. The chip support table on the `esp-hal` documentation index page links the cell to the issue, and `cargo update-metadata` warns about partial drivers without an issue.
 - Each driver generates symbols based on some common rules:
   - Each `bool` in `properties` defines a `<driver_name>_<property>` symbol.
   - Each `Option` defines a `<driver_name>_<property>_is_set` symbol, if it has a value.
