@@ -19,7 +19,7 @@ use embassy_executor::Spawner;
 use embassy_futures::join::join;
 use embassy_usb::{
     Builder,
-    class::cdc_acm::{CdcAcmClass, State},
+    class::cdc_acm::device::{CdcAcmClass, State},
     driver::EndpointError,
 };
 use esp_backtrace as _;

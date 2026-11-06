@@ -405,6 +405,7 @@ instances = {
 [device.twai]
 [device.usb_otg]
 fifo_depth_words = 256
+tx_fifo_count = 5
 
 ## Miscellaneous
 [device.io_mux]
