@@ -315,6 +315,8 @@ pub(crate) fn init() {
         panic!("The scheduler must be initialized before initializing the radio.");
     }
 
+    common_adapter::install_phy_mutex();
+
     // A minimum clock of 80MHz is required to operate Wi-Fi module.
     const MIN_CLOCK: u32 = 80;
     let cpu_clock = esp_hal::clock::cpu_clock().as_mhz();

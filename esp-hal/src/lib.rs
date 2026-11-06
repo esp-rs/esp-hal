@@ -636,6 +636,14 @@ pub mod __macro_implementation {
     pub use xtensa_lx_rt::entry as __entry;
 }
 
+#[doc(hidden)]
+pub mod __regi2c {
+    //! Lock of the analog I2C master, public for esp-phy: the PHY library accesses the same bus,
+    //! and esp-phy implements the library's `phy_i2c_enter_critical` hooks with this lock.
+
+    pub use crate::rom::regi2c::LOCK;
+}
+
 use crate::clock::{ClockConfig, CpuClock};
 #[cfg(feature = "rt")]
 use crate::peripherals::Peripherals;
