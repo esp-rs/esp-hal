@@ -18,3 +18,5 @@ PROVIDE(level7_interrupt = DefaultHandler);
 
 /* external interrupts (from PAC) */
 INCLUDE "device.x"
+
+INCLUDE "esp_hal_checks.x"

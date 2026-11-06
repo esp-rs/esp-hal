@@ -19,10 +19,18 @@ pub(crate) fn enable() {
     }
 }
 
-#[cfg(any(feature = "unstable", all(multi_core, feature = "rt")))]
+#[cfg(any(
+    feature = "unstable",
+    all(multi_core, feature = "rt"),
+    cpu_retention = "software"
+))]
 pub(crate) use guard::DisabledBranchPredictor;
 
-#[cfg(any(feature = "unstable", all(multi_core, feature = "rt")))]
+#[cfg(any(
+    feature = "unstable",
+    all(multi_core, feature = "rt"),
+    cpu_retention = "software"
+))]
 mod guard {
     use super::MHCR_BRANCH_PREDICTOR;
 

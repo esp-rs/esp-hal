@@ -178,7 +178,11 @@ impl<'d> LowPower<'d> {
     ///
     /// A wakeup source cannot refuse this sleep. The wake resets the chip, so the call cannot
     /// return a refusal. [`Self::sleep_light`] reports a refusal.
-    ///
+    #[cfg_attr(
+        cpu_retention = "software",
+        doc = "\n\nDeep sleep shares the entry code of light sleep. See [Optimization \
+               level](crate#optimization-level) for the build requirement.\n"
+    )]
     /// # Panics
     ///
     /// Panics if no wakeup source is enabled, because then nothing can end the sleep. Panics also
@@ -216,7 +220,11 @@ impl<'d> LowPower<'d> {
     /// reach the deep-sleep current, and it cannot know their earlier configuration. Configure
     /// those pads again if this function returns. ESP-IDF has the same limit in
     /// `esp_deep_sleep_try_to_start`.
-    ///
+    #[cfg_attr(
+        cpu_retention = "software",
+        doc = "\n\nDeep sleep shares the entry code of light sleep. See [Optimization \
+               level](crate#optimization-level) for the build requirement.\n"
+    )]
     /// # Panics
     ///
     /// Panics if no wakeup source is enabled.
@@ -245,6 +253,11 @@ impl<'d> LowPower<'d> {
     /// hardware rejects the request because a wakeup source is already asserted. It reports
     /// neither case. For the caller, a rejected sleep and a very short sleep have the same
     /// result.
+    #[cfg_attr(
+        cpu_retention = "software",
+        doc = "\n\nLight sleep suspends the caches. See [Optimization \
+               level](crate#optimization-level) for the build requirement."
+    )]
     #[cfg(sleep_light_sleep)]
     #[cfg(feature = "rt")]
     pub fn sleep_light(&mut self, config: RtcSleepConfig) -> LightSleep {

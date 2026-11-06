@@ -1,3 +1,11 @@
 /* Output sections in RWTEXT only. The bootloader support crate includes this file inside `SECTIONS`,
    in front of the output section that holds `*(.rwtext.*)`, so these sections get their input
    sections first. */
+
+/* Code that runs while the caches are suspended. `esp_hal_checks.x` forbids references from this
+   section to flash and to `.rwtext`. */
+.rwtext.cache_suspend_safe : ALIGN(4)
+{
+  *(.rwtext.cache_suspend_safe.*)
+  . = ALIGN(4);
+} > RWTEXT

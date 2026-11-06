@@ -119,6 +119,10 @@ esp32s3 = [
 alloc-hooks = ["dep:enumset", "esp-alloc/alloc-hooks"]
 # default = ["alloc-hooks"] # Uncomment to enable. Warning: very chatty!
 
+[profile.dev.package.esp-hal]
+# Light sleep needs esp-hal at opt-level 2 or 3
+opt-level = 2
+
 [profile.release]
 debug            = true
 debug-assertions = true

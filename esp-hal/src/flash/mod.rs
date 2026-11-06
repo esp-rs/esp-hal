@@ -67,9 +67,14 @@ use core::marker::PhantomData;
 
 use procmacros::{BuilderLite, ram};
 
-use crate::{Blocking, DriverMode, interrupt::free, peripherals::FLASH, soc::is_slice_in_dram};
+use crate::{
+    Blocking,
+    DriverMode,
+    interrupt::free,
+    peripherals::FLASH,
+    soc::{cache, is_slice_in_dram},
+};
 
-mod cache;
 mod mmu;
 mod rom;
 

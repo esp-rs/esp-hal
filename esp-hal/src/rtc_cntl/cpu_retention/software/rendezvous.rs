@@ -9,10 +9,11 @@
 //! The handshake is one shared [`Phase`]. Every transition has one writer, except the ways out of
 //! [`Phase::Wanted`] and [`Phase::Requested`], which both cores take with a compare-and-swap.
 
-use core::{cell::UnsafeCell, mem::MaybeUninit, ptr};
+use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use portable_atomic::{AtomicU8, Ordering};
+use procmacros::ram;
 
 use super::{
     CoreRetentionContext,
@@ -272,20 +273,27 @@ fn helper_entry() {
 ///
 /// The branch predictor starts cache requests of its own, so it must be off while the CPU domain
 /// has no power. esp-idf turns it off for this routine only, and not for the single-core path.
-#[crate::ram]
+///
+/// The APP CPU waits here while the PRO CPU suspends the caches. After a wake, the APP CPU
+/// restores its state before the caches resume.
+#[ram(unstable(cache_suspend_safe))]
 fn run_helper() {
     let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 
-    // SAFETY: the PRO CPU starts the rendezvous for a sleep that retains the CPU only, so the
-    // memory of the frames is installed.
-    let buffer = unsafe { crate::rtc_cntl::installed_buffer_ptr().unwrap_unchecked() };
+    // The PRO CPU starts the rendezvous only for a sleep that retains the CPU, so the frame memory
+    // is installed. With debug assertions, `unwrap_unchecked` checks the value, and the panic path
+    // is in flash.
+    let Some(buffer) = crate::rtc_cntl::installed_buffer_ptr() else {
+        PHASE.store(Phase::Refused as u8, Ordering::Release);
+        return;
+    };
     let mut ctx = CoreRetentionContext::new(buffer.as_ptr(), Cpu::AppCpu as usize);
     save_pre_critical(&mut ctx);
     let frame = save_critical_frame(&ctx);
 
     // The wake stub writes this word while the compiler believes that nothing did.
     // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
-    let pmufunc = unsafe { ptr::read_volatile(&raw const (*frame).pmufunc) };
+    let pmufunc = unsafe { device_regs::load_word(&raw const (*frame).pmufunc) };
     if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
         // The CPU domain can lose power from here on. This core then comes back through the wake
         // stub, after the PRO CPU released it from reset. This core does not arm the wake stub:
@@ -294,7 +302,7 @@ fn run_helper() {
     } else {
         // The wake stub restored the critical frame already.
         // SAFETY: the frame holds what this core saved before the sleep.
-        unsafe { ctx.non_critical().as_ref().unwrap().restore() };
+        unsafe { (*ctx.non_critical()).restore() };
         device_regs::restore(&super::regions(), ctx.device_frame());
     }
 
