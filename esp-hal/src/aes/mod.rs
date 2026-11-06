@@ -1561,6 +1561,10 @@ pub enum Error {
     /// The additional authenticated data is in memory that the DMA cannot read, such as flash.
     #[cfg(aes_dma_mode_gcm)]
     AadNotInRam,
+
+    /// The output is in PSRAM. The ESP32-S2 does not support a PSRAM output for AES-GCM.
+    #[cfg(esp32s2)]
+    OutputInPsram,
 }
 
 /// An active work queue driver.

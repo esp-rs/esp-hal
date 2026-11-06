@@ -4,6 +4,10 @@
 //! the text, its zero padding and the length block. The hardware hashes them in that order.
 //! The hardware writes whole blocks, so the last partial block of output goes to a bounce block.
 //!
+//! The DMA of the ESP32-S2 fails to write a RAM descriptor that follows a PSRAM descriptor. The
+//! last bytes of an AES-GCM output are written to the bounce block in RAM, so the ESP32-S2 must
+//! refuse an output in PSRAM.
+//!
 //! See <https://github.com/espressif/esp-idf/blob/ab95e70748f2eddac6f87217b0cf62533684a6ba/components/mbedtls/port/aes/esp_aes_gcm.c#L690-L789>
 //! and <https://github.com/espressif/esp-idf/blob/ab95e70748f2eddac6f87217b0cf62533684a6ba/components/mbedtls/port/aes/dma/esp_aes_dma_core.c#L1366-L1600>.
 
@@ -175,6 +179,10 @@ impl AesGcmContext {
     ///   `aad` is longer than 4,080 bytes.
     /// - [`Error::AadNotInRam`] when the DMA cannot read `aad`, for example from flash.
     /// - [`Error::BuffersNotEqual`] when `input` and `output` differ in length.
+    #[cfg_attr(
+        esp32s2,
+        doc = "- [`Error::OutputInPsram`] when `output` is in PSRAM. `input` and `aad` can be in PSRAM."
+    )]
     #[instability::unstable]
     pub fn encrypt<'t>(
         &'t mut self,
@@ -184,7 +192,7 @@ impl AesGcmContext {
         output: &'t mut [u8],
         tag: &'t mut [u8; 16],
     ) -> Result<AesGcmHandle<'t>, Error> {
-        validate(aad, input.len())?;
+        validate(aad, input.len(), output)?;
         let buffers = unsafe { CryptoBuffers::new(input, output)?.into_inner() };
         Ok(self.post(Operation::Encrypt, nonce, aad, buffers, NonNull::from(tag)))
     }
@@ -205,7 +213,7 @@ impl AesGcmContext {
         buffer: &'t mut [u8],
         tag: &'t mut [u8; 16],
     ) -> Result<AesGcmHandle<'t>, Error> {
-        validate(aad, buffer.len())?;
+        validate(aad, buffer.len(), buffer)?;
         let buffers = unsafe { CryptoBuffers::new_in_place(buffer).into_inner() };
         Ok(self.post(Operation::Encrypt, nonce, aad, buffers, NonNull::from(tag)))
     }
@@ -227,7 +235,7 @@ impl AesGcmContext {
         output: &'t mut [u8],
         tag: &'t [u8; 16],
     ) -> Result<AesGcmHandle<'t>, Error> {
-        validate(aad, input.len())?;
+        validate(aad, input.len(), output)?;
         let buffers = unsafe { CryptoBuffers::new(input, output)?.into_inner() };
         Ok(self.post(Operation::Decrypt, nonce, aad, buffers, NonNull::from(tag)))
     }
@@ -247,7 +255,7 @@ impl AesGcmContext {
         buffer: &'t mut [u8],
         tag: &'t [u8; 16],
     ) -> Result<AesGcmHandle<'t>, Error> {
-        validate(aad, buffer.len())?;
+        validate(aad, buffer.len(), buffer)?;
         let buffers = unsafe { CryptoBuffers::new_in_place(buffer).into_inner() };
         Ok(self.post(Operation::Decrypt, nonce, aad, buffers, NonNull::from(tag)))
     }
@@ -282,7 +290,7 @@ impl AesGcmContext {
     }
 }
 
-fn validate(aad: &[u8], text_len: usize) -> Result<(), Error> {
+fn validate(aad: &[u8], text_len: usize, output: &[u8]) -> Result<(), Error> {
     if text_len == 0 || text_len > MAX_TEXT_LEN || aad.len() > MAX_AAD_LEN {
         return Err(Error::IncorrectBufferLength);
     }
@@ -291,6 +299,20 @@ fn validate(aad: &[u8], text_len: usize) -> Result<(), Error> {
     // copied into, so the DMA reads the additional data where it is.
     if !aad.is_empty() && !crate::soc::is_valid_memory_address(aad.as_ptr() as usize) {
         return Err(Error::AadNotInRam);
+    }
+
+    // The DMA of the ESP32-S2 fails to write a RAM descriptor that follows a PSRAM descriptor.
+    // The last bytes of an AES-GCM output are written to the bounce block in RAM, so the check
+    // must refuse an output in PSRAM.
+    cfg_select! {
+        esp32s2 => {
+            if crate::psram::psram_range().contains(&(output.as_ptr() as usize)) {
+                return Err(Error::OutputInPsram);
+            }
+        }
+        _ => {
+            let _ = output;
+        }
     }
 
     Ok(())

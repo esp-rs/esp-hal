@@ -1288,19 +1288,74 @@ mod gcm_tests {
         compare_with_software(&random::<16>(), MAX_TEXT, 5);
     }
 
+    /// Returns `len` random bytes in PSRAM.
+    #[cfg(all(soc_has_psram, dma_can_access_psram))]
+    fn psram_vec(len: usize) -> Vec<u8, esp_alloc::ExternalMemory> {
+        let mut bytes = Vec::with_capacity_in(len, esp_alloc::ExternalMemory);
+        bytes.resize(len, 0);
+        Rng::new().read(&mut bytes);
+        bytes
+    }
+
+    /// On the ESP32-S2, the longest text and additional data come from PSRAM and the output stays
+    /// in internal memory. A PSRAM output is refused before anything is queued, to a separate
+    /// buffer and in place.
+    #[test]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, esp32s2))]
+    fn test_gcm_psram_input_only_s2(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let key = random::<32>();
+        let nonce = random::<12>();
+        let aad = psram_vec(MAX_AAD);
+        let plaintext = psram_vec(MAX_TEXT);
+        let mut expected = copy_vec(&plaintext);
+        let expected_tag = sw_encrypt(&key, &nonce, &aad, &mut expected);
+
+        let mut gcm = AesGcmContext::new(hw_key(&key));
+        let mut ciphertext = zeroed_vec(MAX_TEXT);
+        let mut tag = [0; 16];
+        gcm.encrypt(&nonce, &aad, &plaintext, &mut ciphertext, &mut tag)
+            .unwrap()
+            .wait_blocking()
+            .unwrap();
+        hil_test::assert!(ciphertext[..] == expected[..], "ciphertext differs");
+        hil_test::assert_eq!(tag, expected_tag);
+
+        gcm.decrypt_in_place(&nonce, &aad, &mut ciphertext, &tag)
+            .unwrap()
+            .wait_blocking()
+            .unwrap();
+        hil_test::assert!(ciphertext[..] == plaintext[..], "plaintext differs");
+
+        let mut output = psram_vec(100);
+        expect_refused(
+            &mut gcm,
+            &aad[..5],
+            &plaintext[..100],
+            &mut output,
+            Error::OutputInPsram,
+        );
+        let refused = gcm
+            .encrypt_in_place(&nonce, &aad[..5], &mut output, &mut tag)
+            .map(|_| ());
+        hil_test::assert_eq!(refused, Err(Error::OutputInPsram));
+        let refused = gcm
+            .decrypt(&nonce, &aad[..5], &plaintext[..100], &mut output, &tag)
+            .map(|_| ());
+        hil_test::assert_eq!(refused, Err(Error::OutputInPsram));
+        let refused = gcm
+            .decrypt_in_place(&nonce, &aad[..5], &mut output, &tag)
+            .map(|_| ());
+        hil_test::assert_eq!(refused, Err(Error::OutputInPsram));
+    }
+
     /// The longest text and additional data in PSRAM, where the larger alignment fills every
     /// descriptor the driver owns.
     #[test]
-    #[cfg(all(soc_has_psram, dma_can_access_psram))]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
     fn test_gcm_max_lengths_psram(mut ctx: Context) {
         let _backend = ctx.aes.start();
-
-        fn psram_vec(len: usize) -> Vec<u8, esp_alloc::ExternalMemory> {
-            let mut bytes = Vec::with_capacity_in(len, esp_alloc::ExternalMemory);
-            bytes.resize(len, 0);
-            Rng::new().read(&mut bytes);
-            bytes
-        }
 
         let key = random::<32>();
         let nonce = random::<12>();
@@ -1387,13 +1442,99 @@ mod gcm_tests {
 
     /// Alignment in PSRAM, in place and to a separate buffer.
     #[test]
-    #[cfg(all(soc_has_psram, dma_can_access_psram))]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
     fn test_gcm_shifts_psram(mut ctx: Context) {
         let _backend = ctx.aes.start();
 
         let mut memory = Vec::with_capacity_in(100 + 16 + 64, esp_alloc::ExternalMemory);
         memory.resize(100 + 16 + 64, 0);
         run_shifts(&mut memory);
+    }
+
+    /// Every offset in PSRAM with every partial block length. The lengths cover the three receive
+    /// chains the driver builds: all of the text through one bounce buffer, a head and a tail
+    /// bounce around the PSRAM run, and a run that fills more than one descriptor.
+    #[test]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
+    fn test_gcm_offsets_psram(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let mut memory = Vec::with_capacity_in(16 + 4_097 + 64, esp_alloc::ExternalMemory);
+        memory.resize(16 + 4_097 + 64, 0);
+        for offset in 0..16 {
+            for len in (1..=48).chain(95..=112).chain(4_079..=4_097) {
+                run_offset(&mut memory, offset, len);
+            }
+        }
+    }
+
+    /// The longest texts at every offset in PSRAM, with and without a partial block, where the
+    /// bounces sit around five descriptors of PSRAM.
+    #[test]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
+    fn test_gcm_max_text_offsets_psram(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let mut memory = Vec::with_capacity_in(16 + MAX_TEXT + 64, esp_alloc::ExternalMemory);
+        memory.resize(16 + MAX_TEXT + 64, 0);
+        for offset in 0..16 {
+            for len in [MAX_TEXT - 15, MAX_TEXT - 5, MAX_TEXT] {
+                run_offset(&mut memory, offset, len);
+            }
+        }
+    }
+
+    /// Encrypts `len` random bytes in place at `offset` into `memory`, and checks the text and the
+    /// tag against software. Then decrypts in place, and checks that the bytes around the text
+    /// stay zero.
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
+    fn run_offset(memory: &mut [u8], offset: usize, len: usize) {
+        let key = random::<16>();
+        let nonce = random::<12>();
+        let aad = random::<5>();
+        let plaintext = random_vec(len);
+        let mut expected = copy_vec(&plaintext);
+        let expected_tag = sw_encrypt(&key, &nonce, &aad, &mut expected);
+
+        memory.fill(0);
+        let text = &mut memory[offset..][..len];
+        text.copy_from_slice(&plaintext);
+        let mut tag = [0; 16];
+        let mut gcm = AesGcmContext::new(hw_key(&key));
+        gcm.encrypt_in_place(&nonce, &aad, text, &mut tag)
+            .unwrap()
+            .wait_blocking()
+            .unwrap();
+        hil_test::assert!(
+            text[..] == expected[..],
+            "ciphertext, offset {} len {}",
+            offset,
+            len
+        );
+        hil_test::assert_eq!(tag, expected_tag, "tag, offset {} len {}", offset, len);
+
+        gcm.decrypt_in_place(&nonce, &aad, text, &tag)
+            .unwrap()
+            .wait_blocking()
+            .unwrap();
+        hil_test::assert!(
+            text[..] == plaintext[..],
+            "plaintext, offset {} len {}",
+            offset,
+            len
+        );
+        hil_test::assert!(
+            memory[..offset].iter().all(|&b| b == 0),
+            "write before, offset {} len {}",
+            offset,
+            len
+        );
+        hil_test::assert!(
+            memory[offset + len..].iter().all(|&b| b == 0),
+            "write after, offset {} len {}",
+            offset,
+            len
+        );
     }
 
     fn run_guard_byte(memory: &mut [u8]) {
@@ -1428,7 +1569,7 @@ mod gcm_tests {
     /// A text one byte longer than a block does not overwrite the memory after the buffer, in
     /// PSRAM.
     #[test]
-    #[cfg(all(soc_has_psram, dma_can_access_psram))]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
     fn test_gcm_guard_byte_psram(mut ctx: Context) {
         let _backend = ctx.aes.start();
 
