@@ -139,6 +139,7 @@ pub use ll::{
 use ll::{
     CLASSIC_MAX_DATA_LEN,
     Driver,
+    FilterSlot,
     FrameBuffer,
     FrameHeader,
     FrameKinds,
@@ -972,9 +973,6 @@ pub struct CanFd<'d, Dm: DriverMode = Blocking> {
     bus: BusGuard,
     config: Config,
     _mode: PhantomData<Dm>,
-    /// Accepted frame kinds for filters A, B, C and the range filter. They
-    /// share one register.
-    filter_kinds: [FrameKinds; 4],
     /// Whether a pin has been assigned, which commits `no_transceiver`.
     pins_bound: bool,
     twai: AnyCanFd<'d>,
@@ -1103,6 +1101,64 @@ impl<Dm: DriverMode> CanFdRx<'_, Dm> {
     /// Clears the RX buffer overrun flag.
     pub fn clear_rx_overrun(&mut self) {
         self.driver.clear_overrun();
+    }
+
+    /// Configures one mask filter and enables it.
+    ///
+    /// A frame reaches the RX buffer if it passes at least one enabled filter
+    /// (TRM 38.3.9.8). Out of reset, filter A accepts every frame; see
+    /// [`CanFdRx::accept_all`].
+    ///
+    /// Filters only decide what reaches the RX buffer, so they belong to the
+    /// receiving half and can change while the controller is on the bus. Only
+    /// enabling acceptance filtering itself needs the controller off the bus
+    /// (TRM 38.3.9.8). The filter is disabled while its identifier and mask
+    /// are rewritten, so no frame is judged by half of each. A frame that only
+    /// this filter would accept can be lost during the rewrite.
+    pub fn set_mask_filter(&mut self, filter: MaskFilter, config: &MaskFilterConfig) {
+        let slot = FilterSlot::Mask(filter);
+        self.driver.set_filter_kinds(slot, FrameKinds::NONE);
+        self.driver
+            .set_mask_filter(filter, config.extended, config.id, config.mask);
+        self.driver.set_filter_kinds(slot, config.kinds());
+    }
+
+    /// Disables one mask filter.
+    pub fn disable_mask_filter(&mut self, filter: MaskFilter) {
+        self.driver
+            .set_filter_kinds(FilterSlot::Mask(filter), FrameKinds::NONE);
+    }
+
+    /// Configures the range filter and enables it.
+    ///
+    /// Like a mask filter, the range filter can change while the controller is
+    /// on the bus, and is disabled while its bounds are rewritten; see
+    /// [`CanFdRx::set_mask_filter`].
+    pub fn set_range_filter(&mut self, config: &RangeFilterConfig) {
+        self.driver
+            .set_filter_kinds(FilterSlot::Range, FrameKinds::NONE);
+        self.driver
+            .set_range_filter(config.extended, config.low, config.high);
+        self.driver
+            .set_filter_kinds(FilterSlot::Range, config.kinds());
+    }
+
+    /// Disables the range filter.
+    pub fn disable_range_filter(&mut self) {
+        self.driver
+            .set_filter_kinds(FilterSlot::Range, FrameKinds::NONE);
+    }
+
+    /// Accepts every frame, by giving filter A a zero mask and disabling the rest.
+    ///
+    /// This is the one filter setting that matches standard and extended
+    /// identifiers at once.
+    pub fn accept_all(&mut self) {
+        // A zero mask passes any identifier word, so the format only decides
+        // how the zeros are shifted. Every step accepts at least what the
+        // filters accepted before, and the frame kinds change in one write.
+        self.driver.set_mask_filter(MaskFilter::A, false, 0, 0);
+        self.driver.reset_filter_kinds();
     }
 
     /// Returns the current fault confinement state; see [`CanFd::error_state`].
@@ -1468,7 +1524,6 @@ impl<'d> CanFd<'d, Blocking> {
                 wake_lock: None,
             },
             config,
-            filter_kinds: RESET_FILTER_KINDS,
             pins_bound: false,
             _mode: PhantomData,
             twai,
@@ -1485,7 +1540,6 @@ impl<'d> CanFd<'d, Blocking> {
         let mut this = CanFd {
             bus: self.bus,
             config: self.config,
-            filter_kinds: self.filter_kinds,
             pins_bound: self.pins_bound,
             _mode: PhantomData,
             twai: self.twai,
@@ -1538,7 +1592,6 @@ impl<'d> CanFd<'d, Async> {
         CanFd {
             bus: self.bus,
             config: self.config,
-            filter_kinds: self.filter_kinds,
             pins_bound: self.pins_bound,
             _mode: PhantomData,
             twai: self.twai,
@@ -1792,8 +1845,10 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
     ///
     /// The halves borrow the driver, which keeps the configuration and the
     /// teardown: everything that reconfigures the controller or takes it off
-    /// the bus stays on [`CanFd`] and is unavailable while a half is alive. For
-    /// two independent tasks, split a driver that lives in a `static`.
+    /// the bus stays on [`CanFd`] and is unavailable while a half is alive.
+    /// The acceptance filters are the exception: they only concern reception,
+    /// so the receiving half can change them too. For two independent tasks,
+    /// split a driver that lives in a `static`.
     pub fn split(&mut self) -> (CanFdRx<'_, Dm>, CanFdTx<'_, Dm>) {
         let (info, state) = self.twai.parts();
         (
@@ -1988,63 +2043,31 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         self.bus.driver.tx_traffic_counter()
     }
 
-    /// Configures one mask filter and enables it.
-    ///
-    /// A frame reaches the RX buffer if it passes at least one enabled filter
-    /// (TRM 38.3.9.8). Out of reset, filter A accepts every frame; see
-    /// [`CanFd::accept_all`].
+    /// Configures one mask filter and enables it; see
+    /// [`CanFdRx::set_mask_filter`].
     pub fn set_mask_filter(&mut self, filter: MaskFilter, config: &MaskFilterConfig) {
-        self.bus
-            .driver
-            .set_mask_filter(filter, config.extended, config.id, config.mask);
-        self.filter_kinds[Self::mask_filter_index(filter)] = config.kinds();
-        self.apply_filter_kinds();
+        self.rx_half().set_mask_filter(filter, config);
     }
 
     /// Disables one mask filter.
     pub fn disable_mask_filter(&mut self, filter: MaskFilter) {
-        self.filter_kinds[Self::mask_filter_index(filter)] = FrameKinds::NONE;
-        self.apply_filter_kinds();
+        self.rx_half().disable_mask_filter(filter);
     }
 
-    /// Configures the range filter and enables it.
+    /// Configures the range filter and enables it; see
+    /// [`CanFdRx::set_range_filter`].
     pub fn set_range_filter(&mut self, config: &RangeFilterConfig) {
-        self.bus
-            .driver
-            .set_range_filter(config.extended, config.low, config.high);
-        self.filter_kinds[RANGE_FILTER_INDEX] = config.kinds();
-        self.apply_filter_kinds();
+        self.rx_half().set_range_filter(config);
     }
 
     /// Disables the range filter.
     pub fn disable_range_filter(&mut self) {
-        self.filter_kinds[RANGE_FILTER_INDEX] = FrameKinds::NONE;
-        self.apply_filter_kinds();
+        self.rx_half().disable_range_filter();
     }
 
-    /// Accepts every frame, by giving filter A a zero mask and disabling the rest.
-    ///
-    /// This is the one filter setting that matches standard and extended
-    /// identifiers at once.
+    /// Accepts every frame; see [`CanFdRx::accept_all`].
     pub fn accept_all(&mut self) {
-        // A zero mask passes any identifier word, so the format only decides
-        // how the zeros are shifted.
-        self.bus.driver.set_mask_filter(MaskFilter::A, false, 0, 0);
-        self.filter_kinds = RESET_FILTER_KINDS;
-        self.apply_filter_kinds();
-    }
-
-    fn mask_filter_index(filter: MaskFilter) -> usize {
-        match filter {
-            MaskFilter::A => 0,
-            MaskFilter::B => 1,
-            MaskFilter::C => 2,
-        }
-    }
-
-    fn apply_filter_kinds(&mut self) {
-        let [a, b, c, range] = self.filter_kinds;
-        self.bus.driver.set_filter_kinds(a, b, c, range);
+        self.rx_half().accept_all();
     }
 
     /// Returns details of the last bus error the core captured.
@@ -2227,18 +2250,6 @@ impl Instance for AnyCanFd<'_> {
         any::delegate!(self, twai => { twai.parts() })
     }
 }
-
-/// Index of the range filter in `CanFd::filter_kinds`.
-const RANGE_FILTER_INDEX: usize = 3;
-
-/// The reset value of `CanFd::filter_kinds`: filter A accepts everything, the
-/// rest are off.
-const RESET_FILTER_KINDS: [FrameKinds; 4] = [
-    FrameKinds::ALL,
-    FrameKinds::NONE,
-    FrameKinds::NONE,
-    FrameKinds::NONE,
-];
 
 /// Function clock periods the timestamp prescaler takes to wrap, measured on
 /// an ESP32-C5.
