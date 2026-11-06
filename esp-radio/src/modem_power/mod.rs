@@ -56,7 +56,7 @@ pub(crate) fn start(radio: Radio) {
 /// baseband.
 pub(crate) fn enable_power_down(radio: Radio) -> bool {
     let enabled = STATE.with(|state| {
-        let enabled = method::enable(&mut state.method);
+        let enabled = state.method.enable();
         if enabled {
             state.power_down.insert(radio);
         }
@@ -77,7 +77,7 @@ pub(crate) fn stop(radio: Radio) {
         state.up.remove(radio);
         state.power_down.remove(radio);
         if state.power_down.is_empty() {
-            method::release(&mut state.method);
+            state.method.release();
         }
     });
 }

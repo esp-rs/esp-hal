@@ -643,8 +643,8 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut c_void {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn free(p: *mut c_void) {
-    #[cfg(modem_retention = "backup_dma")]
-    if super::retention::try_free(p) {
+    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+    if super::mac_bb::try_free(p) {
         return;
     }
 
@@ -954,7 +954,9 @@ pub unsafe extern "C" fn wifi_clock_disable() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_rtc_enable_iso() {
     cfg_select! {
-        modem_retention = "backup_dma" => crate::modem_power::sleep(crate::modem_power::Radio::Wifi),
+        all(modem_retention = "backup_dma", feature = "unstable") => {
+            crate::modem_power::sleep(crate::modem_power::Radio::Wifi)
+        }
         _ => todo!("wifi_rtc_enable_iso"),
     }
 }
@@ -968,7 +970,9 @@ pub unsafe extern "C" fn wifi_rtc_enable_iso() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_rtc_disable_iso() {
     cfg_select! {
-        modem_retention = "backup_dma" => crate::modem_power::wake(crate::modem_power::Radio::Wifi),
+        all(modem_retention = "backup_dma", feature = "unstable") => {
+            crate::modem_power::wake(crate::modem_power::Radio::Wifi)
+        }
         _ => todo!("wifi_rtc_disable_iso"),
     }
 }
@@ -1291,9 +1295,14 @@ pub unsafe extern "C" fn log_timestamp() -> u32 {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut c_void {
-    #[cfg(modem_retention = "backup_dma")]
+    // Wi-Fi has no separate allocation hook for retention, so the blob also allocates its MAC
+    // buffer here. The backup DMA reaches only part of the internal RAM, so that buffer must go to
+    // the retention memory. `malloc_retention` gives the retention memory only to an allocation of
+    // the MAC buffer size while `esp_wifi_internal_set_mac_sleep(true)` runs. It returns null for
+    // every other allocation, and the allocation then goes to the heap.
+    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
     {
-        let memory = super::retention::malloc(size);
+        let memory = super::mac_bb::malloc_retention(size);
         if !memory.is_null() {
             return memory;
         }

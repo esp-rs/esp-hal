@@ -1,11 +1,6 @@
 use procmacros::BuilderLite;
 
-pub use super::retention::{
-    RetentionMemory,
-    RetentionMemoryError,
-    RetentionStorage,
-    install_retention_memory,
-};
+pub use super::mac_bb::{RetentionMemory, RetentionStorage, install_retention_memory};
 #[cfg(multi_core)]
 use crate::hal::system::Cpu;
 use crate::{
@@ -155,7 +150,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     esp_hw_power_down: Some(esp_hw_power_down),
     esp_hw_power_up: Some(esp_hw_power_up),
     ets_backup_dma_copy: Some(ets_backup_dma_copy),
-    malloc_retention: Some(super::retention::malloc_retention),
+    malloc_retention: Some(super::mac_bb::malloc_retention),
     ets_delay_us: Some(ets_delay_us_wrapper),
     btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
     coex_bt_wakeup_request: Some(super::coex_bt_wakeup_request),
@@ -165,7 +160,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
 };
 
 unsafe extern "C" fn free_wrapper(ptr: *mut c_void) {
-    if !super::retention::try_free(ptr) {
+    if !super::mac_bb::try_free(ptr) {
         unsafe { crate::ble::free(ptr) }
     }
 }

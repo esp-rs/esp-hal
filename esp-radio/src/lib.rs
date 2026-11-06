@@ -239,15 +239,22 @@ mod asynch;
 mod compat;
 #[cfg(any(esp32h4, esp32s31))]
 mod compiler_rt_abi;
+#[cfg(any(
+    all(feature = "ble", any(bt_controller = "btdm", bt_controller = "btdm2")),
+    all(feature = "wifi", feature = "unstable", modem_retention = "backup_dma"),
+))]
+mod counting_lock;
 #[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "btdm2")))]
 mod drop_guard;
 mod interrupt_dispatch;
-#[cfg(all(modem_retention = "backup_dma", any(feature = "ble", feature = "wifi")))]
+#[cfg(all(
+    modem_retention = "backup_dma",
+    feature = "unstable",
+    any(feature = "ble", feature = "wifi"),
+))]
 mod modem_power;
 mod radio_clocks;
 mod refcount;
-#[cfg(all(modem_retention = "backup_dma", any(feature = "ble", feature = "wifi")))]
-mod retention;
 mod time;
 
 #[cfg(feature = "wifi")]

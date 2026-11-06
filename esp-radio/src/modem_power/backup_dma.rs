@@ -6,10 +6,10 @@
 
 use allocator_api2::boxed::Box;
 use enumset::EnumSet;
-use portable_atomic::{AtomicU32, Ordering};
+use esp_sync::RawMutex;
 
 use super::{Radio, STATE};
-use crate::compat::malloc::InternalMemory;
+use crate::{compat::malloc::InternalMemory, counting_lock::CountingLock};
 
 unsafe extern "C" {
     fn phy_freq_mem_backup(backup: bool, mem: *mut u32);
@@ -35,23 +35,23 @@ impl State {
             modem_off: false,
         }
     }
-}
 
-/// Prepares the PHY memory and the backup DMA. Returns whether they are ready.
-pub(super) fn enable(state: &mut State) -> bool {
-    if state.phy_memory.is_none() {
-        let Ok(phy_memory) = Box::try_new_in([0; PHY_MEMORY_WORDS], InternalMemory) else {
-            return false;
-        };
-        state.phy_memory = Some(phy_memory);
-        init_backup_dma();
+    /// Prepares the PHY memory and the backup DMA. Returns whether they are ready.
+    pub(super) fn enable(&mut self) -> bool {
+        if self.phy_memory.is_none() {
+            let Ok(phy_memory) = Box::try_new_in([0; PHY_MEMORY_WORDS], InternalMemory) else {
+                return false;
+            };
+            self.phy_memory = Some(phy_memory);
+            init_backup_dma();
+        }
+        true
     }
-    true
-}
 
-/// Releases what [`enable`] prepared.
-pub(super) fn release(state: &mut State) {
-    state.phy_memory = None;
+    /// Releases what [`Self::enable`] prepared.
+    pub(super) fn release(&mut self) {
+        self.phy_memory = None;
+    }
 }
 
 /// Records that `radio` sleeps, and powers the modem domain down if every radio that is up sleeps.
@@ -99,21 +99,19 @@ pub(crate) fn wake(radio: Radio) {
     })
 }
 
-/// The chip has one backup DMA, so two copies must not run at the same time.
-static BACKUP_DMA_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
-/// The interrupt state for [`backup_dma_unlock`], because the ROM gives the unlock no argument.
-static BACKUP_DMA_TOKEN: AtomicU32 = AtomicU32::new(0);
+static BACKUP_DMA_MUTEX: RawMutex = RawMutex::new();
+/// The chip has one backup DMA, so two copies must not run at the same time. The ROM gives the
+/// unlock no argument.
+static BACKUP_DMA_LOCK: CountingLock = CountingLock::new(&BACKUP_DMA_MUTEX);
 
 /// The ROM calls this before a backup DMA copy.
 extern "C" fn backup_dma_lock() {
-    let token = unsafe { BACKUP_DMA_LOCK.acquire().inner() };
-    BACKUP_DMA_TOKEN.store(token, Ordering::Relaxed);
+    unsafe { BACKUP_DMA_LOCK.acquire() };
 }
 
 /// The ROM calls this after a backup DMA copy.
 extern "C" fn backup_dma_unlock() {
-    let token = BACKUP_DMA_TOKEN.load(Ordering::Relaxed);
-    unsafe { BACKUP_DMA_LOCK.release(esp_sync::RestoreState::new(token)) };
+    unsafe { BACKUP_DMA_LOCK.release() };
 }
 
 /// Gives the ROM the lock that it takes around a backup DMA copy.

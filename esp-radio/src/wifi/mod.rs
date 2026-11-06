@@ -70,15 +70,10 @@ use procmacros::BuilderLite;
 
 #[cfg(wifi_softap_support)]
 use self::ap::AccessPointConfig;
+#[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use self::mac_bb::{RetentionMemory, RetentionStorage, install_retention_memory};
 pub(crate) use self::os_adapter::*;
-#[cfg(modem_retention = "backup_dma")]
-#[instability::unstable]
-pub use self::retention::{
-    RetentionMemory,
-    RetentionMemoryError,
-    RetentionStorage,
-    install_retention_memory,
-};
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 use self::sniffer::Sniffer;
@@ -133,10 +128,8 @@ pub(crate) mod state;
 #[cfg(wifi_ftm_enable)]
 mod ftm_calibration;
 mod internal;
-#[cfg(modem_retention = "backup_dma")]
+#[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
 mod mac_bb;
-#[cfg(modem_retention = "backup_dma")]
-mod retention;
 mod weak_overrides;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
@@ -1246,7 +1239,7 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
         #[cfg(soc_has_modem_syscon)]
         crate::radio_clocks::enable_wifi(true);
 
-        #[cfg(modem_retention = "backup_dma")]
+        #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
         mac_bb::init()?;
 
         Ok(())
@@ -1299,10 +1292,10 @@ fn wifi_deinit() -> Result<(), WifiError> {
         drop(packet);
     }
 
-    #[cfg(modem_retention = "backup_dma")]
+    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
     mac_bb::stop_power_down()?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
-    #[cfg(modem_retention = "backup_dma")]
+    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
     mac_bb::deinit();
     #[cfg(soc_has_modem_syscon)]
     crate::radio_clocks::enable_wifi(false);

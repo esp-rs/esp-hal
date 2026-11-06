@@ -68,7 +68,6 @@ instability = "0.3.12"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
-bytemuck = "1.24"
 docsplay = { version = "0.1", default-features = false }
 document-features  = "0.2"
 esp-alloc = { version = "0.11.0", path = "../esp-alloc", optional = true, default-features = false }
@@ -81,7 +80,6 @@ num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
 procmacros = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-static_cell = "2"
 xtensa-lx-rt = { version = "0.23.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }

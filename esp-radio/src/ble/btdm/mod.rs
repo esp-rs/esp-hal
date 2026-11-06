@@ -10,6 +10,7 @@ use crate::sys::include;
 use crate::{
     asynch::AtomicWaker,
     compat::common::{str_from_c, task_core},
+    counting_lock::CountingLock,
     hal::ram,
     sys::{c_types::*, include::*},
 };
@@ -21,8 +22,6 @@ pub(crate) mod chip_specific;
 
 #[cfg(modem_retention = "backup_dma")]
 mod mac_bb;
-#[cfg(modem_retention = "backup_dma")]
-mod retention;
 
 use chip_specific::{G_OSI_FUNCS, osi_funcs_s};
 #[cfg(modem_retention = "backup_dma")]
@@ -99,29 +98,18 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-static CRITICAL_NEST: AtomicU32 = AtomicU32::new(0);
-static CRITICAL_TOKEN: AtomicU32 = AtomicU32::new(0);
+static CRITICAL: CountingLock = CountingLock::new(&super::ESP_RADIO_LOCK);
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {
     trace!("interrupt_enable");
-    if CRITICAL_NEST.fetch_sub(1, Ordering::Release) == 1 {
-        let last = CRITICAL_TOKEN.load(Ordering::Relaxed);
-
-        unsafe {
-            super::ESP_RADIO_LOCK.release(esp_sync::RestoreState::new(last));
-        }
-    }
+    unsafe { CRITICAL.release() };
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    let last = CRITICAL_NEST.fetch_add(1, Ordering::Release);
-    if last == 0 {
-        let token = unsafe { super::ESP_RADIO_LOCK.acquire().inner() };
-        CRITICAL_TOKEN.store(token, Ordering::Relaxed);
-    }
+    unsafe { CRITICAL.acquire() };
 }
 
 #[ram]
