@@ -22,13 +22,10 @@ pub(crate) fn reset_wifi_mac() {
 
 pub(crate) fn init_clocks() {
     // from `esp_perip_clk_init`
-    regs!(APB_CTRL).wifi_clk_en().modify(|_, w| {
-        w.unused_bit5().clear_bit();
-        w.unused_bit12().clear_bit()
+    regs!(APB_CTRL).wifi_clk_en().modify(|r, w| {
+        unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_EN) };
+        w.unused_bit5().clear_bit()
     });
-    regs!(APB_CTRL)
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_EN) });
 }
 
 pub(crate) fn deinit_clocks() {

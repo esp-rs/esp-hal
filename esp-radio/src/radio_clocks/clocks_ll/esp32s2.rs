@@ -25,7 +25,8 @@ pub(crate) fn init_clocks() {
     const DPORT_WIFI_CLK_WIFI_EN: u32 = 0x003807cf;
 
     // from `esp_perip_clk_init`
-    regs!(SYSCON).wifi_clk_en().modify(|_, w| unsafe {
+    regs!(SYSCON).wifi_clk_en().modify(|r, w| unsafe {
+        w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_EN);
         w.sdioslave_clk_en().clear_bit();
         w.unused_bit5().clear_bit();
         w.bt_baseband_clk_en().clear_bit();
@@ -34,9 +35,6 @@ pub(crate) fn init_clocks() {
         w.emac_clk_en().clear_bit();
         w.bt_lc_clk_en().bits(0)
     });
-    regs!(SYSCON)
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_EN) });
 
     // The Wi-Fi light sleep clock: the RTC slow clock, undivided. The divider resets to 255.
     regs!(SYSTEM)

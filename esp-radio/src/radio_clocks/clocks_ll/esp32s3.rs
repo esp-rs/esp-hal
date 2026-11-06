@@ -21,14 +21,11 @@ pub(crate) fn reset_wifi_mac() {
 }
 
 pub(crate) fn init_clocks() {
-    regs!(APB_CTRL).wifi_clk_en().modify(|_, w| {
+    regs!(APB_CTRL).wifi_clk_en().modify(|r, w| {
+        unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_EN) };
         w.i2c_clk_en().clear_bit();
-        w.unused_bit12().clear_bit();
         w.sdio_host_clk_en().clear_bit()
     });
-    regs!(APB_CTRL)
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_EN) });
 }
 
 pub(crate) fn deinit_clocks() {
