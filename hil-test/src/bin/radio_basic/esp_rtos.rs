@@ -91,6 +91,20 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    #[cfg(riscv)]
+    fn stack_guard_is_monitored_after_a_context_switch() {
+        unsafe extern "C" {
+            static mut __stack_chk_guard: u32;
+        }
+
+        // Switches to the idle hook and back, re-arming the watchpoint from the scheduler's trap
+        CurrentThreadHandle::get().delay(Duration::from_millis(10));
+
+        unsafe { (&raw mut __stack_chk_guard).write_volatile(0) };
+    }
+
+    #[test]
     fn thread_runs_a_function_and_returns_its_value() {
         fn worker() -> u32 {
             42

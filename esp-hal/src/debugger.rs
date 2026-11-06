@@ -211,8 +211,11 @@ pub(crate) unsafe fn set_watchpoint(id: u8, addr: usize, len: usize) {
     tdata.set_match(NAPOT_MATCH);
     let tdata: u32 = tdata.0;
 
+    // A trap moves `mte` into `mpte` and clears it, and `mret` moves it back: setting `mpte` too
+    // keeps the trigger enabled when this runs in a trap handler, e.g. esp-rtos's scheduler.
     let mut tcontrol = Tcontrol::default();
     tcontrol.set_mte(true);
+    tcontrol.set_mpte(true);
     let tcontrol: u32 = tcontrol.0;
 
     DEBUGGER_LOCK.lock(|| unsafe {
