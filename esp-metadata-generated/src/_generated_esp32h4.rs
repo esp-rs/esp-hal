@@ -289,6 +289,12 @@ macro_rules! property {
     ("bt.controller") => {
         "btdm2"
     };
+    ("bt.requires_fast_cpu") => {
+        false
+    };
+    ("ieee802154.requires_fast_cpu") => {
+        false
+    };
     ("phy.combo_module") => {
         false
     };
@@ -349,6 +355,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.idle_frequency_scaling") => {
+        false
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -399,6 +408,9 @@ macro_rules! property {
     };
     ("psram.extmem_origin", str) => {
         stringify!(1107296256)
+    };
+    ("psram.idle_low_speed_switch") => {
+        false
     };
     ("rom.has_crc_le") => {
         true

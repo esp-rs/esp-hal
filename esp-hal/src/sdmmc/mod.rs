@@ -51,6 +51,7 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
+    clock::CpuFrequencyLock,
     dma::{
         DmaBufError,
         aligned::{DmaAlignedMut, DmaAlignedRef, InternalMemory},
@@ -754,6 +755,7 @@ impl EngineSession {
         block_size: u16,
         auto_stop: bool,
     ) -> Result<[u32; 4], Error> {
+        let _cpu_frequency_lock = CpuFrequencyLock::new();
         let guard = DropGuard::new((), |()| abort_transfer());
         let r = SDHOST::regs();
 

@@ -409,6 +409,8 @@ impl<'d> SpiDma<'d, Async> {
             }
             self.dma_driver().state.tx_transfer_in_progress.set(false);
         }
+        self.channel.rx.end_transfer();
+        self.channel.tx.end_transfer();
     }
 
     /// Fills the given buffer with data from the bus.
@@ -1041,6 +1043,8 @@ where
         }
         self.dma_driver().state.rx_transfer_in_progress.set(false);
         self.dma_driver().state.tx_transfer_in_progress.set(false);
+        self.channel.rx.end_transfer();
+        self.channel.tx.end_transfer();
         fence(Ordering::Acquire);
     }
 

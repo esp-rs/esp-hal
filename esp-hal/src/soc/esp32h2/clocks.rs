@@ -263,6 +263,38 @@ fn configure_hp_root_clk_impl(
     update_rom_cpu_frequency();
 }
 
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+
+/// Switches HP_ROOT_CLK to XTAL_CLK if it is the PLL, with configured dividers that
+/// [`restore_cpu_clock`] can restore. Returns whether the clock changed.
+///
+/// CPU_CLK and AHB_CLK change to XTAL_CLK. APB_CLK changes to XTAL_CLK divided by the APB divider.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if !matches!(
+        clocks.hp_root_clk(),
+        Some(HpRootClkConfig::Pll96 | HpRootClkConfig::Pll64)
+    ) || clocks.cpu_clk().is_none()
+        || clocks.ahb_clk().is_none()
+    {
+        return false;
+    }
+    // CPU_CLK must stay an integer multiple of AHB_CLK after each step.
+    configure_hp_root_clk_impl(clocks, None, HpRootClkConfig::Xtal);
+    configure_cpu_clk_impl(clocks, None, CpuClkConfig::new(0));
+    configure_ahb_clk_impl(clocks, None, AhbClkConfig::new(0));
+    true
+}
+
+/// Restores HP_ROOT_CLK and the CPU and AHB dividers that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    configure_ahb_clk_impl(clocks, None, unwrap!(clocks.ahb_clk()));
+    configure_cpu_clk_impl(clocks, None, unwrap!(clocks.cpu_clk()));
+    configure_hp_root_clk_impl(clocks, None, unwrap!(clocks.hp_root_clk()));
+}
+
 // CPU_CLK
 
 fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
