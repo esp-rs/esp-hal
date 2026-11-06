@@ -22,11 +22,24 @@ name with them:
   `ESP_HAL_BT_RESERVED_DRAM`.
 - `esp_hal_rwtext.x` / `esp_hal_rwdata.x`: input sections that esp-hal's configuration places in
   RAM. They contain input section descriptions only.
+- `esp_hal_rwtext_sections.x`: output sections in `RWTEXT` that esp-hal defines.
 
 A bootloader support crate provides `linkall.x`, which must:
 
 - `INCLUDE "esp_hal_config.x"` before `MEMORY`, `INCLUDE "hal-defaults.x"`, and include
   `esp_hal_rwtext.x` inside `.rwtext` and `esp_hal_rwdata.x` inside `.data`.
+- Include `esp_hal_rwtext_sections.x` inside `SECTIONS`, after `_rwtext_start` and in front of the
+  output section that holds `*(.rwtext.*)`. Derive sizes and addresses from `_rwtext_len` and from
+  the crate's own sections, not from a sum of section sizes, so that new esp-hal sections need no
+  change here.
+- The sections in `esp_hal_rwtext_sections.x` have no `AT`. A crate that copies RAM code from flash
+  must give an `AT` only to the output section in front of them and not to the sections that follow.
+  The load addresses then continue from that section, and one copy range from that section to the
+  end of `.rwtext` holds all RAM code. GNU ld does not continue the load addresses from an empty
+  output section, so that section must contain data, for example `LONG(0)`. `ASSERT` that the
+  load addresses are contiguous.
+- Name the output sections `.text` (code in flash), `.rodata` (data in flash) and `.rwtext` (code
+  in RAM). esp-hal's scripts can refer to them, for example in `NOCROSSREFS_TO`.
 - Set `ENTRY(_esp_bootloader_entry)` and define `_esp_bootloader_entry`. Here it is an alias of the
   runtime entry (`_start` from riscv-rt, `Reset` from xtensa-lx-rt), because the 2nd-stage
   bootloader has already loaded every segment. A crate whose boot ROM only maps flash defines its
@@ -55,7 +68,8 @@ range homogeneous:
   granularity.
   - `_rwtext_start` .. `_rwtext_end`: read and execute, no write. Nothing in it may be written after
     `esp_hal::init`, so keep runtime-written data out. The scripts here keep `.trap` (trap entry and
-    vector tables) in front of `_rwtext_start`.
+    vector tables) in front of `_rwtext_start`, and the sections from `esp_hal_rwtext_sections.x`
+    behind it.
   - `_stack_end_cpu0` .. `_stack_start_cpu0`: read and write, no execute.
   - `_data_start` .. `_noinit_end`: read and write, no execute. `.data`, `.bss` and `.noinit` must be
     contiguous, with no code in between.
@@ -65,7 +79,7 @@ range homogeneous:
     `ESP_HAL_CONFIG_WRITE_VEC_TABLE_MONITORING` (ESP32-C2/C3/C6/H2). `_trap_section_origin` must be
     the start of `.trap`, and `_rwtext_len` the size of the code from `ORIGIN(RWTEXT)`.
 - esp-riscv-rt's trap entry treats a stack pointer below `_dram_data_start` as a stack overflow, so
-  set it to the DRAM address where the RAM code ends (here: the end of `.trap` plus `.rwtext`).
+  set it to the DRAM address where the RAM code ends (here: the end of `.rwtext`).
 
 Optionally, the crate defines `extern "C" fn __esp_bootloader_init()`. esp-hal calls it right before
 `main`, once `.data` and `.bss` are initialized: from `hal_main` on RISC-V and at the end of

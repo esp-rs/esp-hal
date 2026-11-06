@@ -4,7 +4,7 @@ INCLUDE exception.x
 SECTIONS {
   .rwdata_dummy (NOLOAD) : ALIGN(4)
   {
-    . = . + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi);
+    . = . + _rwtext_len;
   } > RWDATA
 }
 INSERT BEFORE .data;

@@ -6,5 +6,8 @@ memory layout that depend on esp-hal's configuration and features. They are temp
 `${...}` are evaluated against the chip's esp-metadata symbols, esp-hal's configuration
 (`ESP_HAL_CONFIG_*`) and esp-hal's cargo features (`CARGO_FEATURE(...)`).
 
+To add an output section in RAM code, put it in `fragments/esp_hal_rwtext_sections.x`. Top-level
+commands, for example `NOCROSSREFS_TO`, go in `hal-defaults.x`.
+
 The memory layout belongs to the bootloader support crate, see
 `esp-bootloader-esp-idf/ld/README.md`.
