@@ -17,6 +17,11 @@ use crate::{
     soc::{regi2c, xtal32k},
 };
 
+/// The crystal frequency in MHz. The S31 supports only a 40 MHz crystal (`SOC_XTAL_SUPPORT_40M`).
+///
+/// Light sleep uses this constant, because `xtal_clk_frequency` does not run from RAM.
+pub(crate) const XTAL_MHZ: u32 = 40;
+
 define_clock_tree_types!();
 
 /// CPU clock speed options.
@@ -168,6 +173,11 @@ fn update_bus_clocks() {
 
 // BBPLL_CLK
 
+/// Returns whether a clock in the tree uses the BBPLL.
+pub(crate) fn bbpll_requested(clocks: &ClockTree) -> bool {
+    clocks.bbpll_clk_refcount > 0
+}
+
 fn enable_bbpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
         // The S31 BBPLL is fixed at 480 MHz. Program its documented divider taps.
@@ -313,7 +323,23 @@ fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
         HP_SYS_CLKRST::regs()
             .ref_500m_ctrl0()
             .modify(|_, w| w.sel().set_bit()); // MPLL
+    }
 
+    set_mpll_power(en);
+
+    if let Some(mpll_mhz) = mpll_mhz {
+        set_mpll_frequency(mpll_mhz);
+    }
+}
+
+/// Powers the MPLL up or down.
+///
+/// Light sleep calls this function with the caches suspended, so the function must be inlined.
+///
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hal_clock/esp32s31/include/hal/clk_tree_ll.h#L201-L221>.
+#[inline(always)]
+pub(crate) fn set_mpll_power(on: bool) {
+    if on {
         PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
             w.tie_high_global_mpll_icg().set_bit();
             w.tie_high_xpd_mpll().set_bit();
@@ -329,15 +355,11 @@ fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
 
     HP_ALIVE_SYS::regs()
         .hp_clk_ctrl()
-        .modify(|_, w| w.hp_mpll_500m_clk_en().bit(en));
+        .modify(|_, w| w.hp_mpll_500m_clk_en().bit(on));
     PMU::regs().hp_active_hp_ck_power().modify(|_, w| {
-        w.hp_active_xpd_mpll().bit(en);
-        w.hp_active_xpd_mpll_i2c().bit(en)
+        w.hp_active_xpd_mpll().bit(on);
+        w.hp_active_xpd_mpll_i2c().bit(on)
     });
-
-    if let Some(mpll_mhz) = mpll_mhz {
-        set_mpll_frequency(mpll_mhz);
-    }
 }
 
 /// Programs the MPLL to `mpll_mhz` and waits for its calibration to end.
@@ -345,7 +367,10 @@ fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
 /// MPLL = XTAL * (fb_div + 1) / (ref_div + 1), with ref_div 1.
 ///
 /// Ref: [IDF `clk_ll_mpll_set_config` (esp32s31)](https://github.com/espressif/esp-idf/blob/27506a49bc919926f546e325d5f5334ba23db316/components/esp_hal_clock/esp32s31/include/hal/clk_tree_ll.h#L527-L545)
-fn set_mpll_frequency(mpll_mhz: u32) {
+///
+/// Light sleep calls this function with the caches suspended, so the function must be inlined.
+#[inline(always)]
+pub(crate) fn set_mpll_frequency(mpll_mhz: u32) {
     // Analog settings IDF writes before each calibration.
     regi2c::I2C_MPLL_IR_CAL_EXT_CAP.write_field(3);
     regi2c::I2C_MPLL_IR_CAL_ENX_CAP.write_field(1);
@@ -361,7 +386,8 @@ fn set_mpll_frequency(mpll_mhz: u32) {
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().clear_bit());
     let ref_div = 1;
-    let fb_div = mpll_mhz * (ref_div + 1) / (xtal_clk_frequency() / 1_000_000) - 1;
+    // The arithmetic wraps, because the overflow panic path is in flash.
+    let fb_div = (mpll_mhz.wrapping_mul(ref_div + 1) / XTAL_MHZ).wrapping_sub(1);
     LP_AON_CLK_RST::regs()
         .mspi_div()
         .modify(|_, w| unsafe { w.mspi_fb_div().bits(fb_div as u8) });
@@ -378,13 +404,19 @@ fn set_mpll_frequency(mpll_mhz: u32) {
         .modify(|_, w| w.mspi_cal_stop().set_bit());
 }
 
-/// Calibrates the MPLL again at the rate the clock tree holds, if a clock uses it.
+/// Returns the MPLL frequency in MHz that the clock tree holds, or `None` if no clock uses the
+/// MPLL.
 ///
 /// The rate comes from the clock tree and not from the dividers, so that a calibration cannot
 /// change it.
+pub(crate) fn requested_mpll_mhz(clocks: &ClockTree) -> Option<u32> {
+    (clocks.mpll_clk_refcount > 0).then(|| unwrap!(clocks.mpll_clk).value() / 1_000_000)
+}
+
+/// Calibrates the MPLL again at the rate the clock tree holds, if a clock uses it.
 pub(crate) fn recalibrate_mpll(clocks: &ClockTree) {
-    if clocks.mpll_clk_refcount > 0 {
-        set_mpll_frequency(unwrap!(clocks.mpll_clk).value() / 1_000_000);
+    if let Some(mpll_mhz) = requested_mpll_mhz(clocks) {
+        set_mpll_frequency(mpll_mhz);
     }
 }
 

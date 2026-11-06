@@ -91,6 +91,7 @@ const EXTMEM_ORIGIN: usize = property!("psram.extmem_origin");
 static MAPPED_PSRAM_START: AtomicUsize = AtomicUsize::new(0);
 static MAPPED_PSRAM_END: AtomicUsize = AtomicUsize::new(0);
 
+#[inline(always)]
 pub(crate) fn psram_range() -> Range<usize> {
     let end = MAPPED_PSRAM_END.load(Ordering::Acquire);
     let start = MAPPED_PSRAM_START.load(Ordering::Relaxed);
