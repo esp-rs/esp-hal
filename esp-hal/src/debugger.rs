@@ -121,6 +121,24 @@ bitfield::bitfield! {
 
 }
 
+/// Whether `mret` enables the triggers: `tcontrol.mpte`.
+#[cfg(interrupt_controller = "clic")]
+#[inline(always)]
+pub(crate) fn triggers_enabled_on_mret() -> bool {
+    let tcontrol: u32;
+    unsafe { core::arch::asm!("csrr {}, 0x7a5", out(reg) tcontrol) };
+    Tcontrol(tcontrol).mpte()
+}
+
+/// Makes `mret` enable the triggers: sets `tcontrol.mpte`.
+#[cfg(interrupt_controller = "clic")]
+#[inline(always)]
+pub(crate) unsafe fn enable_triggers_on_mret() {
+    let mut tcontrol = Tcontrol::default();
+    tcontrol.set_mpte(true);
+    unsafe { core::arch::asm!("csrs 0x7a5, {}", in(reg) tcontrol.0) };
+}
+
 #[cfg(riscv)]
 pub(crate) struct WatchPoint {
     tdata1: u32,
