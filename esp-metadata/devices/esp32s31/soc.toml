@@ -241,7 +241,6 @@ support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 idle_frequency_scaling = true
 deep_sleep = true
-pmu_sleep_steps = true
 ext1_version = 3
 pin_wakeup_version = 3
 wakeup_sources = {
