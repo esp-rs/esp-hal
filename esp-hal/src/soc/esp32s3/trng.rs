@@ -1,7 +1,5 @@
 use crate::soc::regi2c;
 
-const SYSTEM_WIFI_CLK_RNG_EN: u32 = 1 << 15;
-
 /// Enables true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
@@ -12,13 +10,7 @@ pub(crate) fn ensure_randomness() {
         let sens = crate::peripherals::SENS::regs();
         let syscon = crate::peripherals::APB_CTRL::regs();
 
-        // `wifi_clk_en` register is defined in a really weird way, for now just simple
-        // bit edit
-        syscon.wifi_clk_en().modify(|r, w| {
-            let current_bits = r.bits();
-            let new_bits = current_bits | SYSTEM_WIFI_CLK_RNG_EN;
-            w.bits(new_bits)
-        });
+        syscon.wifi_clk_en().modify(|_, w| w.rng_clk_en().set_bit());
 
         // Enable 8M clock source for RNG (this is actually enough to produce strong
         // random results, but enabling the SAR ADC as well adds some insurance.)
