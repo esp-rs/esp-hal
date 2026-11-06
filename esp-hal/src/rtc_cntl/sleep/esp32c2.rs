@@ -31,6 +31,8 @@ pub const RTC_CNTL_DBIAS_1V30: u8 = 31;
 pub const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_DEFAULT: u8 = 5;
 /// No attenuation (no voltage drop) during light sleep.
 pub const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP: u8 = 0;
+/// Digital and RTC bias setting for light sleep with RC_FAST and XTAL powered down, about 0.6 V.
+const RTC_CNTL_DBIAS_LIGHTSLEEP_0V6: u8 = 5;
 /// Default attenuation setting during deep sleep, with maximum voltage drop.
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_DEFAULT: u8 = 15;
 /// No attenuation (no voltage drop) during deep sleep.
@@ -124,7 +126,6 @@ impl Default for RtcConfig {
         cfg.set_pwrctl_init(true);
         cfg.set_rtc_dboost_fpd(true);
         cfg.set_cpu_waiti_clk_gate(true);
-        cfg.set_bbpll_fpu(true);
         cfg
     }
 }
@@ -229,8 +230,10 @@ impl Default for RtcSleepConfig {
         let mut cfg = Self(Default::default());
         cfg.set_deep_slp_reject(true);
         cfg.set_light_slp_reject(true);
-        cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
-        cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_1V10);
+        cfg.set_int_8m_pd_en(true);
+        cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_LIGHTSLEEP_0V6);
+        cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_LIGHTSLEEP_0V6);
+        cfg.set_dbg_atten_slp(RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_DEFAULT);
 
         // This is the light-sleep config. The main XTAL is powered down in sleep
         // (`xtal_fpu` stays false), so the analog regulator/bias must use the
@@ -310,8 +313,13 @@ fn rtc_sleep_pu(val: bool) {
 
 impl RtcSleepConfig {
     /// Configures the RTC for deep sleep mode.
+    ///
+    /// The RTC regulator is off in this mode, for the lowest current.
     pub fn deep() -> Self {
-        // Set up for ultra-low power sleep. Wakeup sources may modify these settings.
+        // Set up for ultra-low power sleep. Wakeup sources may modify these settings. ESP-IDF
+        // uses this mode only on request, and does not support RTC IO inputs in it:
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/sleep_modes.c#L3083-L3085
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32c2/rtc_sleep.c#L91-L101
         let mut cfg = Self::default();
 
         cfg.set_lslp_mem_inf_fpu(false);
@@ -485,21 +493,30 @@ impl RtcSleepConfig {
         }
 
         unsafe {
-            // Like `rtc_sleep_get_default_config`: a crystal that stays on through a light sleep
-            // needs the bias current and the voltage of the active mode.
+            // A crystal that stays on through a light sleep needs the bias current of the active
+            // mode, and digital logic clocked from XTAL or RC_FAST needs the active voltage.
             let xtal_on = self.xtal_fpu() && !self.deep_slp();
             let bias_sleep_slp = self.bias_sleep_slp() && !xtal_on;
             let pd_cur_slp = self.pd_cur_slp() && !xtal_on;
-            let dbg_atten_slp = if xtal_on {
-                RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP
+            let rc_fast_on = !self.int_8m_pd_en() && !self.deep_slp();
+            let (rtc_dbias_slp, dig_dbias_slp, dbg_atten_slp) = if xtal_on || rc_fast_on {
+                (
+                    RTC_CNTL_DBIAS_1V10,
+                    RTC_CNTL_DBIAS_1V10,
+                    RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP,
+                )
             } else {
-                self.dbg_atten_slp()
+                (
+                    self.rtc_dbias_slp(),
+                    self.dig_dbias_slp(),
+                    self.dbg_atten_slp(),
+                )
             };
 
             assert!(!pd_cur_slp || bias_sleep_slp);
 
-            regi2c::I2C_DIG_REG_EXT_RTC_DREG_SLEEP.write_field(self.rtc_dbias_slp());
-            regi2c::I2C_DIG_REG_EXT_DIG_DREG_SLEEP.write_field(self.dig_dbias_slp());
+            regi2c::I2C_DIG_REG_EXT_RTC_DREG_SLEEP.write_field(rtc_dbias_slp);
+            regi2c::I2C_DIG_REG_EXT_DIG_DREG_SLEEP.write_field(dig_dbias_slp);
 
             rtc_cntl.bias_conf().modify(|_, w| {
                 w.dbg_atten_monitor()
@@ -577,8 +594,13 @@ impl RtcSleepConfig {
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call.
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
+    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
+    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
+    /// sleep ends.
+    #[crate::ram]
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
+        let restore_clock_config = super::cpu_clock_for_sleep();
+
         // set bits for what can wake us up
         LPWR::regs()
             .wakeup_state()
@@ -589,6 +611,8 @@ impl RtcSleepConfig {
         LPWR::regs()
             .slp_reject_conf()
             .modify(|_, w| unsafe { w.sleep_reject_ena().bits(reject_mask) });
+
+        restore_clock_config
     }
 
     /// Requests the sleep.
