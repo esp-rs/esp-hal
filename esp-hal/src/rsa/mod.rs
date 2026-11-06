@@ -33,7 +33,12 @@ use crate::{
     pac,
     peripherals::RSA,
     rtc_cntl::WakeLock,
-    system::{CryptoClockGuard, GenericPeripheralGuard, Peripheral as PeripheralEnable},
+    system::{
+        CryptoClockGuard,
+        GenericPeripheralGuard,
+        Peripheral as PeripheralEnable,
+        PeripheralClockControl,
+    },
     trm_markdown_link,
     work_queue::{self, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
@@ -41,14 +46,17 @@ use crate::{
 /// RSA peripheral driver.
 pub struct Rsa<'d, Dm: DriverMode> {
     rsa: RSA<'d>,
+    // Cache the configuration because its registers may be inaccessible while RSA is busy.
+    config: Config,
     phantom: PhantomData<Dm>,
     _guard: RsaGuard,
 }
 
 /// RSA accelerator configuration.
-///
-/// The default is the most secure: constant time on and search acceleration off. The ESP32 has
-/// neither option, so its `Config` is empty.
+#[doc = cfg_select! {
+    rsa_version = "1" => "\nThis hardware has no configurable options.",
+    _ => "\nBy default, constant-time operation is enabled and search acceleration is disabled.",
+}]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -165,6 +173,7 @@ impl<'d> Rsa<'d, Blocking> {
     pub fn new(rsa: RSA<'d>, config: Config) -> Result<Self, ConfigError> {
         let mut this = Self {
             rsa,
+            config,
             phantom: PhantomData,
             _guard: RsaGuard::new(),
         };
@@ -182,6 +191,7 @@ impl<'d> Rsa<'d, Blocking> {
 
         Rsa {
             rsa: self.rsa,
+            config: self.config,
             phantom: PhantomData,
             _guard: self._guard,
         }
@@ -215,6 +225,24 @@ impl crate::interrupt::InterruptConfigurable for Rsa<'_, Blocking> {
 }
 
 impl<'d> Rsa<'d, Async> {
+    fn abort(&mut self) {
+        let mut reset = || {
+            PeripheralClockControl::reset(PeripheralEnable::Rsa);
+            while !self.ready() {}
+            self.clear_interrupt();
+        };
+
+        cfg_select! {
+            rsa_version = "1" => SIGNALED.with(|signaled| {
+                // Serialize reset with the interrupt handler's completion register access.
+                reset();
+                *signaled = false;
+            }),
+            _ => reset(),
+        }
+        self.write_config(&self.config);
+    }
+
     /// Reconfigures the RSA driver to operate in [`Blocking`] mode.
     pub fn into_blocking(self) -> Rsa<'d, Blocking> {
         self.internal_enable_disable_interrupt(false);
@@ -222,6 +250,7 @@ impl<'d> Rsa<'d, Async> {
 
         Rsa {
             rsa: self.rsa,
+            config: self.config,
             phantom: PhantomData,
             _guard: self._guard,
         }
@@ -372,11 +401,12 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
     /// For more information on the options, refer to the
     #[doc = trm_markdown_link!("rsa")]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.config = *config;
         self.write_config(config);
         Ok(())
     }
 
-    fn write_config(&mut self, _config: &Config) {
+    fn write_config(&self, _config: &Config) {
         #[cfg(not(rsa_version = "1"))]
         {
             self.regs()
@@ -386,16 +416,6 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
                 .search_enable()
                 .write(|w| w.search_enable().bit(_config.search_acceleration));
         }
-    }
-
-    /// Returns whether the search functionality is enabled in the RSA hardware.
-    #[cfg(not(rsa_version = "1"))]
-    fn is_search_enabled(&mut self) -> bool {
-        self.regs()
-            .search_enable()
-            .read()
-            .search_enable()
-            .bit_is_set()
     }
 
     /// Sets the search position in the RSA hardware.
@@ -450,14 +470,18 @@ pub mod operand_sizes {
 /// Each operand is a little endian byte array of the same size.
 pub struct RsaModularExponentiation<'a, 'd, T: RsaMode, Dm: DriverMode> {
     rsa: &'a mut Rsa<'d, Dm>,
-    phantom: PhantomData<T>,
+    exponent: &'a T::InputType,
+    modulus: &'a T::InputType,
+    m_prime: u32,
 }
 
 impl<'a, 'd, T: RsaMode, Dm: DriverMode, const N: usize> RsaModularExponentiation<'a, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    /// Creates an instance of `RsaModularExponentiation`.
+    /// Creates a new modular exponentiation operation.
+    ///
+    /// Borrows `exponent` and `modulus` for as long as this object is in use.
     ///
     /// `m_prime` could be calculated using `-(modular multiplicative inverse of
     /// modulus) mod 2^32`.
@@ -466,27 +490,31 @@ where
     #[doc = trm_markdown_link!("rsa")]
     pub fn new(
         rsa: &'a mut Rsa<'d, Dm>,
-        exponent: &T::InputType,
-        modulus: &T::InputType,
+        exponent: &'a T::InputType,
+        modulus: &'a T::InputType,
         m_prime: u32,
     ) -> Self {
-        Self::write_mode(rsa);
-        rsa.write_operand_b(exponent);
-        rsa.write_modulus(modulus);
-        rsa.write_mprime(m_prime);
-
-        #[cfg(not(rsa_version = "1"))]
-        if rsa.is_search_enabled() {
-            rsa.write_search_position(Self::find_search_pos(exponent));
-        }
-
         Self {
             rsa,
-            phantom: PhantomData,
+            exponent,
+            modulus,
+            m_prime,
         }
     }
 
     fn set_up_exponentiation(&mut self, base: &T::InputType, r: &T::InputType) {
+        self.rsa
+            .write_modexp_mode(N as u32 / WORDS_PER_INCREMENT - 1);
+        self.rsa.write_operand_b(self.exponent);
+        self.rsa.write_modulus(self.modulus);
+        self.rsa.write_mprime(self.m_prime);
+
+        #[cfg(not(rsa_version = "1"))]
+        if self.rsa.config.search_acceleration {
+            self.rsa
+                .write_search_position(Self::find_search_pos(self.exponent));
+        }
+
         self.rsa.write_operand_a(base);
         self.rsa.write_r(r);
     }
@@ -521,11 +549,6 @@ where
         }
         0
     }
-
-    /// Sets the modular exponentiation mode for the RSA hardware.
-    fn write_mode(rsa: &mut Rsa<'d, Dm>) {
-        rsa.write_modexp_mode(N as u32 / WORDS_PER_INCREMENT - 1);
-    }
 }
 
 /// Support for the RSA peripheral's modular multiplication feature that could be
@@ -538,7 +561,10 @@ where
     Dm: DriverMode,
 {
     rsa: &'a mut Rsa<'d, Dm>,
-    phantom: PhantomData<T>,
+    operand_a: &'a T::InputType,
+    modulus: &'a T::InputType,
+    r: &'a T::InputType,
+    m_prime: u32,
 }
 
 impl<'a, 'd, T, Dm, const N: usize> RsaModularMultiplication<'a, 'd, T, Dm>
@@ -546,7 +572,9 @@ where
     T: RsaMode<InputType = [u32; N]>,
     Dm: DriverMode,
 {
-    /// Creates an instance of `RsaModularMultiplication`.
+    /// Creates a new modular multiplication operation.
+    ///
+    /// Borrows `operand_a`, `modulus`, and `r` for as long as this object is in use.
     ///
     /// - `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
     /// - `m_prime` can be calculated using `-(modular multiplicative inverse of modulus) mod 2^32`.
@@ -555,22 +583,27 @@ where
     #[doc = trm_markdown_link!("rsa")]
     pub fn new(
         rsa: &'a mut Rsa<'d, Dm>,
-        operand_a: &T::InputType,
-        modulus: &T::InputType,
-        r: &T::InputType,
+        operand_a: &'a T::InputType,
+        modulus: &'a T::InputType,
+        r: &'a T::InputType,
         m_prime: u32,
     ) -> Self {
-        rsa.write_multi_mode(N as u32 / WORDS_PER_INCREMENT - 1, true);
-
-        rsa.write_mprime(m_prime);
-        rsa.write_modulus(modulus);
-        rsa.write_operand_a(operand_a);
-        rsa.write_r(r);
-
         Self {
             rsa,
-            phantom: PhantomData,
+            operand_a,
+            modulus,
+            r,
+            m_prime,
         }
+    }
+
+    fn set_up_modular_multiplication(&mut self) {
+        self.rsa
+            .write_multi_mode(N as u32 / WORDS_PER_INCREMENT - 1, true);
+        self.rsa.write_mprime(self.m_prime);
+        self.rsa.write_modulus(self.modulus);
+        self.rsa.write_operand_a(self.operand_a);
+        self.rsa.write_r(self.r);
     }
 
     /// Starts the modular multiplication operation.
@@ -578,7 +611,15 @@ where
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
     pub fn start_modular_multiplication(&mut self, operand_b: &T::InputType) {
-        self.set_up_modular_multiplication(operand_b);
+        self.set_up_modular_multiplication();
+        cfg_select! {
+            rsa_version = "1" => {
+                self.rsa.start_multi();
+                self.rsa.wait_for_idle();
+                self.rsa.write_operand_a(operand_b);
+            }
+            _ => self.rsa.write_operand_b(operand_b),
+        }
         self.rsa.start_modmulti();
     }
 
@@ -589,17 +630,6 @@ where
     /// called before calling this function.
     pub fn read_results(&mut self, outbuf: &mut T::InputType) {
         self.rsa.read_results(outbuf);
-    }
-
-    fn set_up_modular_multiplication(&mut self, operand_b: &T::InputType) {
-        if cfg!(rsa_version = "1") {
-            self.rsa.start_multi();
-            self.rsa.wait_for_idle();
-
-            self.rsa.write_operand_a(operand_b);
-        } else {
-            self.rsa.write_operand_b(operand_b);
-        }
     }
 }
 
@@ -613,7 +643,7 @@ where
     Dm: DriverMode,
 {
     rsa: &'a mut Rsa<'d, Dm>,
-    phantom: PhantomData<T>,
+    operand_a: &'a T::InputType,
 }
 
 impl<'a, 'd, T, Dm, const N: usize> RsaMultiplication<'a, 'd, T, Dm>
@@ -622,16 +652,11 @@ where
     T: Multi,
     Dm: DriverMode,
 {
-    /// Creates an instance of `RsaMultiplication`.
-    pub fn new(rsa: &'a mut Rsa<'d, Dm>, operand_a: &T::InputType) -> Self {
-        // Non-modular multiplication result is twice as wide as its operands.
-        rsa.write_multi_mode(2 * N as u32 / WORDS_PER_INCREMENT - 1, false);
-        rsa.write_operand_a(operand_a);
-
-        Self {
-            rsa,
-            phantom: PhantomData,
-        }
+    /// Creates a new multiplication operation.
+    ///
+    /// Borrows `operand_a` for as long as this object is in use.
+    pub fn new(rsa: &'a mut Rsa<'d, Dm>, operand_a: &'a T::InputType) -> Self {
+        Self { rsa, operand_a }
     }
 
     /// Starts the multiplication operation.
@@ -653,6 +678,10 @@ where
     }
 
     fn set_up_multiplication(&mut self, operand_b: &T::InputType) {
+        // Non-modular multiplication result is twice as wide as its operands.
+        self.rsa
+            .write_multi_mode(2 * N as u32 / WORDS_PER_INCREMENT - 1, false);
+        self.rsa.write_operand_a(self.operand_a);
         self.rsa.write_multi_operand_b(operand_b);
     }
 }
@@ -661,20 +690,24 @@ static WAKER: AtomicWaker = AtomicWaker::new();
 #[cfg(rsa_version = "1")]
 static SIGNALED: NonReentrantMutex<bool> = NonReentrantMutex::new(false);
 
-/// `Future` that waits for the RSA operation to complete.
+/// An in-flight RSA operation.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct RsaFuture<'a, 'd> {
-    driver: &'a Rsa<'d, Async>,
+    driver: &'a mut Rsa<'d, Async>,
+    finished: bool,
     _wake_lock: WakeLock,
 }
 
 impl<'a, 'd> RsaFuture<'a, 'd> {
-    fn new(driver: &'a Rsa<'d, Async>) -> Self {
+    fn start(driver: &'a mut Rsa<'d, Async>, start: impl FnOnce(&Rsa<'d, Async>)) -> Self {
+        let wake_lock = WakeLock::new();
         driver.internal_enable_disable_interrupt(true);
+        start(driver);
 
         Self {
             driver,
-            _wake_lock: WakeLock::new(),
+            finished: false,
+            _wake_lock: wake_lock,
         }
     }
 
@@ -689,6 +722,11 @@ impl<'a, 'd> RsaFuture<'a, 'd> {
 impl Drop for RsaFuture<'_, '_> {
     fn drop(&mut self) {
         self.driver.internal_enable_disable_interrupt(false);
+        if self.finished {
+            self.driver.clear_interrupt();
+        } else {
+            self.driver.abort();
+        }
     }
 }
 
@@ -696,11 +734,12 @@ impl core::future::Future for RsaFuture<'_, '_> {
     type Output = ();
 
     fn poll(
-        self: core::pin::Pin<&mut Self>,
+        mut self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> core::task::Poll<Self::Output> {
         WAKER.register(cx.waker());
         if self.is_done() {
+            self.finished = true;
             Poll::Ready(())
         } else {
             Poll::Pending
@@ -713,6 +752,11 @@ where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Asynchronously performs an RSA modular exponentiation operation.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Dropping a pending future aborts the operation and leaves `outbuf` unchanged.
+    /// You can retry the operation.
     pub async fn exponentiation(
         &mut self,
         base: &T::InputType,
@@ -720,9 +764,7 @@ where
         outbuf: &mut T::InputType,
     ) {
         self.set_up_exponentiation(base, r);
-        let fut = RsaFuture::new(self.rsa);
-        self.rsa.start_modexp();
-        fut.await;
+        RsaFuture::start(self.rsa, Rsa::start_modexp).await;
         self.rsa.read_out(outbuf);
     }
 }
@@ -732,24 +774,26 @@ where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Asynchronously performs an RSA modular multiplication operation.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Dropping a pending future aborts the operation and leaves `outbuf` unchanged.
+    /// You can retry the operation.
     pub async fn modular_multiplication(
         &mut self,
         operand_b: &T::InputType,
         outbuf: &mut T::InputType,
     ) {
-        if cfg!(rsa_version = "1") {
-            let fut = RsaFuture::new(self.rsa);
-            self.rsa.start_multi();
-            fut.await;
-
-            self.rsa.write_operand_a(operand_b);
-        } else {
-            self.set_up_modular_multiplication(operand_b);
+        self.set_up_modular_multiplication();
+        cfg_select! {
+            rsa_version = "1" => {
+                RsaFuture::start(self.rsa, Rsa::start_multi).await;
+                self.rsa.write_operand_a(operand_b);
+            }
+            _ => self.rsa.write_operand_b(operand_b),
         }
 
-        let fut = RsaFuture::new(self.rsa);
-        self.rsa.start_modmulti();
-        fut.await;
+        RsaFuture::start(self.rsa, Rsa::start_modmulti).await;
         self.rsa.read_out(outbuf);
     }
 }
@@ -759,6 +803,11 @@ where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Asynchronously performs an RSA multiplication operation.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Dropping a pending future aborts the operation and leaves `outbuf` unchanged.
+    /// You can retry the operation.
     pub async fn multiplication<const O: usize>(
         &mut self,
         operand_b: &T::InputType,
@@ -767,9 +816,7 @@ where
         T: Multi<OutputType = [u32; O]>,
     {
         self.set_up_multiplication(operand_b);
-        let fut = RsaFuture::new(self.rsa);
-        self.rsa.start_multi();
-        fut.await;
+        RsaFuture::start(self.rsa, Rsa::start_multi).await;
         self.rsa.read_out(outbuf);
     }
 }
@@ -915,6 +962,7 @@ impl<'d> RsaBackend<'d> {
             RsaBackendState::Idle => {
                 let driver = Rsa {
                     rsa: unsafe { self.peri.clone_unchecked() },
+                    config: Config::default(),
                     phantom: PhantomData,
                     _guard: RsaGuard::new(),
                 };
