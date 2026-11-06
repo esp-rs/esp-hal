@@ -104,10 +104,20 @@ SECTIONS {
     _init_end = ABSOLUTE(.);
   } > vectors_seg
 
-  /* xtensa-lx-rt's `Reset` lives here, so the entry stub copies it before jumping to it. */
-  .rwtext ORIGIN(RWTEXT) : AT(LOADADDR(.vectors) + SIZEOF(.vectors))
+  /* The only RAM code section with an `AT`: the sections up to the end of `.rwtext` continue its
+     load addresses, so the entry stub copies them as one range. GNU ld does not continue the load
+     addresses from an empty section, hence the `LONG`. */
+  .direct_boot.rwtext_start ORIGIN(RWTEXT) : AT(LOADADDR(.vectors) + SIZEOF(.vectors))
   {
     _rwtext_start = .;
+    LONG(0)
+  } > RWTEXT
+
+  INCLUDE "esp_hal_rwtext_sections.x"
+
+  /* xtensa-lx-rt's `Reset` lives here, so the entry stub copies it before jumping to it. */
+  .rwtext : ALIGN(4)
+  {
     /* Keep each object's literal pool adjacent to its code (see `.text`). */
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
     /* Patched SPI-flash ROM functions from esp-rom-sys. */
@@ -133,7 +143,7 @@ SECTIONS {
     _rwtext_end = .;
   } > RWTEXT
 
-  _rwtext_len = _rwtext_end - ORIGIN(RWTEXT);
+  _rwtext_len = ABSOLUTE(_rwtext_end - ORIGIN(RWTEXT));
 
   /* Skip the DRAM view of `.vectors` and `.rwtext`. */
   .data ALIGN(_rwtext_end - IRAM_DRAM_OFFSET, 16) : AT(ALIGN(LOADADDR(.rwtext) + SIZEOF(.rwtext), 4))
@@ -331,14 +341,17 @@ SECTIONS {
 /* xtensa-lx-rt reads this, but `__init_data` tells it not to copy `.data`: the stub did. */
 _sidata = LOADADDR(.data);
 
-/* `.vectors` and `.rwtext` are copied through their DRAM view. */
+/* `.vectors` and the RAM code up to the end of `.rwtext` are copied through their DRAM view. */
 _direct_boot_vectors_src = DROM_BASE + LOADADDR(.vectors);
 _direct_boot_vectors_dst = ADDR(.vectors) - IRAM_DRAM_OFFSET;
 _direct_boot_vectors_end = _direct_boot_vectors_dst + SIZEOF(.vectors);
 
-_direct_boot_rwtext_src = DROM_BASE + LOADADDR(.rwtext);
-_direct_boot_rwtext_dst = ADDR(.rwtext) - IRAM_DRAM_OFFSET;
-_direct_boot_rwtext_end = _direct_boot_rwtext_dst + SIZEOF(.rwtext);
+_direct_boot_rwtext_src = DROM_BASE + LOADADDR(.direct_boot.rwtext_start);
+_direct_boot_rwtext_dst = ADDR(.direct_boot.rwtext_start) - IRAM_DRAM_OFFSET;
+_direct_boot_rwtext_end = _rwtext_end - IRAM_DRAM_OFFSET;
+
+ASSERT(LOADADDR(.rwtext) - LOADADDR(.direct_boot.rwtext_start) == ADDR(.rwtext) - ADDR(.direct_boot.rwtext_start), "
+ERROR(esp-bootloader-direct-boot): the load addresses of the RAM code are not contiguous");
 
 _direct_boot_data_src = DROM_BASE + LOADADDR(.data);
 _direct_boot_data_dst = ADDR(.data);
