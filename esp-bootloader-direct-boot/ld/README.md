@@ -19,9 +19,13 @@ magic | entry stub, copy table | RAM section images | .text | .rodata
 
 - The magic is `0xaedb041d` twice, at `DIRECT_BOOT_MAGIC_OFFSET`. The ROM jumps to the
   instruction after it.
-- The RAM section images (`.rwtext`, `.data`, and on the ESP32-P4 `.uncached.data`) are listed in
+- The RAM section images (RAM code, `.data`, and on the ESP32-P4 `.uncached.data`) are listed in
   the copy table as `(source, destination start, destination end)`. The entry stub copies them
   before it starts the runtime, so `.data` is not copied again by riscv-rt or xtensa-lx-rt.
+- RAM code is one copy range: `.trap` (on the ESP32-S3 `.direct_boot.rwtext_start`), the output
+  sections from esp-hal's `esp_hal_rwtext_sections.x`, and `.rwtext`. Only the first section has an
+  `AT`, so the others continue its load addresses, and an `ASSERT` checks that they do. On the
+  ESP32-S3, `.vectors` is a separate range.
 - The RTC memory images are listed in a second table of the same format. `early_init` copies them
   unless the chip woke up from deep sleep, as the ESP-IDF bootloader does, so initialized RTC
   statics keep their values over deep sleep.

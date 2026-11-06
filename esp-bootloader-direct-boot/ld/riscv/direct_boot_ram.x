@@ -5,7 +5,9 @@
    esp-hal's `esp_hal_rwtext.x` places in RAM before the `.text` catch-all does. */
 
 SECTIONS {
-  .rwtext : AT(_direct_boot_rwtext_lma)
+  /* The only RAM code section with an `AT`: the sections up to the end of `.rwtext` continue its
+     load addresses, so the entry stub copies them as one range. */
+  .trap : AT(_direct_boot_rwtext_lma)
   {
     /* The vector tables are written at runtime, so they stay in front of `_rwtext_start`:
        esp-hal's PMP makes `_rwtext_start`..`_rwtext_end` read-only. */
@@ -16,6 +18,12 @@ SECTIONS {
 
     . = ALIGN(4);
     _rwtext_start = .;
+  } > RWTEXT
+
+  INCLUDE "esp_hal_rwtext_sections.x"
+
+  .rwtext : ALIGN(4)
+  {
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
     /* Patched SPI-flash ROM functions from esp-rom-sys. */
     *:esp_rom_spiflash.*(.literal .text .literal.* .text.*)
@@ -40,7 +48,7 @@ SECTIONS {
     _rwtext_end = .;
   } > RWTEXT
 
-  _rwtext_len = _rwtext_end - ORIGIN(RWTEXT);
+  _rwtext_len = ABSOLUTE(_rwtext_end - ORIGIN(RWTEXT));
 
   /* Where IRAM and DRAM are two views of the same SRAM, skip the DRAM view of `.rwtext`. */
   .data ALIGN(_rwtext_end - IRAM_DRAM_OFFSET, 16) : AT(ALIGN(LOADADDR(.rwtext) + SIZEOF(.rwtext), 4))
@@ -102,10 +110,13 @@ _sidata = LOADADDR(.data);
 /* esp-riscv-rt treats a stack pointer below this as a stack overflow. */
 _dram_data_start = _rwtext_end - IRAM_DRAM_OFFSET;
 
-/* `.rwtext` is copied through its DRAM view. */
-_direct_boot_rwtext_src = DROM_BASE + LOADADDR(.rwtext);
-_direct_boot_rwtext_dst = ADDR(.rwtext) - IRAM_DRAM_OFFSET;
-_direct_boot_rwtext_end = _direct_boot_rwtext_dst + SIZEOF(.rwtext);
+/* The RAM code from `.trap` to the end of `.rwtext` is copied through its DRAM view. */
+_direct_boot_rwtext_src = DROM_BASE + LOADADDR(.trap);
+_direct_boot_rwtext_dst = ADDR(.trap) - IRAM_DRAM_OFFSET;
+_direct_boot_rwtext_end = _rwtext_end - IRAM_DRAM_OFFSET;
+
+ASSERT(LOADADDR(.rwtext) - LOADADDR(.trap) == ADDR(.rwtext) - ADDR(.trap), "
+ERROR(esp-bootloader-direct-boot): the load addresses of the RAM code are not contiguous");
 
 _direct_boot_data_src = DROM_BASE + LOADADDR(.data);
 _direct_boot_data_dst = ADDR(.data);
