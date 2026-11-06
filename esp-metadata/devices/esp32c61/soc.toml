@@ -316,6 +316,7 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",
