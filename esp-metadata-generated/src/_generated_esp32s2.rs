@@ -370,6 +370,24 @@ macro_rules! property {
     ("adc.sar_power_override") => {
         false
     };
+    ("dac.version") => {
+        1
+    };
+    ("dac.version", str) => {
+        stringify!(1)
+    };
+    ("dac.channel_count") => {
+        2
+    };
+    ("dac.channel_count", str) => {
+        stringify!(2)
+    };
+    ("dac.resolution") => {
+        8
+    };
+    ("dac.resolution", str) => {
+        stringify!(8)
+    };
     ("ledc.version") => {
         2
     };
@@ -4968,6 +4986,9 @@ macro_rules! for_each_peripheral {
         "PCNT0_UNIT2 peripheral singleton"] PCNT0_UNIT2 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "PCNT0_UNIT3 peripheral singleton"] PCNT0_UNIT3 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "DAC1 peripheral singleton"]
+        DAC1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "DAC2 peripheral singleton"] DAC2 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SDM_CH0 peripheral singleton"]
         SDM_CH0 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "SDM_CH1 peripheral singleton"] SDM_CH1 <= virtual() (unstable)));
@@ -5071,9 +5092,6 @@ macro_rules! for_each_peripheral {
         "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "ADC2 peripheral singleton"]
         ADC2 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "DAC1 peripheral singleton"] DAC1 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "DAC2 peripheral singleton"]
-        DAC2 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "FLASH peripheral singleton"] FLASH <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
@@ -5120,6 +5138,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PCNT0_UNIT1(unstable)));
         _for_each_inner_peripheral!((PCNT0_UNIT2(unstable)));
         _for_each_inner_peripheral!((PCNT0_UNIT3(unstable)));
+        _for_each_inner_peripheral!((DAC1(unstable)));
+        _for_each_inner_peripheral!((DAC2(unstable)));
         _for_each_inner_peripheral!((SDM_CH0(unstable)));
         _for_each_inner_peripheral!((SDM_CH1(unstable)));
         _for_each_inner_peripheral!((SDM_CH2(unstable)));
@@ -5171,8 +5191,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((WIFI));
         _for_each_inner_peripheral!((ADC1(unstable)));
         _for_each_inner_peripheral!((ADC2(unstable)));
-        _for_each_inner_peripheral!((DAC1(unstable)));
-        _for_each_inner_peripheral!((DAC2(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((PSRAM(unstable)));
@@ -5361,6 +5379,8 @@ macro_rules! for_each_peripheral {
         <= virtual() (unstable)), (@ peri_type #[doc =
         "PCNT0_UNIT2 peripheral singleton"] PCNT0_UNIT2 <= virtual() (unstable)), (@
         peri_type #[doc = "PCNT0_UNIT3 peripheral singleton"] PCNT0_UNIT3 <= virtual()
+        (unstable)), (@ peri_type #[doc = "DAC1 peripheral singleton"] DAC1 <= virtual()
+        (unstable)), (@ peri_type #[doc = "DAC2 peripheral singleton"] DAC2 <= virtual()
         (unstable)), (@ peri_type #[doc = "SDM_CH0 peripheral singleton"] SDM_CH0 <=
         virtual() (unstable)), (@ peri_type #[doc = "SDM_CH1 peripheral singleton"]
         SDM_CH1 <= virtual() (unstable)), (@ peri_type #[doc =
@@ -5439,8 +5459,6 @@ macro_rules! for_each_peripheral {
         enable_pwr_interrupt, disable_pwr_interrupt })), (@ peri_type #[doc =
         "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)), (@ peri_type #[doc =
         "ADC2 peripheral singleton"] ADC2 <= virtual() (unstable)), (@ peri_type #[doc =
-        "DAC1 peripheral singleton"] DAC1 <= virtual() (unstable)), (@ peri_type #[doc =
-        "DAC2 peripheral singleton"] DAC2 <= virtual() (unstable)), (@ peri_type #[doc =
         "FLASH peripheral singleton"] FLASH <= virtual() (unstable)), (@ peri_type #[doc
         = "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)),
         (@ peri_type #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual()
@@ -5460,27 +5478,28 @@ macro_rules! for_each_peripheral {
         (GPIO41), (GPIO42), (GPIO43), (GPIO44), (GPIO45), (GPIO46), (DMA_SPI2(unstable)),
         (DMA_SPI3(unstable)), (DMA_I2S0(unstable)), (DMA_CRYPTO(unstable)),
         (DMA_COPY(unstable)), (PCNT0_UNIT0(unstable)), (PCNT0_UNIT1(unstable)),
-        (PCNT0_UNIT2(unstable)), (PCNT0_UNIT3(unstable)), (SDM_CH0(unstable)),
-        (SDM_CH1(unstable)), (SDM_CH2(unstable)), (SDM_CH3(unstable)),
-        (SDM_CH4(unstable)), (SDM_CH5(unstable)), (SDM_CH6(unstable)),
-        (SDM_CH7(unstable)), (AES(unstable)), (APB_SARADC(unstable)), (DS(unstable)),
-        (EXTMEM(unstable)), (FE(unstable)), (FE2(unstable)), (GPIO(unstable)),
-        (GPIO_SD(unstable)), (HMAC(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1),
-        (I2S0(unstable)), (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)),
-        (LEDC(unstable)), (NRX(unstable)), (PCNT(unstable)), (PMS(unstable)),
-        (RMT(unstable)), (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)),
-        (RTC_TIMER(unstable)), (LP_I2C0(unstable)), (RTC_IO(unstable)), (SENS(unstable)),
-        (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3),
-        (SYSCON(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)),
-        (TIMG1(unstable)), (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)),
-        (USB_FS(unstable)), (XTS_AES(unstable)), (WIFI), (ADC1(unstable)),
-        (ADC2(unstable)), (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
-        (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (ULP_RISCV_CORE(unstable)),
-        (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
-        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, SpiDmaChannel), (I2S0,
-        I2s0, 0, I2sDmaChannel), (AES, Aes, 0, CryptoDmaChannel), (SPI3, Spi3, 1,
-        SpiDmaChannel), (SHA, Sha, 1, CryptoDmaChannel)));
+        (PCNT0_UNIT2(unstable)), (PCNT0_UNIT3(unstable)), (DAC1(unstable)),
+        (DAC2(unstable)), (SDM_CH0(unstable)), (SDM_CH1(unstable)), (SDM_CH2(unstable)),
+        (SDM_CH3(unstable)), (SDM_CH4(unstable)), (SDM_CH5(unstable)),
+        (SDM_CH6(unstable)), (SDM_CH7(unstable)), (AES(unstable)),
+        (APB_SARADC(unstable)), (DS(unstable)), (EXTMEM(unstable)), (FE(unstable)),
+        (FE2(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
+        (I2C_ANA_MST(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
+        (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)), (LEDC(unstable)),
+        (NRX(unstable)), (PCNT(unstable)), (PMS(unstable)), (RMT(unstable)),
+        (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)), (RTC_TIMER(unstable)),
+        (LP_I2C0(unstable)), (RTC_IO(unstable)), (SENS(unstable)), (SHA(unstable)),
+        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (SYSCON(unstable)),
+        (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
+        (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_FS(unstable)),
+        (XTS_AES(unstable)), (WIFI), (ADC1(unstable)), (ADC2(unstable)),
+        (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (PSRAM(unstable)),
+        (ULP_RISCV_CORE(unstable)), (FROM_CPU_INTR0(unstable)),
+        (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
+        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
+        Spi2, 0, SpiDmaChannel), (I2S0, I2s0, 0, I2sDmaChannel), (AES, Aes, 0,
+        CryptoDmaChannel), (SPI3, Spi3, 1, SpiDmaChannel), (SHA, Sha, 1,
+        CryptoDmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

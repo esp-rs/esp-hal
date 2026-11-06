@@ -529,6 +529,19 @@ pub unsafe fn wake_pin(pin: u8) {
 }
 
 for_each_analog_function! {
+    (($_ch:ident, DACn, $_n:literal), $gpio:ident) => {
+        #[cfg(dac_version = "2")]
+        #[instability::unstable]
+        impl $crate::gpio::AnalogPin for crate::peripherals::$gpio<'_> {
+            fn set_analog(&self, _: private::Internal) {
+                unsafe { AnyPin::steal(self.number()) }.init_gpio();
+                io_mux_reg(self.number()).modify(|_, w| {
+                    w.fun_wpu().clear_bit();
+                    w.fun_wpd().clear_bit()
+                });
+            }
+        }
+    };
     (($_ch:ident, ADCn_CHm, $_n:literal, $_m:literal), $gpio:ident) => {
         #[instability::unstable]
         impl $crate::gpio::AnalogPin for crate::peripherals::$gpio<'_> {
