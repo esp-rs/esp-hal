@@ -159,6 +159,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | Driver          | Status |
 | --------------- |:------:|
 | LEDC            | [⚠️][2286] [^1] |
+| 2D DMA          | 🚧     |
 | MCPWM           | 🚧     |
 | PCNT            | 🚧     |
 | RTC Timekeeping | 🚧     |
