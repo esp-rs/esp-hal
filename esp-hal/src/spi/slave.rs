@@ -423,6 +423,8 @@ pub mod dma {
                     self.spi_dma.channel.tx.stop_transfer();
                 }
             }
+            self.spi_dma.channel.rx.end_transfer();
+            self.spi_dma.channel.tx.end_transfer();
 
             let retval = unsafe {
                 (

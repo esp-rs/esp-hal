@@ -17,7 +17,7 @@
 
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU},
-    soc::{regi2c, xtal32k},
+    soc::{regi2c, update_bus_clocks, with_single_bus_clock_update, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -119,7 +119,7 @@ impl ClockConfig {
             Some(XtalClkConfig::_48)
         };
 
-        self.apply(clocks);
+        with_single_bus_clock_update(|| self.apply(clocks));
     }
 }
 
@@ -357,26 +357,43 @@ fn configure_hp_root_clk_impl(
         })
     });
 
-    bus_clock_update();
-    update_rom_cpu_frequency();
+    update_bus_clocks();
 }
 
-/// Applies the new `soc_clk_sel`, `cpu_div_num` and `ahb_div_num` values.
-fn bus_clock_update() {
-    PCR::regs()
-        .bus_clk_update()
-        .write(|w| w.bus_clock_update().set_bit());
-    while PCR::regs()
-        .bus_clk_update()
-        .read()
-        .bus_clock_update()
-        .bit_is_set()
-    {}
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+//
+// One bus clock update applies the root clock and both dividers together, so that CPU_CLK stays
+// an integer multiple of AHB_CLK, and AHB_CLK does not exceed XTAL_CLK.
+
+/// Switches the CPU clock to XTAL_CLK if it comes from the PLL, with configured dividers that
+/// [`restore_cpu_clock`] can restore. Returns whether the clock changed.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if !matches!(
+        clocks.hp_root_clk(),
+        Some(HpRootClkConfig::PllF160m | HpRootClkConfig::PllF240m)
+    ) || clocks.cpu_clk().is_none()
+        || clocks.ahb_clk().is_none()
+    {
+        return false;
+    }
+    with_single_bus_clock_update(|| {
+        configure_hp_root_clk_impl(clocks, None, HpRootClkConfig::Xtal);
+        configure_cpu_clk_impl(clocks, None, CpuClkConfig::new(0));
+        configure_ahb_clk_impl(clocks, None, AhbClkConfig::new(0));
+    });
+    true
 }
 
-/// `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
-fn update_rom_cpu_frequency() {
-    esp_rom_sys::rom::ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+/// Restores the CPU clock that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    with_single_bus_clock_update(|| {
+        configure_ahb_clk_impl(clocks, None, unwrap!(clocks.ahb_clk()));
+        configure_cpu_clk_impl(clocks, None, unwrap!(clocks.cpu_clk()));
+        configure_hp_root_clk_impl(clocks, None, unwrap!(clocks.hp_root_clk()));
+    });
 }
 
 // CPU_CLK
@@ -394,8 +411,7 @@ fn configure_cpu_clk_impl(
         .cpu_freq_conf()
         .modify(|_, w| unsafe { w.cpu_div_num().bits(new_config.divisor() as u8) });
 
-    bus_clock_update();
-    update_rom_cpu_frequency();
+    update_bus_clocks();
 }
 
 // AHB_CLK
@@ -413,7 +429,7 @@ fn configure_ahb_clk_impl(
         .ahb_freq_conf()
         .modify(|_, w| unsafe { w.ahb_div_num().bits(new_config.divisor() as u8) });
 
-    bus_clock_update();
+    update_bus_clocks();
 }
 
 // APB_CLK

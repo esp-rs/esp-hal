@@ -9,13 +9,9 @@
 #![allow(dead_code, reason = "Some of this is bound to be unused")]
 #![allow(missing_docs, reason = "Experimental")]
 
-use core::sync::atomic::{AtomicBool, Ordering};
-
-use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
-
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU},
-    soc::{regi2c, xtal32k},
+    soc::{regi2c, update_bus_clocks, with_single_bus_clock_update, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -88,39 +84,8 @@ impl ClockConfig {
     }
 
     pub(crate) fn configure(self, clocks: &mut ClockTree) {
-        // HP_ROOT_CLK and the CPU, AHB and APB dividers share one update signal. Write the
-        // complete configuration before latching it, applying each change separately would
-        // temporarily overclock the buses.
-        BUS_CLOCK_UPDATE_DEFERRED.store(true, Ordering::Relaxed);
-        self.apply(clocks);
-        BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
-
-        update_bus_clocks();
+        with_single_bus_clock_update(|| self.apply(clocks));
     }
-}
-
-static BUS_CLOCK_UPDATE_DEFERRED: AtomicBool = AtomicBool::new(false);
-
-/// Applies a new `soc_clk_sel`, `cpu_div_num`, `ahb_div_num` or `apb_div_num`.
-///
-/// The bus may get stuck if the new combination is invalid.
-fn update_bus_clocks() {
-    if BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
-        return;
-    }
-
-    PCR::regs()
-        .bus_clk_update()
-        .write(|w| w.bus_clock_update().set_bit());
-    while PCR::regs()
-        .bus_clk_update()
-        .read()
-        .bus_clock_update()
-        .bit_is_set()
-    {}
-
-    // `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
-    ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
 /// Powers up and configures the BBPLL and the XTAL frequency doubler again, if a clock uses them.
