@@ -295,7 +295,7 @@ opt-level        = "z"
 overflow-checks  = true
 
 [profile.dev.package.esp-hal]
-# Light sleep needs esp-hal at opt-level 2 or 3
+# Light sleep and flash operations need esp-hal at opt-level 2 or 3
 opt-level = 2
 
 [profile.release]
