@@ -32,6 +32,12 @@ A bootloader support crate provides `linkall.x`, which must:
   output section that holds `*(.rwtext.*)`. Derive sizes and addresses from `_rwtext_len` and from
   the crate's own sections, not from a sum of section sizes, so that new esp-hal sections need no
   change here.
+- The sections in `esp_hal_rwtext_sections.x` have no `AT`. A crate that copies RAM code from flash
+  must give an `AT` only to the output section in front of them and not to the sections that follow.
+  The load addresses then continue from that section, and one copy range from that section to the
+  end of `.rwtext` holds all RAM code. GNU ld does not continue the load addresses from an empty
+  output section, so that section must contain data, for example `LONG(0)`. `ASSERT` that the
+  load addresses are contiguous.
 - Name the output sections `.text` (code in flash), `.rodata` (data in flash) and `.rwtext` (code
   in RAM). esp-hal's scripts can refer to them, for example in `NOCROSSREFS_TO`.
 - Set `ENTRY(_esp_bootloader_entry)` and define `_esp_bootloader_entry`. Here it is an alias of the
