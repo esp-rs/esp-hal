@@ -72,6 +72,7 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
+    clock::CpuFrequencyLock,
     ethernet::phy::PhyError,
     gpio::{
         AlternateFunction,
@@ -783,6 +784,8 @@ fn eth_mac_isr() {
 pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
     _eth: ETH<'d>,
     _clock_guard: GenericPeripheralGuard<{ Peripheral::Emac as u8 }>,
+    // The DMA receives frames at any time, also while the CPU waits for an interrupt.
+    _cpu_frequency_lock: CpuFrequencyLock,
     tx: TDesRing<'d>,
     rx: RDesRing<'d>,
     phy: P,
@@ -874,6 +877,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
             apply_speed: self.apply_speed,
             duplex: self.duplex,
             _clock_guard: self._clock_guard,
+            _cpu_frequency_lock: self._cpu_frequency_lock,
             _eth: self._eth,
             _mode: PhantomData,
         }
@@ -1018,6 +1022,7 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
             apply_speed: self.apply_speed,
             duplex: self.duplex,
             _clock_guard: self._clock_guard,
+            _cpu_frequency_lock: self._cpu_frequency_lock,
             _eth: self._eth,
             _mode: PhantomData,
         }
@@ -1079,6 +1084,7 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
         apply_speed,
         duplex: Duplex::Full,
         _clock_guard: clock_guard,
+        _cpu_frequency_lock: CpuFrequencyLock::new(),
         _eth: eth,
         _mode: PhantomData,
     };

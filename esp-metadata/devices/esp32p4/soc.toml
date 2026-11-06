@@ -478,6 +478,12 @@ channel_count = 8
 [device.sleep]
 support_status = "partial"
 light_sleep = true
+# No idle frequency scaling. With the CPU clock from XTAL_CLK, PSRAM must run at a low speed,
+# because the AXI bus clock must not be slower than the PSRAM clock. The PSRAM speed changes while
+# the L2 cache is frozen. A flash or PSRAM access from the other core then blocks the L1 cache,
+# which also caches HP L2MEM, so the switching core cannot reach its code, stack or data. ESP-IDF
+# stalls the other core. A switch without the stall must run from the uncached view of HP L2MEM,
+# with its stack and data there.
 deep_sleep = true
 ext1_version = 3
 pin_wakeup_version = 3

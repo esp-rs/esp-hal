@@ -349,6 +349,45 @@ fn update_rom_cpu_frequency() {
     esp_rom_sys::rom::ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+
+/// Switches SOC_ROOT_CLK to XTAL_CLK if it is the PLL. Returns whether the clock changed.
+///
+/// CPU_CLK, AHB_CLK and MSPI_FAST_CLK change to XTAL_CLK. APB_CLK changes to XTAL_CLK divided by
+/// the APB divider.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if clocks.soc_root_clk() != Some(SocRootClkConfig::Pll) {
+        return false;
+    }
+    // The LS dividers have no effect while SOC_ROOT_CLK is the PLL.
+    configure_cpu_ls_div_impl(clocks, None, CpuLsDivConfig::new(CpuLsDivDivisor::_0));
+    configure_ahb_ls_div_impl(clocks, None, AhbLsDivConfig::new(AhbLsDivDivisor::_0));
+    configure_mspi_fast_ls_clk_impl(
+        clocks,
+        None,
+        MspiFastLsClkConfig::new(MspiFastLsClkDivisor::_0),
+    );
+    configure_soc_root_clk_impl(clocks, None, SocRootClkConfig::Xtal);
+    true
+}
+
+/// Restores SOC_ROOT_CLK and the LS dividers that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    configure_soc_root_clk_impl(clocks, None, unwrap!(clocks.soc_root_clk()));
+    if let Some(config) = clocks.cpu_ls_div() {
+        configure_cpu_ls_div_impl(clocks, None, config);
+    }
+    if let Some(config) = clocks.ahb_ls_div() {
+        configure_ahb_ls_div_impl(clocks, None, config);
+    }
+    if let Some(config) = clocks.mspi_fast_ls_clk() {
+        configure_mspi_fast_ls_clk_impl(clocks, None, config);
+    }
+}
+
 // CPU_HS_DIV
 
 fn enable_cpu_hs_div_impl(_clocks: &mut ClockTree, _en: bool) {

@@ -11,6 +11,7 @@ use esp_sync::NonReentrantMutex;
 
 use crate::{
     asynch::AtomicWaker,
+    clock::CpuFrequencyLock,
     dma::aligned::InternalMemory,
     interrupt,
     mipi_dsi::{
@@ -178,6 +179,8 @@ fn dsi_bridge_isr() {
 /// continuously streaming frame buffers via VDMA.
 pub struct DsiDpi<'d> {
     _guard: crate::mipi_dsi::DphyGuard<'d>,
+    // VDMA streams the frame buffers from PSRAM, also while the CPU waits for an interrupt.
+    _cpu_frequency_lock: CpuFrequencyLock,
     fb_ptrs: [*mut u8; MAX_FBS],
     fb_size: usize,
     num_fbs: usize,
@@ -215,6 +218,7 @@ impl<'d> DsiDpi<'d> {
         config: DpiConfig,
         framebuffers: &[&'d mut [u8]],
     ) -> Result<Self, ConfigError> {
+        let cpu_frequency_lock = CpuFrequencyLock::new();
         let num_fbs = framebuffers.len();
         debug_assert!((1..=MAX_FBS).contains(&num_fbs));
         let fb_size = framebuffers[0].len();
@@ -422,6 +426,7 @@ impl<'d> DsiDpi<'d> {
         let MipiDsi { guard, .. } = bus;
         Ok(Self {
             _guard: guard,
+            _cpu_frequency_lock: cpu_frequency_lock,
             fb_ptrs,
             fb_size,
             num_fbs,

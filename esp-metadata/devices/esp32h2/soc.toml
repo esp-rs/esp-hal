@@ -337,6 +337,7 @@ max_data_width = 8
 [device.sleep]
 support_status = "partial"
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 # esp32h2 has no separate per-pin path: `pin_wakeup_version` stays unset because the per-pin
 # registers *are* the ext1 registers.
@@ -419,8 +420,10 @@ support_status = "not_supported"
 [device.bt]
 support_status = "partial"
 controller = "npl"
+requires_fast_cpu = true
 
 [device.ieee802154]
+requires_fast_cpu = true
 
 [device.phy]
 
