@@ -399,6 +399,8 @@ unstable_driver! {
     #[cfg(cordic_driver_supported)]
     pub mod cordic;
     pub mod delay;
+    #[cfg(dma2d_driver_supported)]
+    pub mod dma2d;
     #[cfg(ecc_driver_supported)]
     pub mod ecc;
     #[cfg(flash_driver_supported)]

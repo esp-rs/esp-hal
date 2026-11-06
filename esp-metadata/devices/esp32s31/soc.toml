@@ -606,6 +606,11 @@ extmem_origin = 0x5000_0000
 octal_spi = true
 has_timing_tuning = true
 
+[device.dma2d]
+support_status = "partial"
+tx_channel_count = 4
+rx_channel_count = 3
+
 [device.pixel_accelerator]
 support_status = "partial"
 
