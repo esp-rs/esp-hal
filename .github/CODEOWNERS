@@ -14,6 +14,7 @@
 /esp-lp-hal/                    @playfulFence @SergioGasquez
 
 # ─── Area: boot & flash ───
+/esp-bootloader-direct-boot/    @bjoernQ @SergioGasquez
 /esp-bootloader-esp-idf/        @bjoernQ @SergioGasquez
 /esp-storage/                   @bjoernQ @SergioGasquez
 /esp-rom-sys/                   @bjoernQ @SergioGasquez

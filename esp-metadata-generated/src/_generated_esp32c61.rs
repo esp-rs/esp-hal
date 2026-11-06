@@ -4279,7 +4279,7 @@ macro_rules! memory_range {
         "327680"
     };
     ("DRAM2_UNINIT") => {
-        0x4083EA70..0x4084EA70
+        0x4083E670..0x4084E670
     };
     (size as str, "DRAM2_UNINIT") => {
         "65536"
