@@ -1,8 +1,8 @@
 //! # Coordinate Rotation Digital Computer (CORDIC)
 //!
 //! ## Overview
-//! The CORDIC peripheral computes trigonometric functions and converts
-//! Cartesian vectors to polar coordinates.
+//! The CORDIC peripheral computes trigonometric functions and square roots.
+//! It also converts Cartesian vectors to polar coordinates.
 //!
 //! The driver uses signed Q1.15 and Q1.31 values in `[-1, 1)`.
 //! Angle formulas use radians.
@@ -144,6 +144,8 @@ impl core::error::Error for ConfigError {}
 pub enum Error {
     /// The input is outside the supported range of the operation.
     InvalidInput,
+    /// The operation does not support the configured iteration count.
+    UnsupportedPrecision,
     /// The peripheral did not report completion within the polling timeout.
     ///
     /// The driver resets the peripheral before returning this error.
@@ -194,6 +196,7 @@ enum Function {
     Phase   = 2,
     Modulus = 3,
     Atan    = 4,
+    Sqrt    = 9,
 }
 
 impl Function {}
@@ -463,11 +466,62 @@ impl<'d> Cordic<'d, Blocking> {
         self.calculate_q31(Function::Atan, x, None)
     }
 
-    fn iterations(&self) -> u8 {
-        match self.precision {
-            Precision::Maximum => Precision::Iterations24 as u8,
-            precision => precision as u8,
+    /// Returns `sqrt(x)` in Q1.15.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `x` is negative.
+    /// - [`Error::UnsupportedPrecision`] when the iteration count exceeds 12.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn sqrt_q15(&mut self, x: i16) -> Result<i16, Error> {
+        let Some(root_shift) = self.sqrt_shift(i32::from(x), x.leading_zeros())? else {
+            return Ok(0);
+        };
+        let root = self.calculate_q15(Function::Sqrt, x << (2 * root_shift), None)?;
+        Ok(root >> root_shift)
+    }
+
+    /// Returns `sqrt(x)` in Q1.31.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidInput`] when `x` is negative.
+    /// - [`Error::UnsupportedPrecision`] when the iteration count exceeds 12.
+    /// - [`Error::Timeout`] when the calculation does not complete.
+    pub fn sqrt_q31(&mut self, x: i32) -> Result<i32, Error> {
+        let Some(root_shift) = self.sqrt_shift(x, x.leading_zeros())? else {
+            return Ok(0);
+        };
+        let root = self.calculate_q31(Function::Sqrt, x << (2 * root_shift), None)?;
+        Ok(root >> root_shift)
+    }
+
+    fn sqrt_shift(&self, x: i32, leading_zeros: u32) -> Result<Option<u32>, Error> {
+        match x {
+            ..0 => Err(Error::InvalidInput),
+            0 => {
+                self.iterations(Function::Sqrt)?;
+                Ok(None)
+            }
+            // Normalize to [0.25, 1) for the hardware input range of [0.1069, 1).
+            // See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/docs/en/api-reference/peripherals/cordic.rst#L99-L103>.
+            _ => Ok(Some((leading_zeros - 1) / 2)),
         }
+    }
+
+    fn iterations(&self, function: Function) -> Result<u8, Error> {
+        let max = match function {
+            Function::Sqrt => Precision::Iterations12,
+            _ => Precision::Iterations24,
+        } as u8;
+        let iterations = match self.precision {
+            Precision::Maximum => max,
+            precision => precision as u8,
+        };
+        if iterations > max {
+            return Err(Error::UnsupportedPrecision);
+        }
+        Ok(iterations)
     }
 
     fn calculate_q15(
@@ -523,7 +577,7 @@ impl<'d> Cordic<'d, Blocking> {
         const FAST_POLL_ATTEMPTS: usize = 1024;
         const SLOW_POLL_TIMEOUT: Duration = Duration::from_millis(2);
 
-        let iterations = self.iterations();
+        let iterations = self.iterations(function)?;
         let regs = self.peripheral.register_block();
         let Arguments {
             arg1_word,

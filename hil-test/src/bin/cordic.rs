@@ -239,4 +239,33 @@ mod tests {
         check_q31(cordic.atan_q31(-ATAN_INPUT_Q31).unwrap(), -before_timeout);
         assert_eq!(csr.read().pres().bits(), 3);
     }
+
+    #[test]
+    fn square_root() {
+        let p = esp_hal::init(esp_hal::Config::default());
+        let default = Config::default();
+        let mut cordic = Cordic::new(p.CORDIC, default).unwrap();
+
+        assert_eq!(cordic.sqrt_q31(-1), Err(Error::InvalidInput));
+        assert_eq!(cordic.sqrt_q15(0), Ok(0));
+
+        check_q15(cordic.sqrt_q15(1).unwrap(), 181);
+        assert!(cordic.sqrt_q31(1).unwrap().abs_diff(46_341) <= 1);
+        check_q31(cordic.sqrt_q31(0x0200_0000).unwrap(), 0x1000_0000);
+        let csr = CORDIC::regs().csr_cfg();
+        assert_eq!(csr.read().pres().bits(), 2);
+
+        cordic
+            .apply_config(&default.with_precision(Precision::Iterations16))
+            .unwrap();
+        assert_eq!(cordic.sqrt_q15(0), Err(Error::UnsupportedPrecision));
+        assert_eq!(cordic.sqrt_q31(1), Err(Error::UnsupportedPrecision));
+
+        cordic
+            .apply_config(&default.with_precision(Precision::Iterations12))
+            .unwrap();
+        check_q15(cordic.sqrt_q15(0x4000).unwrap(), 23_170);
+        check_q31(cordic.sqrt_q31(0x4000_0000).unwrap(), 1_518_500_250);
+        assert_eq!(csr.read().pres().bits(), 2);
+    }
 }
