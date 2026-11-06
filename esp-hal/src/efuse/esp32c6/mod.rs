@@ -39,6 +39,15 @@ pub fn block_version() -> (u8, u8) {
     )
 }
 
+/// Returns the factory temperature offset to subtract, in tenths of a degree Celsius.
+///
+/// See <https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/esp_hal_ana_conv/esp32c6/include/hal/temperature_sensor_ll.h#L281-L286>.
+#[instability::unstable]
+pub fn temperature_sensor_calibration() -> Option<i16> {
+    let value = super::read_field_le::<u16>(TEMP_CALIB);
+    Some(super::sign_magnitude(u32::from(value), 8) as i16)
+}
+
 /// Returns the version of RTC calibration block.
 ///
 /// See <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32c6/esp_efuse_rtc_calib.c#L20>

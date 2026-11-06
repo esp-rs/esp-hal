@@ -12,24 +12,31 @@
 //!
 //! ## Configuration
 //!
-//! [`Config`] selects the clock source. Available sources depend on the chip;
-//! see [`ClockSource`].
+//! [`Config`] selects the measurement range and clock source. Available clock
+//! sources depend on the chip; see [`ClockSource`].
 //!
 //! ## Examples
 //!
-//! The following example will measure the internal chip temperature every
-//! second, and print it
+//! This example measures the chip temperature every second.
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::tsens::{TemperatureSensor, Config};
+//! # use esp_hal::tsens::{Config, MeasurementRange, TemperatureSensor};
 //! # use esp_hal::delay::Delay;
 //!
-//! let mut temperature_sensor = TemperatureSensor::new(peripherals.TSENS, Config::default())?;
+//! let config = Config::default().with_range(MeasurementRange::Minus10To80C);
+//! let mut temperature_sensor = TemperatureSensor::new(peripherals.TSENS, config)?;
 //! let delay = Delay::new();
 //! loop {
-//!     let temp = temperature_sensor.get_temperature();
-//!     println!("Temperature: {:.2}°C", temp.to_celsius());
+//!     let sample = temperature_sensor.get_temperature();
+//!     if let Some(celsius) = sample.to_celsius() {
+//!         println!("Temperature: {:.2} °C", celsius);
+//!     } else {
+//!         println!(
+//!             "Uncalibrated temperature: {:.2} °C",
+//!             sample.to_uncalibrated_celsius()
+//!         );
+//!     }
 //!     delay.delay_millis(1_000);
 //! }
 //! # }
@@ -37,7 +44,6 @@
 //!
 //! ## Implementation State
 //!
-//! - Temperature calibration range is not supported
 //! - Interrupts are not supported
 
 mod clocks;
@@ -52,6 +58,7 @@ use crate::{
     clock::ll::{ClockTree, TsensInstance},
     peripherals::TSENS,
     system::GenericPeripheralGuard,
+    time::{Duration, Instant},
 };
 
 /// Temperature sensor configuration
@@ -61,6 +68,47 @@ use crate::{
 pub struct Config {
     /// Clock source for the temperature sensor.
     clock_source: ClockSource,
+
+    /// Measurement range of the temperature sensor.
+    /// Defaults to [`MeasurementRange::Minus10To80C`].
+    range: MeasurementRange,
+}
+
+/// Measurement range of the temperature sensor.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum MeasurementRange {
+    /// -40 °C to 20 °C.
+    Minus40To20C,
+    /// -30 °C to 50 °C.
+    Minus30To50C,
+    /// -10 °C to 80 °C.
+    #[default]
+    Minus10To80C,
+    /// 20 °C to 100 °C.
+    Plus20To100C,
+    /// 50 °C to 125 °C.
+    Plus50To125C,
+}
+
+struct RangeSettings {
+    dac: u8,
+    offset: i8,
+}
+
+impl MeasurementRange {
+    fn settings(self) -> RangeSettings {
+        // See <https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/esp_hal_ana_conv/esp32s3/temperature_sensor_periph.c#L9-L16>.
+        let (dac, offset) = match self {
+            Self::Minus40To20C => (10, 2),
+            Self::Minus30To50C => (11, 1),
+            Self::Minus10To80C => (15, 0),
+            Self::Plus20To100C => (7, -1),
+            Self::Plus50To125C => (5, -2),
+        };
+        RangeSettings { dac, offset }
+    }
 }
 
 /// Temperature sensor configuration error.
@@ -68,43 +116,41 @@ pub struct Config {
 #[non_exhaustive]
 pub enum ConfigError {}
 
-/// Stores the raw ADC value and can be used to calculate the temperature in Celsius using the
-/// formula: `(raw_value * 0.4386) - (offset * 27.88) - 20.52`.
+/// A temperature measurement from one sensor sample.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Temperature {
-    /// Raw ADC value.
-    pub raw_value: u8,
-
-    /// Offset value - depends on the temperature range configured.
-    pub offset: i8,
+    raw_value: u8,
+    offset: i8,
+    calibration: Option<i16>,
 }
 
 impl Temperature {
-    /// Creates a new temperature value.
+    /// Returns the temperature in Celsius before factory calibration.
     #[inline]
-    pub fn new(raw_value: u8, offset: i8) -> Self {
-        Self { raw_value, offset }
+    pub fn to_uncalibrated_celsius(&self) -> f32 {
+        f32::from(self.raw_value) * 0.4386 - f32::from(self.offset) * 27.88 - 20.52
     }
 
-    /// Returns the temperature in Celsius.
+    /// Returns the calibrated temperature in Celsius.
+    ///
+    /// Returns `None` if factory calibration data is unavailable.
     #[inline]
-    pub fn to_celsius(&self) -> f32 {
-        (self.raw_value as f32) * 0.4386 - (self.offset as f32) * 27.88 - 20.52
+    pub fn to_celsius(&self) -> Option<f32> {
+        let calibration = self.calibration?;
+        Some(self.to_uncalibrated_celsius() - f32::from(calibration) / 10.0)
     }
 
-    /// Returns the temperature in Fahrenheit.
+    /// Returns the calibrated temperature in Fahrenheit, if available.
     #[inline]
-    pub fn to_fahrenheit(&self) -> f32 {
-        let celsius = self.to_celsius();
-        (celsius * 1.8) + 32.0
+    pub fn to_fahrenheit(&self) -> Option<f32> {
+        Some(self.to_celsius()? * 1.8 + 32.0)
     }
 
-    /// Returns the temperature in Kelvin.
+    /// Returns the calibrated temperature in Kelvin, if available.
     #[inline]
-    pub fn to_kelvin(&self) -> f32 {
-        let celsius = self.to_celsius();
-        celsius + 273.15
+    pub fn to_kelvin(&self) -> Option<f32> {
+        Some(self.to_celsius()? + 273.15)
     }
 }
 
@@ -112,6 +158,9 @@ impl Temperature {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TemperatureSensor<'d> {
+    range: MeasurementRange,
+    ready_at: Instant,
+    calibration: Option<i16>,
     _peripheral: TSENS<'d>,
     _clock_guard: TsensClockGuard,
     _tsens_guard: GenericPeripheralGuard<{ crate::system::Peripheral::Tsens as u8 }>,
@@ -120,9 +169,7 @@ pub struct TemperatureSensor<'d> {
 }
 
 impl<'d> TemperatureSensor<'d> {
-    /// Creates a new temperature sensor instance with the given configuration.
-    ///
-    /// The sensor is automatically powered up.
+    /// Creates and powers up the temperature sensor with the given configuration.
     pub fn new(peripheral: TSENS<'d>, config: Config) -> Result<Self, ConfigError> {
         // The APB_SARADC clock must be enabled before TSENS.
         #[cfg(temp_sensor_register_block_apb_saradc)]
@@ -130,6 +177,9 @@ impl<'d> TemperatureSensor<'d> {
         let tsens_guard = GenericPeripheralGuard::new();
 
         let mut tsens = Self {
+            range: config.range,
+            ready_at: Instant::EPOCH,
+            calibration: crate::efuse::temperature_sensor_calibration(),
             _peripheral: peripheral,
             _clock_guard: TsensClockGuard::new(config.clock_source),
             _tsens_guard: tsens_guard,
@@ -137,18 +187,24 @@ impl<'d> TemperatureSensor<'d> {
             _apb_saradc_guard: apb_saradc_guard,
         };
 
+        let dac = config.range.settings().dac;
         #[cfg(any(temp_sensor_register_block_sens, temp_sensor_register_block_lp_tsens))]
-        crate::soc::regi2c::I2C_SARADC_TSENS_DAC.write_field(15); // -10 °C to 80 °C, offset 0.
+        crate::soc::regi2c::I2C_SARADC_TSENS_DAC.write_field(dac);
 
         tsens.power_up();
-        // https://github.com/espressif/esp-idf/blob/ab95e70748f2eddac6f87217b0cf62533684a6ba/components/esp_hal_ana_conv/esp32c6/temperature_sensor_periph.c#L9-L16
         #[cfg(temp_sensor_register_block_apb_saradc)]
-        crate::soc::regi2c::I2C_SARADC_TSENS_DAC.write_field(7); // 20 °C to 100 °C, offset -1.
+        crate::soc::regi2c::I2C_SARADC_TSENS_DAC.write_field(dac);
 
-        // https://github.com/espressif/esp-idf/blob/cebb3dd4d8704a5aa1c2b3a23c4c4b9b26e71194/components/esp_driver_tsens/src/temperature_sensor.c#L251-L254
-        crate::rom::ets_delay_us(300);
+        tsens.start_stabilization();
 
         Ok(tsens)
+    }
+
+    fn start_stabilization(&mut self) {
+        const STABILIZATION_CYCLES: u64 = 20_000;
+        let delay_us = (STABILIZATION_CYCLES * 1_000_000)
+            .div_ceil(u64::from(TsensInstance::Tsens.sclk_frequency()));
+        self.ready_at = Instant::now() + Duration::from_micros(delay_us);
     }
 
     fn power_up(&mut self) {
@@ -213,37 +269,58 @@ impl<'d> TemperatureSensor<'d> {
     }
 
     /// Changes the temperature sensor configuration.
-    pub fn apply_config(&mut self, _config: &Config) -> Result<(), ConfigError> {
-        #[cfg(soc_clock_node_tsens_sclk_is_configurable)]
-        ClockTree::with(|clocks| {
-            TsensInstance::Tsens.configure_sclk(clocks, _config.clock_source);
-        });
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        let restart_stabilization = cfg_select! {
+            soc_clock_node_tsens_sclk_is_configurable => ClockTree::with(|clocks| {
+                let tsens = TsensInstance::Tsens;
+                let restart = tsens.sclk_config(clocks) != Some(config.clock_source)
+                    && Instant::now() < self.ready_at;
+                tsens.configure_sclk(clocks, config.clock_source);
+                restart
+            }),
+            _ => false,
+        };
+
+        let range_changed = self.range != config.range;
+        if range_changed {
+            crate::soc::regi2c::I2C_SARADC_TSENS_DAC.write_field(config.range.settings().dac);
+            self.range = config.range;
+        }
+        if range_changed || restart_stabilization {
+            self.start_stabilization();
+        }
 
         Ok(())
     }
 
-    /// Returns the raw temperature value.
+    /// Reads a temperature sample.
+    ///
+    /// Waits for any remaining stabilization time after power-up or a range change.
     #[inline]
     pub fn get_temperature(&mut self) -> Temperature {
-        // TODO Address multiple temperature ranges and offsets
-        let (raw_value, offset) = cfg_select! {
-            temp_sensor_register_block_apb_saradc => {
-                (APB_SARADC::regs().tsens_ctrl().read().out().bits(), -1)
-            }
-            temp_sensor_register_block_sens => (
-                {
-                    let ctrl = SENS::regs().sar_tsens_ctrl();
-                    ctrl.modify(|_, w| w.sar_tsens_dump_out().set_bit());
-                    while ctrl.read().sar_tsens_ready().bit_is_clear() {}
-                    ctrl.modify(|_, w| w.sar_tsens_dump_out().clear_bit());
-                    ctrl.read().sar_tsens_out().bits()
-                },
-                0,
-            ),
-            temp_sensor_register_block_lp_tsens => (TSENS::regs().ctrl().read().out().bits(), 0),
-        };
+        if self.ready_at != Instant::EPOCH {
+            while Instant::now() < self.ready_at {}
+            self.ready_at = Instant::EPOCH;
+        }
 
-        Temperature::new(raw_value, offset)
+        let raw_value = cfg_select! {
+            temp_sensor_register_block_apb_saradc => {
+                APB_SARADC::regs().tsens_ctrl().read().out().bits()
+            }
+            temp_sensor_register_block_sens => {{
+                let ctrl = SENS::regs().sar_tsens_ctrl();
+                ctrl.modify(|_, w| w.sar_tsens_dump_out().set_bit());
+                while ctrl.read().sar_tsens_ready().bit_is_clear() {}
+                ctrl.modify(|_, w| w.sar_tsens_dump_out().clear_bit());
+                ctrl.read().sar_tsens_out().bits()
+            }}
+            temp_sensor_register_block_lp_tsens => TSENS::regs().ctrl().read().out().bits(),
+        };
+        Temperature {
+            raw_value,
+            offset: self.range.settings().offset,
+            calibration: self.calibration,
+        }
     }
 }
 
