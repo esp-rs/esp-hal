@@ -2285,4 +2285,14 @@ impl ManualWritebackBuffer {
     pub fn mut_buffer_ptr(&mut self) -> *mut u8 {
         self.buffer.get_mut().as_mut_ptr().cast::<u8>()
     }
+
+    /// Zeroes the buffer. It can hold plaintext.
+    // Only the GCM path zeroes a buffer, so the method is dead code without it.
+    #[cfg(aes_dma_mode_gcm)]
+    pub fn clear(&mut self) {
+        let mut buffer = self.buffer.get_mut();
+        unsafe { core::ptr::write_volatile(buffer.as_mut_ptr(), [0; BUF_LEN]) };
+        #[cfg(soc_internal_memory_cached)]
+        buffer.writeback();
+    }
 }
