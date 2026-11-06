@@ -1104,3 +1104,13 @@ impl RtcSleepConfig {
         }
     }
 }
+
+/// Requests a light sleep with CPU retention.
+///
+/// esp-idf also prepares PSRAM and the MPLL around the request. This function does not do that
+/// yet.
+pub(crate) use super::pmu_common::request_sleep as pmu_sleep_start;
+
+/// Runs the wake steps after a CPU power-down. The ESP32-P4 has no wake steps yet.
+#[inline(always)]
+pub(crate) fn pmu_sleep_finish() {}

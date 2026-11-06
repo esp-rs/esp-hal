@@ -888,3 +888,10 @@ impl RtcSleepConfig {
         // driver knows which pads it prepared.
     }
 }
+
+/// Requests a light sleep with CPU retention. The ESP32-C5 needs no steps around the request.
+pub(crate) use super::pmu_common::request_sleep as pmu_sleep_start;
+
+/// Runs the wake steps after a CPU power-down. The ESP32-C5 has no wake steps.
+#[inline(always)]
+pub(crate) fn pmu_sleep_finish() {}
