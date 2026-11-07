@@ -1,5 +1,8 @@
-//! Module clock is engine-wide (`SdHostController::new`); per-slot card clock
-//! is programmed by `EngineSession` on engine acquire.
+//! The module clock's source is engine-wide (`SdHostController::new`), while
+//! its first-stage divider follows the slot being programmed: `EngineSession`
+//! picks the divider for the slot's frequency on every engine acquire, so the
+//! controller's own card divider can stay bypassed for every card clock. See
+//! [`clock_dividers`].
 use super::*;
 
 /// Powers the SD card / SD IO domain from on-chip LDO channel 4 at 3.3 V.
@@ -46,11 +49,12 @@ pub fn chip_setup() {
 /// Programs the module clock in `HP_SYS_CLKRST` (P4 keeps the divider/source
 /// outside the SDHOST block; see `sdmmc_ll`).
 ///
-/// Two sources are supported: [`ClockSource::Pll160m`] (the default, 160 MHz —
+/// Two sources are supported: [`ClockSource::Pll160m`] (the default, 160 MHz --
 /// enough for Default/High Speed) and [`ClockSource::SdioPll`] (the dedicated
-/// 200 MHz SDIO PLL, required for the UHS-I SDR50 mode). The module clock is
-/// the upper bound for the card clock (`card = module / (2 * div)`, or `module`
-/// when the card divider is bypassed).
+/// 200 MHz SDIO PLL, required for the UHS-I SDR50 mode). `div` is the smallest
+/// first-stage divider, i.e. the divider that yields the fastest card clock;
+/// [`clock_dividers`] raises it per slot when a lower frequency is asked for,
+/// so the module clock is the upper bound for every card clock.
 pub fn set_module_clock(source: ClockSource, div: u8) {
     let c = crate::peripherals::HP_SYS_CLKRST::regs();
 
@@ -75,8 +79,55 @@ pub fn set_module_clock(source: ClockSource, div: u8) {
         w.sdio_ls_clk_en().set_bit()
     });
 
-    // Low-speed clock divider edges (`h`/`l`/`n`); `div == 1` bypasses the
-    // divider via `sdio_hs_mode`.
+    set_clock_div(div);
+
+    // Enable the drive (output), sample (input) and self (core) clocks. Without
+    // these the controller never drives the card clock out, so commands never
+    // complete.
+    //
+    // The drive edge is 1. Which divider stage produces the card clock decides
+    // where the launch lands relative to the card clock edge, so keeping the
+    // division in the first stage and the controller's card divider bypassed
+    // leaves one edge valid for every card clock; only the sample edge moves,
+    // and only when `EngineSession` tunes it.
+    //
+    // `clock_dividers` falls back to the controller's card divider when the
+    // first stage cannot divide far enough (`hz < source_hz / 16`, the
+    // low-frequency probe). Those clocks are long enough that the launch shift
+    // of half a module clock cycle stays a small fraction of a card period, so
+    // the edge stays 1 there too.
+    //
+    // See https://github.com/espressif/esp-idf/blob/f761a647c833a5df9771cf794f1279ae5d41fb72/components/hal/esp32p4/include/hal/sdmmc_ll.h#L256-L267.
+    c.peri_clk_ctrl02().modify(|_, w| unsafe {
+        w.sdio_ls_drv_clk_en().set_bit();
+        w.sdio_ls_sam_clk_en().set_bit();
+        w.sdio_ls_slf_clk_en().set_bit();
+        w.sdio_ls_drv_clk_edge_sel().bits(1);
+        w.sdio_ls_sam_clk_edge_sel().bits(0);
+        w.sdio_ls_slf_clk_edge_sel().bits(0)
+    });
+
+    // Commit the divider/phase edge configuration.
+    c.peri_clk_ctrl02()
+        .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
+    c.peri_clk_ctrl02()
+        .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
+}
+
+/// Largest divider the first stage can produce (`sdio_ls_clk_edge_l` is 4 bits).
+const FIRST_STAGE_DIV_MAX: u8 = 16;
+
+/// Programs the module clock's first-stage divider.
+///
+/// `div == 1` bypasses the divider through `sdio_hs_mode`, otherwise `h`/`l`/`n`
+/// generate the low/high edge pattern the divided clock is made of. Callers
+/// program a divider with the card clock of the slot they are serving gated off,
+/// because the first stage is shared by both slots.
+///
+/// See https://github.com/espressif/esp-idf/blob/f761a647c833a5df9771cf794f1279ae5d41fb72/components/hal/esp32p4/include/hal/sdmmc_ll.h#L200-L214.
+pub fn set_clock_div(div: u8) {
+    let c = crate::peripherals::HP_SYS_CLKRST::regs();
+
     if div > 1 {
         // Make sure the divider is not bypassed: a previous `div == 1` session
         // leaves `sdio_hs_mode` set, which would otherwise make the card clock
@@ -101,24 +152,6 @@ pub fn set_module_clock(source: ClockSource, div: u8) {
         });
     }
 
-    // Enable the drive (output), sample (input) and self (core) clocks. Without
-    // these the controller never drives the card clock out, so commands never
-    // complete.
-    //
-    // The drive edge starts at 0 (correct for every divided card clock; see
-    // [`set_drive_clk_edge`] for why esp-idf's 1 breaks writes at 50 MHz here
-    // and why the *bypassed* SDR50 point needs 1). `EngineSession` re-programs
-    // it on every clock change.
-    c.peri_clk_ctrl02().modify(|_, w| unsafe {
-        w.sdio_ls_drv_clk_en().set_bit();
-        w.sdio_ls_sam_clk_en().set_bit();
-        w.sdio_ls_slf_clk_en().set_bit();
-        w.sdio_ls_drv_clk_edge_sel().bits(0);
-        w.sdio_ls_sam_clk_edge_sel().bits(0);
-        w.sdio_ls_slf_clk_edge_sel().bits(0)
-    });
-
-    // Commit the divider/phase edge configuration.
     c.peri_clk_ctrl02()
         .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
     c.peri_clk_ctrl02()
@@ -128,30 +161,30 @@ pub fn set_module_clock(source: ClockSource, div: u8) {
 /// Card-clock frequency at which the P4 DLL delay path is used (SDR104).
 const SDR104_HZ: u32 = 200_000_000;
 
-/// Programs the **drive** (host→card) clock edge.
+/// Splits a card clock between the module clock's first stage and the
+/// controller's card divider, as `(first-stage divider, card divider)`.
 ///
-/// `sdio_ls_drv_clk_edge_sel` picks which phase of the module clock launches
-/// command/data to the card. It is not output-tunable by `tune_bus` (that
-/// sweeps only the sample edge), so the value must match the card-clock
-/// divider: with the divider active (the card sees every other module edge)
-/// edge 0 is correct, but with the divider **bypassed** (`card_div == 0`, the
-/// SDR50 100 MHz point) the card samples the same module edge that edge 0
-/// launches on. Edge 1 restores the setup margin there; edge 0 at 100 MHz loses
-/// the worst-case command argument (`0xaaaa0000`, the RCA) while benign
-/// arguments still pass, which shows up as `ResponseTimeout` on the first
-/// addressed command after the SDR50 switch.
+/// Dividing in the first stage and leaving the controller's card divider
+/// bypassed keeps the drive-clock launch phase the same for every frequency
+/// (see `set_module_clock`), at the cost of the coarser steps the first stage
+/// can make. The controller's card divider only comes in when the first stage
+/// cannot divide far enough (`div > 16`), which is the low-frequency probe.
 ///
-/// `EngineSession::program_slot_hw` calls this on every clock change with
-/// `card_div == 0`, so one build serves both the bypassed SDR50 point and the
-/// divided High Speed one.
-pub fn set_drive_clk_edge(edge: u8) {
-    let c = crate::peripherals::HP_SYS_CLKRST::regs();
-    c.peri_clk_ctrl02()
-        .modify(|_, w| unsafe { w.sdio_ls_drv_clk_edge_sel().bits(edge & 0b11) });
-    c.peri_clk_ctrl02()
-        .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
-    c.peri_clk_ctrl02()
-        .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
+/// `module_div` is the smallest divider used, so a slot never runs faster than
+/// the configured module clock.
+///
+/// See https://github.com/espressif/esp-idf/blob/f761a647c833a5df9771cf794f1279ae5d41fb72/components/esp_driver_sdmmc/src/sdmmc_host.c#L225-L269.
+pub fn clock_dividers(module: Config, hz: u32) -> (u8, u8) {
+    let base = source_hz(module.clock_source);
+    let hz = hz.max(1);
+    let want = base.div_ceil(hz).max(module.module_div as u32);
+
+    if want <= FIRST_STAGE_DIV_MAX as u32 {
+        (want as u8, 0)
+    } else {
+        let first = module.module_div;
+        (first, freq_to_card_div(base / first as u32, hz))
+    }
 }
 
 /// Programs the input sampling delay phase (LS edge select below SDR104, DLL above).

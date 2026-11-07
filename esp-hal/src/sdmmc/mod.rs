@@ -137,8 +137,9 @@ pub enum BusWidth {
 
 /// Controller-wide (engine) configuration.
 ///
-/// These settings drive the shared module clock and therefore apply to the
-/// whole controller, not an individual slot.
+/// These settings select the module clock: its source, which the whole
+/// controller shares, and the *smallest* divider the driver uses, which sets
+/// the fastest card clock any slot can be programmed to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -146,7 +147,11 @@ pub struct Config {
     /// The clock source for the module clock.
     clock_source: ClockSource,
 
-    /// The module-clock divider (valid range `2..=16`).
+    /// The smallest module-clock divider (valid range `2..=16`).
+    ///
+    /// A slot that asks for a lower frequency divides further: in the module
+    /// clock's first stage where the driver can reprogram it per slot
+    /// (ESP32-P4), in the controller's card divider otherwise.
     module_div: u8,
 }
 
@@ -528,14 +533,19 @@ impl EngineSession {
         module: Config,
     ) -> Result<(), Error> {
         self.set_card_width(slot, cached.width);
-        let card_div =
-            freq_to_card_div(module_hz(module.clock_source, module.module_div), cached.hz);
-        // The host->card drive edge must follow the card divider: a bypassed
-        // divider (`card_div == 0`, the SDR50 100 MHz point) needs edge 1, a
-        // divided one edge 0. See `set_drive_clk_edge`.
-        #[cfg(sdmmc_uhs)]
-        chip_specific::set_drive_clk_edge(if card_div == 0 { 1 } else { 0 });
-        self.set_card_clock(slot, card_div)?;
+        // Which stage divides the card clock, and by how much. Chips whose
+        // first stage can be reprogrammed per slot prefer it and keep the
+        // controller's card divider bypassed -- the arrangement the host->card
+        // drive clock edge is calibrated for; the others keep the module clock
+        // as configured and divide the rest out in the controller.
+        let (first_div, card_div) = cfg_select! {
+            sdmmc_uhs => chip_specific::clock_dividers(module, cached.hz),
+            _ => (
+                module.module_div,
+                freq_to_card_div(module_hz(module.clock_source, module.module_div), cached.hz),
+            ),
+        };
+        self.set_card_clock(slot, first_div, card_div)?;
         #[cfg(sdmmc_delay_phase_num_is_set)]
         if cached.hz > 25_000_000 {
             chip_specific::set_input_delay_phase(cached.input_delay_phase, cached.hz);
@@ -558,7 +568,15 @@ impl EngineSession {
         });
     }
 
-    fn set_card_clock(&mut self, id: SlotId, card_div: u8) -> Result<(), Error> {
+    /// Programs the slot's card clock.
+    ///
+    /// `first_div` is the module clock's first-stage divider, `card_div` the
+    /// controller's card divider. Both are programmed with this slot's card
+    /// clock gated off, so neither changes mid-cycle. The first stage feeds
+    /// every slot, so reprogramming it for this slot's frequency also disturbs
+    /// the other slot's idle clock; no transfer can be in flight here, because
+    /// the engine guard is held.
+    fn set_card_clock(&mut self, id: SlotId, first_div: u8, card_div: u8) -> Result<(), Error> {
         let slot = id.index();
         let r = SDHOST::regs();
 
@@ -584,6 +602,11 @@ impl EngineSession {
                 SlotId::_1 => w.clk_divider1().bits(card_div),
             }
         });
+
+        #[cfg(sdmmc_uhs)]
+        chip_specific::set_clock_div(first_div);
+        #[cfg(not(sdmmc_uhs))]
+        let _ = first_div;
 
         r.clkena().modify(|rd, w| unsafe {
             w.cclk_enable().bits(rd.cclk_enable().bits() | (1 << slot));
@@ -1364,10 +1387,11 @@ impl<'d> SdHostController<'d> {
         };
 
         // Module clock first, then the DesignWare reset, then quiesce
-        // interrupts. The module clock is engine-wide, so it is programmed once
-        // here and the config is stashed for slots to derive their card
-        // dividers from. The clock setup must precede `reset_engine` because
-        // the module clock drives the FIFO reset.
+        // interrupts. The clock source is engine-wide and is set up once here;
+        // `module_div` is the smallest divider the driver uses, and slots
+        // derive their per-frequency divider from it (see
+        // `chip_specific::clock_dividers`). The clock setup must precede
+        // `reset_engine` because the module clock drives the FIFO reset.
         chip_specific::set_module_clock(config.clock_source, config.module_div);
         this.reset_engine();
 
@@ -2597,9 +2621,9 @@ fn disable_idmac() {
     r.ctrl().modify(|_, w| w.dma_reset().set_bit());
 }
 
-/// Module clock in Hz for a given source and divider.
-fn module_hz(source: ClockSource, div: u8) -> u32 {
-    let base = match source {
+/// Rate of the clock source that feeds the module clock, before dividing.
+fn source_hz(source: ClockSource) -> u32 {
+    match source {
         #[cfg(esp32s31)]
         ClockSource::Mpll => crate::clock::ll::mpll_clk_frequency(),
         #[cfg(not(esp32s31))]
@@ -2610,8 +2634,12 @@ fn module_hz(source: ClockSource, div: u8) -> u32 {
         // ClockSource::Apll => unimplemented!(),
         #[cfg(not(esp32p4))]
         ClockSource::Xtal => 40_000_000,
-    };
-    base / (div as u32)
+    }
+}
+
+/// Module clock in Hz for a given source and divider.
+fn module_hz(source: ClockSource, div: u8) -> u32 {
+    source_hz(source) / (div as u32)
 }
 
 /// Computes the per-card divider for a target frequency.
