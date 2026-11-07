@@ -1887,11 +1887,15 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
     }
 
     /// Issues a control command, mapping protocol types to the engine core.
+    ///
+    /// One attempt only: the retry policy for unanswered commands lives in the
+    /// `MmcBus::send_command` implementation below, which owns the engine lock
+    /// around every attempt.
     async fn cmd_async<'a, C: sdio::ControlCommand + 'a>(
         &mut self,
         session: &mut EngineSession,
-        cmd: C,
-    ) -> Result<C::Resp<'a>, MmcError> {
+        cmd: &C,
+    ) -> Result<C::Resp<'a>, Error> {
         let slot = slot_id(S);
         let resp_len = match <C::Resp<'a> as sdio::Response>::LEN {
             sdio::ResponseLen::Zero => ResponseLen::None,
@@ -1906,29 +1910,9 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             busy: <C::Resp<'a> as sdio::Response>::BUSY,
         };
         let crc = <C::Resp<'a> as sdio::Response>::CRC;
-        // A card that missed the first commands after a cold power-up leaves
-        // them unanswered; the spec has the host keep repeating identification,
-        // so retry a command that shows no response at all (a timeout means
-        // nothing was executed, which makes this safe for CMD0/8/55/41 -- unlike
-        // a CRC error, where the card did act).
-        let mut attempt = 0u8;
-        let words = loop {
-            match session
-                .send_command_async(slot, C::INDEX, cmd.arg(), resp_len, crc, flags)
-                .await
-            {
-                Ok(w) => break w,
-                Err(e)
-                    if attempt < 3
-                        && matches!(C::INDEX, 0 | 8 | 55 | 41)
-                        && matches!(e, Error::ResponseTimeout | Error::DataTimeout) =>
-                {
-                    attempt += 1;
-                    crate::rom::ets_delay_us(2_000);
-                }
-                Err(e) => return Err(MmcError::from(e)),
-            }
-        };
+        let words = session
+            .send_command_async(slot, C::INDEX, cmd.arg(), resp_len, crc, flags)
+            .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
 }
@@ -1959,8 +1943,38 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
             return Ok(<C::Resp<'a> as sdio::Response>::from_words(&words));
         }
 
-        let resp = self.cmd_async(&mut session, cmd).await?;
-        Ok(resp)
+        // A card that missed the first commands after a cold power-up leaves
+        // them unanswered; the spec has the host keep repeating identification,
+        // so retry a command that shows no response at all (a timeout means
+        // nothing was executed, which makes this safe for CMD0/8/55/41 -- unlike
+        // a CRC error, where the card did act).
+        //
+        // The backoff releases the engine instead of spinning inside it: a
+        // `yield_now` loop gives the executor its turn while an `Instant`
+        // deadline keeps the wait bounded, and the next attempt re-locks.
+        let mut attempt = 0u8;
+        loop {
+            let result = self.cmd_async(&mut session, &cmd).await;
+            match result {
+                Ok(resp) => return Ok(resp),
+                Err(e)
+                    if attempt < 3
+                        && matches!(C::INDEX, 0 | 8 | 55 | 41)
+                        && matches!(e, Error::ResponseTimeout | Error::DataTimeout) =>
+                {
+                    attempt += 1;
+                    drop(session);
+
+                    let deadline = Instant::now() + Duration::from_micros(2_000);
+                    while Instant::now() < deadline {
+                        yield_now().await;
+                    }
+
+                    session = lock_engine(slot_id(S)).await?;
+                }
+                Err(e) => return Err(MmcError::from(e)),
+            }
+        }
     }
 
     async fn read_blocks<'a, C>(
