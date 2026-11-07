@@ -755,4 +755,16 @@ mod work_queue_dma_tests {
 
         run_output_shares_cache_lines(&mut internal_memory);
     }
+
+    #[test]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
+    fn test_aes_dma_psram_output_shares_cache_lines(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let mut external_memory =
+            Vec::with_capacity_in(SHARED_LINE_MEMORY_LEN, esp_alloc::ExternalMemory);
+        external_memory.resize(SHARED_LINE_MEMORY_LEN, 0);
+
+        run_output_shares_cache_lines(&mut external_memory);
+    }
 }

@@ -2095,15 +2095,7 @@ fn bounce_alignment(addr: usize, in_psram: bool) -> usize {
     } else {
         1
     };
-    cfg_select! {
-        soc_internal_memory_cached => {
-            dma.max(unwrap!(crate::dma::aligned::region_dma_alignment(addr)))
-        }
-        _ => {
-            let _ = addr;
-            dma
-        }
-    }
+    dma.max(unwrap!(crate::dma::aligned::region_dma_alignment(addr)))
 }
 
 /// Invalidates the cache lines that lie wholly inside `data`, after a receive transfer.
@@ -2284,14 +2276,11 @@ impl<'a> DescriptorChainingIter<'a> {
 #[cfg(dma_can_access_psram)]
 const MIN_LAST_DMA_LEN: usize = if cfg!(esp32s2) { 5 } else { 1 };
 // A bounce buffer holds the longest partial line the DMA writes, plus the bytes that
-// `MIN_LAST_DMA_LEN` can add to a head and to a tail. A buffer that fits goes into one bounce
-// buffer whole, so every longer buffer leaves a head and a tail that each fit in one.
+// `MIN_LAST_DMA_LEN` can add to a head and to a tail. The longest line is the PSRAM cache line.
+// A buffer that fits goes into one bounce buffer whole, so every longer buffer leaves a head
+// and a tail that each fit in one.
 #[cfg(dma_can_access_psram)]
-const BUF_LEN: usize = if cfg!(soc_internal_memory_cached) {
-    128
-} else {
-    16 + 2 * (MIN_LAST_DMA_LEN - 1)
-};
+const BUF_LEN: usize = crate::dma::aligned::PSRAM_CACHE_LINE + 2 * (MIN_LAST_DMA_LEN - 1);
 
 /// Bounce buffer for a partial cache line at either end of a receive buffer. The DMA writes to
 /// it, and then the CPU copies it to the caller's buffer.

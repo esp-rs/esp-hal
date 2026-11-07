@@ -950,9 +950,12 @@ impl DmaOperationKind {
             if is_slice_in_psram(buffer) {
                 #[cfg(spi_master_version = "2")]
                 if _direction == TransferDirection::In {
-                    // For some reason, having tail bytes in internal RAM causes issues, so we
-                    // force copying if the end of the PSRAM buffer is not aligned.
-                    let tail_bytes = (buffer.as_ptr() as usize + buffer.len()).wrapping_neg() & 15;
+                    // The S2's DMA does not write an internal descriptor that follows a PSRAM
+                    // descriptor. A PSRAM buffer that does not end on a cache line would need an
+                    // internal tail bounce buffer, so the DMA receives into the driver's internal
+                    // buffer instead, and the CPU copies the data to the PSRAM buffer.
+                    let tail_bytes = (buffer.as_ptr() as usize + buffer.len()).wrapping_neg()
+                        & (crate::dma::aligned::PSRAM_CACHE_LINE - 1);
                     if tail_bytes > 0 {
                         return false;
                     }
