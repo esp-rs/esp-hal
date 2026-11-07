@@ -149,6 +149,8 @@ define_regi2c! {
     }
 }
 
+// With code in PSRAM, the BBPLL calibration calls the accessors from RAM, so they must be inlined.
+#[cfg_attr(code_in_psram, inline(always))]
 fn regi2c_enable_block(block: u8) -> usize {
     MODEM_LPCON::regs()
         .clk_conf()
@@ -180,6 +182,7 @@ fn regi2c_enable_block(block: u8) -> usize {
     if i2c_sel { 0 } else { 1 }
 }
 
+#[cfg_attr(code_in_psram, inline(always))]
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     let master = regi2c_enable_block(block);
 
@@ -195,6 +198,7 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     I2C_ANA_MST::regs().i2c_ctrl(master).read().data().bits()
 }
 
+#[cfg_attr(code_in_psram, inline(always))]
 pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     let master = regi2c_enable_block(block);
 
