@@ -43,6 +43,11 @@ mod bus_clock_update {
     ///
     /// Inside [`with_single_bus_clock_update`], this function does nothing. The bus can stop if
     /// the new combination is not valid.
+    // With code in PSRAM, on the ESP32-C5, the update applies a switch of the HP root clock, and a
+    // fetch from PSRAM during that switch does not complete, so the update runs from RAM. Elsewhere
+    // it is inlined into its callers in RAM.
+    #[cfg_attr(all(code_in_psram, esp32c5), crate::ram(unstable(checked)))]
+    #[cfg_attr(all(code_in_psram, not(esp32c5)), inline(always))]
     pub(crate) fn update_bus_clocks() {
         if DEFERRED.load(Ordering::Relaxed) {
             return;

@@ -112,18 +112,26 @@ impl ClockConfig {
 
     pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
         // FIXME: we ignore user XTAL configuration, but we shouldn't offer it in the first place.
-        // PCR_CLK_XTAL_FREQ updates its value based on EFUSE_XTAL_48M_SEL.
-        self.xtal_clk = if PCR::regs().sysclk_conf().read().clk_xtal_freq().bits() == 40 {
-            Some(XtalClkConfig::_40)
-        } else {
-            Some(XtalClkConfig::_48)
-        };
+        self.xtal_clk = Some(reported_xtal_clk());
 
         with_single_bus_clock_update(|| self.apply(clocks));
     }
 }
 
 // XTAL_CLK
+
+/// PCR_CLK_XTAL_FREQ updates its value based on EFUSE_XTAL_48M_SEL.
+///
+/// `enable_pll_clk_impl` reads the register and not the clock tree, because with code in PSRAM it
+/// runs from RAM, and `unwrap!` on the clock tree would reach flash.
+#[inline(always)]
+fn reported_xtal_clk() -> XtalClkConfig {
+    if PCR::regs().sysclk_conf().read().clk_xtal_freq().bits() == 40 {
+        XtalClkConfig::_40
+    } else {
+        XtalClkConfig::_48
+    }
+}
 
 fn configure_xtal_clk_impl(
     _clocks: &mut ClockTree,
@@ -145,7 +153,9 @@ pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
     }
 }
 
-fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
+// PSRAM's clock comes from the BBPLL, so with code in PSRAM the calibration must run from RAM.
+#[cfg_attr(code_in_psram, crate::ram(unstable(checked)))]
+fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
         PMU::regs().imm_hp_ck_power().write(|w| {
             w.tie_high_xpd_bb_i2c().set_bit();
@@ -181,7 +191,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     let div7_0: u8;
     let dr1: u8;
     let dr3: u8;
-    match unwrap!(clocks.xtal_clk()) {
+    match reported_xtal_clk() {
         XtalClkConfig::_40 => {
             div7_0 = 12;
             dr1 = 0;
@@ -341,6 +351,10 @@ fn enable_hp_root_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do here.
 }
 
+// With code in PSRAM, a fetch from PSRAM during the switch of the HP root clock to XTAL_CLK does
+// not complete, so the switch must run from RAM. Under `with_single_bus_clock_update`, the bus
+// clock update applies the switch, and it runs from RAM too.
+#[cfg_attr(code_in_psram, crate::ram(unstable(checked)))]
 fn configure_hp_root_clk_impl(
     _clocks: &mut ClockTree,
     _old_config: Option<HpRootClkConfig>,
