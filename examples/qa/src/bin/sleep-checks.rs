@@ -1,7 +1,7 @@
 //! Quick checks of sleep.
 //!
 //! The program runs a list of checks, and prints `RUN <name>` before each check, then
-//! `PASS <name>`, `FAIL <name>: <reason>` or `SKIP <name>`. At the end it prints
+//! `PASS <name>` or `FAIL <name>: <reason>`. At the end it prints
 //! `sleep-checks: <n> of <m> checks passed`.
 //!
 //! Each check requests a light sleep. After the wake, the check verifies:
@@ -16,10 +16,11 @@
 //!
 //! The program keeps its progress in memory that a reset does not clear:
 //!
-//! - If a check hangs, the RTC watchdog resets the chip. A CPU lockup also resets the chip. The
-//!   next boot reports the check as failed, with the reset reason. The boot then reports each later
-//!   check as skipped, and stops. Such a reset does not clear all of the chip's state, so a later
-//!   check can fail because of the earlier one.
+//! - If a check hangs outside a sleep or panics, the RTC watchdog resets the chip. A CPU lockup
+//!   also resets the chip. The next boot reports the check as failed, with the reset reason, and
+//!   runs the next check. A reset does not clear all of the chip's state, so a check after a failed
+//!   check can fail because of it. A sleep that never ends hangs the test, because the RTC watchdog
+//!   is not active during a light sleep.
 //! - The CPU clock is set at start-up. A check that needs a different CPU clock resets the chip in
 //!   software first.
 //! - A power-on reset starts the list again.
@@ -47,7 +48,6 @@ use esp_hal::{
     rtc_cntl::{
         Rtc,
         RwdtStage,
-        SocResetReason,
         WakeupSource,
         reset_reason,
         sleep::{LightSleep, LowPower, RtcSleepConfig},
@@ -56,18 +56,9 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
-use esp_println::println;
+use qa_test::{Progress, ProgressWord, report};
 
 esp_bootloader_esp_idf::esp_app_desc!();
-
-/// Prints a line and waits for the UART to send the line. A light sleep loses unsent UART data.
-macro_rules! report {
-    ($($arg:tt)*) => {{
-        println!($($arg)*);
-        let end = Instant::now() + Duration::from_millis(20);
-        while Instant::now() < end {}
-    }};
-}
 
 /// The maximum duration of a check before the watchdog resets the chip.
 const WATCHDOG_TIMEOUT: Duration = Duration::from_secs(5);
@@ -165,93 +156,7 @@ const CHECKS: &[Check] = &[
     },
 ];
 
-/// The reason for a reset that the program requested.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ExpectedReset {
-    None        = 0,
-    ClockChange = 1,
-}
-
-/// The progress of the run, kept across resets in one word.
-#[derive(Clone, Copy)]
-struct Progress {
-    /// The index in [`CHECKS`] of the check that runs next, or that ran when the chip reset.
-    next: usize,
-    passed: u8,
-    reset: ExpectedReset,
-}
-
-impl Progress {
-    /// The value in the top four bits of a stored word. A word without this value holds no
-    /// progress.
-    const MARKER: u32 = 0xA;
-
-    const START: Self = Self {
-        next: 0,
-        passed: 0,
-        reset: ExpectedReset::None,
-    };
-
-    fn load() -> Option<Self> {
-        let word = load_word();
-        if word >> 28 != Self::MARKER {
-            return None;
-        }
-        let reset = match (word >> 24) & 0xF {
-            0 => ExpectedReset::None,
-            1 => ExpectedReset::ClockChange,
-            _ => return None,
-        };
-        let next = (word & 0xFF) as usize;
-        if next >= CHECKS.len() {
-            return None;
-        }
-        Some(Self {
-            next,
-            passed: (word >> 8) as u8,
-            reset,
-        })
-    }
-
-    fn store(self) {
-        store_word(
-            (Self::MARKER << 28)
-                | ((self.reset as u32) << 24)
-                | ((self.passed as u32) << 8)
-                | self.next as u32,
-        );
-    }
-}
-
-#[cfg(not(any(feature = "esp32c2", feature = "esp32c61", feature = "esp32h4")))]
-#[esp_hal::ram(unstable(rtc_fast, persistent))]
-static mut PROGRESS: u32 = 0;
-
-fn load_word() -> u32 {
-    cfg_select! {
-        feature = "esp32c2" => esp_hal::peripherals::LPWR::regs().store6().read().bits(),
-        any(feature = "esp32c61", feature = "esp32h4") => {
-            esp_hal::peripherals::LP_AON::regs().store6().read().bits()
-        }
-        _ => unsafe { PROGRESS },
-    }
-}
-
-fn store_word(value: u32) {
-    cfg_select! {
-        feature = "esp32c2" => {
-            esp_hal::peripherals::LPWR::regs()
-                .store6()
-                .write(|w| unsafe { w.bits(value) });
-        }
-        any(feature = "esp32c61", feature = "esp32h4") => {
-            esp_hal::peripherals::LP_AON::regs()
-                .store6()
-                .write(|w| unsafe { w.bits(value) });
-        }
-        _ => unsafe { PROGRESS = value },
-    }
-}
+static PROGRESS: ProgressWord = ProgressWord::new(0xA);
 
 /// The peripherals and the PSRAM that the checks use.
 struct Board<'d> {
@@ -448,12 +353,19 @@ fn next_check(index: usize) -> usize {
 #[main]
 fn main() -> ! {
     let reset = reset_reason(Cpu::ProCpu);
-    let loaded = if reset == Some(SocResetReason::ChipPowerOn) {
-        None
-    } else {
-        Progress::load()
-    };
-    let mut progress = loaded.unwrap_or(Progress::START);
+    let loaded = PROGRESS.load(CHECKS.len());
+    // When the program did not request the reset, the stored check did not finish.
+    let hung = loaded
+        .filter(|stored| !stored.reset_requested)
+        .map(|stored| stored.next);
+    let mut progress = loaded.unwrap_or(Progress {
+        next: 0,
+        passed: 0,
+        reset_requested: false,
+    });
+    if let Some(hung) = hung {
+        progress.next = hung + 1;
+    }
     progress.next = next_check(progress.next);
     let clock = CHECKS
         .get(progress.next)
@@ -467,23 +379,10 @@ fn main() -> ! {
         clock.cpu_clock()
     );
 
-    // The stored check was running when the chip reset, and the program did not request that
-    // reset.
-    if let Some(stored) = loaded
-        && stored.reset == ExpectedReset::None
-    {
-        report!("FAIL {}: reset {:?}", CHECKS[stored.next].name, reset);
-        // The reset leaves some sleep and clock state as it was, so a later check can fail
-        // because of this one.
-        for check in CHECKS[stored.next + 1..]
-            .iter()
-            .filter(|check| check.runs())
-        {
-            report!("SKIP {}", check.name);
-        }
-        progress.next = CHECKS.len();
+    if let Some(hung) = hung {
+        report!("FAIL {}: reset {:?}", CHECKS[hung].name, reset);
     }
-    progress.reset = ExpectedReset::None;
+    progress.reset_requested = false;
 
     let mut rtc = Rtc::new(peripherals.RTC_TIMER);
     rtc.rwdt.set_timeout(RwdtStage::Stage0, WATCHDOG_TIMEOUT);
@@ -519,13 +418,13 @@ fn main() -> ! {
     while progress.next < CHECKS.len() {
         let check = &CHECKS[progress.next];
         if check.clock != clock {
-            progress.reset = ExpectedReset::ClockChange;
-            progress.store();
+            progress.reset_requested = true;
+            PROGRESS.store(progress);
             report!("reset for the {:?} CPU clock", check.clock.cpu_clock());
             esp_hal::system::software_reset();
         }
 
-        progress.store();
+        PROGRESS.store(progress);
         board.rtc.rwdt.feed();
         report!("RUN {}", check.name);
         match (check.run)(&mut board) {
@@ -538,7 +437,7 @@ fn main() -> ! {
         progress.next = next_check(progress.next + 1);
     }
 
-    progress.store();
+    PROGRESS.store(progress);
     report!(
         "sleep-checks: {} of {} checks passed",
         progress.passed,
