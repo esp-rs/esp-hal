@@ -11,6 +11,44 @@ use crate::{
 
 // Per-instance clock impl for UART (called on UartInstance enum)
 impl UartInstance {
+    /// Returns whether the instance is clocked and out of reset, so that a register update
+    /// completes.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn is_enabled(self) -> bool {
+        let regs = HP_SYS_CLKRST::regs();
+        let sys = regs.soc_clk_ctrl1().read();
+        let apb = regs.soc_clk_ctrl2().read();
+        let rst = regs.hp_rst_en1().read();
+        let (bus, reset, function) = match self {
+            UartInstance::Uart0 => (
+                sys.uart0_sys_clk_en().bit() && apb.uart0_apb_clk_en().bit(),
+                rst.rst_en_uart0_core().bit() || rst.rst_en_uart0_apb().bit(),
+                regs.peri_clk_ctrl110().read().uart0_clk_en().bit(),
+            ),
+            UartInstance::Uart1 => (
+                sys.uart1_sys_clk_en().bit() && apb.uart1_apb_clk_en().bit(),
+                rst.rst_en_uart1_core().bit() || rst.rst_en_uart1_apb().bit(),
+                regs.peri_clk_ctrl111().read().uart1_clk_en().bit(),
+            ),
+            UartInstance::Uart2 => (
+                sys.uart2_sys_clk_en().bit() && apb.uart2_apb_clk_en().bit(),
+                rst.rst_en_uart2_core().bit() || rst.rst_en_uart2_apb().bit(),
+                regs.peri_clk_ctrl112().read().uart2_clk_en().bit(),
+            ),
+            UartInstance::Uart3 => (
+                sys.uart3_sys_clk_en().bit() && apb.uart3_apb_clk_en().bit(),
+                rst.rst_en_uart3_core().bit() || rst.rst_en_uart3_apb().bit(),
+                regs.peri_clk_ctrl113().read().uart3_clk_en().bit(),
+            ),
+            UartInstance::Uart4 => (
+                sys.uart4_sys_clk_en().bit() && apb.uart4_apb_clk_en().bit(),
+                rst.rst_en_uart4_core().bit() || rst.rst_en_uart4_apb().bit(),
+                regs.peri_clk_ctrl114().read().uart4_clk_en().bit(),
+            ),
+        };
+        bus && !reset && function
+    }
+
     pub(crate) fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
         let regs = HP_SYS_CLKRST::regs();
         match self {

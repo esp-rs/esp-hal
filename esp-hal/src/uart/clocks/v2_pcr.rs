@@ -10,6 +10,26 @@ use crate::{
 };
 
 impl UartInstance {
+    /// Returns whether the instance is clocked and out of reset, so that a register update
+    /// completes.
+    ///
+    /// The function clock is checked as well as the bus clock, because the bus clock of UART0
+    /// stays on when its function clock is off.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn is_enabled(self) -> bool {
+        let uart = match self {
+            UartInstance::Uart0 => 0,
+            UartInstance::Uart1 => 1,
+            #[cfg(soc_has_uart2)]
+            UartInstance::Uart2 => 2,
+        };
+        let regs = PCR::regs().uart(uart);
+        let conf = regs.conf().read();
+        conf.clk_en().bit_is_set()
+            && conf.rst_en().bit_is_clear()
+            && regs.clk_conf().read().sclk_en().bit_is_set()
+    }
+
     // UART_FUNCTION_CLOCK
 
     pub(crate) fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {

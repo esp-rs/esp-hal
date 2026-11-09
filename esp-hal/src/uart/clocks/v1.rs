@@ -7,6 +7,52 @@ use crate::clock::ll::{
 };
 
 impl UartInstance {
+    /// Returns whether the instance is clocked and out of reset, so that its transmitter can
+    /// drain.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn is_enabled(self) -> bool {
+        let system = crate::peripherals::SYSTEM::regs();
+        cfg_select! {
+            esp32 => {
+                let clk = system.perip_clk_en().read();
+                let rst = system.perip_rst_en().read();
+            }
+            _ => {
+                let clk = system.perip_clk_en0().read();
+                let rst = system.perip_rst_en0().read();
+            }
+        }
+        let bus = match self {
+            #[cfg(soc_has_uart0)]
+            Self::Uart0 => clk.uart_clk_en().bit() && !rst.uart_rst().bit(),
+            #[cfg(soc_has_uart1)]
+            Self::Uart1 => clk.uart1_clk_en().bit() && !rst.uart1_rst().bit(),
+            #[cfg(soc_has_uart2)]
+            Self::Uart2 => cfg_select! {
+                esp32s3 => {
+                    system.perip_clk_en1().read().uart2_clk_en().bit()
+                        && !system.perip_rst_en1().read().uart2_rst().bit()
+                }
+                _ => clk.uart2_clk_en().bit() && !rst.uart2_rst().bit(),
+            },
+        };
+
+        #[cfg(uart_has_sclk_divider)]
+        let bus = bus && {
+            let regs = match self {
+                #[cfg(soc_has_uart0)]
+                Self::Uart0 => crate::peripherals::UART0::regs(),
+                #[cfg(soc_has_uart1)]
+                Self::Uart1 => crate::peripherals::UART1::regs(),
+                #[cfg(soc_has_uart2)]
+                Self::Uart2 => crate::peripherals::UART2::regs(),
+            };
+            regs.clk_conf().read().sclk_en().bit()
+        };
+
+        bus
+    }
+
     // UART_FUNCTION_CLOCK
 
     pub(crate) fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {

@@ -833,10 +833,17 @@ impl Info {
         Ok(to_read)
     }
 
+    /// Stops the transmitter for a sleep and waits until it is idle. Returns whether it did.
+    ///
+    /// An instance that is not enabled is skipped, because its suspension never completes.
     #[cfg(sleep_driver_supported)]
-    pub(crate) fn suspend_for_sleep(&self) {
+    pub(crate) fn suspend_for_sleep(&self) -> bool {
+        if !self.clock_instance.is_enabled() {
+            return false;
+        }
         version::suspend(self, true);
         version::wait_for_suspended(self);
+        true
     }
 
     #[cfg(sleep_driver_supported)]

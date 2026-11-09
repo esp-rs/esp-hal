@@ -10,6 +10,18 @@ use crate::{
 };
 
 impl UartInstance {
+    /// Returns whether the instance is clocked and out of reset, so that a register update
+    /// completes.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn is_enabled(self) -> bool {
+        let ctrl = HP_SYS_CLKRST::regs().uart_ctrl0(self as usize).read();
+        ctrl.sys_clk_en().bit()
+            && ctrl.apb_clk_en().bit()
+            && !ctrl.core_rst_en().bit()
+            && !ctrl.apb_rst_en().bit()
+            && ctrl.clk_en().bit()
+    }
+
     pub(crate) fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
         HP_SYS_CLKRST::regs()
             .uart_ctrl0(self as usize)

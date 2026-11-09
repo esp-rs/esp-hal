@@ -417,7 +417,7 @@ impl<'d> LowPower<'d> {
 
         let reject_mask = if allow_reject { reject_mask() } else { 0 };
 
-        sleep_uart_prepare();
+        let suspended_uarts = sleep_uart_prepare();
 
         // Latch the systimer value *before* sleeping. The systimer keeps running during
         // the sleep enter/exit sequences, so we must not advance from the post-wake
@@ -509,7 +509,7 @@ impl<'d> LowPower<'d> {
         let slept_ticks = crate::time::implem::us_to_ticks(slept_us);
 
         unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
-        sleep_uart_resume();
+        sleep_uart_resume(suspended_uarts);
 
         run_exit_hooks();
 
@@ -617,25 +617,32 @@ pub(crate) fn wait_for_sleep_result() -> bool {
     }
 }
 
+/// Suspends the transmitter of every enabled UART. Returns a mask with one bit per suspended
+/// instance.
+///
+/// See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_sleep/sleep_uart.c#L95-L131>.
 #[cfg(sleep_driver_supported)]
-fn sleep_uart_prepare() {
+fn sleep_uart_prepare() -> u32 {
     use crate::uart::Instance;
+    let mut suspended = 0;
     for_each_uart! {
         ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
-            unsafe {
-                crate::peripherals::$inst::steal().info().suspend_for_sleep();
+            if unsafe { crate::peripherals::$inst::steal() }.info().suspend_for_sleep() {
+                suspended |= 1 << $id;
             }
         };
     }
+    suspended
 }
 
+/// Resumes the UARTs that [`sleep_uart_prepare`] suspended.
 #[cfg(sleep_driver_supported)]
-fn sleep_uart_resume() {
+fn sleep_uart_resume(suspended: u32) {
     use crate::uart::Instance;
     for_each_uart! {
         ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
-            unsafe {
-                crate::peripherals::$inst::steal().info().resume_from_sleep();
+            if suspended & (1 << $id) != 0 {
+                unsafe { crate::peripherals::$inst::steal() }.info().resume_from_sleep();
             }
         };
     }
