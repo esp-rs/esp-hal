@@ -38,6 +38,13 @@
 //! Please note that the configuration keys are usually named slightly different and not all
 //! configuration keys apply.
 //!
+//! The Wi-Fi driver copies each TX frame into a buffer from the heap. If the heap has no free
+//! memory, the driver refuses the frame. By default, esp-radio keeps one refused frame and sends
+//! it again when a transmission ends. This uses `ESP_RADIO_CONFIG_WIFI_MTU` bytes of static RAM.
+//! To save this RAM, set `ESP_RADIO_CONFIG_WIFI_TX_RETRY` to `false`. esp-radio then drops refused
+//! frames, and TCP must send the data again, which decreases the throughput. Applications with a
+//! large heap seldom have refused frames.
+//!
 //! ## Troubleshooting
 //!
 //! ### Connection failures on boards with a weak antenna or in a poor RF environment
@@ -1283,6 +1290,8 @@ fn wifi_deinit() -> Result<(), WifiError> {
     while let Some(packet) = DATA_QUEUE_RX_AP.with(|q| q.pop_front()) {
         drop(packet);
     }
+    #[cfg(wifi_tx_retry)]
+    tx_retry::drop_pending_frame();
 
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
     #[cfg(soc_has_modem_syscon)]
@@ -1342,6 +1351,95 @@ fn decrement_inflight_counter() {
             Some(x.saturating_sub(1))
         })
     );
+}
+
+#[cfg(wifi_tx_retry)]
+mod tx_retry {
+    use portable_atomic::AtomicBool;
+
+    use super::*;
+
+    /// A frame that `esp_wifi_internal_tx` refused because the driver had no free memory.
+    pub(super) struct PendingTxFrame {
+        interface: wifi_interface_t,
+        len: usize,
+        data: [u8; MTU],
+    }
+
+    impl PendingTxFrame {
+        pub(super) const fn new() -> Self {
+            Self {
+                interface: wifi_interface_t_WIFI_IF_STA,
+                len: 0,
+                data: [0; MTU],
+            }
+        }
+    }
+
+    // True while a refused frame waits in `State::pending_tx`. Only code under `state::locked`
+    // writes it. The driver gets TX memory back when a transmission ends. While a frame waits, the
+    // TX path accepts no new frames, so the network stack keeps its data.
+    static PENDING: AtomicBool = AtomicBool::new(false);
+
+    /// Sends a frame. If the driver has no free memory, keeps the frame in `pending`.
+    ///
+    /// The caller must hold the `state::locked` lock.
+    pub(super) fn send_frame(
+        pending: &mut PendingTxFrame,
+        interface: wifi_interface_t,
+        data: &mut [u8],
+    ) {
+        if send_data_locked(interface, data) {
+            return;
+        }
+
+        if !PENDING.load(Ordering::Relaxed) && data.len() <= MTU {
+            pending.interface = interface;
+            pending.len = data.len();
+            pending.data[..data.len()].copy_from_slice(data);
+            PENDING.store(true, Ordering::Relaxed);
+        } else {
+            warn!("Dropping a TX frame, the driver has no free memory");
+        }
+
+        release_inflight_slot();
+    }
+
+    /// Sends the pending frame again. Returns `true` if no frame is pending after the call.
+    pub(super) fn send_pending_frame() -> bool {
+        if !PENDING.load(Ordering::Relaxed) {
+            return true;
+        }
+
+        state::locked(|state| {
+            if !PENDING.load(Ordering::Relaxed) {
+                return;
+            }
+
+            let frame = &mut state.pending_tx;
+            WIFI_TX_INFLIGHT.fetch_add(1, Ordering::SeqCst);
+            if send_data_locked(frame.interface, &mut frame.data[..frame.len]) {
+                PENDING.store(false, Ordering::Relaxed);
+            } else {
+                release_inflight_slot();
+            }
+        });
+
+        !PENDING.load(Ordering::Relaxed)
+    }
+
+    /// The caller must hold the `state::locked` lock.
+    pub(super) fn drop_pending_frame() {
+        PENDING.store(false, Ordering::Relaxed);
+    }
+
+    fn release_inflight_slot() {
+        decrement_inflight_counter();
+        // Without a frame in flight, no TX done callback wakes the network stack.
+        if WIFI_TX_INFLIGHT.load(Ordering::SeqCst) == 0 {
+            TRANSMIT_WAKER.wake();
+        }
+    }
 }
 
 #[ram]
@@ -1497,6 +1595,11 @@ impl InterfaceType {
     }
 
     fn can_send(&self) -> bool {
+        #[cfg(wifi_tx_retry)]
+        if !tx_retry::send_pending_frame() {
+            return false;
+        }
+
         WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE.load(Ordering::Relaxed)
     }
 
@@ -2097,31 +2200,52 @@ impl WifiTxToken {
 // though in reality `esp_wifi_internal_tx` copies the buffer into its own
 // memory and does not modify
 pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
-    // `esp_wifi_internal_tx` will crash if wifi is uninitialized or de-inited
-
-    state::locked(|| {
-        // even checking for !Uninitialized would be enough to not crash
-        if (interface == wifi_interface_t_WIFI_IF_STA
-            && !matches!(station_state(), WifiStationState::Connected))
-            || (interface == wifi_interface_t_WIFI_IF_AP
-                && !matches!(access_point_state(), WifiAccessPointState::Started))
-        {
-            return;
-        }
-
-        trace!("sending... {} bytes", data.len());
-        dump_packet_info(data);
-
-        let len = data.len() as u16;
-        let ptr = data.as_mut_ptr().cast();
-
-        let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
-
-        if res != include::ESP_OK as i32 {
-            warn!("esp_wifi_internal_tx returned error: {}", res);
-            decrement_inflight_counter();
+    state::locked(|_state| {
+        cfg_select! {
+            wifi_tx_retry => tx_retry::send_frame(&mut _state.pending_tx, interface, data),
+            _ => {
+                send_data_locked(interface, data);
+            }
         }
     })
+}
+
+/// Returns `false` if the driver refused the frame because it has no free memory. The frame then
+/// keeps its in-flight slot.
+///
+/// The caller must hold the `state::locked` lock.
+fn send_data_locked(interface: wifi_interface_t, data: &mut [u8]) -> bool {
+    // `esp_wifi_internal_tx` will crash if wifi is uninitialized or de-inited
+
+    // even checking for !Uninitialized would be enough to not crash
+    if (interface == wifi_interface_t_WIFI_IF_STA
+        && !matches!(station_state(), WifiStationState::Connected))
+        || (interface == wifi_interface_t_WIFI_IF_AP
+            && !matches!(access_point_state(), WifiAccessPointState::Started))
+    {
+        decrement_inflight_counter();
+        return true;
+    }
+
+    trace!("sending... {} bytes", data.len());
+    dump_packet_info(data);
+
+    let len = data.len() as u16;
+    let ptr = data.as_mut_ptr().cast();
+
+    let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
+
+    #[cfg(wifi_tx_retry)]
+    if res == include::ESP_ERR_NO_MEM as i32 {
+        return false;
+    }
+
+    if res != include::ESP_OK as i32 {
+        warn!("esp_wifi_internal_tx returned error: {}", res);
+        decrement_inflight_counter();
+    }
+
+    true
 }
 
 fn dump_packet_info(_buffer: &mut [u8]) {
@@ -2673,7 +2797,7 @@ impl Clone for WifiRefGuard {
 impl Drop for WifiRefGuard {
     fn drop(&mut self) {
         WIFI_REFCOUNT.decrement(|| {
-            state::locked(|| {
+            state::locked(|_| {
                 set_access_point_state(WifiAccessPointState::Uninitialized);
                 set_station_state(WifiStationState::Uninitialized);
 
