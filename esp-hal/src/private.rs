@@ -77,6 +77,7 @@ impl<I, F: FnOnce(I)> DropGuard<I, F> {
 }
 
 impl<I, F: FnOnce(I)> Drop for DropGuard<I, F> {
+    #[inline(always)]
     fn drop(&mut self) {
         let inner = unsafe { ManuallyDrop::take(&mut self.inner) };
         let on_drop = unsafe { ManuallyDrop::take(&mut self.on_drop) };
