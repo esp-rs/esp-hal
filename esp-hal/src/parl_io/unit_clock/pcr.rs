@@ -40,6 +40,18 @@ pub(super) fn set_div_num(tx: bool, div_num: u32) {
     }
 }
 
+#[cfg(parl_io_version = "2")]
+pub(super) fn set_clock_enabled(tx: bool, enabled: bool) {
+    let pcr = PCR::regs();
+    if tx {
+        pcr.parl_clk_tx_conf()
+            .modify(|_, w| w.parl_clk_tx_en().bit(enabled));
+    } else {
+        pcr.parl_clk_rx_conf()
+            .modify(|_, w| w.parl_clk_rx_en().bit(enabled));
+    }
+}
+
 pub(super) fn set_reset(tx: bool, reset: bool) {
     let pcr = PCR::regs();
     if tx {
