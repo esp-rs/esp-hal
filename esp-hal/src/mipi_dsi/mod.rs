@@ -479,11 +479,36 @@ const DMA_STATUS_ENABLE_MASK: u32 = DMA_STATUS_BLOCK_TRANSFER_DONE
     | (1 << 30)
     | (1 << 31);
 
-/// Channel-stop result for the DW-GDMA mem2mem QA hook.
+/// QA profile for one mem2mem transfer. Unset `VDMA_MEM2MEM_DMA_PROFILE` uses [`Self::BASELINE`].
 #[doc(hidden)]
 #[instability::unstable]
 #[cfg(mipi_dsi_driver_supported)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DwGdmaMem2MemProfile {
+    /// `CTL0.DST_MSIZE` code. 8 is 512 items.
+    pub dst_msize: u8,
+    /// `CTL1.AWLEN` value written with `AWLEN_EN=1`.
+    pub dst_awlen: u8,
+    /// `CFG1.SRC_OSR_LMT` field. Outstanding reads are this value plus 1.
+    pub src_osr_lmt: u8,
+    /// `CFG1.DST_OSR_LMT` field. Outstanding writes are this value plus 1.
+    pub dst_osr_lmt: u8,
+}
+
+#[cfg(mipi_dsi_driver_supported)]
+impl DwGdmaMem2MemProfile {
+    pub const BASELINE: Self = Self {
+        dst_msize: DW_GDMA_BURST_SIZE_512_ITEMS,
+        dst_awlen: DW_GDMA_AXI_BURST_LEN_16,
+        src_osr_lmt: DW_GDMA_OSR_LIMIT_5_REQUESTS,
+        dst_osr_lmt: DW_GDMA_OSR_LIMIT_5_REQUESTS,
+    };
+}
+#[doc(hidden)]
+#[instability::unstable]
+#[cfg(mipi_dsi_driver_supported)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Channel-stop result for the DW-GDMA mem2mem QA hook.
 pub enum DwGdmaStopOutcome {
     AlreadyStopped,
     Disabled,
@@ -743,6 +768,7 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
     transfer_units: u32,
     timeout_ms: u64,
     dst_awlen_auto: bool,
+    profile: DwGdmaMem2MemProfile,
 ) -> DwGdmaMem2MemReport {
     use crate::mipi_dw_gdma::{
         AddressIncrementMode,
@@ -759,7 +785,7 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
     assert!(transfer_units > 0);
     assert!(transfer_units <= MAX_BLOCK_TRANSFER_SIZE_UNITS);
 
-    const CHANNEL_CONFIG: ChannelConfig = ChannelConfig {
+    let channel_config = ChannelConfig {
         src_multblk_type: 0,
         dst_multblk_type: 0,
         transfer_type_flow_control: DW_GDMA_TT_FC_M2M_DMAC,
@@ -770,8 +796,8 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
         src_status_fetch_addr: 0,
         dst_status_fetch_addr: 0,
         priority: DW_GDMA_CHANNEL_PRIORITY,
-        src_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
-        dst_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
+        src_outstanding_limit: profile.src_osr_lmt,
+        dst_outstanding_limit: profile.dst_osr_lmt,
     };
 
     info!(
@@ -795,7 +821,7 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
     channel.clear_all_interrupts();
     channel.set_interrupt_status_enable(DMA_STATUS_ENABLE_MASK);
     channel.set_interrupt_signal_enable(0);
-    channel.configure(CHANNEL_CONFIG);
+    channel.configure(channel_config);
     info!("STEP 107: configure transfer block");
     channel.configure_block_transfer(BlockTransferConfig {
         src: BlockTransferEndpointConfig {
@@ -810,8 +836,8 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
             addr: dst_addr,
             ll_pointer_master: LlPointerMasterSelect::Memory,
             addr_inc_mode: AddressIncrementMode::Increment,
-            burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
-            axi_burst_len: DW_GDMA_AXI_BURST_LEN_16,
+            burst_size: profile.dst_msize,
+            axi_burst_len: profile.dst_awlen,
             width: DW_GDMA_WIDTH_64_BITS,
         },
         transfer_size_in_units: transfer_units,
@@ -838,6 +864,15 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
 
     let intstatus_before = channel.interrupt_status();
     let start = crate::time::Instant::now();
+    info!(
+        "PSRAM AXI before DMA: 0x{:08x}",
+        crate::peripherals::MEMSPI2::regs()
+            .smem_axi_addr_ctrl()
+            .read()
+            .bits()
+    );
+    crate::psram::implem::log_psram_timing_pins("before-dma");
+
     info!("STEP 109: start DMA channel");
     channel.set_enabled(true);
     info!("STEP 110: DMA started, entering wait loop");
@@ -883,10 +918,55 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
     let elapsed_us = start.elapsed().as_micros();
     let dar_end = channel.destination_address();
     let bytes_written = dar_end.saturating_sub(dst_addr);
+    let psram_axi_after = crate::peripherals::MEMSPI2::regs()
+        .smem_axi_addr_ctrl()
+        .read()
+        .bits();
+
     info!(
         "STEP 113: dar_end=0x{:08x} bytes_written={} elapsed_us={}",
         dar_end, bytes_written, elapsed_us
     );
+    info!("PSRAM AXI after DMA wait: 0x{psram_axi_after:08x}");
+    if timed_out {
+        let mspi = crate::peripherals::MEMSPI2::regs();
+        let cmd = mspi.cmd().read();
+        let axi = mspi.smem_axi_addr_ctrl().read();
+        let ecc = mspi.smem_ecc_ctrl().read();
+        let ac = mspi.smem_ac().read();
+        let ddr = mspi.smem_ddr().read();
+        let timing_cali = mspi.timing_cali().read();
+        let smem_timing_cali = mspi.smem_timing_cali().read();
+        let iomux = crate::peripherals::IOMUX_MSPI_PIN::regs();
+        let dqs0 = iomux.psram_dqs_0_pin0().read();
+        let dqs1 = iomux.psram_dqs_1_pin0().read();
+        // IDF `REG_PSRAM_DQS_*_DELAY_270` is bits [20:17]. The PAC `delay_270()`
+        // accessor reads bits [21:18], so take this field from the raw value.
+        let dqs_delay_270 = |bits: u32| (bits >> 17) & 0x0f;
+        info!(
+            "PSRAM stall snapshot: cmd=0x{:08x} mst_st={} slv_st={} axi=0x{:08x} ecc=0x{:08x} page_size={} ac=0x{:08x} ddr=0x{:08x} timing_cali=0x{:08x} smem_timing_cali=0x{:08x} dqs0=0x{:08x} dqs0_phase={} dqs0_dli={} dqs0_delay90={} dqs0_delay270={} dqs1=0x{:08x} dqs1_phase={} dqs1_dli={} dqs1_delay90={} dqs1_delay270={}",
+            cmd.bits(),
+            cmd.mst_st().bits(),
+            cmd.slv_st().bits(),
+            axi.bits(),
+            ecc.bits(),
+            ecc.page_size().bits(),
+            ac.bits(),
+            ddr.bits(),
+            timing_cali.bits(),
+            smem_timing_cali.bits(),
+            dqs0.bits(),
+            dqs0.phase().bits(),
+            dqs0.dli().bits(),
+            dqs0.delay_90().bits(),
+            dqs_delay_270(dqs0.bits()),
+            dqs1.bits(),
+            dqs1.phase().bits(),
+            dqs1.dli().bits(),
+            dqs1.delay_90().bits(),
+            dqs_delay_270(dqs1.bits()),
+        );
+    }
     info!("STEP 114: begin DMA channel stop");
     let stop_outcome = stop_dw_gdma_channel(channel);
     info!("STEP 115: stop outcome={:?}", stop_outcome);
@@ -926,11 +1006,11 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
         transfer_bytes: transfer_units * 8,
         bytes_written,
         width: DW_GDMA_WIDTH_64_BITS,
-        burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
-        axi_burst_len: DW_GDMA_AXI_BURST_LEN_16,
+        burst_size: profile.dst_msize,
+        axi_burst_len: profile.dst_awlen,
         transfer_type_flow_control: DW_GDMA_TT_FC_M2M_DMAC,
-        src_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
-        dst_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
+        src_outstanding_limit: profile.src_osr_lmt,
+        dst_outstanding_limit: profile.dst_osr_lmt,
         intstatus_enable0,
         intstatus_before,
         intstatus_after,

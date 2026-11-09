@@ -18,7 +18,7 @@ use esp_hal::{
     Config,
     dma::aligned::{DmaAlignedMut, DmaAlignedRef},
     main,
-    mipi_dsi::{__qa_dw_gdma_mem2mem_transfer, DwGdmaMem2MemReport},
+    mipi_dsi::{__qa_dw_gdma_mem2mem_transfer, DwGdmaMem2MemProfile, DwGdmaMem2MemReport},
 };
 use esp_println::println;
 
@@ -54,6 +54,8 @@ enum CaseSelection {
     Both,
     PsramOnly,
     SramOnly,
+    /// CPU stores and loads only. No DMA channel is enabled.
+    CpuPsram,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,10 +68,40 @@ fn step(step: u32, msg: &str) {
     println!("STEP {step}: {msg}");
 }
 
+/// Read back the PSRAM function-clock mux and the MSPI SRAM divider after init.
+fn log_psram_clock_readback() {
+    let mpll_hz = esp_hal::clock::ll::mpll_clk_frequency();
+    let source_hz = esp_hal::clock::ll::PsramInstance::Psram.function_clock_frequency();
+    let clk_ctrl = esp_hal::peripherals::HP_SYS_CLKRST::regs()
+        .peri_clk_ctrl00()
+        .read();
+    let sram_clk = esp_hal::peripherals::MEMSPI2::regs().sram_clk().read();
+    // `src_sel`: 0 = XTAL, 1 = MPLL, 2 = SPLL, 3 = CPLL.
+    let src_sel = clk_ctrl.psram_clk_src_sel().bits();
+    // Register value N means divide by N + 1. Reset and IDF both use 0 (divide by 1).
+    let core_div_num = clk_ctrl.psram_core_clk_div_num().bits();
+    let core_div = u32::from(core_div_num) + 1;
+    let bus_div = if sram_clk.sclk_equ_sysclk().bit_is_set() {
+        1
+    } else {
+        u32::from(sram_clk.sclkcnt_n().bits()) + 1
+    };
+    let bus_mhz = source_hz / 1_000_000 / core_div / bus_div;
+    println!(
+        "psram-clock: mpll_hz={mpll_hz} source_hz={source_hz} src_sel={src_sel} core_div_num={core_div_num} sram_clk=0x{:08x} n={} h={} l={} equ={} bus_div={bus_div} bus_mhz={bus_mhz}",
+        sram_clk.bits(),
+        sram_clk.sclkcnt_n().bits(),
+        sram_clk.sclkcnt_h().bits(),
+        sram_clk.sclkcnt_l().bits(),
+        u8::from(sram_clk.sclk_equ_sysclk().bit_is_set()),
+    );
+}
+
 fn selected_case() -> CaseSelection {
     match option_env!("VDMA_MEM2MEM_CASE") {
         Some(mode) if mode.eq_ignore_ascii_case("psram") => CaseSelection::PsramOnly,
         Some(mode) if mode.eq_ignore_ascii_case("sram") => CaseSelection::SramOnly,
+        Some(mode) if mode.eq_ignore_ascii_case("cpu-psram") => CaseSelection::CpuPsram,
         _ => CaseSelection::Both,
     }
 }
@@ -100,7 +132,7 @@ fn parse_usize_env(value: &'static str, name: &str) -> usize {
 fn selected_psram_channel() -> u8 {
     parse_channel_env(
         option_env!("VDMA_MEM2MEM_PSRAM_CH"),
-        0,
+        1,
         "VDMA_MEM2MEM_PSRAM_CH",
     )
 }
@@ -108,7 +140,7 @@ fn selected_psram_channel() -> u8 {
 fn selected_sram_channel() -> u8 {
     parse_channel_env(
         option_env!("VDMA_MEM2MEM_SRAM_CH"),
-        1,
+        0,
         "VDMA_MEM2MEM_SRAM_CH",
     )
 }
@@ -119,6 +151,57 @@ fn selected_dst_awlen_auto() -> bool {
         Some("0") => false,
         Some("1") => true,
         Some(other) => panic!("VDMA_MEM2MEM_DST_AWLEN_AUTO must be '0' or '1', got '{other}'"),
+    }
+}
+
+/// One DMA parameter away from the current helper baseline.
+///
+/// `msize` codes follow IDF `dw_gdma_burst_items_t`: 3 is 16 items, 8 is 512 items.
+/// `OSR` fields follow IDF `limit - 1`: 0 is 1 outstanding request, 4 is 5.
+/// `AWLEN` is the value written into `CTL1.AWLEN` with `AWLEN_EN=1`.
+fn selected_dma_profile() -> (&'static str, DwGdmaMem2MemProfile) {
+    let baseline = DwGdmaMem2MemProfile::BASELINE;
+    match option_env!("VDMA_MEM2MEM_DMA_PROFILE") {
+        None | Some("baseline") => ("baseline", baseline),
+        Some("dst-msize-16") => (
+            "dst-msize-16",
+            DwGdmaMem2MemProfile {
+                dst_msize: 3,
+                ..baseline
+            },
+        ),
+        Some("dst-awlen-4") => (
+            "dst-awlen-4",
+            DwGdmaMem2MemProfile {
+                dst_awlen: 4,
+                ..baseline
+            },
+        ),
+        Some("dst-osr-1") => (
+            "dst-osr-1",
+            DwGdmaMem2MemProfile {
+                dst_osr_lmt: 0,
+                ..baseline
+            },
+        ),
+        Some("src-osr-1") => (
+            "src-osr-1",
+            DwGdmaMem2MemProfile {
+                src_osr_lmt: 0,
+                ..baseline
+            },
+        ),
+        Some(other) => panic!(
+            "VDMA_MEM2MEM_DMA_PROFILE must be baseline, dst-msize-16, dst-awlen-4, dst-osr-1, or src-osr-1, got '{other}'"
+        ),
+    }
+}
+
+fn msize_items(code: u32) -> u32 {
+    match code {
+        0 => 1,
+        1..=9 => 1u32 << (code + 1),
+        _ => 0,
     }
 }
 
@@ -345,6 +428,105 @@ fn prepare_buffers_for_dma(label: &str, src: &[u8], dst_with_guard: &mut [u8]) {
     println!("cache-ready: {label}");
 }
 
+/// CPU-only PSRAM check. Does not enable a DMA channel.
+///
+/// `0x4800_0000` is the cached PSRAM window. Stores update cache lines and do
+/// not, by themselves, prove that PSRAM captured the data. After each
+/// pattern this writes the lines back and then invalidates them, using the
+/// same `DmaAlignedMut` cache ops as the DMA cases. The following loads miss
+/// and are fetched from PSRAM through MSPI2.
+fn run_cpu_psram(buf: &mut [u8], offset: usize) -> bool {
+    let payload_end = offset + TRANSFER_BYTES;
+    let guarded_end = offset + DEST_TOTAL_BYTES;
+    assert!(
+        guarded_end <= buf.len(),
+        "CPU PSRAM buffer is smaller than the 64 KiB payload plus guard"
+    );
+    let base = buf.as_ptr() as usize;
+    println!(
+        "cpu-psram: base=0x{base:08x} payload=[0x{:08x}..0x{:08x}) guard=[0x{:08x}..0x{:08x})",
+        base + offset,
+        base + payload_end,
+        base + payload_end,
+        base + guarded_end
+    );
+
+    buf[payload_end..guarded_end].fill(DEST_SENTINEL);
+
+    let pattern_a = cpu_pattern_pass(
+        buf,
+        offset,
+        payload_end,
+        guarded_end,
+        0x1357_9bdf,
+        "pattern-a",
+    );
+    let pattern_b = cpu_pattern_pass(
+        buf,
+        offset,
+        payload_end,
+        guarded_end,
+        0xa5a5_f00d,
+        "pattern-b",
+    );
+    pattern_a && pattern_b
+}
+
+fn cpu_pattern_pass(
+    buf: &mut [u8],
+    offset: usize,
+    payload_end: usize,
+    guarded_end: usize,
+    seed: u32,
+    name: &str,
+) -> bool {
+    write_lcg(&mut buf[offset..payload_end], seed);
+    flush_psram_lines(&mut buf[..guarded_end]);
+
+    if let Some((index, expected, actual)) = first_lcg_mismatch(&buf[offset..payload_end], seed) {
+        let addr = buf.as_ptr() as usize + offset + index;
+        println!(
+            "cpu-psram {name}: mismatch addr=0x{addr:08x} offset={index} expected=0x{expected:02x} actual=0x{actual:02x}"
+        );
+        return false;
+    }
+    if let Some((index, actual)) = first_guard_mismatch(&buf[payload_end..guarded_end]) {
+        let addr = buf.as_ptr() as usize + payload_end + index;
+        println!(
+            "cpu-psram {name}: guard mismatch addr=0x{addr:08x} offset={index} expected=0x{DEST_SENTINEL:02x} actual=0x{actual:02x}"
+        );
+        return false;
+    }
+    println!("cpu-psram {name}: PASS");
+    true
+}
+
+fn write_lcg(dst: &mut [u8], seed: u32) {
+    let mut state = seed;
+    for slot in dst.iter_mut() {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        *slot = (state >> 24) as u8;
+    }
+}
+
+fn first_lcg_mismatch(actual: &[u8], seed: u32) -> Option<(usize, u8, u8)> {
+    let mut state = seed;
+    for (index, &byte) in actual.iter().enumerate() {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let expected = (state >> 24) as u8;
+        if byte != expected {
+            return Some((index, expected, byte));
+        }
+    }
+    None
+}
+
+fn flush_psram_lines(buf: &mut [u8]) {
+    let mut aligned = DmaAlignedMut::new(buf).expect("PSRAM buffer is not cache-line aligned");
+    aligned.writeback();
+    aligned.invalidate();
+}
+
 fn invalidate_after_dma(label: &str, buf: &[u8]) {
     step(22, "before destination cache invalidate after DMA");
     DmaAlignedRef::new(buf)
@@ -384,12 +566,26 @@ fn print_report(label: &str, report: &DwGdmaMem2MemReport, verify: Option<&Verif
         report.cfg1_bits, report.ctl0_bits, report.ctl1_bits, report.block_ts0_bits
     );
     println!(
-        "regs-decode: dms={} dst_width={} dst_msize={} awlen_en={} awlen={}",
+        "regs-decode: tt_fc={} sinc={} dinc={} sms={} dms={} src_width={} dst_width={} src_msize={} src_items={} dst_msize={} dst_items={} arlen_en={} arlen={} awlen_en={} awlen={} src_osr={} src_outstanding={} dst_osr={} dst_outstanding={}",
+        report.cfg1_bits & 0x7,
+        (report.ctl0_bits >> 4) & 0x1,
+        (report.ctl0_bits >> 6) & 0x1,
+        report.ctl0_bits & 0x1,
         (report.ctl0_bits >> 2) & 0x1,
+        (report.ctl0_bits >> 8) & 0x7,
         (report.ctl0_bits >> 11) & 0x7,
+        (report.ctl0_bits >> 14) & 0xf,
+        msize_items((report.ctl0_bits >> 14) & 0xf),
         (report.ctl0_bits >> 18) & 0xf,
+        msize_items((report.ctl0_bits >> 18) & 0xf),
+        (report.ctl1_bits >> 6) & 0x1,
+        (report.ctl1_bits >> 7) & 0xff,
         (report.ctl1_bits >> 15) & 0x1,
-        (report.ctl1_bits >> 16) & 0xff
+        (report.ctl1_bits >> 16) & 0xff,
+        (report.cfg1_bits >> 23) & 0xf,
+        ((report.cfg1_bits >> 23) & 0xf) + 1,
+        (report.cfg1_bits >> 27) & 0xf,
+        ((report.cfg1_bits >> 27) & 0xf) + 1,
     );
     println!(
         "result: completed={} timed_out={} dma_error={} bytes_written={} elapsed_us={}",
@@ -442,6 +638,7 @@ where
     prepare_buffers_for_dma(label, src, dst_cache_region);
 
     step(20, "before helper call (__qa_dw_gdma_mem2mem_transfer)");
+    let (_profile_name, profile) = selected_dma_profile();
     let dst_addr = {
         let dst_with_guard =
             &mut dst_cache_region[dst_transfer_offset..dst_transfer_offset + DEST_TOTAL_BYTES];
@@ -454,12 +651,13 @@ where
         TRANSFER_UNITS_64BIT,
         DMA_TIMEOUT_MS,
         dst_awlen_auto,
+        profile,
     );
     step(21, "after helper call (__qa_dw_gdma_mem2mem_transfer)");
 
     if !report.buffers_safe_for_cpu {
         println!(
-            "ownership-guard: DMA stop outcome {:?} leaves channel ownership uncertain; skipping invalidate/verify/reuse",
+            "ownership-guard: DMA stop outcome {:?} leaves channel ownership uncertain; skipping invalidate/verify/reuse. This boot will not start another DMA transfer.",
             report.stop_outcome
         );
         print_report(label, &report, None);
@@ -515,10 +713,32 @@ fn main() -> ! {
     let sram_channel = selected_sram_channel();
     let psram_dst_offset = selected_psram_dst_offset();
     let dst_awlen_auto = selected_dst_awlen_auto();
+    let (dma_profile_name, dma_profile) = selected_dma_profile();
     let peripherals = esp_hal::init(Config::default());
     esp_println::logger::init_logger_from_env();
     if case_selection != CaseSelection::SramOnly {
-        esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
+        // 250 MHz on the default 500 MHz MPLL. Tuning itself follows the
+        // active preset for every PSRAM user; this line is only the QA speed.
+        let timing = esp_hal::psram::PsramTimingParams::MHZ_250;
+        println!(
+            "psram-config: requested_mhz={} clock_source={:?} mr0_rl={} mr4_wl={} rd_dummy={} wr_dummy={} reg_dummy={}",
+            timing.clock,
+            timing.clock_source,
+            timing.mr0_rl,
+            timing.mr4_wl,
+            timing.rd_dummy_bits,
+            timing.wr_dummy_bits,
+            timing.reg_dummy_bits
+        );
+        esp_alloc::psram_allocator!(
+            peripherals.PSRAM,
+            esp_hal::psram,
+            esp_hal::psram::PsramConfig {
+                timing,
+                ..Default::default()
+            }
+        );
+        log_psram_clock_readback();
     }
 
     println!("DW-GDMA mem2mem diagnostic (ESP32-P4)");
@@ -527,8 +747,23 @@ fn main() -> ! {
         TRANSFER_BYTES, GUARD_BYTES, DMA_TIMEOUT_MS
     );
     println!(
-        "selection: {:?} psram_channel={} sram_channel={} dst_awlen_auto={} psram_dst_offset={}",
-        case_selection, psram_channel, sram_channel, dst_awlen_auto, psram_dst_offset
+        "selection: {:?} psram_channel={} sram_channel={} dst_awlen_auto={} psram_dst_offset={} dma_profile={}",
+        case_selection,
+        psram_channel,
+        sram_channel,
+        dst_awlen_auto,
+        psram_dst_offset,
+        dma_profile_name
+    );
+    println!(
+        "dma-profile: name={dma_profile_name} dst_msize={} dst_items={} dst_awlen={} src_osr={} src_outstanding={} dst_osr={} dst_outstanding={}",
+        dma_profile.dst_msize,
+        msize_items(u32::from(dma_profile.dst_msize)),
+        dma_profile.dst_awlen,
+        dma_profile.src_osr_lmt,
+        u32::from(dma_profile.src_osr_lmt) + 1,
+        dma_profile.dst_osr_lmt,
+        u32::from(dma_profile.dst_osr_lmt) + 1,
     );
 
     step(1, "before internal SRAM buffer acquisition");
@@ -562,6 +797,15 @@ fn main() -> ! {
     let mut overall = true;
 
     match case_selection {
+        CaseSelection::CpuPsram => {
+            step(7, "before CPU-only PSRAM test");
+            let pass = run_cpu_psram(
+                dst_psram_cache.expect("PSRAM destination missing in CPU mode"),
+                psram_dst_offset,
+            );
+            step(8, "after CPU-only PSRAM test");
+            overall &= pass;
+        }
         CaseSelection::PsramOnly => {
             step(7, "before first DMA case (SRAM->PSRAM)");
             let outcome = match psram_channel {
@@ -688,13 +932,17 @@ VDMA_MEM2MEM_SRAM_CH to different values"
         }
     }
 
+    let result_name = match case_selection {
+        CaseSelection::CpuPsram => "CPU-PSRAM",
+        _ => "DW-GDMA mem2mem overall",
+    };
     println!(
-        "DW-GDMA mem2mem overall RESULT: {}",
+        "{result_name} RESULT: {}",
         if overall { "PASS" } else { "FAIL" }
     );
 
     if !overall {
-        panic!("DW-GDMA mem2mem diagnostic failed");
+        panic!("{result_name} diagnostic failed");
     }
 
     loop {}
