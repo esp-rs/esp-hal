@@ -1,12 +1,16 @@
 //! Continuous capture into two frame buffers that the DMA cycles through.
 
-use core::{mem::ManuallyDrop, ops::Deref, ptr};
+use core::{future::poll_fn, mem::ManuallyDrop, ops::Deref, ptr, task::Poll};
 
 use esp_sync::NonReentrantMutex;
 
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
 use crate::dma::aligned::DmaAlignedMut;
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
+    asynch::AtomicWaker,
     dma::DmaBufError,
     mipi_csi::{
         CsiCapture,
@@ -97,6 +101,8 @@ impl Shared {
 }
 
 static SHARED: NonReentrantMutex<Shared> = NonReentrantMutex::new(Shared::IDLE);
+/// Woken by the interrupt handler after every change of [`SHARED`].
+static STREAM_WAKER: AtomicWaker = AtomicWaker::new();
 
 /// Counters of a [`CsiStream`] since it started.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -180,22 +186,25 @@ pub enum StreamError {
 /// configured frame size, is dropped. The bridge is then switched off and
 /// switched on again by the next [`Self::next_frame`] call, so that the next
 /// frame starts on a frame boundary again.
-pub struct CsiStream<'d> {
-    capture: CsiCapture<'d>,
+///
+/// In [`Async`] mode, [`Self::next_frame_async`] waits for the DMA interrupt
+/// instead of polling.
+pub struct CsiStream<'d, Dm: DriverMode = Blocking> {
+    capture: CsiCapture<'d, Dm>,
     buffers: [&'static mut [u8]; STREAM_BUFFER_COUNT],
 }
 
 /// A completed frame, borrowed from a [`CsiStream`].
 ///
-/// While it is alive the DMA does not write its buffer. Dropping it gives the
-/// buffer back to the stream.
-pub struct StreamFrame<'s, 'd> {
-    stream: &'s mut CsiStream<'d>,
+/// While it is alive the DMA does not write its buffer, and the stream stays
+/// borrowed. Dropping it gives the buffer back to the stream.
+pub struct StreamFrame<'s> {
+    data: &'s [u8],
     slot: usize,
     sequence: u32,
 }
 
-impl StreamFrame<'_, '_> {
+impl StreamFrame<'_> {
     /// Position of this frame among the completed frames of the stream,
     /// starting at 0. Gaps are frames that were overwritten.
     pub fn sequence(&self) -> u32 {
@@ -203,15 +212,15 @@ impl StreamFrame<'_, '_> {
     }
 }
 
-impl Deref for StreamFrame<'_, '_> {
+impl Deref for StreamFrame<'_> {
     type Target = [u8];
 
     fn deref(&self) -> &[u8] {
-        &self.stream.buffers[self.slot][..self.stream.capture.config.frame_bytes]
+        self.data
     }
 }
 
-impl Drop for StreamFrame<'_, '_> {
+impl Drop for StreamFrame<'_> {
     fn drop(&mut self) {
         SHARED.with(|shared| {
             if shared.slots[self.slot] == Slot::App {
@@ -221,7 +230,15 @@ impl Drop for StreamFrame<'_, '_> {
     }
 }
 
-impl<'d> CsiCapture<'d> {
+/// The capture, the buffers and the reason, returned when
+/// [`CsiCapture::into_stream`] fails.
+pub type IntoStreamError<'d, Dm> = (
+    CsiCapture<'d, Dm>,
+    [&'static mut [u8]; STREAM_BUFFER_COUNT],
+    StreamStartError,
+);
+
+impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
     /// Starts capturing continuously into `buffers`.
     ///
     /// The DMA channel and the bridge are armed on the first buffer before
@@ -244,14 +261,7 @@ impl<'d> CsiCapture<'d> {
     pub fn into_stream(
         self,
         buffers: [&'static mut [u8]; STREAM_BUFFER_COUNT],
-    ) -> Result<
-        CsiStream<'d>,
-        (
-            Self,
-            [&'static mut [u8]; STREAM_BUFFER_COUNT],
-            StreamStartError,
-        ),
-    > {
+    ) -> Result<CsiStream<'d, Dm>, IntoStreamError<'d, Dm>> {
         let mut stream = CsiStream {
             capture: self,
             buffers,
@@ -266,7 +276,7 @@ impl<'d> CsiCapture<'d> {
     }
 }
 
-impl<'d> CsiStream<'d> {
+impl<'d, Dm: DriverMode> CsiStream<'d, Dm> {
     fn start(&mut self) -> Result<(), StreamStartError> {
         let frame_bytes = self.capture.config.frame_bytes;
         let smallest = self.buffers.iter().map(|b| b.len()).min().unwrap_or(0);
@@ -330,52 +340,31 @@ impl<'d> CsiStream<'d> {
     ///
     /// [`StreamError::Timeout`] if no frame completed in time,
     /// [`StreamError::DmaFault`] if the stream stopped on a DMA error.
-    pub fn next_frame(&mut self, timeout: Duration) -> Result<StreamFrame<'_, 'd>, StreamError> {
+    pub fn next_frame(&mut self, timeout: Duration) -> Result<StreamFrame<'_>, StreamError> {
         let channel = self.capture.dma_channel;
         let deadline = Instant::now() + timeout;
         loop {
-            let taken = SHARED.with(|shared| {
-                if shared.fault {
-                    return Err(StreamError::DmaFault);
-                }
-                if shared.paused {
-                    resync(shared, channel);
-                }
-                let ready = shared
-                    .slots
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(slot, state)| match state {
-                        Slot::Ready(sequence) => Some((slot, *sequence)),
-                        _ => None,
-                    })
-                    .max_by_key(|(_, sequence)| *sequence);
-                if let Some((slot, _)) = ready {
-                    shared.slots[slot] = Slot::App;
-                    shared.stats.delivered += 1;
-                }
-                Ok(ready)
-            })?;
-
-            if let Some((slot, sequence)) = taken {
-                // The DMA finished this buffer and is not armed on it.
-                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-                {
-                    let frame_bytes = self.capture.config.frame_bytes;
-                    if let Ok(aligned) = DmaAlignedMut::new(&mut self.buffers[slot][..frame_bytes])
-                    {
-                        aligned.invalidate();
-                    }
-                }
-                return Ok(StreamFrame {
-                    stream: self,
-                    slot,
-                    sequence,
-                });
+            if let Some((slot, sequence)) = SHARED.with(|shared| take_newest(shared, channel))? {
+                return Ok(self.frame(slot, sequence));
             }
             if Instant::now() > deadline {
                 return Err(StreamError::Timeout);
             }
+        }
+    }
+
+    /// Hands out `slot`, which [`take_newest`] moved to [`Slot::App`].
+    fn frame(&mut self, slot: usize, sequence: u32) -> StreamFrame<'_> {
+        let frame_bytes = self.capture.config.frame_bytes;
+        // The DMA finished this buffer and is not armed on it.
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        if let Ok(aligned) = DmaAlignedMut::new(&mut self.buffers[slot][..frame_bytes]) {
+            aligned.invalidate();
+        }
+        StreamFrame {
+            data: &self.buffers[slot][..frame_bytes],
+            slot,
+            sequence,
         }
     }
 
@@ -391,14 +380,14 @@ impl<'d> CsiStream<'d> {
     /// Panics if the DMA channel cannot be shown to have stopped, as
     /// [`CsiCapture::receive`] does, so that the buffers are never handed back
     /// while the DMA may still write them.
-    pub fn stop(self) -> (CsiCapture<'d>, [&'static mut [u8]; STREAM_BUFFER_COUNT]) {
+    pub fn stop(self) -> (CsiCapture<'d, Dm>, [&'static mut [u8]; STREAM_BUFFER_COUNT]) {
         let mut stream = ManuallyDrop::new(self);
         stream.halt();
         // SAFETY: `stream` is never used or dropped again.
         unsafe { (ptr::read(&stream.capture), ptr::read(&stream.buffers)) }
     }
 
-    fn into_parts(self) -> (CsiCapture<'d>, [&'static mut [u8]; STREAM_BUFFER_COUNT]) {
+    fn into_parts(self) -> (CsiCapture<'d, Dm>, [&'static mut [u8]; STREAM_BUFFER_COUNT]) {
         let stream = ManuallyDrop::new(self);
         // SAFETY: `stream` is never used or dropped again, and was not started.
         unsafe { (ptr::read(&stream.capture), ptr::read(&stream.buffers)) }
@@ -420,10 +409,66 @@ impl<'d> CsiStream<'d> {
     }
 }
 
-impl Drop for CsiStream<'_> {
+impl<'d> CsiStream<'d, Async> {
+    /// Returns the newest completed frame, waiting for the DMA interrupt until
+    /// one completes.
+    ///
+    /// Restarts the bridge first if the previous frame failed. Dropping the
+    /// future before it completes leaves the stream unchanged. Use a timer
+    /// future to bound the wait.
+    ///
+    /// # Errors
+    ///
+    /// [`StreamError::DmaFault`] if the stream stopped on a DMA error.
+    pub async fn next_frame_async(&mut self) -> Result<StreamFrame<'_>, StreamError> {
+        let channel = self.capture.dma_channel;
+        let (slot, sequence) = poll_fn(|cx| {
+            // Registered before the check, so a frame that completes after
+            // the check wakes this task.
+            STREAM_WAKER.register(cx.waker());
+            match SHARED.with(|shared| take_newest(shared, channel)) {
+                Ok(Some(taken)) => Poll::Ready(Ok(taken)),
+                Ok(None) => Poll::Pending,
+                Err(error) => Poll::Ready(Err(error)),
+            }
+        })
+        .await?;
+        Ok(self.frame(slot, sequence))
+    }
+}
+
+impl<Dm: DriverMode> Drop for CsiStream<'_, Dm> {
     fn drop(&mut self) {
         self.halt();
     }
+}
+
+/// Moves the newest completed frame to [`Slot::App`] and returns its slot and
+/// sequence number, after restarting the bridge if the previous frame failed.
+fn take_newest(
+    shared: &mut Shared,
+    channel: DwGdmaChannel,
+) -> Result<Option<(usize, u32)>, StreamError> {
+    if shared.fault {
+        return Err(StreamError::DmaFault);
+    }
+    if shared.paused {
+        resync(shared, channel);
+    }
+    let ready = shared
+        .slots
+        .iter()
+        .enumerate()
+        .filter_map(|(slot, state)| match state {
+            Slot::Ready(sequence) => Some((slot, *sequence)),
+            _ => None,
+        })
+        .max_by_key(|(_, sequence)| *sequence);
+    if let Some((slot, _)) = ready {
+        shared.slots[slot] = Slot::App;
+        shared.stats.delivered += 1;
+    }
+    Ok(ready)
 }
 
 fn enable_bridge(enable: bool) {
@@ -440,12 +485,7 @@ fn resync(shared: &mut Shared, channel: DwGdmaChannel) {
         return;
     };
     flush_bridge_fifo();
-    channel.clear_all_interrupts();
-    unsafe {
-        MIPI_CSI_BRIDGE::regs()
-            .int_clr()
-            .write(|w| w.bits(super::CSI_BRIDGE_INTERRUPT_MASK))
-    };
+    super::clear_transfer_status(channel);
     shared.arm(channel, slot);
     enable_bridge(true);
     shared.paused = false;
@@ -456,14 +496,22 @@ fn resync(shared: &mut Shared, channel: DwGdmaChannel) {
 ///
 /// Called by the shared DW-GDMA dispatcher only for the capture channel.
 #[crate::ram]
-fn stream_interrupt_handler(channel: DwGdmaChannel, _pending: u32) {
+fn stream_interrupt_handler(channel: DwGdmaChannel, pending: u32) {
+    update_on_interrupt(channel, pending);
+    STREAM_WAKER.wake();
+}
+
+fn update_on_interrupt(channel: DwGdmaChannel, _pending: u32) {
     SHARED.with(|shared| {
         shared.stats.interrupts += 1;
         let status = channel.interrupt_status();
-        channel.clear_interrupts(status);
         if !shared.active {
+            // A stop in progress may be waiting for `CH_SUSPENDED`, which
+            // does not raise the line.
+            channel.clear_interrupts(status & DMA_COMPLETION_INTERRUPT_MASK);
             return;
         }
+        channel.clear_interrupts(status);
         // The channel clears `CH_EN` itself when the block ends. One that is
         // still enabled is either still writing after an error or did not
         // stop, and is left to the bounded shutdown.

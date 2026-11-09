@@ -275,31 +275,6 @@ pub(crate) struct DwGdmaChannel {
     channel_id: u8,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct DwGdmaChannelDebugRegisters {
-    pub(crate) controller_cfg0: u32,
-    pub(crate) controller_reset0: u32,
-    pub(crate) controller_lowpower_cfg0: u32,
-    pub(crate) controller_lowpower_cfg1: u32,
-    pub(crate) chen0: u32,
-    pub(crate) chen1: u32,
-    pub(crate) cfg0: u32,
-    pub(crate) cfg1: u32,
-    pub(crate) ctl0: u32,
-    pub(crate) ctl1: u32,
-    pub(crate) sar0: u32,
-    pub(crate) dar0: u32,
-    pub(crate) block_ts0: u32,
-    pub(crate) sstatar0: u32,
-    pub(crate) dstatar0: u32,
-    pub(crate) sstat0: u32,
-    pub(crate) dstat0: u32,
-    pub(crate) status0: u32,
-    pub(crate) status1: u32,
-    pub(crate) intstatus_enable0: u32,
-    pub(crate) intstatus0: u32,
-}
-
 impl DwGdmaChannel {
     #[inline]
     pub(crate) const fn new(channel_id: u8) -> Self {
@@ -429,9 +404,8 @@ impl DwGdmaChannel {
             w.ch1_awlen_en().set_bit();
             w.ch1_awlen().bits(config.dst.axi_burst_len);
             w.ch1_ioc_blktfr().bit(config.interrupt_on_block_done);
-            // Keep contiguous transfer programming aligned with IDF:
-            // block markers are configured separately, and are not asserted
-            // for this one-shot CSI transfer path.
+            // Contiguous transfer: no shadow-register or link-list block
+            // markers. Link-list users set them in the item itself.
             w.ch1_shadowreg_or_lli_last().clear_bit();
             w.ch1_shadowreg_or_lli_valid().clear_bit()
         });
@@ -524,35 +498,6 @@ impl DwGdmaChannel {
             .read()
             .ch1_data_left_in_fifo()
             .bits()
-    }
-
-    #[inline]
-    pub(crate) fn debug_registers(&self) -> DwGdmaChannelDebugRegisters {
-        let regs = VDMA::regs();
-        let ch = regs.ch(self.channel_id as usize);
-        DwGdmaChannelDebugRegisters {
-            controller_cfg0: regs.cfg0().read().bits(),
-            controller_reset0: regs.reset0().read().bits(),
-            controller_lowpower_cfg0: regs.lowpower_cfg0().read().bits(),
-            controller_lowpower_cfg1: regs.lowpower_cfg1().read().bits(),
-            chen0: regs.chen0().read().bits(),
-            chen1: regs.chen1().read().bits(),
-            cfg0: ch.cfg0().read().bits(),
-            cfg1: ch.cfg1().read().bits(),
-            ctl0: ch.ctl0().read().bits(),
-            ctl1: ch.ctl1().read().bits(),
-            sar0: ch.sar0().read().bits(),
-            dar0: ch.dar0().read().bits(),
-            block_ts0: ch.block_ts0().read().bits(),
-            sstatar0: ch.sstatar0().read().bits(),
-            dstatar0: ch.dstatar0().read().bits(),
-            sstat0: ch.sstat0().read().bits(),
-            dstat0: ch.dstat0().read().bits(),
-            status0: ch.status0().read().bits(),
-            status1: ch.status1().read().bits(),
-            intstatus_enable0: ch.intstatus_enable0().read().bits(),
-            intstatus0: ch.intstatus0().read().bits(),
-        }
     }
 
     /// Clears raw interrupt status bits for this channel.
