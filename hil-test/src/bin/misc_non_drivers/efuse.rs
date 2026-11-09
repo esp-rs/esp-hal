@@ -71,4 +71,36 @@ mod tests {
         let another = MacAddress::new_eui48([0x02, 0x00, 0x00, 0x00, 0x00, 0x02]);
         assert!(efuse::override_mac_address(another).is_err());
     }
+
+    /// Exercises the per-interface override flow:
+    /// 1. After `override_interface_mac_address`, Bluetooth returns the override as it is.
+    /// 2. The other interfaces keep their derived MACs.
+    /// 3. A second `override_interface_mac_address` for Bluetooth returns `AlreadySet`.
+    #[cfg(soc_has_bt)]
+    #[test]
+    fn interface_mac_override_replaces_only_that_interface() {
+        #[cfg(soc_has_wifi)]
+        let sta_before = efuse::interface_mac_address(InterfaceMacAddress::Station);
+
+        // A universal address, which a derived Bluetooth MAC never is.
+        let custom = MacAddress::new_eui48([0x00, 0x11, 0x22, 0x33, 0x44, 0x55]);
+        efuse::override_interface_mac_address(InterfaceMacAddress::Bluetooth, custom)
+            .expect("first override_interface_mac_address should succeed");
+
+        assert_eq!(
+            efuse::interface_mac_address(InterfaceMacAddress::Bluetooth),
+            custom
+        );
+        #[cfg(soc_has_wifi)]
+        assert_eq!(
+            efuse::interface_mac_address(InterfaceMacAddress::Station),
+            sta_before
+        );
+
+        // Second set must fail
+        let another = MacAddress::new_eui48([0x00, 0x11, 0x22, 0x33, 0x44, 0x56]);
+        assert!(
+            efuse::override_interface_mac_address(InterfaceMacAddress::Bluetooth, another).is_err()
+        );
+    }
 }
