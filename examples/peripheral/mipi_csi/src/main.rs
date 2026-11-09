@@ -1,6 +1,6 @@
 //! Minimal MIPI CSI-2 bring-up smoke test for ESP32-P4
 //!
-//! This only powers the D-PHY rail and initializes the CSI HOST/BRIDGE blocks.
+//! This only initializes the CSI HOST/BRIDGE blocks, which also powers the D-PHY rail.
 //! It does not configure the camera sensor or start capture.
 //!
 //! Diagnostics output from `MipiCsi::init_diagnostics()` is enabled by the
@@ -15,30 +15,12 @@ use esp_backtrace as _;
 #[cfg(feature = "diagnostics")]
 use esp_hal::mipi_csi::PhyCfgClockSource;
 use esp_hal::{
-    delay::Delay,
     main,
     mipi_csi::{Config, DataLanes, MipiCsi},
-    peripherals::PMU,
 };
 use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
-
-// PMU VO3 (ext_ldo_p0_0p2a) configured to 2.5 V for VDD_MIPI_DPHY.
-const MIPI_DPHY_LDO_CTRL: u32 = 0x4020_0180;
-const MIPI_DPHY_LDO_ANA_2P5V: u32 = (9u32 << 28) | (6u32 << 23);
-
-fn enable_mipi_dphy_power(delay: &Delay) {
-    PMU::regs()
-        .ext_ldo_p0_0p2a()
-        .write(|w| unsafe { w.bits(MIPI_DPHY_LDO_CTRL) });
-    PMU::regs()
-        .ext_ldo_p0_0p2a_ana()
-        .write(|w| unsafe { w.bits(MIPI_DPHY_LDO_ANA_2P5V) });
-
-    // Allow the rail to settle before touching MIPI D-PHY logic.
-    delay.delay_micros(500);
-}
 
 #[cfg(feature = "diagnostics")]
 fn phy_cfg_clk_source_name(source: PhyCfgClockSource) -> &'static str {
@@ -54,10 +36,6 @@ fn phy_cfg_clk_source_name(source: PhyCfgClockSource) -> &'static str {
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     esp_println::logger::init_logger_from_env();
-    let delay = Delay::new();
-
-    enable_mipi_dphy_power(&delay);
-    println!("MIPI D-PHY power enabled");
 
     let config = Config::default()
         .with_num_data_lanes(DataLanes::_1)
