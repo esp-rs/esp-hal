@@ -7,5 +7,7 @@
 .rwtext.cache_suspend_safe : ALIGN(4)
 {
   *(.rwtext.cache_suspend_safe.*)
+  /* unconditionally add patched SPI-flash ROM functions (from esp-rom-sys) - the linker is still happy if there are none */
+  *:esp_rom_spiflash.*(.literal .text .literal.* .text.*)
   . = ALIGN(4);
 } > RWTEXT
