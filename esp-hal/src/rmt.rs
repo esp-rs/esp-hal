@@ -921,6 +921,11 @@ impl<'rmt> Rmt<'rmt, Blocking> {
     /// converting real-time pulse durations to [`PulseCode`] lengths; this is
     /// not necessarily the APB clock frequency.
     ///
+    /// On chips other than ESP32 and ESP32-S2, the counter clock is derived from the source
+    /// clock with a fractional divider. A `frequency` that does not divide the source clock
+    /// evenly is approximated with a fractional divider, which introduces clock jitter: the
+    /// average tick rate matches [`Rmt::frequency`], but individual ticks vary in length.
+    ///
     /// # Errors
     ///
     /// [`ConfigError::UnreachableTargetFrequency`] when the target frequency cannot be reached.
@@ -2273,33 +2278,43 @@ mod chip_specific {
         Tx,
         WAKER,
     };
-    use crate::{peripherals::RMT, soc::clocks, time::Rate};
+    use crate::{clock::dividers::FractionalDivider, peripherals::RMT, soc::clocks, time::Rate};
 
     // Time to wait after a `conf_update`, see `DynChannelAccess::update`.
     static CONF_UPDATE_DELAY_US: AtomicU32 = AtomicU32::new(0);
 
+    // The SCLK divider is `div_num + 1 + numerator / denominator`, with an 8-bit `div_num`.
+    const MAX_DIVIDER: u32 = 256;
+    const MAX_DENOMINATOR: u32 = if cfg!(any(esp32p4, esp32s31)) {
+        255
+    } else {
+        63
+    };
+
     pub(super) fn validate_clock(
         source: ClockSource,
         frequency: Rate,
-    ) -> Result<(u8, Rate), ConfigError> {
-        let src_clock = Rate::from_hz(clocks::RmtInstance::sclk_source_frequency(source));
+    ) -> Result<(FractionalDivider, Rate), ConfigError> {
+        let src_clock = clocks::RmtInstance::sclk_source_frequency(source);
+        let frequency = frequency.as_hz();
 
-        if frequency > src_clock {
+        if frequency == 0 || frequency > src_clock {
             return Err(ConfigError::UnreachableTargetFrequency);
         }
 
-        let div = src_clock
-            .as_hz()
-            .checked_div(frequency.as_hz())
-            .ok_or(ConfigError::UnreachableTargetFrequency)?;
+        let divider = FractionalDivider::new(src_clock, frequency, MAX_DENOMINATOR);
+        if divider.integer > MAX_DIVIDER {
+            return Err(ConfigError::UnreachableTargetFrequency);
+        }
 
-        let div = u8::try_from(div - 1).map_err(|_| ConfigError::UnreachableTargetFrequency)?;
-        let actual_frequency = src_clock / (u32::from(div) + 1);
-
-        Ok((div, actual_frequency))
+        Ok((divider, Rate::from_hz(divider.output_frequency(src_clock))))
     }
 
-    pub(super) fn configure_clock(source: ClockSource, div: u8, frequency: Rate) {
+    pub(super) fn configure_clock(
+        source: ClockSource,
+        divider: FractionalDivider,
+        frequency: Rate,
+    ) {
         // Synchronizing a `conf_update` into the SCLK domain takes about one SCLK cycle, wait for
         // two to leave some margin. For a fast SCLK, this is shorter than the register accesses
         // following the update, so don't delay at all.
@@ -2314,39 +2329,46 @@ mod chip_specific {
             clocks::RmtInstance::Rmt.configure_sclk(clocks, source);
         });
 
+        let div_num = (divider.integer - 1) as u8;
+        let numerator = divider.numerator as u8;
+        // An integral divider is described as `0 / 1`, not as `0 / 0`.
+        let denominator = divider.denominator.max(1) as u8;
+
         // TODO: configure dividers through clock tree
+        // `div_a` is the numerator and `div_b` the denominator, as in the TRMs' RMT clock sections
+        // and ESP-IDF. Some register descriptions have them swapped.
         cfg_select! {
             esp32p4 => {
                 use crate::peripherals::HP_SYS_CLKRST;
                 HP_SYS_CLKRST::regs()
                     .peri_clk_ctrl22()
                     .modify(|_, w| unsafe {
-                        w.rmt_clk_div_num().bits(div);
-                        w.rmt_clk_div_numerator().bits(0);
-                        w.rmt_clk_div_denominator().bits(0)
+                        w.rmt_clk_div_num().bits(div_num);
+                        w.rmt_clk_div_numerator().bits(numerator);
+                        w.rmt_clk_div_denominator().bits(denominator)
                     });
             }
             esp32s31 => {
                 use crate::peripherals::HP_SYS_CLKRST;
                 HP_SYS_CLKRST::regs().rmt_ctrl0().modify(|_, w| unsafe {
-                    w.clk_div_num().bits(div);
-                    w.clk_div_numerator().bits(0);
-                    w.clk_div_denominator().bits(0)
+                    w.clk_div_num().bits(div_num);
+                    w.clk_div_numerator().bits(numerator);
+                    w.clk_div_denominator().bits(denominator)
                 });
             }
             soc_has_pcr => {
                 use crate::peripherals::PCR;
                 PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
-                    w.sclk_div_num().bits(div);
-                    w.sclk_div_a().bits(0);
-                    w.sclk_div_b().bits(0)
+                    w.sclk_div_num().bits(div_num);
+                    w.sclk_div_a().bits(numerator);
+                    w.sclk_div_b().bits(denominator)
                 });
             }
             _ => {
                 RMT::regs().sys_conf().modify(|_, w| unsafe {
-                    w.sclk_div_num().bits(div);
-                    w.sclk_div_a().bits(0);
-                    w.sclk_div_b().bits(0)
+                    w.sclk_div_num().bits(div_num);
+                    w.sclk_div_a().bits(numerator);
+                    w.sclk_div_b().bits(denominator)
                 });
             }
         }
