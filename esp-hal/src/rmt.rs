@@ -2283,13 +2283,36 @@ mod chip_specific {
     // Time to wait after a `conf_update`, see `DynChannelAccess::update`.
     static CONF_UPDATE_DELAY_US: AtomicU32 = AtomicU32::new(0);
 
-    // The SCLK divider is `div_num + 1 + numerator / denominator`, with an 8-bit `div_num`.
-    const MAX_DIVIDER: u32 = 256;
-    const MAX_DENOMINATOR: u32 = if cfg!(any(esp32p4, esp32s31)) {
-        255
-    } else {
-        63
-    };
+    cfg_select! {
+        esp32p4 => {
+            use crate::soc::pac::hp_sys_clkrst::peri_clk_ctrl22 as sclk_conf;
+            type Spec = sclk_conf::PERI_CLK_CTRL22_SPEC;
+            type DivNumW<'a> = sclk_conf::RMT_CLK_DIV_NUM_W<'a, Spec>;
+            type DenominatorW<'a> = sclk_conf::RMT_CLK_DIV_DENOMINATOR_W<'a, Spec>;
+        }
+        esp32s31 => {
+            use crate::soc::pac::hp_sys_clkrst::rmt_ctrl0 as sclk_conf;
+            type Spec = sclk_conf::RMT_CTRL0_SPEC;
+            type DivNumW<'a> = sclk_conf::CLK_DIV_NUM_W<'a, Spec>;
+            type DenominatorW<'a> = sclk_conf::CLK_DIV_DENOMINATOR_W<'a, Spec>;
+        }
+        soc_has_pcr => {
+            use crate::soc::pac::pcr::rmt_sclk_conf as sclk_conf;
+            type Spec = sclk_conf::RMT_SCLK_CONF_SPEC;
+            type DivNumW<'a> = sclk_conf::SCLK_DIV_NUM_W<'a, Spec>;
+            type DenominatorW<'a> = sclk_conf::SCLK_DIV_B_W<'a, Spec>;
+        }
+        _ => {
+            use crate::soc::pac::rmt::sys_conf as sclk_conf;
+            type Spec = sclk_conf::SYS_CONF_SPEC;
+            type DivNumW<'a> = sclk_conf::SCLK_DIV_NUM_W<'a, Spec>;
+            type DenominatorW<'a> = sclk_conf::SCLK_DIV_B_W<'a, Spec>;
+        }
+    }
+
+    // The SCLK divider is `div_num + 1 + numerator / denominator`.
+    const MAX_DIVIDER: u32 = 1 << DivNumW::WIDTH;
+    const MAX_DENOMINATOR: u32 = (1 << DenominatorW::WIDTH) - 1;
 
     pub(super) fn validate_clock(
         source: ClockSource,
@@ -2335,8 +2358,8 @@ mod chip_specific {
         let denominator = divider.denominator.max(1) as u8;
 
         // TODO: configure dividers through clock tree
-        // `div_a` is the numerator and `div_b` the denominator, as in the TRMs' RMT clock sections
-        // and ESP-IDF. Some register descriptions have them swapped.
+        // `div_a` is the numerator and `div_b` the denominator, as the RMT clock sections of the
+        // TRMs state. Some register descriptions have them swapped.
         cfg_select! {
             esp32p4 => {
                 use crate::peripherals::HP_SYS_CLKRST;
