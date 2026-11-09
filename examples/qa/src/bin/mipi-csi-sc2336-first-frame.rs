@@ -19,6 +19,8 @@
 //!   outstanding frame-buffer write, `dst-awlen-4` uses 4-beat frame-buffer writes, `src-osr-1`
 //!   allows one outstanding bridge read, and `idf` keeps the ESP-IDF driver settings. The first
 //!   three passed `vdma-mem2mem-psram` into 250 MHz PSRAM, where the `idf` settings stalled.
+//! - `CSI_FRAME_EXPORT=1`: after a valid mode A frame, print it as `@@SC2336FRAME` text lines for
+//!   `examples/qa/tools/csi_frame_extract.py`. About 860 KB of console output.
 //% CHIP_FILTER: mipi_csi_driver_supported && i2c_master_driver_supported
 //% FEATURES: unstable
 
@@ -1266,6 +1268,7 @@ fn run_capture(
     mode: CaptureMode,
     allocation: &mut [u8],
     test_pattern: bool,
+    frame_export: bool,
 ) -> bool {
     let label = mode.label();
     let capture_len = mode.expected_bytes();
@@ -1316,7 +1319,7 @@ fn run_capture(
         print_receive_error(label, err);
     }
 
-    print_verdict(
+    let valid = print_verdict(
         label,
         &CaptureEvidence {
             mode,
@@ -1327,7 +1330,136 @@ fn run_capture(
             allocation,
             test_pattern,
         },
-    )
+    );
+
+    if frame_export {
+        // `receive` returning `Ok` means the DMA block completed and the
+        // channel was shown stopped. The buffer was invalidated after that,
+        // and `valid` includes the length, sentinel, and guard checks.
+        match (mode, &result) {
+            (CaptureMode::Raw8Psram, Ok(_)) if valid => {
+                export_raw8_frame(i2c, &allocation[..capture_len], test_pattern, &trace)
+            }
+            (CaptureMode::Raw8Psram, _) => {
+                println!("{label}: frame export skipped, the capture is not a valid frame")
+            }
+            _ => println!("{label}: frame export skipped, only mode A exports a frame"),
+        }
+    }
+
+    valid
+}
+
+const EXPORT_PREFIX: &str = "@@SC2336FRAME";
+const EXPORT_CHUNK_BYTES: usize = 512;
+const EXPORT_BASE64_BYTES: usize = EXPORT_CHUNK_BYTES.div_ceil(3) * 4;
+const EXPORT_FRAME_ID: u32 = 1;
+const SC2336_REG_FLIP_MIRROR: u16 = 0x3221;
+const BASE64_ALPHABET: &[u8; 64] =
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+const CRC32_TABLE: [u32; 256] = {
+    let mut table = [0u32; 256];
+    let mut index = 0;
+    while index < 256 {
+        let mut crc = index as u32;
+        let mut bit = 0;
+        while bit < 8 {
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xEDB8_8320
+            } else {
+                crc >> 1
+            };
+            bit += 1;
+        }
+        table[index] = crc;
+        index += 1;
+    }
+    table
+};
+
+/// CRC-32 (IEEE), the same as Python's `zlib.crc32`.
+fn crc32_update(crc: u32, data: &[u8]) -> u32 {
+    let mut crc = !crc;
+    for &byte in data {
+        crc = CRC32_TABLE[((crc ^ byte as u32) & 0xff) as usize] ^ (crc >> 8);
+    }
+    !crc
+}
+
+fn base64_encode<'a>(input: &[u8], output: &'a mut [u8; EXPORT_BASE64_BYTES]) -> &'a str {
+    let mut len = 0;
+    for group in input.chunks(3) {
+        let b = [
+            group[0],
+            group.get(1).copied().unwrap_or(0),
+            group.get(2).copied().unwrap_or(0),
+        ];
+        let n = (b[0] as u32) << 16 | (b[1] as u32) << 8 | b[2] as u32;
+        let encoded = [
+            BASE64_ALPHABET[(n >> 18) as usize & 63],
+            BASE64_ALPHABET[(n >> 12) as usize & 63],
+            if group.len() > 1 {
+                BASE64_ALPHABET[(n >> 6) as usize & 63]
+            } else {
+                b'='
+            },
+            if group.len() > 2 {
+                BASE64_ALPHABET[n as usize & 63]
+            } else {
+                b'='
+            },
+        ];
+        output[len..len + 4].copy_from_slice(&encoded);
+        len += 4;
+    }
+    core::str::from_utf8(&output[..len]).unwrap()
+}
+
+/// Prints `frame` as text lines that `examples/qa/tools/csi_frame_extract.py`
+/// turns back into the raw frame.
+///
+/// espflash decodes the console as text, so the payload is base64. Numbers are
+/// hex without a `0x` prefix, which espflash would try to resolve as symbols.
+fn export_raw8_frame(
+    i2c: &mut I2c<'_, Blocking>,
+    frame: &[u8],
+    test_pattern: bool,
+    trace: &CaptureTrace,
+) {
+    // The Bayer order of the official mode table assumes mirror and flip are off.
+    // `--` tells the host that the register could not be read.
+    let flip_mirror = read_reg_u8(i2c, SC2336_REG_FLIP_MIRROR).map_or(u16::MAX, u16::from);
+    let crc = crc32_update(0, frame);
+    let chunks = frame.len().div_ceil(EXPORT_CHUNK_BYTES);
+    print!("{EXPORT_PREFIX} BEGIN v=1 id={EXPORT_FRAME_ID} ");
+    if flip_mirror == u16::MAX {
+        print!("reg3221=-- ");
+    } else {
+        print!("reg3221={flip_mirror:02x} ");
+    }
+    println!(
+        "width={SC2336_FRAME_WIDTH} height={SC2336_FRAME_HEIGHT} format=RAW8 bayer=BGGR bayer_source=esp-cam-sensor:MIPI_2lane_24Minput_RAW8_1024x600_30fps test_pattern={} dar_start={:08x} len={} chunk_bytes={EXPORT_CHUNK_BYTES} chunks={chunks} crc32={crc:08x} checksum32={:08x}",
+        test_pattern as u8,
+        trace.dar_start,
+        frame.len(),
+        checksum32(frame),
+    );
+
+    let mut encoded = [0u8; EXPORT_BASE64_BYTES];
+    for (index, chunk) in frame.chunks(EXPORT_CHUNK_BYTES).enumerate() {
+        println!(
+            "{EXPORT_PREFIX} D {EXPORT_FRAME_ID} {index} {:x} {:08x} {}",
+            index * EXPORT_CHUNK_BYTES,
+            crc32_update(0, chunk),
+            base64_encode(chunk, &mut encoded)
+        );
+    }
+
+    println!(
+        "{EXPORT_PREFIX} END id={EXPORT_FRAME_ID} len={} chunks={chunks} crc32={crc:08x}",
+        frame.len()
+    );
 }
 
 fn print_capture_trace(label: &str, trace: &CaptureTrace) {
@@ -1673,13 +1805,15 @@ fn main() -> ! {
     let mode = CaptureMode::selected();
     let test_pattern = env_flag(option_env!("CSI_TEST_PATTERN"));
     let host_errors = env_flag(option_env!("CSI_HOST_ERRORS"));
+    let frame_export = env_flag(option_env!("CSI_FRAME_EXPORT"));
     let (dma_profile_name, dma_profile) = selected_dma_profile();
     println!(
-        "SC2336 capture start: mode={} test_pattern={} host_errors_unmasked={} dma_profile={}",
+        "SC2336 capture start: mode={} test_pattern={} host_errors_unmasked={} dma_profile={} frame_export={}",
         mode.label(),
         test_pattern,
         host_errors,
-        dma_profile_name
+        dma_profile_name,
+        frame_export
     );
     println!("Board assumptions: SCCB SCL=GPIO8, SDA=GPIO7, addr=0x30");
     println!("Board assumptions: reset/pwdn/xclk are hardware-managed on this sub-board");
@@ -1806,7 +1940,14 @@ fn main() -> ! {
     }
     print_capture_plan(mode, &bridge_after_isp, allocation);
 
-    if !run_capture(&mut capture, &mut i2c, mode, allocation, test_pattern) {
+    if !run_capture(
+        &mut capture,
+        &mut i2c,
+        mode,
+        allocation,
+        test_pattern,
+        frame_export,
+    ) {
         panic!("{}: no valid aligned frame", mode.label());
     }
     println!("{}: PASS", mode.label());
