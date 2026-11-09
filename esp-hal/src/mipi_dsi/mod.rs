@@ -508,6 +508,7 @@ impl DwGdmaMem2MemProfile {
 #[instability::unstable]
 #[cfg(mipi_dsi_driver_supported)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Channel-stop result for the DW-GDMA mem2mem QA hook.
 pub enum DwGdmaStopOutcome {
     AlreadyStopped,
@@ -801,12 +802,13 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
     };
 
     info!(
-        "STEP 100: helper enter src=0x{src_addr:08x} dst=0x{dst_addr:08x} units={transfer_units} timeout_ms={timeout_ms} dst_awlen_auto={dst_awlen_auto}"
+        "STEP 100: helper enter src=0x{:08x} dst=0x{:08x} units={} timeout_ms={} dst_awlen_auto={}",
+        src_addr, dst_addr, transfer_units, timeout_ms, dst_awlen_auto
     );
     info!("STEP 101: take VDMA channel ownership");
     let (owned_channel, channel_id) = take_owned_vdma_channel(channel);
     let _owned_channel = owned_channel;
-    info!("STEP 102: channel_id={channel_id}");
+    info!("STEP 102: channel_id={}", channel_id);
 
     info!("STEP 103: acquire VDMA peripheral guard");
     let vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }> =
@@ -927,7 +929,7 @@ pub fn __qa_dw_gdma_mem2mem_transfer<'d>(
         "STEP 113: dar_end=0x{:08x} bytes_written={} elapsed_us={}",
         dar_end, bytes_written, elapsed_us
     );
-    info!("PSRAM AXI after DMA wait: 0x{psram_axi_after:08x}");
+    info!("PSRAM AXI after DMA wait: 0x{:08x}", psram_axi_after);
     if timed_out {
         let mspi = crate::peripherals::MEMSPI2::regs();
         let cmd = mspi.cmd().read();

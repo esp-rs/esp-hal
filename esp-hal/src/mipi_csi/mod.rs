@@ -88,15 +88,10 @@ const DW_GDMA_HW_HANDSHAKE_PERIPH_CSI: u8 = 1;
 const DMA_CHANNEL_DISABLE_TIMEOUT_MS: u64 = 50;
 const DMA_CHANNEL_SUSPEND_TIMEOUT_MS: u64 = 5;
 const DMA_CHANNEL_ABORT_TIMEOUT_MS: u64 = 5;
-#[cfg(feature = "unstable")]
 const CAPTURE_RUNTIME_SAMPLE_COUNT: usize = 4;
-#[cfg(feature = "unstable")]
 const CAPTURE_RUNTIME_SAMPLE_INTERVAL_MS: u64 = 25;
-#[cfg(feature = "unstable")]
 const CAPTURE_TRACE_CAPACITY: usize = 32;
-#[cfg(feature = "unstable")]
 const CAPTURE_TRACE_SHUTDOWN_ENTRIES: usize = 3;
-#[cfg(feature = "unstable")]
 const CAPTURE_TRACE_STALL_US: u64 = 2_000;
 
 const DMA_STATUS_BLOCK_TRANSFER_DONE: u32 = 1 << 0;
@@ -192,7 +187,6 @@ impl DmaAxiConfig {
         dst_outstanding_requests: DW_GDMA_OUTSTANDING_REQUESTS_5,
     };
 
-    #[cfg(feature = "unstable")]
     const fn is_valid(&self) -> bool {
         const fn in_range(value: u8, max: u8) -> bool {
             value >= 1 && value <= max
@@ -442,7 +436,6 @@ pub enum CaptureConfigError {
     /// The frame transfer exceeds the DW-GDMA single-block limit.
     FrameTooLargeForSingleDmaBlock,
     /// A [`DmaAxiConfig`] field is outside its documented range.
-    #[cfg(feature = "unstable")]
     InvalidDmaAxiConfig,
 }
 
@@ -461,7 +454,6 @@ impl fmt::Display for CaptureConfigError {
             Self::FrameTooLargeForSingleDmaBlock => {
                 write!(f, "frame exceeds DW-GDMA single-block transfer limit")
             }
-            #[cfg(feature = "unstable")]
             Self::InvalidDmaAxiConfig => {
                 write!(
                     f,
@@ -605,8 +597,6 @@ impl fmt::Display for ReceiveError {
 impl core::error::Error for ReceiveError {}
 
 /// D-PHY configuration clock source.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PhyCfgClockSource {
@@ -621,8 +611,6 @@ pub enum PhyCfgClockSource {
 }
 
 /// Readback of CSI initialization-related configuration registers.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ConfigReadback {
@@ -659,8 +647,6 @@ pub struct ConfigReadback {
 }
 
 /// CSI host error interrupt summary status.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct HostErrorStatus {
@@ -686,7 +672,6 @@ pub struct HostErrorStatus {
     pub raw_main_status: u32,
 }
 
-#[cfg(feature = "unstable")]
 impl HostErrorStatus {
     /// Returns true when any host error/status bit is set.
     pub const fn any_error(&self) -> bool {
@@ -703,8 +688,6 @@ impl HostErrorStatus {
 }
 
 /// CSI bridge event summary status.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct BridgeEventStatus {
@@ -724,7 +707,6 @@ pub struct BridgeEventStatus {
     pub raw_status: u32,
 }
 
-#[cfg(feature = "unstable")]
 impl BridgeEventStatus {
     /// Returns true when any bridge event/status bit is set.
     pub const fn any_event(&self) -> bool {
@@ -743,8 +725,6 @@ impl BridgeEventStatus {
 /// same as a frame-aligned image: a startup `CSI_BRIG_DISCARD` means the block
 /// began on a partial frame, and this diagnostic does not re-arm the destination
 /// at the next frame boundary.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DiscardContinueDiagnostic {
@@ -832,8 +812,6 @@ impl DiscardDiag {
 }
 
 /// Runtime hardware status that is not just static configuration readback.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct HardwareStatus {
@@ -844,8 +822,6 @@ pub struct HardwareStatus {
 }
 
 /// Full initialization diagnostics snapshot.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct InitDiagnostics {
@@ -856,8 +832,6 @@ pub struct InitDiagnostics {
 }
 
 /// Low-level CSI/DMA snapshot for hardware bring-up diagnostics.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CaptureDebugSnapshot {
@@ -938,8 +912,6 @@ pub struct CaptureDebugSnapshot {
 /// Sampling is performed inside the capture polling loop. `*_seen` flags are
 /// only updated for samples where both CSI bridge and DMA channel are enabled,
 /// so they reflect activity during an armed capture window.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CapturePhyActivitySummary {
@@ -971,7 +943,6 @@ pub struct CapturePhyActivitySummary {
     pub data_lane1_left_stopstate_seen: bool,
 }
 
-#[cfg(feature = "unstable")]
 impl CapturePhyActivitySummary {
     const fn empty() -> Self {
         Self {
@@ -1035,7 +1006,6 @@ impl CapturePhyActivitySummary {
 }
 
 /// Reason a `CaptureTraceEntry` was recorded.
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CaptureTraceEvent {
@@ -1066,8 +1036,6 @@ pub enum CaptureTraceEvent {
 }
 
 /// One entry of the capture timeline recorded by `receive`.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CaptureTraceEntry {
@@ -1091,7 +1059,6 @@ pub struct CaptureTraceEntry {
     pub phy_stopstate: u32,
 }
 
-#[cfg(feature = "unstable")]
 impl CaptureTraceEntry {
     const EMPTY: Self = Self {
         event: CaptureTraceEvent::Armed,
@@ -1110,8 +1077,6 @@ impl CaptureTraceEntry {
 ///
 /// Entries are only recorded when something changes, so a stalled transfer
 /// and a completed one both fit.
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CaptureTrace {
@@ -1125,7 +1090,6 @@ pub struct CaptureTrace {
     pub polls: u32,
 }
 
-#[cfg(feature = "unstable")]
 impl CaptureTrace {
     const fn empty() -> Self {
         Self {
@@ -1162,7 +1126,6 @@ impl CaptureTrace {
     }
 }
 
-#[cfg(feature = "unstable")]
 #[derive(Clone, Copy, Debug)]
 struct CaptureTraceRecorder {
     armed_at: Instant,
@@ -1174,7 +1137,6 @@ struct CaptureTraceRecorder {
     last_dma_intstatus: u32,
 }
 
-#[cfg(feature = "unstable")]
 impl CaptureTraceRecorder {
     const fn idle() -> Self {
         Self {
@@ -1209,13 +1171,9 @@ pub struct CsiCapture<'d> {
     dma_axi: DmaAxiConfig,
     _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
     _owned_dma_channel: OwnedCsiDmaChannel<'d>,
-    #[cfg(feature = "unstable")]
     runtime_samples: [Option<CaptureStatus>; CAPTURE_RUNTIME_SAMPLE_COUNT],
-    #[cfg(feature = "unstable")]
     runtime_phy_activity: CapturePhyActivitySummary,
-    #[cfg(feature = "unstable")]
     trace: CaptureTrace,
-    #[cfg(feature = "unstable")]
     trace_recorder: CaptureTraceRecorder,
     /// Temporary bring-up switch. Default `armed = false` keeps `DISCARD` fatal.
     discard_diag: DiscardDiag,
@@ -1280,13 +1238,9 @@ impl<'d> MipiCsi<'d> {
             dma_axi: DmaAxiConfig::ESP_IDF,
             _vdma_guard: vdma_guard,
             _owned_dma_channel: owned_dma_channel,
-            #[cfg(feature = "unstable")]
             runtime_samples: [None; CAPTURE_RUNTIME_SAMPLE_COUNT],
-            #[cfg(feature = "unstable")]
             runtime_phy_activity: CapturePhyActivitySummary::empty(),
-            #[cfg(feature = "unstable")]
             trace: CaptureTrace::empty(),
-            #[cfg(feature = "unstable")]
             trace_recorder: CaptureTraceRecorder::idle(),
             discard_diag: DiscardDiag::idle(),
         })
@@ -1296,8 +1250,6 @@ impl<'d> MipiCsi<'d> {
     ///
     /// Register readback is useful to verify software configuration, but it
     /// does not prove a working MIPI CSI physical link.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn init_diagnostics(&self) -> InitDiagnostics {
         let host = MIPI_CSI_HOST::regs();
         let bridge = MIPI_CSI_BRIDGE::regs();
@@ -1516,8 +1468,6 @@ impl<'d> MipiCsi<'d> {
 
 impl CsiCapture<'_> {
     /// Returns a low-level CSI/DMA register snapshot for bring-up diagnostics.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn debug_snapshot(&self) -> CaptureDebugSnapshot {
         let host = MIPI_CSI_HOST::regs();
         let bridge = MIPI_CSI_BRIDGE::regs();
@@ -1563,22 +1513,16 @@ impl CsiCapture<'_> {
     }
 
     /// Returns periodic status samples collected during the previous `receive` call.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn runtime_status_samples(&self) -> &[Option<CaptureStatus>] {
         &self.runtime_samples
     }
 
     /// Returns aggregated D-PHY runtime activity from the previous `receive`.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn runtime_phy_activity_summary(&self) -> CapturePhyActivitySummary {
         self.runtime_phy_activity
     }
 
     /// Returns the timeline recorded during the previous `receive`.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn capture_trace(&self) -> &CaptureTrace {
         &self.trace
     }
@@ -1588,8 +1532,6 @@ impl CsiCapture<'_> {
     /// The CSI bridge pixel geometry programmed by `with_dma` is left unchanged.
     /// `receive` refuses a buffer shorter than `bytes`, and the DW-GDMA block
     /// size is this length, so the destination is not expected to advance past it.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn set_diagnostic_dma_transfer_bytes(
         &mut self,
         bytes: usize,
@@ -1611,8 +1553,6 @@ impl CsiCapture<'_> {
     ///
     /// Flow control, handshake, addressing, transfer width and burst items stay
     /// as ESP-IDF programs them.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn set_diagnostic_dma_axi_config(
         &mut self,
         config: DmaAxiConfig,
@@ -1629,8 +1569,6 @@ impl CsiCapture<'_> {
     }
 
     /// Returns the AXI settings the next `receive` programs.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn dma_axi_config(&self) -> DmaAxiConfig {
         self.dma_axi
     }
@@ -1640,15 +1578,11 @@ impl CsiCapture<'_> {
     /// Default capture behavior is unchanged until this is called. Overrun,
     /// asynchronous-FIFO overflow, and vertical-count errors still stop the wait.
     /// This does not resynchronize DMA to the next frame boundary.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn enable_discard_continue_diagnostic(&mut self) {
         self.discard_diag.armed = true;
     }
 
     /// Returns the last discard-continue diagnostic result.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub fn discard_continue_diagnostic(&self) -> DiscardContinueDiagnostic {
         DiscardContinueDiagnostic {
             enabled: self.discard_diag.armed,
@@ -1800,136 +1734,112 @@ impl CsiCapture<'_> {
             // definitely quiesced. If shutdown did not complete and the channel might still be
             // active, abort execution instead of returning a potentially writable buffer.
             if dma_may_still_be_active {
-                #[cfg(feature = "unstable")]
-                {
-                    let debug = self.debug_snapshot();
-                    let runtime_phy = self.runtime_phy_activity;
-                    let last_runtime_sample =
-                        self.runtime_samples.iter().rev().flatten().next().copied();
+                let debug = self.debug_snapshot();
+                let runtime_phy = self.runtime_phy_activity;
+                let last_runtime_sample =
+                    self.runtime_samples.iter().rev().flatten().next().copied();
 
-                    if let Some(last) = last_runtime_sample {
-                        panic!(
-                            "mipi-csi DMA shutdown failed ({reason:?}); outcome={} before={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} after={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} runtime={{samples={},active_samples={},bridge_fifo_nonzero_seen={},bridge_fifo_max={},clkactivehs_seen={},lane0_left_stopstate_seen={},lane1_left_stopstate_seen={}}} last_sample={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} regs={{host_phy_stopstate=0x{:08x},host_phy_rx=0x{:08x},host_int_st_main=0x{:08x},bridge_buf_flow_ctl=0x{:08x},bridge_dma_req_cfg=0x{:08x},bridge_int_raw=0x{:08x},bridge_int_st=0x{:08x},bridge_int_ena=0x{:08x},dma_chen0=0x{:08x},dma_chen1=0x{:08x},dma_sar0=0x{:08x},dma_dar0=0x{:08x},dma_block_ts0=0x{:08x},dma_status0=0x{:08x},dma_status1=0x{:08x},dma_intstatus0=0x{:08x},dma_intstatus_enable0=0x{:08x}}} abort_in_progress_after_shutdown={} discard_diag={{armed={},count={},dar_start=0x{:08x},dar_end=0x{:08x}}} channel may still be active",
-                            outcome.kind(),
-                            status_before_shutdown.host_errors.raw_main_status,
-                            status_before_shutdown.bridge_events.raw_status,
-                            status_before_shutdown.dma_status.raw_status,
-                            status_before_shutdown.dma_status.channel_enabled,
-                            status_before_shutdown.dma_status.completed_transfer_units,
-                            status_before_shutdown.dma_status.fifo_remaining_units,
-                            status_after_shutdown.host_errors.raw_main_status,
-                            status_after_shutdown.bridge_events.raw_status,
-                            status_after_shutdown.dma_status.raw_status,
-                            status_after_shutdown.dma_status.channel_enabled,
-                            status_after_shutdown.dma_status.completed_transfer_units,
-                            status_after_shutdown.dma_status.fifo_remaining_units,
-                            runtime_phy.sample_count,
-                            runtime_phy.active_sample_count,
-                            runtime_phy.bridge_buf_depth_nonzero_seen,
-                            runtime_phy.bridge_buf_depth_max,
-                            runtime_phy.clkactivehs_seen,
-                            runtime_phy.data_lane0_left_stopstate_seen,
-                            runtime_phy.data_lane1_left_stopstate_seen,
-                            last.host_errors.raw_main_status,
-                            last.bridge_events.raw_status,
-                            last.dma_status.raw_status,
-                            last.dma_status.channel_enabled,
-                            last.dma_status.completed_transfer_units,
-                            last.dma_status.fifo_remaining_units,
-                            debug.host_phy_stopstate_raw,
-                            debug.host_phy_rx_raw,
-                            debug.host_int_st_main_raw,
-                            debug.bridge_buf_flow_ctl_raw,
-                            debug.bridge_dma_req_cfg_raw,
-                            debug.bridge_int_raw_raw,
-                            debug.bridge_int_st_raw,
-                            debug.bridge_int_ena_raw,
-                            debug.dma_chen0_raw,
-                            debug.dma_chen1_raw,
-                            debug.dma_sar0_raw,
-                            debug.dma_dar0_raw,
-                            debug.dma_block_ts0_raw,
-                            debug.dma_status0_raw,
-                            debug.dma_status1_raw,
-                            debug.dma_intstatus0_raw,
-                            debug.dma_intstatus_enable0_raw,
-                            abort_in_progress_after_shutdown,
-                            self.discard_diag.armed,
-                            self.discard_diag.discard_count,
-                            self.discard_diag.dar_start,
-                            self.discard_diag.dar_end,
-                        );
-                    } else {
-                        panic!(
-                            "mipi-csi DMA shutdown failed ({reason:?}); outcome={} before={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} after={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} runtime={{samples={},active_samples={},bridge_fifo_nonzero_seen={},bridge_fifo_max={},clkactivehs_seen={},lane0_left_stopstate_seen={},lane1_left_stopstate_seen={}}} regs={{host_phy_stopstate=0x{:08x},host_phy_rx=0x{:08x},host_int_st_main=0x{:08x},bridge_buf_flow_ctl=0x{:08x},bridge_dma_req_cfg=0x{:08x},bridge_int_raw=0x{:08x},bridge_int_st=0x{:08x},bridge_int_ena=0x{:08x},dma_chen0=0x{:08x},dma_chen1=0x{:08x},dma_sar0=0x{:08x},dma_dar0=0x{:08x},dma_block_ts0=0x{:08x},dma_status0=0x{:08x},dma_status1=0x{:08x},dma_intstatus0=0x{:08x},dma_intstatus_enable0=0x{:08x}}} abort_in_progress_after_shutdown={} discard_diag={{armed={},count={},dar_start=0x{:08x},dar_end=0x{:08x}}} no_runtime_sample channel may still be active",
-                            outcome.kind(),
-                            status_before_shutdown.host_errors.raw_main_status,
-                            status_before_shutdown.bridge_events.raw_status,
-                            status_before_shutdown.dma_status.raw_status,
-                            status_before_shutdown.dma_status.channel_enabled,
-                            status_before_shutdown.dma_status.completed_transfer_units,
-                            status_before_shutdown.dma_status.fifo_remaining_units,
-                            status_after_shutdown.host_errors.raw_main_status,
-                            status_after_shutdown.bridge_events.raw_status,
-                            status_after_shutdown.dma_status.raw_status,
-                            status_after_shutdown.dma_status.channel_enabled,
-                            status_after_shutdown.dma_status.completed_transfer_units,
-                            status_after_shutdown.dma_status.fifo_remaining_units,
-                            runtime_phy.sample_count,
-                            runtime_phy.active_sample_count,
-                            runtime_phy.bridge_buf_depth_nonzero_seen,
-                            runtime_phy.bridge_buf_depth_max,
-                            runtime_phy.clkactivehs_seen,
-                            runtime_phy.data_lane0_left_stopstate_seen,
-                            runtime_phy.data_lane1_left_stopstate_seen,
-                            debug.host_phy_stopstate_raw,
-                            debug.host_phy_rx_raw,
-                            debug.host_int_st_main_raw,
-                            debug.bridge_buf_flow_ctl_raw,
-                            debug.bridge_dma_req_cfg_raw,
-                            debug.bridge_int_raw_raw,
-                            debug.bridge_int_st_raw,
-                            debug.bridge_int_ena_raw,
-                            debug.dma_chen0_raw,
-                            debug.dma_chen1_raw,
-                            debug.dma_sar0_raw,
-                            debug.dma_dar0_raw,
-                            debug.dma_block_ts0_raw,
-                            debug.dma_status0_raw,
-                            debug.dma_status1_raw,
-                            debug.dma_intstatus0_raw,
-                            debug.dma_intstatus_enable0_raw,
-                            abort_in_progress_after_shutdown,
-                            self.discard_diag.armed,
-                            self.discard_diag.discard_count,
-                            self.discard_diag.dar_start,
-                            self.discard_diag.dar_end,
-                        );
-                    }
+                if let Some(last) = last_runtime_sample {
+                    panic!(
+                        "mipi-csi DMA shutdown failed ({:?}); outcome={} before={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} after={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} runtime={{samples={},active_samples={},bridge_fifo_nonzero_seen={},bridge_fifo_max={},clkactivehs_seen={},lane0_left_stopstate_seen={},lane1_left_stopstate_seen={}}} last_sample={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} regs={{host_phy_stopstate=0x{:08x},host_phy_rx=0x{:08x},host_int_st_main=0x{:08x},bridge_buf_flow_ctl=0x{:08x},bridge_dma_req_cfg=0x{:08x},bridge_int_raw=0x{:08x},bridge_int_st=0x{:08x},bridge_int_ena=0x{:08x},dma_chen0=0x{:08x},dma_chen1=0x{:08x},dma_sar0=0x{:08x},dma_dar0=0x{:08x},dma_block_ts0=0x{:08x},dma_status0=0x{:08x},dma_status1=0x{:08x},dma_intstatus0=0x{:08x},dma_intstatus_enable0=0x{:08x}}} abort_in_progress_after_shutdown={} discard_diag={{armed={},count={},dar_start=0x{:08x},dar_end=0x{:08x}}} channel may still be active",
+                        reason,
+                        outcome.kind(),
+                        status_before_shutdown.host_errors.raw_main_status,
+                        status_before_shutdown.bridge_events.raw_status,
+                        status_before_shutdown.dma_status.raw_status,
+                        status_before_shutdown.dma_status.channel_enabled,
+                        status_before_shutdown.dma_status.completed_transfer_units,
+                        status_before_shutdown.dma_status.fifo_remaining_units,
+                        status_after_shutdown.host_errors.raw_main_status,
+                        status_after_shutdown.bridge_events.raw_status,
+                        status_after_shutdown.dma_status.raw_status,
+                        status_after_shutdown.dma_status.channel_enabled,
+                        status_after_shutdown.dma_status.completed_transfer_units,
+                        status_after_shutdown.dma_status.fifo_remaining_units,
+                        runtime_phy.sample_count,
+                        runtime_phy.active_sample_count,
+                        runtime_phy.bridge_buf_depth_nonzero_seen,
+                        runtime_phy.bridge_buf_depth_max,
+                        runtime_phy.clkactivehs_seen,
+                        runtime_phy.data_lane0_left_stopstate_seen,
+                        runtime_phy.data_lane1_left_stopstate_seen,
+                        last.host_errors.raw_main_status,
+                        last.bridge_events.raw_status,
+                        last.dma_status.raw_status,
+                        last.dma_status.channel_enabled,
+                        last.dma_status.completed_transfer_units,
+                        last.dma_status.fifo_remaining_units,
+                        debug.host_phy_stopstate_raw,
+                        debug.host_phy_rx_raw,
+                        debug.host_int_st_main_raw,
+                        debug.bridge_buf_flow_ctl_raw,
+                        debug.bridge_dma_req_cfg_raw,
+                        debug.bridge_int_raw_raw,
+                        debug.bridge_int_st_raw,
+                        debug.bridge_int_ena_raw,
+                        debug.dma_chen0_raw,
+                        debug.dma_chen1_raw,
+                        debug.dma_sar0_raw,
+                        debug.dma_dar0_raw,
+                        debug.dma_block_ts0_raw,
+                        debug.dma_status0_raw,
+                        debug.dma_status1_raw,
+                        debug.dma_intstatus0_raw,
+                        debug.dma_intstatus_enable0_raw,
+                        abort_in_progress_after_shutdown,
+                        self.discard_diag.armed,
+                        self.discard_diag.discard_count,
+                        self.discard_diag.dar_start,
+                        self.discard_diag.dar_end,
+                    );
+                } else {
+                    panic!(
+                        "mipi-csi DMA shutdown failed ({:?}); outcome={} before={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} after={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} runtime={{samples={},active_samples={},bridge_fifo_nonzero_seen={},bridge_fifo_max={},clkactivehs_seen={},lane0_left_stopstate_seen={},lane1_left_stopstate_seen={}}} regs={{host_phy_stopstate=0x{:08x},host_phy_rx=0x{:08x},host_int_st_main=0x{:08x},bridge_buf_flow_ctl=0x{:08x},bridge_dma_req_cfg=0x{:08x},bridge_int_raw=0x{:08x},bridge_int_st=0x{:08x},bridge_int_ena=0x{:08x},dma_chen0=0x{:08x},dma_chen1=0x{:08x},dma_sar0=0x{:08x},dma_dar0=0x{:08x},dma_block_ts0=0x{:08x},dma_status0=0x{:08x},dma_status1=0x{:08x},dma_intstatus0=0x{:08x},dma_intstatus_enable0=0x{:08x}}} abort_in_progress_after_shutdown={} discard_diag={{armed={},count={},dar_start=0x{:08x},dar_end=0x{:08x}}} no_runtime_sample channel may still be active",
+                        reason,
+                        outcome.kind(),
+                        status_before_shutdown.host_errors.raw_main_status,
+                        status_before_shutdown.bridge_events.raw_status,
+                        status_before_shutdown.dma_status.raw_status,
+                        status_before_shutdown.dma_status.channel_enabled,
+                        status_before_shutdown.dma_status.completed_transfer_units,
+                        status_before_shutdown.dma_status.fifo_remaining_units,
+                        status_after_shutdown.host_errors.raw_main_status,
+                        status_after_shutdown.bridge_events.raw_status,
+                        status_after_shutdown.dma_status.raw_status,
+                        status_after_shutdown.dma_status.channel_enabled,
+                        status_after_shutdown.dma_status.completed_transfer_units,
+                        status_after_shutdown.dma_status.fifo_remaining_units,
+                        runtime_phy.sample_count,
+                        runtime_phy.active_sample_count,
+                        runtime_phy.bridge_buf_depth_nonzero_seen,
+                        runtime_phy.bridge_buf_depth_max,
+                        runtime_phy.clkactivehs_seen,
+                        runtime_phy.data_lane0_left_stopstate_seen,
+                        runtime_phy.data_lane1_left_stopstate_seen,
+                        debug.host_phy_stopstate_raw,
+                        debug.host_phy_rx_raw,
+                        debug.host_int_st_main_raw,
+                        debug.bridge_buf_flow_ctl_raw,
+                        debug.bridge_dma_req_cfg_raw,
+                        debug.bridge_int_raw_raw,
+                        debug.bridge_int_st_raw,
+                        debug.bridge_int_ena_raw,
+                        debug.dma_chen0_raw,
+                        debug.dma_chen1_raw,
+                        debug.dma_sar0_raw,
+                        debug.dma_dar0_raw,
+                        debug.dma_block_ts0_raw,
+                        debug.dma_status0_raw,
+                        debug.dma_status1_raw,
+                        debug.dma_intstatus0_raw,
+                        debug.dma_intstatus_enable0_raw,
+                        abort_in_progress_after_shutdown,
+                        self.discard_diag.armed,
+                        self.discard_diag.discard_count,
+                        self.discard_diag.dar_start,
+                        self.discard_diag.dar_end,
+                    );
                 }
-
-                #[cfg(not(feature = "unstable"))]
-                panic!(
-                    "mipi-csi DMA shutdown failed ({reason:?}); outcome={} before={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} after={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} abort_in_progress_after_shutdown={} discard_diag={{armed={},count={},dar_start=0x{:08x},dar_end=0x{:08x}}} channel may still be active",
-                    outcome.kind(),
-                    status_before_shutdown.host_errors.raw_main_status,
-                    status_before_shutdown.bridge_events.raw_status,
-                    status_before_shutdown.dma_status.raw_status,
-                    status_before_shutdown.dma_status.channel_enabled,
-                    status_before_shutdown.dma_status.completed_transfer_units,
-                    status_before_shutdown.dma_status.fifo_remaining_units,
-                    status_after_shutdown.host_errors.raw_main_status,
-                    status_after_shutdown.bridge_events.raw_status,
-                    status_after_shutdown.dma_status.raw_status,
-                    status_after_shutdown.dma_status.channel_enabled,
-                    status_after_shutdown.dma_status.completed_transfer_units,
-                    status_after_shutdown.dma_status.fifo_remaining_units,
-                    abort_in_progress_after_shutdown,
-                    self.discard_diag.armed,
-                    self.discard_diag.discard_count,
-                    self.discard_diag.dar_start,
-                    self.discard_diag.dar_end,
-                );
             }
 
             self.check_destination_bounds(dst_start, buffer_len);
@@ -2044,7 +1954,8 @@ impl CsiCapture<'_> {
             .saturating_sub(dst_start) as usize;
         if written > buffer_len {
             panic!(
-                "mipi-csi DMA wrote {written} bytes from 0x{dst_start:08x} into a {buffer_len}-byte buffer"
+                "mipi-csi DMA wrote {} bytes from 0x{:08x} into a {}-byte buffer",
+                written, dst_start, buffer_len
             );
         }
         written
@@ -2069,14 +1980,12 @@ impl CsiCapture<'_> {
     }
 }
 
-#[cfg(feature = "unstable")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct RuntimeSampler {
     next_index: usize,
     next_sample_deadline: Instant,
 }
 
-#[cfg(feature = "unstable")]
 impl RuntimeSampler {
     fn new() -> Self {
         Self {
@@ -2087,26 +1996,10 @@ impl RuntimeSampler {
     }
 }
 
-#[cfg(not(feature = "unstable"))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct RuntimeSampler;
-
-#[cfg(not(feature = "unstable"))]
-impl RuntimeSampler {
-    fn new() -> Self {
-        Self
-    }
-}
-
-#[cfg(feature = "unstable")]
 fn reset_runtime_samples(capture: &mut CsiCapture<'_>) {
     capture.runtime_samples = [None; CAPTURE_RUNTIME_SAMPLE_COUNT];
 }
 
-#[cfg(not(feature = "unstable"))]
-fn reset_runtime_samples(_capture: &mut CsiCapture<'_>) {}
-
-#[cfg(feature = "unstable")]
 fn maybe_record_runtime_sample(
     capture: &mut CsiCapture<'_>,
     sampler: &mut RuntimeSampler,
@@ -2126,23 +2019,10 @@ fn maybe_record_runtime_sample(
         Instant::now() + Duration::from_millis(CAPTURE_RUNTIME_SAMPLE_INTERVAL_MS);
 }
 
-#[cfg(not(feature = "unstable"))]
-fn maybe_record_runtime_sample(
-    _capture: &mut CsiCapture<'_>,
-    _sampler: &mut RuntimeSampler,
-    _status: CaptureStatus,
-) {
-}
-
-#[cfg(feature = "unstable")]
 fn reset_runtime_phy_activity(capture: &mut CsiCapture<'_>) {
     capture.runtime_phy_activity = CapturePhyActivitySummary::empty();
 }
 
-#[cfg(not(feature = "unstable"))]
-fn reset_runtime_phy_activity(_capture: &mut CsiCapture<'_>) {}
-
-#[cfg(feature = "unstable")]
 fn sample_runtime_phy_activity(capture: &mut CsiCapture<'_>) {
     let host = MIPI_CSI_HOST::regs();
     let bridge = MIPI_CSI_BRIDGE::regs();
@@ -2165,10 +2045,6 @@ fn sample_runtime_phy_activity(capture: &mut CsiCapture<'_>) {
     );
 }
 
-#[cfg(not(feature = "unstable"))]
-fn sample_runtime_phy_activity(_capture: &mut CsiCapture<'_>) {}
-
-#[cfg(feature = "unstable")]
 fn trace_arm(capture: &mut CsiCapture<'_>, dar_start: u32) {
     let now = Instant::now();
     capture.trace = CaptureTrace::empty();
@@ -2185,10 +2061,6 @@ fn trace_arm(capture: &mut CsiCapture<'_>, dar_start: u32) {
     capture.trace_recorder.last_dma_intstatus = armed.dma_intstatus;
 }
 
-#[cfg(not(feature = "unstable"))]
-fn trace_arm(_capture: &mut CsiCapture<'_>, _dar_start: u32) {}
-
-#[cfg(feature = "unstable")]
 fn trace_record(capture: &mut CsiCapture<'_>, event: CaptureTraceEvent) {
     let bridge = MIPI_CSI_BRIDGE::regs();
     let channel = capture.dma_channel;
@@ -2211,10 +2083,6 @@ fn trace_record(capture: &mut CsiCapture<'_>, event: CaptureTraceEvent) {
     capture.trace.push(entry);
 }
 
-#[cfg(not(feature = "unstable"))]
-fn trace_record(_capture: &mut CsiCapture<'_>, _event: CaptureTraceEvent) {}
-
-#[cfg(feature = "unstable")]
 fn trace_poll(capture: &mut CsiCapture<'_>, status: CaptureStatus) {
     capture.trace.polls = capture.trace.polls.saturating_add(1);
 
@@ -2251,9 +2119,6 @@ fn trace_poll(capture: &mut CsiCapture<'_>, status: CaptureStatus) {
         trace_record(capture, CaptureTraceEvent::Stalled);
     }
 }
-
-#[cfg(not(feature = "unstable"))]
-fn trace_poll(_capture: &mut CsiCapture<'_>, _status: CaptureStatus) {}
 
 /// Polls `condition` until it holds or `timeout_ms` passes, then checks it once
 /// more.
@@ -2298,7 +2163,7 @@ impl ReceiveOutcome {
 impl Drop for CsiCapture<'_> {
     fn drop(&mut self) {
         if let Err(reason) = self.stop_transfer() {
-            panic!("mipi-csi DMA shutdown failed in Drop: {reason:?}");
+            panic!("mipi-csi DMA shutdown failed in Drop: {:?}", reason);
         }
         self.clear_transfer_status();
     }

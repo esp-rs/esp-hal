@@ -180,7 +180,8 @@ pub(super) fn log_applied_readback(tag: &str) {
     let dqs1 = iomux.psram_dqs_1_pin0().read();
     let delay270 = |bits: u32| (bits >> 17) & 0xF;
     info!(
-        "PSRAM timing readback {tag}: dqs0=0x{:08x} phase={} delay90={} delay270={} dqs1=0x{:08x} phase={} delay90={} delay270={} dq0_dlc={} dq15_dlc={} ck_dlc={} cs_dlc={}",
+        "PSRAM timing readback {}: dqs0=0x{:08x} phase={} delay90={} delay270={} dqs1=0x{:08x} phase={} delay90={} delay270={} dq0_dlc={} dq15_dlc={} ck_dlc={} cs_dlc={}",
+        tag,
         dqs0.bits(),
         dqs0.phase().bits(),
         dqs0.delay_90().bits(),

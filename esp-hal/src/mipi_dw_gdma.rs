@@ -130,7 +130,6 @@ pub(crate) struct DwGdmaChannel {
     channel_id: u8,
 }
 
-#[cfg(feature = "unstable")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct DwGdmaChannelDebugRegisters {
     pub(crate) controller_cfg0: u32,
@@ -367,7 +366,6 @@ impl DwGdmaChannel {
             .bits()
     }
 
-    #[cfg(feature = "unstable")]
     #[inline]
     pub(crate) fn debug_registers(&self) -> DwGdmaChannelDebugRegisters {
         let regs = VDMA::regs();

@@ -157,7 +157,7 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     }
     let is_hex = matches!(config.mode, PsramMode::Hex);
     oct_hex::enable_dll();
-    oct_hex::psram_pad_init(is_hex);
+    oct_hex::psram_pad_init(is_hex); // required for DDR strobe latch
     oct_hex::set_cs_timing();
     set_psram_page_size_2kb();
 

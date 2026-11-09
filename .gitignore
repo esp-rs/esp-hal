@@ -33,9 +33,14 @@ api-baseline/
 .mcp.json
 .cursor/
 
-# Local agent notes (Cursor project-understanding skill)
-.cursor_project_understanding/
-
 # Ignore compile tests
 compile-tests/
-.DS_Store
+
+# Python bytecode of the QA tools
+__pycache__/
+
+# Console logs and frames captured by the QA camera examples
+/*.log
+/out/
+/sc2336-*.raw
+/sc2336-*.png
