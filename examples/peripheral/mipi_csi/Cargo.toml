@@ -14,18 +14,11 @@ esp-hal = { path = "../../../esp-hal", features = ["log-04"] }
 esp-println = { path = "../../../esp-println", default-features = false, features = ["esp32p4", "log-04", "auto", "critical-section", "colors"] }
 
 [features]
-default = ["diagnostics"]
-
-# Enable detailed CSI initialization readback/status logging via
-# `MipiCsi::init_diagnostics()`.
-diagnostics = ["esp-hal/unstable"]
-
 esp32p4 = [
     "esp-backtrace/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
     "esp-hal/esp32p4",
-    # The MIPI-CSI driver itself is currently unstable, independent of
-    # diagnostics output.
+    # The MIPI-CSI driver is unstable.
     "esp-hal/unstable",
 ]
 

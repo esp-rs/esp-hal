@@ -10,8 +10,6 @@
 //! - `CSI_CAPTURE_MODE=A` (default): ISP bypass, RAW8 frame into PSRAM.
 //! - `CSI_CAPTURE_MODE=B`: ISP RAW8 to RGB565 into PSRAM, with the RAW8-sized DMA block that the
 //!   ESP-IDF CSI driver programs for this configuration.
-//! - `CSI_CAPTURE_MODE=C`: ISP bypass, one 64 KiB DMA block into internal SRAM.
-//! - `CSI_CAPTURE_MODE=D`: ISP bypass, one 64 KiB DMA block into PSRAM.
 //! - `CSI_TEST_PATTERN=1`: SC2336 test pattern instead of the image.
 //! - `CSI_HOST_ERRORS=1`: unmask the CSI host error interrupts, so that host errors end the
 //!   capture.
@@ -41,6 +39,12 @@
 //!   with the sensor stopped, a consumer holding a frame while the sensor streams, and repeated
 //!   stop/start at varying points of the frame. Prints `restart-snap` lines with the sensor, D-PHY,
 //!   host, bridge, ISP and DMA state around the sensor restart.
+//! - `CSI_ASYNC=1`: with `CSI_STREAM`, convert the capture with `into_async` and take the frames
+//!   with `CsiStream::next_frame_async`, polled again only after its waker fired. Then drop a
+//!   pending `next_frame_async` future, check that frames still arrive, stop and restart the
+//!   stream, and capture one frame after `into_blocking`, with the sensor already streaming because
+//!   the sensor stop can cut a frame. `CSI_ASYNC_SENSOR_RESTART=1` also stops and restarts the
+//!   sensor while the stream stays armed, which reproduces a known stall.
 //! - `CSI_FAULT_ROUNDS=<n>`: with `CSI_STREAM`, repeat the stream run (and the fault cases) `n`
 //!   times in one boot.
 //! - `CSI_QUIET=1`: with `CSI_REPEAT_FRAMES`, print the per-frame line only for failures and every
@@ -60,6 +64,10 @@
 //!   cases again. After every step the PMU rail must be on exactly while a driver lives, a live CSI
 //!   driver must capture a full RAW8 frame, and a live DSI driver must keep its PHY PLL locked.
 //!   Prints `DPHY LIFECYCLE RESULT: PASS` or `FAIL`.
+//!
+//! Every run ends with one `QA_RESULT: PASS test=<name> ...` or
+//! `QA_RESULT: FAIL test=<name> ...` line, printed after all checks, for a
+//! host script to stop the monitor on.
 //% CHIP_FILTER: mipi_csi_driver_supported && mipi_dsi_driver_supported
 //% FEATURES: unstable
 
@@ -69,7 +77,13 @@
 extern crate alloc;
 
 use alloc::{format, string::String, vec::Vec};
-use core::alloc::Layout;
+use core::{
+    alloc::Layout,
+    future::Future,
+    pin::pin,
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
+};
 
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -77,7 +91,7 @@ use esp_hal::{
     Blocking,
     clock::ll::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk},
     delay::Delay,
-    dma::aligned::{DmaAlignedMut, InternalMemory},
+    dma::aligned::DmaAlignedMut,
     gpio::{Level, Output, OutputConfig},
     i2c::{
         self,
@@ -86,16 +100,12 @@ use esp_hal::{
     main,
     mipi_csi::{
         CaptureConfig,
-        CaptureDebugSnapshot,
         CaptureFrame,
         CapturePixelFormat,
         CaptureStatus,
-        CaptureTrace,
-        CaptureTraceEvent,
         Config,
         CsiCapture,
         DataLanes,
-        DiscardContinueDiagnostic,
         DmaAxiConfig,
         MipiCsi,
         ReceiveError,
@@ -212,18 +222,7 @@ const BRIDGE_INT_NAMES: &[(u32, &str)] = &[
     (4, "async_fifo_ovf"),
     (5, "dma_cfg_has_updated"),
 ];
-const DMA_INT_NAMES: &[(u32, &str)] = &[
-    (0, "block_tfr_done"),
-    (1, "dma_tfr_done"),
-    (3, "src_transcomp"),
-    (4, "dst_transcomp"),
-    (28, "src_suspended"),
-    (29, "suspended"),
-    (30, "disabled"),
-    (31, "aborted"),
-];
 // Bits 5 to 14 and 16 to 21 of `CH_INTSTATUS0`.
-const DMA_INT_ERROR_MASK: u32 = 0x003F_7FE0;
 const BRIDGE_DMA_BURST_BYTES: usize = 512 * 8;
 const HP_SYS_CLKRST_PERI_CLK_CTRL25_ISP_CLK_EN_BIT: u32 = 1 << 25;
 const HP_SYS_CLKRST_PERI_CLK_CTRL25_ISP_CLK_SRC_SEL_SHIFT: u32 = 23;
@@ -430,18 +429,12 @@ enum CaptureMode {
     Raw8Psram,
     /// ISP RAW8 to RGB565 into PSRAM, `BLOCK_TS` sized for RAW8 like ESP-IDF.
     Rgb565Psram,
-    /// ISP bypass, one 64 KiB block into internal SRAM.
-    Raw8InternalBlock,
-    /// ISP bypass, one 64 KiB block into PSRAM.
-    Raw8PsramBlock,
 }
 
 impl CaptureMode {
     fn selected() -> Self {
         match option_env!("CSI_CAPTURE_MODE") {
             Some("B") | Some("b") => Self::Rgb565Psram,
-            Some("C") | Some("c") => Self::Raw8InternalBlock,
-            Some("D") | Some("d") => Self::Raw8PsramBlock,
             _ => Self::Raw8Psram,
         }
     }
@@ -450,8 +443,6 @@ impl CaptureMode {
         match self {
             Self::Raw8Psram => "A-raw8-bypass-psram",
             Self::Rgb565Psram => "B-rgb565-isp-psram",
-            Self::Raw8InternalBlock => "C-raw8-bypass-sram-64k",
-            Self::Raw8PsramBlock => "D-raw8-bypass-psram-64k",
         }
     }
 
@@ -472,25 +463,12 @@ impl CaptureMode {
         match self {
             Self::Raw8Psram => SC2336_FRAME_BYTES,
             Self::Rgb565Psram => RGB565_FRAME_BYTES,
-            Self::Raw8InternalBlock => INTERNAL_CAPTURE_BYTES,
-            Self::Raw8PsramBlock => INTERNAL_CAPTURE_BYTES,
         }
     }
 
-    /// `BLOCK_TS` of the capture, in bytes.
+    /// `BLOCK_TS` of the capture, in bytes. The driver sizes it for RAW8.
     const fn dma_block_bytes(self) -> usize {
-        match self {
-            Self::Raw8InternalBlock | Self::Raw8PsramBlock => INTERNAL_CAPTURE_BYTES,
-            _ => SC2336_FRAME_BYTES,
-        }
-    }
-
-    const fn uses_internal_sram(self) -> bool {
-        matches!(self, Self::Raw8InternalBlock)
-    }
-
-    const fn is_64k_block_mode(self) -> bool {
-        matches!(self, Self::Raw8InternalBlock | Self::Raw8PsramBlock)
+        SC2336_FRAME_BYTES
     }
 }
 
@@ -942,6 +920,95 @@ fn selected_dma_profile() -> (&'static str, DmaAxiConfig) {
     }
 }
 
+/// Raw CSI host, CSI bridge and VDMA register values, read through the PAC.
+#[derive(Clone, Copy)]
+struct CaptureDebugSnapshot {
+    dma_channel_id: u8,
+    host_phy_stopstate_raw: u32,
+    host_phy_rx_raw: u32,
+    host_int_st_main_raw: u32,
+    bridge_csi_en_raw: u32,
+    bridge_frame_cfg_raw: u32,
+    bridge_data_type_cfg_raw: u32,
+    bridge_host_cm_ctrl_raw: u32,
+    bridge_buf_flow_ctl_raw: u32,
+    bridge_dma_req_cfg_raw: u32,
+    bridge_dmablk_size_raw: u32,
+    bridge_int_raw_raw: u32,
+    bridge_int_st_raw: u32,
+    bridge_int_ena_raw: u32,
+    dma_chen0_raw: u32,
+    dma_chen1_raw: u32,
+    dma_controller_cfg0_raw: u32,
+    dma_controller_reset0_raw: u32,
+    dma_controller_lowpower_cfg0_raw: u32,
+    dma_controller_lowpower_cfg1_raw: u32,
+    dma_cfg0_raw: u32,
+    dma_cfg1_raw: u32,
+    dma_ctl0_raw: u32,
+    dma_ctl1_raw: u32,
+    dma_sar0_raw: u32,
+    dma_dar0_raw: u32,
+    dma_block_ts0_raw: u32,
+    dma_sstatar0_raw: u32,
+    dma_dstatar0_raw: u32,
+    dma_sstat0_raw: u32,
+    dma_dstat0_raw: u32,
+    dma_status0_raw: u32,
+    dma_status1_raw: u32,
+    dma_intstatus_enable0_raw: u32,
+    dma_intstatus0_raw: u32,
+}
+
+/// The capture runs on `VDMA_CH1`.
+const CSI_DMA_CHANNEL: usize = 1;
+
+/// Only valid while a `CsiCapture` lives, which keeps the CSI and VDMA clocks
+/// on.
+fn debug_snapshot() -> CaptureDebugSnapshot {
+    let host = MIPI_CSI_HOST::regs();
+    let bridge = MIPI_CSI_BRIDGE::regs();
+    let vdma = VDMA::regs();
+    let ch = vdma.ch(CSI_DMA_CHANNEL);
+    CaptureDebugSnapshot {
+        dma_channel_id: CSI_DMA_CHANNEL as u8,
+        host_phy_stopstate_raw: host.phy_stopstate().read().bits(),
+        host_phy_rx_raw: host.phy_rx().read().bits(),
+        host_int_st_main_raw: host.int_st_main().read().bits(),
+        bridge_csi_en_raw: bridge.csi_en().read().bits(),
+        bridge_frame_cfg_raw: bridge.frame_cfg().read().bits(),
+        bridge_data_type_cfg_raw: bridge.data_type_cfg().read().bits(),
+        bridge_host_cm_ctrl_raw: bridge.host_cm_ctrl().read().bits(),
+        bridge_buf_flow_ctl_raw: bridge.buf_flow_ctl().read().bits(),
+        bridge_dma_req_cfg_raw: bridge.dma_req_cfg().read().bits(),
+        bridge_dmablk_size_raw: bridge.dmablk_size().read().bits(),
+        bridge_int_raw_raw: bridge.int_raw().read().bits(),
+        bridge_int_st_raw: bridge.int_st().read().bits(),
+        bridge_int_ena_raw: bridge.int_ena().read().bits(),
+        dma_chen0_raw: vdma.chen0().read().bits(),
+        dma_chen1_raw: vdma.chen1().read().bits(),
+        dma_controller_cfg0_raw: vdma.cfg0().read().bits(),
+        dma_controller_reset0_raw: vdma.reset0().read().bits(),
+        dma_controller_lowpower_cfg0_raw: vdma.lowpower_cfg0().read().bits(),
+        dma_controller_lowpower_cfg1_raw: vdma.lowpower_cfg1().read().bits(),
+        dma_cfg0_raw: ch.cfg0().read().bits(),
+        dma_cfg1_raw: ch.cfg1().read().bits(),
+        dma_ctl0_raw: ch.ctl0().read().bits(),
+        dma_ctl1_raw: ch.ctl1().read().bits(),
+        dma_sar0_raw: ch.sar0().read().bits(),
+        dma_dar0_raw: ch.dar0().read().bits(),
+        dma_block_ts0_raw: ch.block_ts0().read().bits(),
+        dma_sstatar0_raw: ch.sstatar0().read().bits(),
+        dma_dstatar0_raw: ch.dstatar0().read().bits(),
+        dma_sstat0_raw: ch.sstat0().read().bits(),
+        dma_dstat0_raw: ch.dstat0().read().bits(),
+        dma_status0_raw: ch.status0().read().bits(),
+        dma_status1_raw: ch.status1().read().bits(),
+        dma_intstatus_enable0_raw: ch.intstatus_enable0().read().bits(),
+        dma_intstatus0_raw: ch.intstatus0().read().bits(),
+    }
+}
+
 /// Decodes the channel registers that the AXI profile and the CSI flow setup
 /// program. `CTL0` and `CTL1` are only written when a capture is armed.
 fn print_dma_axi_readback(stage: &str, snapshot: &CaptureDebugSnapshot) {
@@ -976,14 +1043,6 @@ fn print_dma_axi_readback(stage: &str, snapshot: &CaptureDebugSnapshot) {
 const GUARD_BYTES: usize = 4096;
 const PSRAM_DMA_ALIGNMENT: usize = 128;
 const SENTINEL_SEED: u32 = 0xA5C3_5A3C;
-// Mode C sets both `BLOCK_TS` and the bridge block size (TRM §38.5.7) to the
-// buffer size, so either one ends the block at the end of the buffer.
-const INTERNAL_CAPTURE_BYTES: usize = 64 * 1024;
-const INTERNAL_CAPTURE_BRIDGE_BURSTS: u16 =
-    (INTERNAL_CAPTURE_BYTES / BRIDGE_DMA_BURST_BYTES) as u16;
-
-static mut INTERNAL_CAPTURE: InternalMemory<[u8; INTERNAL_CAPTURE_BYTES + GUARD_BYTES]> =
-    InternalMemory::new([0; INTERNAL_CAPTURE_BYTES + GUARD_BYTES]);
 
 fn enable_mipi_dphy_power(delay: &Delay) {
     PMU::regs()
@@ -1404,56 +1463,6 @@ fn print_capture_debug_snapshot(stage: &str, snapshot: &CaptureDebugSnapshot) {
         snapshot.dma_status1_raw,
         snapshot.dma_intstatus_enable0_raw,
         snapshot.dma_intstatus0_raw
-    );
-}
-
-fn print_runtime_samples(samples: &[Option<esp_hal::mipi_csi::CaptureStatus>]) {
-    println!("--- CSI DURING-CAPTURE SAMPLES ---");
-    for (idx, sample) in samples.iter().enumerate() {
-        match sample {
-            Some(status) => {
-                println!(
-                    "sample[{}]: host=0x{:08x} bridge=0x{:08x} dma=0x{:08x} enabled={} done={} dma_units={}",
-                    idx,
-                    status.host_errors.raw_main_status,
-                    status.bridge_events.raw_status,
-                    status.dma_status.raw_status,
-                    status.dma_status.channel_enabled,
-                    status.dma_status.transfer_done(),
-                    status.dma_status.completed_transfer_units
-                );
-            }
-            None => println!("sample[{}]: <none>", idx),
-        }
-    }
-}
-
-fn print_runtime_phy_activity(summary: esp_hal::mipi_csi::CapturePhyActivitySummary) {
-    println!("--- CSI ACTIVE-POLL PHY SUMMARY ---");
-    println!(
-        "samples: total={} active(bridge&&dma)={} bridge_enabled={} dma_enabled={}",
-        summary.sample_count,
-        summary.active_sample_count,
-        summary.bridge_enabled_sample_count,
-        summary.dma_enabled_sample_count
-    );
-    println!(
-        "phy_stopstate: OR=0x{:08x} AND=0x{:08x}",
-        summary.phy_stopstate_or_raw, summary.phy_stopstate_and_raw
-    );
-    println!(
-        "phy_rx:        OR=0x{:08x} AND=0x{:08x}",
-        summary.phy_rx_or_raw, summary.phy_rx_and_raw
-    );
-    println!(
-        "decoded(active-only): clkactivehs_seen={} lane0_left_stopstate_seen={} lane1_left_stopstate_seen={}",
-        summary.clkactivehs_seen,
-        summary.data_lane0_left_stopstate_seen,
-        summary.data_lane1_left_stopstate_seen
-    );
-    println!(
-        "bridge(active-only): buf_depth_nonzero_seen={} buf_depth_max={}",
-        summary.bridge_buf_depth_nonzero_seen, summary.bridge_buf_depth_max
     );
 }
 
@@ -2175,12 +2184,6 @@ fn scan_sentinel(region: &[u8], bytes: core::ops::Range<usize>) -> SentinelScan 
 }
 
 fn allocate_capture_buffer(mode: CaptureMode) -> &'static mut [u8] {
-    if mode.uses_internal_sram() {
-        // SAFETY: `main` runs once, so this is the only reference to the static.
-        let internal = unsafe { &mut *(&raw mut INTERNAL_CAPTURE) };
-        return internal.get_mut().unsize().into_inner();
-    }
-
     let len = mode.expected_bytes() + GUARD_BYTES;
     let layout = Layout::from_size_align(len, PSRAM_DMA_ALIGNMENT).unwrap();
     let ptr = unsafe { alloc::alloc::alloc(layout) };
@@ -2262,7 +2265,7 @@ fn run_capture(
     let capture_len = mode.expected_bytes();
 
     let _ = print_isp_input_gate_readback("before-arm");
-    let before_arm = capture.debug_snapshot();
+    let before_arm = debug_snapshot();
     print_capture_debug_snapshot("before-arm", &before_arm);
     print_dma_axi_readback("before-arm", &before_arm);
     clear_isp_interrupts();
@@ -2288,7 +2291,7 @@ fn run_capture(
         "{label}: stream_on={:?} stream_off={:?}",
         stream_on, stream_off
     );
-    let after = capture.debug_snapshot();
+    let after = debug_snapshot();
     print_capture_debug_snapshot("after-shutdown", &after);
     print_dma_axi_readback("after-shutdown", &after);
     print_dma_block_registers(label, &after);
@@ -2297,12 +2300,6 @@ fn run_capture(
     println!();
     let _ = print_isp_input_gate_readback("after-capture");
     print_host_detail_status("after-capture");
-    print_runtime_samples(capture.runtime_status_samples());
-    print_runtime_phy_activity(capture.runtime_phy_activity_summary());
-    let trace = *capture.capture_trace();
-    print_capture_trace(label, &trace);
-    let discard = capture.discard_continue_diagnostic();
-    print_discard_diagnostic(label, discard);
     if let Err(err) = &result {
         print_receive_error(label, err);
     }
@@ -2312,8 +2309,6 @@ fn run_capture(
         &CaptureEvidence {
             mode,
             result: &result,
-            trace: &trace,
-            discard,
             isp_int_raw,
             allocation,
             test_pattern,
@@ -2326,7 +2321,7 @@ fn run_capture(
         // and `valid` includes the length, sentinel, and guard checks.
         match (mode, &result) {
             (CaptureMode::Raw8Psram, Ok(_)) if valid => {
-                export_raw8_frame(i2c, &allocation[..capture_len], test_pattern, &trace)
+                export_raw8_frame(i2c, &allocation[..capture_len], test_pattern)
             }
             (CaptureMode::Raw8Psram, _) => {
                 println!("{label}: frame export skipped, the capture is not a valid frame")
@@ -2498,7 +2493,7 @@ fn run_stream_fault_cases<'d>(
     i2c: &mut I2c<'_, Blocking>,
 ) -> (CsiCapture<'d>, bool) {
     let frame_bytes = CaptureMode::Raw8Psram.expected_bytes();
-    let channel = capture.debug_snapshot().dma_channel_id as usize;
+    let channel = CSI_DMA_CHANNEL;
     let (buffer0, guard0, buffer1, guard1) = allocate_stream_buffers(frame_bytes);
     for region in [&mut *buffer0, &mut *guard0, &mut *buffer1, &mut *guard1] {
         sentinel_writeback(region);
@@ -2819,6 +2814,207 @@ fn run_stream_capture<'d>(
     (capture, passed)
 }
 
+static ASYNC_WOKEN: AtomicBool = AtomicBool::new(false);
+static ASYNC_WAKES: AtomicU32 = AtomicU32::new(0);
+/// Polls that returned `Pending` and were followed by a wake and a new poll.
+static ASYNC_WOKEN_POLLS: AtomicU32 = AtomicU32::new(0);
+
+fn flag_waker() -> Waker {
+    const VTABLE: RawWakerVTable = RawWakerVTable::new(
+        |_| RawWaker::new(core::ptr::null(), &VTABLE),
+        |_| wake_flag(),
+        |_| wake_flag(),
+        |_| {},
+    );
+    fn wake_flag() {
+        ASYNC_WAKES.fetch_add(1, Ordering::Relaxed);
+        ASYNC_WOKEN.store(true, Ordering::Release);
+    }
+    // SAFETY: the vtable functions ignore the data pointer.
+    unsafe { Waker::from_raw(RawWaker::new(core::ptr::null(), &VTABLE)) }
+}
+
+/// Polls `future` once, then again only after its waker fired, until it
+/// completes or `timeout` passes. A future that never wakes times out.
+fn poll_on_wake<F: Future>(future: core::pin::Pin<&mut F>, timeout: Duration) -> Option<F::Output> {
+    let mut future = future;
+    let waker = flag_waker();
+    let mut cx = Context::from_waker(&waker);
+    let deadline = esp_hal::time::Instant::now() + timeout;
+    loop {
+        ASYNC_WOKEN.store(false, Ordering::Release);
+        if let Poll::Ready(output) = future.as_mut().poll(&mut cx) {
+            return Some(output);
+        }
+        while !ASYNC_WOKEN.load(Ordering::Acquire) {
+            if esp_hal::time::Instant::now() > deadline {
+                return None;
+            }
+        }
+        ASYNC_WOKEN_POLLS.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// `CSI_ASYNC=1`: frames through `next_frame_async`, a dropped pending
+/// future, a sensor restart, and a blocking frame after `into_blocking`.
+fn run_async_stream_check<'d>(
+    capture: CsiCapture<'d>,
+    i2c: &mut I2c<'_, Blocking>,
+    frames: u32,
+    mut lcd: Option<&mut Lcd>,
+) -> (CsiCapture<'d>, bool) {
+    let frame_bytes = CaptureMode::Raw8Psram.expected_bytes();
+    let (buffer0, guard0, buffer1, guard1) = allocate_stream_buffers(frame_bytes);
+    for region in [&mut *buffer0, &mut *guard0, &mut *buffer1, &mut *guard1] {
+        sentinel_writeback(region);
+    }
+    let mut stream = match capture.into_async().into_stream([buffer0, buffer1]) {
+        Ok(stream) => stream,
+        Err((capture, _, error)) => {
+            println!("async: FAIL, did not start: {error:?}");
+            return (capture.into_blocking(), false);
+        }
+    };
+    let timeout = Duration::from_millis(500);
+    let take = |stream: &mut esp_hal::mipi_csi::CsiStream<'d, esp_hal::Async>,
+                label: &str|
+     -> Option<(u32, usize)> {
+        let future = pin!(stream.next_frame_async());
+        match poll_on_wake(future, timeout) {
+            Some(Ok(frame)) => Some((
+                frame.sequence(),
+                scan_sentinel(&frame, 0..frame_bytes).untouched_words,
+            )),
+            Some(Err(error)) => {
+                println!("async: FAIL {label}: {error:?}");
+                None
+            }
+            None => {
+                println!("async: FAIL {label}: no wake within {timeout:?}");
+                None
+            }
+        }
+    };
+
+    let stream_on = set_sc2336_stream(i2c, true);
+    let wakes_before = ASYNC_WAKES.load(Ordering::Relaxed);
+    let woken_polls_before = ASYNC_WOKEN_POLLS.load(Ordering::Relaxed);
+    let start = esp_hal::time::Instant::now();
+    let mut delivered = 0;
+    let mut last_sequence = None::<u32>;
+    let mut sequences_increase = true;
+    let mut first_fill_untouched = 0;
+    for index in 1..=frames {
+        if let Some(lcd) = lcd.as_deref_mut() {
+            lcd.render_step();
+        }
+        let Some((sequence, untouched)) = take(&mut stream, "frame") else {
+            break;
+        };
+        if index <= 2 {
+            first_fill_untouched += untouched;
+        }
+        sequences_increase &= last_sequence.is_none_or(|last| sequence > last);
+        last_sequence = Some(sequence);
+        delivered += 1;
+    }
+    let elapsed_ms = start.elapsed().as_millis().max(1);
+    let wakes = ASYNC_WAKES
+        .load(Ordering::Relaxed)
+        .wrapping_sub(wakes_before);
+    let woken_polls = ASYNC_WOKEN_POLLS
+        .load(Ordering::Relaxed)
+        .wrapping_sub(woken_polls_before);
+
+    // The frame just taken was the newest, so a new future is pending until
+    // the next frame completes. Dropping it must not lose that frame.
+    let cancel_pending = {
+        let future = pin!(stream.next_frame_async());
+        let waker = flag_waker();
+        future.poll(&mut Context::from_waker(&waker)).is_pending()
+    };
+    let after_cancel = (0..5)
+        .filter(|_| take(&mut stream, "after-cancel").is_some())
+        .count();
+
+    // Restart through the stream while the sensor streams, as the fault cases
+    // do. The first block can be the tail of the frame the stop cut.
+    let (capture, buffers) = stream.stop();
+    let mut stream = match capture.into_stream(buffers) {
+        Ok(stream) => stream,
+        Err((capture, _, error)) => {
+            println!("async: FAIL, did not restart: {error:?}");
+            let _ = set_sc2336_stream(i2c, false);
+            return (capture.into_blocking(), false);
+        }
+    };
+    let after_restart = (0..5)
+        .filter(|_| take(&mut stream, "after-restart").is_some())
+        .count();
+
+    // Opt-in reproducer: stopping the sensor mid-frame while the stream stays
+    // armed can leave the bridge FIFO full with no DMA interrupt, so no frame
+    // completes until the stream is restarted.
+    let sensor_restart = env_flag(option_env!("CSI_ASYNC_SENSOR_RESTART")).then(|| {
+        let _ = set_sc2336_stream(i2c, false);
+        Delay::new().delay_millis(100);
+        let _ = set_sc2336_stream(i2c, true);
+        let frames = (0..5)
+            .filter(|_| take(&mut stream, "after-sensor-restart").is_some())
+            .count();
+        if frames < 5 {
+            restart_snapshot("async-sensor-restart-stall", i2c, CSI_DMA_CHANNEL, false);
+            print_capture_debug_snapshot("async-sensor-restart-stall", &debug_snapshot());
+        }
+        frames
+    });
+    let stream_off = set_sc2336_stream(i2c, false);
+    let stats = stream.stats();
+    let (capture, [buffer0, _]) = stream.stop();
+    let guards = [guard_written_words(guard0), guard_written_words(guard1)];
+
+    // The sensor stop above can cut a frame, and the host then reports an
+    // error at the next frame start. One whole sensor frame before arming
+    // lets that error latch before the capture, which clears it.
+    let mut capture = capture.into_blocking();
+    let settle_on = set_sc2336_stream(i2c, true);
+    Delay::new().delay_millis(50);
+    let blocking = capture
+        .receive_with(&mut buffer0[..frame_bytes], || {})
+        .map(|frame| frame.received_bytes);
+    let settle_off = set_sc2336_stream(i2c, false);
+
+    println!(
+        "async: delivered={delivered}/{frames} wakes={wakes} woken_polls={woken_polls} delivered_frames_per_s_x10={} sequences_increase={sequences_increase} first_fill_untouched_words={first_fill_untouched} guard_written_words={guards:?}",
+        delivered as u64 * 10_000 / elapsed_ms
+    );
+    println!(
+        "async: cancel_pending={cancel_pending} after_cancel_frames={after_cancel}/5 after_restart_frames={after_restart}/5 sensor_restart_frames={sensor_restart:?} completed={} errored={} resyncs={} stream_on={stream_on:?} stream_off={stream_off:?}",
+        stats.completed, stats.errored, stats.resyncs
+    );
+    println!(
+        "async: blocking_after_into_blocking={blocking:?} sensor_on={settle_on:?} sensor_off={settle_off:?}"
+    );
+    // With the LCD, rendering between frames can take longer than a frame, so
+    // every frame may be ready at the first poll.
+    let passed = delivered == frames
+        && (woken_polls > 0 || lcd.is_some())
+        && sequences_increase
+        && first_fill_untouched == 0
+        && guards == [0, 0]
+        && cancel_pending
+        && after_cancel == 5
+        && after_restart == 5
+        && sensor_restart.is_none_or(|frames| frames == 5)
+        && stream_on.is_ok()
+        && stream_off.is_ok()
+        && settle_on.is_ok()
+        && settle_off.is_ok()
+        && blocking.is_ok_and(|bytes| bytes == frame_bytes);
+    println!("async: {}", if passed { "PASS" } else { "FAIL" });
+    (capture, passed)
+}
+
 /// Captures `frames` RAW8 frames into the same PSRAM buffer, one full
 /// single-shot capture per frame, and checks the buffer before it is reused.
 /// The sensor streams only while a DMA block is armed, or throughout with
@@ -2840,7 +3036,7 @@ fn run_repeated_capture(
     let label = mode.label();
     let capture_len = mode.expected_bytes();
 
-    let before_arm = capture.debug_snapshot();
+    let before_arm = debug_snapshot();
     print_capture_debug_snapshot("before-arm", &before_arm);
     print_dma_axi_readback("before-arm", &before_arm);
 
@@ -2884,13 +3080,9 @@ fn run_repeated_capture(
             .expect("capture allocation is DMA aligned")
             .invalidate();
 
-        let trace = *capture.capture_trace();
-        let discard = capture.discard_continue_diagnostic();
         let evidence = CaptureEvidence {
             mode,
             result: &result,
-            trace: &trace,
-            discard,
             isp_int_raw,
             allocation,
             test_pattern,
@@ -2908,21 +3100,17 @@ fn run_repeated_capture(
             continue;
         }
         print!(
-            "repeat[{}/{}]: ok={} receive={} received_bytes={} first_data={:?}us done={:?}us untouched_words={} guard_words_written={} bridge_errors=0x{:02x} discard={} host_error={} isp_errors={:#x} stalls={} checksum32=",
+            "repeat[{}/{}]: ok={} receive={} received_bytes={} untouched_words={} guard_words_written={} bridge_errors=0x{:02x} host_error={} isp_errors={:#x} checksum32=",
             frame,
             frames,
             ok,
             if result.is_ok() { "Ok" } else { "Err" },
             received,
-            assessment.first_data_us,
-            assessment.completed_us,
             assessment.capture_scan.untouched_words,
             assessment.guard_scan.written_words,
             assessment.bridge_errors,
-            discard.discard_count,
             assessment.host_error,
             assessment.isp_errors,
-            assessment.stalls,
         );
         // Not `{:08x}` with a `0x` prefix: the monitor resolves those as addresses.
         print!(
@@ -2943,16 +3131,13 @@ fn run_repeated_capture(
 
         if !ok {
             println!(
-                "repeat[{frame}/{frames}]: FAIL stream_on={:?} stream_off={:?} shutdown={}, full diagnostics follow",
-                stream_on, stream_off, assessment.shutdown
+                "repeat[{frame}/{frames}]: FAIL stream_on={:?} stream_off={:?}, full diagnostics follow",
+                stream_on, stream_off
             );
-            let after = capture.debug_snapshot();
+            let after = debug_snapshot();
             print_capture_debug_snapshot("after-shutdown", &after);
             print_dma_axi_readback("after-shutdown", &after);
             print_host_detail_status("after-capture");
-            print_runtime_samples(capture.runtime_status_samples());
-            print_capture_trace(label, &trace);
-            print_discard_diagnostic(label, discard);
             if let Err(err) = &result {
                 print_receive_error(label, err);
             }
@@ -2967,7 +3152,7 @@ fn run_repeated_capture(
     let run_ms = run_start.elapsed().as_millis();
     let continuous_stream_off = continuous_sensor.then(|| set_sc2336_stream(i2c, false));
 
-    let after = capture.debug_snapshot();
+    let after = debug_snapshot();
     print_dma_axi_readback("after-shutdown", &after);
     let mut distinct = checksums.clone();
     distinct.sort_unstable();
@@ -3008,8 +3193,7 @@ fn run_repeated_capture(
     if frame_export {
         // The last frame passed the same checks as a single-shot export.
         println!("{label}: exporting frame {frames} of {frames}");
-        let trace = *capture.capture_trace();
-        export_raw8_frame(i2c, &allocation[..capture_len], test_pattern, &trace);
+        export_raw8_frame(i2c, &allocation[..capture_len], test_pattern);
     }
     true
 }
@@ -3085,12 +3269,7 @@ fn base64_encode<'a>(input: &[u8], output: &'a mut [u8; EXPORT_BASE64_BYTES]) ->
 ///
 /// espflash decodes the console as text, so the payload is base64. Numbers are
 /// hex without a `0x` prefix, which espflash would try to resolve as symbols.
-fn export_raw8_frame(
-    i2c: &mut I2c<'_, Blocking>,
-    frame: &[u8],
-    test_pattern: bool,
-    trace: &CaptureTrace,
-) {
+fn export_raw8_frame(i2c: &mut I2c<'_, Blocking>, frame: &[u8], test_pattern: bool) {
     // The Bayer order of the official mode table assumes mirror and flip are off.
     // `--` tells the host that the register could not be read.
     let flip_mirror = read_reg_u8(i2c, SC2336_REG_FLIP_MIRROR).map_or(u16::MAX, u16::from);
@@ -3103,9 +3282,9 @@ fn export_raw8_frame(
         print!("reg3221={flip_mirror:02x} ");
     }
     println!(
-        "width={SC2336_FRAME_WIDTH} height={SC2336_FRAME_HEIGHT} format=RAW8 bayer=BGGR bayer_source=esp-cam-sensor:MIPI_2lane_24Minput_RAW8_1024x600_30fps test_pattern={} dar_start={:08x} len={} chunk_bytes={EXPORT_CHUNK_BYTES} chunks={chunks} crc32={crc:08x} checksum32={:08x}",
+        "width={SC2336_FRAME_WIDTH} height={SC2336_FRAME_HEIGHT} format=RAW8 bayer=BGGR bayer_source=esp-cam-sensor:MIPI_2lane_24Minput_RAW8_1024x600_30fps test_pattern={} buffer={:08x} len={} chunk_bytes={EXPORT_CHUNK_BYTES} chunks={chunks} crc32={crc:08x} checksum32={:08x}",
         test_pattern as u8,
-        trace.dar_start,
+        frame.as_ptr() as u32,
         frame.len(),
         checksum32(frame),
     );
@@ -3124,33 +3303,6 @@ fn export_raw8_frame(
         "{EXPORT_PREFIX} END id={EXPORT_FRAME_ID} len={} chunks={chunks} crc32={crc:08x}",
         frame.len()
     );
-}
-
-fn print_capture_trace(label: &str, trace: &CaptureTrace) {
-    println!(
-        "{label}: trace polls={} dropped={} dar_start=0x{:08x}",
-        trace.polls, trace.dropped, trace.dar_start
-    );
-    for entry in trace.entries() {
-        print!(
-            "{label}: trace t={}us {:?} written={} fifo={} ch_en={} abort_pending={} stopstate=0x{:08x} bridge=0x{:02x}",
-            entry.elapsed_us,
-            entry.event,
-            entry.dar.wrapping_sub(trace.dar_start),
-            entry.bridge_fifo_depth,
-            entry.dma_enabled,
-            entry.dma_abort_pending,
-            entry.phy_stopstate,
-            entry.bridge_int_raw
-        );
-        print_bit_names(entry.bridge_int_raw, BRIDGE_INT_NAMES);
-        print!(" dma=0x{:08x}", entry.dma_intstatus);
-        print_bit_names(entry.dma_intstatus & !DMA_INT_ERROR_MASK, DMA_INT_NAMES);
-        println!(
-            " dma_errors=0x{:08x}",
-            entry.dma_intstatus & DMA_INT_ERROR_MASK
-        );
-    }
 }
 
 /// Prints how many rows equal the row two above, which share the same bayer
@@ -3208,14 +3360,11 @@ fn print_frame_stats(label: &str, frame: &[u8]) {
     print_sample_bytes(frame, 32);
 }
 
-const DMA_INT_TRANSFER_DONE_BIT: u32 = 1 << 1;
 const BRIDGE_INT_ERROR_MASK: u32 = 0x1F;
 
 struct CaptureEvidence<'a> {
     mode: CaptureMode,
     result: &'a Result<CaptureFrame, ReceiveError>,
-    trace: &'a CaptureTrace,
-    discard: DiscardContinueDiagnostic,
     isp_int_raw: u32,
     allocation: &'a [u8],
     test_pattern: bool,
@@ -3223,28 +3372,20 @@ struct CaptureEvidence<'a> {
 
 struct Assessment {
     written: usize,
-    first_data_us: Option<u32>,
-    completed_us: Option<u32>,
-    stalls: usize,
     capture_scan: SentinelScan,
     guard_scan: SentinelScan,
     bytes_moved: bool,
     block_complete: bool,
     frame_sized: bool,
-    bridge_errors_at: &'static str,
     bridge_errors: u32,
     host_error: bool,
     isp_errors: u32,
-    isp_errors_count: bool,
-    data_before_stream_on: bool,
-    shutdown: &'static str,
     valid: bool,
 }
 
 /// Applies the four result levels to one capture without printing.
 fn assess(evidence: &CaptureEvidence<'_>) -> Assessment {
     let mode = evidence.mode;
-    let trace = evidence.trace;
     let expected = mode.expected_bytes();
     let error_status: Option<CaptureStatus> = match evidence.result {
         Ok(_) => None,
@@ -3260,29 +3401,15 @@ fn assess(evidence: &CaptureEvidence<'_>) -> Assessment {
         Err(_) => None,
     };
 
-    let entries = trace.entries();
-    let written = entries
-        .last()
-        .map_or(0, |entry| entry.dar.wrapping_sub(trace.dar_start) as usize);
-    let first_data = entries
-        .iter()
-        .find(|entry| entry.event == CaptureTraceEvent::FirstData);
-    let data_before_stream_on = entries
-        .iter()
-        .find(|entry| entry.event == CaptureTraceEvent::SourceStarted)
-        .is_some_and(|entry| entry.dar != trace.dar_start);
-    let completion = entries.iter().find(|entry| {
-        entry.event == CaptureTraceEvent::DmaEvent
-            && entry.dma_intstatus & DMA_INT_TRANSFER_DONE_BIT != 0
-    });
-    let stalls = entries
-        .iter()
-        .filter(|entry| entry.event == CaptureTraceEvent::Stalled)
-        .count();
-
     let capture_scan = scan_sentinel(evidence.allocation, 0..expected);
     let guard_scan = scan_sentinel(evidence.allocation, expected..evidence.allocation.len());
 
+    // `received_bytes` is measured from the DMA destination address; after an
+    // error only the sentinel shows how far the DMA wrote.
+    let written = match evidence.result {
+        Ok(frame) => frame.received_bytes,
+        Err(_) => capture_scan.written_end_byte,
+    };
     let bytes_moved = written > 0 || capture_scan.written_words > 0;
     let block_complete = evidence.result.is_ok()
         || error_status.is_some_and(|status| status.dma_status.transfer_done());
@@ -3290,58 +3417,25 @@ fn assess(evidence: &CaptureEvidence<'_>) -> Assessment {
         && written == expected
         && capture_scan.untouched_words == 0
         && guard_scan.written_words == 0;
-    // Errors after the block completed belong to the next frame, which no DMA
-    // block was waiting for.
-    let wait_end = entries
-        .iter()
-        .find(|entry| entry.event == CaptureTraceEvent::WaitEnded);
-    let bridge_errors_at = if completion.is_some() {
-        "completion"
-    } else {
-        "wait_end"
-    };
-    let bridge_errors = completion
-        .or(wait_end)
-        .map_or(0, |entry| entry.bridge_int_raw & BRIDGE_INT_ERROR_MASK);
+    // `Ok` means the driver saw no bridge or host error when the block
+    // completed.
+    let bridge_errors = error_status.map_or(0, |status| {
+        status.bridge_events.raw_status & BRIDGE_INT_ERROR_MASK
+    });
     let host_error = error_status.is_some_and(|status| status.host_errors.any_error());
     let isp_errors = evidence.isp_int_raw & ISP_INT_ERROR_MASK;
-    // Mode C stops the DMA mid-frame, so the ISP overflows behind it.
-    let isp_errors_count = !mode.is_64k_block_mode();
-    let valid = frame_sized
-        && bridge_errors == 0
-        && evidence.discard.discard_count == 0
-        && !host_error
-        && (isp_errors == 0 || !isp_errors_count)
-        && !data_before_stream_on;
-
-    let shutdown = entries
-        .iter()
-        .rev()
-        .find_map(|entry| match entry.event {
-            CaptureTraceEvent::ChannelDisabled => Some("CH_EN cleared after disable"),
-            CaptureTraceEvent::ChannelAborted => Some("stopped only after suspend and abort"),
-            CaptureTraceEvent::ShutdownFailed => Some("not shown stopped"),
-            _ => None,
-        })
-        .unwrap_or("already stopped when the wait ended");
+    let valid = frame_sized && bridge_errors == 0 && !host_error && isp_errors == 0;
 
     Assessment {
         written,
-        first_data_us: first_data.map(|entry| entry.elapsed_us),
-        completed_us: completion.map(|entry| entry.elapsed_us),
-        stalls,
         capture_scan,
         guard_scan,
         bytes_moved,
         block_complete,
         frame_sized,
-        bridge_errors_at,
         bridge_errors,
         host_error,
         isp_errors,
-        isp_errors_count,
-        data_before_stream_on,
-        shutdown,
         valid,
     }
 }
@@ -3352,21 +3446,14 @@ fn print_verdict(label: &str, evidence: &CaptureEvidence<'_>) -> bool {
     let expected = mode.expected_bytes();
     let Assessment {
         written,
-        first_data_us,
-        completed_us,
-        stalls,
         capture_scan,
         guard_scan,
         bytes_moved,
         block_complete,
         frame_sized,
-        bridge_errors_at,
         bridge_errors,
         host_error,
         isp_errors,
-        isp_errors_count,
-        data_before_stream_on,
-        shutdown,
         valid,
     } = assess(evidence);
 
@@ -3378,14 +3465,8 @@ fn print_verdict(label: &str, evidence: &CaptureEvidence<'_>) -> bool {
         ),
         Err(err) => println!("{label}: receive=Err({err})"),
     }
-    println!(
-        "{label}: level1 bytes_moved={} written={} first_data_at={:?}us stalls={}",
-        bytes_moved, written, first_data_us, stalls
-    );
-    println!(
-        "{label}: level2 dma_block_complete={} completed_at={:?}us",
-        block_complete, completed_us
-    );
+    println!("{label}: level1 bytes_moved={bytes_moved} written={written}");
+    println!("{label}: level2 dma_block_complete={block_complete}");
     println!(
         "{label}: level3 frame_sized={} written={} expected={} sentinel_written_end={} untouched_words={} first_untouched={:?} guard_words_written={}",
         frame_sized,
@@ -3396,47 +3477,25 @@ fn print_verdict(label: &str, evidence: &CaptureEvidence<'_>) -> bool {
         capture_scan.first_untouched_byte,
         guard_scan.written_words
     );
-    print!(
-        "{label}: level4 valid_aligned_frame={} bridge_errors(at {})=0x{:02x}",
-        valid, bridge_errors_at, bridge_errors
-    );
+    print!("{label}: level4 valid_aligned_frame={valid} bridge_errors=0x{bridge_errors:02x}");
     print_bit_names(bridge_errors, BRIDGE_INT_NAMES);
-    println!(
-        " discard_count={} host_error={} data_before_stream_on={}",
-        evidence.discard.discard_count, host_error, data_before_stream_on
-    );
+    println!(" host_error={host_error}");
     print!("{label}: level4 isp_errors=0x{isp_errors:08x}");
     print_bit_names(isp_errors, ISP_INT_NAMES);
-    if !isp_errors_count {
-        print!(" (not counted)");
-    }
     println!();
 
-    match mode {
-        CaptureMode::Rgb565Psram if block_complete => {
-            if written == RGB565_FRAME_BYTES {
-                println!(
-                    "{label}: BLOCK_TS was sized for RAW8 ({SC2336_FRAME_BYTES} bytes), the bridge ended the block at the RGB565 frame size"
-                );
-            } else if written == SC2336_FRAME_BYTES {
-                println!(
-                    "{label}: the block ended at BLOCK_TS ({SC2336_FRAME_BYTES} bytes), half of the RGB565 frame"
-                );
-            } else {
-                println!("{label}: the block ended after {written} bytes");
-            }
+    if mode == CaptureMode::Rgb565Psram && block_complete {
+        if written == RGB565_FRAME_BYTES {
+            println!(
+                "{label}: BLOCK_TS was sized for RAW8 ({SC2336_FRAME_BYTES} bytes), the bridge ended the block at the RGB565 frame size"
+            );
+        } else if written == SC2336_FRAME_BYTES {
+            println!(
+                "{label}: the block ended at BLOCK_TS ({SC2336_FRAME_BYTES} bytes), half of the RGB565 frame"
+            );
+        } else {
+            println!("{label}: the block ended after {written} bytes");
         }
-        CaptureMode::Raw8InternalBlock | CaptureMode::Raw8PsramBlock => println!(
-            "{label}: this mode stops after {INTERNAL_CAPTURE_BYTES} bytes by design, it is not a full frame"
-        ),
-        _ => {}
-    }
-
-    if let Some(last) = evidence.trace.entries().last() {
-        println!(
-            "{label}: shutdown={} last_event={:?} ch_en={} abort_pending={} bridge_fifo={}",
-            shutdown, last.event, last.dma_enabled, last.dma_abort_pending, last.bridge_fifo_depth
-        );
     }
 
     if bytes_moved {
@@ -3481,39 +3540,6 @@ fn print_host_detail_status(label: &str) {
         host.int_st_ecc_corrected().read().bits(),
         host.int_st_phy().read().bits(),
     );
-}
-
-fn print_discard_diagnostic(label: &str, report: esp_hal::mipi_csi::DiscardContinueDiagnostic) {
-    if !report.enabled {
-        return;
-    }
-
-    let dar_delta = report.dar_end.wrapping_sub(report.dar_start);
-    println!(
-        "{label}: discard-diag count={} fatal_error={} dma_completed={} valid_complete_frame={} units={}/{} dar_start=0x{:08x} dar_end=0x{:08x} dar_delta={}",
-        report.discard_count,
-        report.fatal_error_seen,
-        report.dma_completed,
-        report.valid_complete_frame,
-        report.completed_transfer_units,
-        report.expected_transfer_units,
-        report.dar_start,
-        report.dar_end,
-        dar_delta
-    );
-    print!("{label}: discard-diag dar_samples =");
-    for sample in report.dar_samples {
-        match sample {
-            Some(dar) => print!(" 0x{dar:08x}"),
-            None => break,
-        }
-    }
-    println!();
-    if report.discard_count > 0 {
-        println!(
-            "{label}: DISCARD is not a valid frame boundary. No DMA re-arm was performed, so a completed block can still be a spliced partial frame."
-        );
-    }
 }
 
 #[main]
@@ -3602,6 +3628,11 @@ fn main() -> ! {
         println!(
             "DPHY LIFECYCLE RESULT: {}",
             if ok { "PASS" } else { "FAIL" }
+        );
+        qa_result(
+            ok,
+            "dphy_lifecycle",
+            format_args!("repeats={DPHY_LIFECYCLE_REPEATS}"),
         );
         loop {}
     }
@@ -3734,14 +3765,12 @@ fn main() -> ! {
             .with_frame_width(SC2336_FRAME_WIDTH)
             .with_frame_height(SC2336_FRAME_HEIGHT)
             .with_pixel_format(CapturePixelFormat::Raw8)
-            .with_timeout(Duration::from_millis(500)),
+            .with_timeout(Duration::from_millis(500))
+            .with_dma_axi_config(dma_profile),
     )
     .unwrap();
 
-    capture
-        .set_diagnostic_dma_axi_config(dma_profile)
-        .expect("DMA profile fields are in range");
-    let applied = capture.dma_axi_config();
+    let applied = dma_profile;
     println!(
         "dma-profile: name={} src_burst_len={} dst_burst_len={} src_outstanding={} dst_outstanding={}",
         dma_profile_name,
@@ -3757,50 +3786,48 @@ fn main() -> ! {
         CSI_IDF_DEFAULT_DATA_TYPE_MIN, CSI_IDF_DEFAULT_DATA_TYPE_MAX
     );
 
-    if mode.is_64k_block_mode() {
-        capture
-            .set_diagnostic_dma_transfer_bytes(INTERNAL_CAPTURE_BYTES)
-            .expect("64 KiB is 8-byte aligned and fits one DMA block");
-        MIPI_CSI_BRIDGE::regs()
-            .dmablk_size()
-            .write(|w| unsafe { w.dmablk_size().bits(INTERNAL_CAPTURE_BRIDGE_BURSTS) });
-    }
-    // A lone DISCARD does not end the wait, so the trace shows what follows it.
-    capture.enable_discard_continue_diagnostic();
-
-    let bridge_before_isp = capture.debug_snapshot();
+    let bridge_before_isp = debug_snapshot();
     if env_flag(option_env!("CSI_SKIP_ISP")) {
         assert!(!mode.isp_enabled(), "CSI_SKIP_ISP needs an ISP bypass mode");
         println!("isp-config: skipped (CSI_SKIP_ISP=1)");
     } else {
         configure_isp_like_idf(mode.isp_enabled());
     }
-    let bridge_after_isp = capture.debug_snapshot();
+    let bridge_after_isp = debug_snapshot();
     print_bridge_state_transition(&bridge_before_isp, &bridge_after_isp, "isp-init");
     if host_errors {
         unmask_csi_host_errors();
     }
     print_capture_plan(mode, &bridge_after_isp, allocation);
 
+    let stream_faults = env_flag(option_env!("CSI_STREAM_FAULTS"));
+    let use_async = env_flag(option_env!("CSI_ASYNC"));
+    assert!(!use_async || stream, "CSI_ASYNC needs CSI_STREAM");
+    let test = match repeat_frames {
+        _ if coexist && use_async => "csi_dsi_coexist_async",
+        _ if coexist => "csi_dsi_coexist",
+        Some(_) if use_async => "stream_async",
+        Some(_) if stream && stream_faults => "stream_faults",
+        Some(_) if stream => "stream",
+        Some(_) => "repeat",
+        None => "single_frame",
+    };
+    let mut failed_rounds = 0;
     let (capture, passed) = match repeat_frames {
         Some(frames) if stream => {
             let rounds: u32 = option_env!("CSI_FAULT_ROUNDS").map_or(1, |r| r.parse().unwrap());
             let (mut capture, mut passed) = (capture, true);
-            let mut failed_rounds = 0;
             for round in 0..rounds {
                 if rounds > 1 {
                     println!("fault-round[{round}]: start");
                 }
-                let (c, ok) = run_stream_capture(
-                    capture,
-                    &mut i2c,
-                    frames,
-                    test_pattern,
-                    quiet,
-                    lcd.as_mut(),
-                );
+                let (c, ok) = if use_async {
+                    run_async_stream_check(capture, &mut i2c, frames, lcd.as_mut())
+                } else {
+                    run_stream_capture(capture, &mut i2c, frames, test_pattern, quiet, lcd.as_mut())
+                };
                 capture = c;
-                let ok = if ok && env_flag(option_env!("CSI_STREAM_FAULTS")) {
+                let ok = if ok && stream_faults {
                     let (c, ok) = run_stream_fault_cases(capture, &mut i2c);
                     capture = c;
                     ok
@@ -3846,17 +3873,34 @@ fn main() -> ! {
             (capture, passed)
         }
     };
+    let summary = format!(
+        "mode={} completion={} frames={} failed_rounds={failed_rounds}",
+        mode.label(),
+        completion.label(),
+        repeat_frames.unwrap_or(1)
+    );
     if !passed {
+        qa_result(false, test, format_args!("{summary}"));
         panic!("{}: no valid aligned frame", mode.label());
     }
     println!("{}: PASS", mode.label());
 
     if let Some(lcd) = lcd {
-        if !coexistence_teardown(capture, lcd) {
-            panic!("COEXISTENCE RESULT: FAIL");
-        }
-        println!("COEXISTENCE RESULT: PASS");
+        let ok = coexistence_teardown(capture, lcd);
+        println!("COEXISTENCE RESULT: {}", if ok { "PASS" } else { "FAIL" });
+        qa_result(ok, test, format_args!("{summary}"));
+    } else {
+        drop(capture);
+        qa_result(true, test, format_args!("{summary}"));
     }
 
     loop {}
+}
+
+/// The last line of a run, printed only after every check.
+fn qa_result(pass: bool, test: &str, detail: core::fmt::Arguments<'_>) {
+    println!(
+        "QA_RESULT: {} test={test} {detail}",
+        if pass { "PASS" } else { "FAIL" }
+    );
 }

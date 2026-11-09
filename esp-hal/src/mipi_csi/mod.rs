@@ -15,10 +15,10 @@
 //!   fits one DMA block.
 //!
 //! Verified on hardware with an SC2336 sensor on the ESP32-P4 Function EV
-//! Board: 2 lanes at 288 Mbps, 1024 × 600 RAW8 at 30 fps into PSRAM, and
-//! 64 KiB blocks into internal memory, alone and while MIPI-DSI streams to a
-//! panel. 1 lane, other lane rates, other resolutions and other sensors use the
-//! same code but are not verified.
+//! Board: 2 lanes at 288 Mbps, 1024 × 600 RAW8 at 30 fps into PSRAM, alone and
+//! while MIPI-DSI streams to a panel. Buffers in internal memory, 1 lane,
+//! other lane rates, other resolutions and other sensors use the same code but
+//! are not verified.
 //!
 //! # Power
 //!
@@ -32,15 +32,30 @@
 //! PSRAM. The driver does the cache maintenance: it writes the buffer back
 //! before the DMA starts and invalidates it before handing it back.
 //!
+//! # Driver modes
+//!
+//! [`MipiCsi::with_dma`] returns a [`Blocking`] capture. [`CsiCapture::into_async`] converts it
+//! to [`Async`], which adds [`CsiStream::next_frame_async`]. The blocking methods work in both
+//! modes, and [`CsiCapture::into_blocking`] converts back.
+//!
 //! # Capture modes
 //!
 //! - Single frame: [`CsiCapture::receive`], [`CsiCapture::receive_with`] and
 //!   [`CsiCapture::receive_with_interrupt`] borrow the buffer for one frame and block until it
-//!   completes, fails or times out.
+//!   completes, fails or times out. There is no async single-frame capture.
 //! - Continuous: [`CsiCapture::into_stream`] takes two `'static` buffers. The DMA interrupt starts
-//!   each frame on the other buffer, and [`CsiStream::next_frame`] hands out the newest completed
-//!   frame, which the DMA does not write while the [`StreamFrame`] lives. `next_frame` waits by
-//!   polling, there is no async interface yet.
+//!   each frame on the other buffer and hands out the newest completed frame as a [`StreamFrame`],
+//!   which the DMA does not write while it lives. [`CsiStream::next_frame`] polls for it with a
+//!   timeout. [`CsiStream::next_frame_async`] waits for the DMA interrupt instead, and dropping its
+//!   future leaves the stream unchanged.
+//!
+//! # Errors and timeouts
+//!
+//! The single-frame timeout is [`CaptureConfig::with_timeout`], and [`CsiStream::next_frame`] takes
+//! its own. [`CsiStream::next_frame_async`] has no timeout; combine it with a timer to bound the
+//! wait. A frame with a DMA error, a CSI host or bridge error, or a size other than the configured
+//! one is an error for a single-frame capture. A stream drops such a frame and switches the bridge
+//! off and on again, which [`StreamStats`] counts.
 //!
 //! # Shutdown
 //!
@@ -54,6 +69,14 @@
 //! - No RAW10, RAW12, YUV422 or RGB formats, and no ISP processing.
 //! - One frame per DMA block, so no frames larger than one block.
 //! - Embedded data and other non-image packets are not captured.
+//! - A source that stops in the middle of a frame leaves the CSI host waiting for that frame's end,
+//!   so the host reports a frame boundary or packet error at the next frame start. A single-frame
+//!   capture armed right then fails; let the source run for one frame first.
+//! - If the source stops in the middle of a frame while a stream runs, the stream can stall with
+//!   the bridge FIFO full and no DMA interrupt. [`CsiStream::next_frame`] then times out until the
+//!   stream is stopped and started again.
+//! - The bridge FIFO flush on every capture start uses the bridge soft reset, whose effect on the
+//!   FIFO the TRM does not describe. It was checked on hardware.
 //!
 //! # Example
 //!
@@ -86,12 +109,14 @@
 
 use core::{
     fmt,
+    marker::PhantomData,
     sync::atomic::{AtomicU8, AtomicU32, Ordering},
 };
 
 use procmacros::BuilderLite;
 pub use stream::{
     CsiStream,
+    IntoStreamError,
     STREAM_BUFFER_COUNT,
     StreamError,
     StreamFrame,
@@ -100,6 +125,9 @@ pub use stream::{
 };
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     dma::{DmaBufError, aligned::DmaAlignedMut},
     mipi_dphy_power::DphyPower,
     mipi_dw_gdma::{
@@ -126,16 +154,22 @@ use crate::{
 
 const MIN_LANE_RATE_MBPS: u16 = 90;
 const MAX_LANE_RATE_MBPS: u16 = 1500;
-// ESP-IDF `MIPI_CSI_BRG_MEM_BASE`. The neighboring `0x5010_5000` aperture is
-// the DSI bridge FIFO (`MIPI_DSI_BRG_MEM_BASE`), not CSI.
+// DMA read aperture of the CSI bridge FIFO. The TRM register map does not list
+// it; the address is ESP-IDF's `MIPI_CSI_BRG_MEM_BASE`:
+// <https://github.com/espressif/esp-idf/blob/v6.0/components/soc/esp32p4/register/hw_ver3/soc/reg_base.h#L169-L170>.
+// The next aperture, `0x5010_5000`, is the DSI bridge FIFO.
 const CSI_BRG_MEM_BASE: u32 = 0x5010_4000;
 const CSI_BRG_AFULL_THRESHOLD: u16 = 960;
 const CSI_RAW8_DATA_TYPE: u8 = 0x2A;
-// IDF CSI controller long-packet filter for YUV, RGB, and RAW capture.
+// Long-packet data types the bridge passes on: the YUV, RGB and RAW ranges of
+// the CSI-2 data type table. ESP-IDF uses the same filter:
+// <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_hal_cam/mipi_csi_hal.c#L74-L75>.
 const CSI_DATA_TYPE_MIN: u8 = 0x12;
 const CSI_DATA_TYPE_MAX: u8 = 0x2F;
-// ISP bypass setup of IDF `esp_isp_new_processor`: 80 MHz from PLL_F240M, CSI
-// input, register changes applied at the next vsync.
+// The bridge only receives data through a clocked ISP, so a bypassed ISP still
+// gets an 80 MHz clock from PLL_F240M, the CSI input and register updates at
+// the next vsync, as in ESP-IDF's processor setup:
+// <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_isp/src/isp_core.c#L116-L178>.
 const ISP_CLK_SRC_PLL_F240M: u8 = 1;
 const ISP_CLK_DIV_80MHZ: u8 = 2;
 const ISP_IN_SRC_CSI: u8 = 0;
@@ -156,11 +190,6 @@ const DW_GDMA_HW_HANDSHAKE_PERIPH_CSI: u8 = 1;
 const DMA_CHANNEL_DISABLE_TIMEOUT_MS: u64 = 50;
 const DMA_CHANNEL_SUSPEND_TIMEOUT_MS: u64 = 5;
 const DMA_CHANNEL_ABORT_TIMEOUT_MS: u64 = 5;
-const CAPTURE_RUNTIME_SAMPLE_COUNT: usize = 4;
-const CAPTURE_RUNTIME_SAMPLE_INTERVAL_MS: u64 = 25;
-const CAPTURE_TRACE_CAPACITY: usize = 32;
-const CAPTURE_TRACE_SHUTDOWN_ENTRIES: usize = 3;
-const CAPTURE_TRACE_STALL_US: u64 = 2_000;
 
 const DMA_STATUS_BLOCK_TRANSFER_DONE: u32 = 1 << 0;
 const DMA_STATUS_DMA_TRANSFER_DONE: u32 = 1 << 1;
@@ -203,7 +232,6 @@ const DMA_STATUS_ENABLE_MASK: u32 = DMA_STATUS_BLOCK_TRANSFER_DONE
 const DMA_COMPLETION_INTERRUPT_MASK: u32 =
     DMA_STATUS_BLOCK_TRANSFER_DONE | DMA_STATUS_DMA_TRANSFER_DONE | DMA_STATUS_ERROR_MASK;
 const CSI_BRIDGE_INTERRUPT_MASK: u32 = 0x3F;
-const DISCARD_DIAG_DAR_SAMPLES: usize = 8;
 
 mod stream;
 
@@ -218,8 +246,9 @@ const fn csi_dma_channel_config(axi: DmaAxiConfig) -> ChannelConfig {
         // DW-GDMA HW handshake peripheral selector: CSI=1 (DSI=0, CSI=1, ISP=2).
         src_peripheral: DW_GDMA_HW_HANDSHAKE_PERIPH_CSI,
         dst_peripheral: 0,
-        // IDF configures the CSI bridge status aperture as source status-fetch
-        // address for this source-controlled P2M transfer path.
+        // The bridge is the flow controller and reports the source status from
+        // its FIFO aperture, as in ESP-IDF's channel setup:
+        // <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L189-L204>.
         src_status_fetch_addr: CSI_BRG_MEM_BASE,
         dst_status_fetch_addr: 0,
         priority: DW_GDMA_CHANNEL_PRIORITY,
@@ -231,8 +260,9 @@ const fn csi_dma_channel_config(axi: DmaAxiConfig) -> ChannelConfig {
 
 /// AXI burst lengths and outstanding-request limits of the CSI DMA channel.
 ///
-/// [`Self::DEFAULT`] is used unless a bring-up diagnostic replaces it with
-/// `CsiCapture::set_diagnostic_dma_axi_config`.
+/// [`CaptureConfig`] uses [`Self::DEFAULT`] unless
+/// [`CaptureConfig::with_dma_axi_config`] replaces it. Flow control, handshake,
+/// addressing, transfer width and burst items are fixed by the driver.
 #[instability::unstable]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -252,7 +282,9 @@ pub struct DmaAxiConfig {
 }
 
 impl DmaAxiConfig {
-    /// Settings of the ESP-IDF v6.1 CSI driver (`esp_cam_ctlr_csi.c`).
+    /// Settings of the ESP-IDF v6.0 CSI driver: 5 outstanding requests
+    /// ([channel](https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L189-L204)) and 16-beat bursts
+    /// ([transfer](https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L495-L511)) on both sides.
     ///
     /// On ESP32-P4 v3.2 with 250 MHz HEX PSRAM, the DMA stalls with these
     /// settings when it writes frames into PSRAM.
@@ -287,7 +319,7 @@ impl DmaAxiConfig {
     }
 }
 
-// IDF: MIPI_CSI_PHY_CLK_SRC_PLL_F20M
+// `PERI_CLK_CTRL03` selector value of the 20 MHz D-PHY configuration clock.
 const PHY_CFG_CLK_SRC_PLL_F20M: u8 = 0;
 
 /// Number of MIPI D-PHY data lanes.
@@ -439,6 +471,8 @@ pub struct CaptureConfig {
     pixel_format: CapturePixelFormat,
     /// Bounded timeout for blocking receive operations.
     timeout: Duration,
+    /// AXI burst lengths and outstanding-request limits of the DMA channel.
+    dma_axi_config: DmaAxiConfig,
 }
 
 impl Default for CaptureConfig {
@@ -448,6 +482,7 @@ impl Default for CaptureConfig {
             frame_height: 480,
             pixel_format: CapturePixelFormat::Raw8,
             timeout: Duration::from_millis(100),
+            dma_axi_config: DmaAxiConfig::DEFAULT,
         }
     }
 }
@@ -460,10 +495,14 @@ struct ValidatedCaptureConfig {
     transfer_size_units: u32,
     csi_data_type: u8,
     timeout: Duration,
+    dma_axi: DmaAxiConfig,
 }
 
 impl CaptureConfig {
     fn validate(self) -> Result<ValidatedCaptureConfig, CaptureConfigError> {
+        if !self.dma_axi_config.is_valid() {
+            return Err(CaptureConfigError::InvalidDmaAxiConfig);
+        }
         if self.frame_width == 0 || self.frame_height == 0 {
             return Err(CaptureConfigError::InvalidFrameDimensions);
         }
@@ -499,6 +538,7 @@ impl CaptureConfig {
             transfer_size_units,
             csi_data_type: self.pixel_format.csi_data_type(),
             timeout: self.timeout,
+            dma_axi: self.dma_axi_config,
         })
     }
 }
@@ -692,56 +732,6 @@ impl fmt::Display for ReceiveError {
 
 impl core::error::Error for ReceiveError {}
 
-/// D-PHY configuration clock source.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum PhyCfgClockSource {
-    /// PLL_F20M source.
-    PllF20m,
-    /// RC_FAST source.
-    RcFast,
-    /// PLL_F25M source.
-    PllF25m,
-    /// An unknown raw value in the source-select field.
-    Unknown(u8),
-}
-
-/// Readback of CSI initialization-related configuration registers.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ConfigReadback {
-    /// CSI HOST bus clock gate state (`soc_clk_ctrl1.csi_host_sys_clk_en`).
-    pub host_bus_clock_enabled: bool,
-    /// CSI BRIDGE bus clock gate state (`soc_clk_ctrl1.csi_brg_sys_clk_en`).
-    pub bridge_bus_clock_enabled: bool,
-    /// D-PHY configuration clock gate state (`peri_clk_ctrl03.mipi_csi_dphy_cfg_clk_en`).
-    pub phy_cfg_clock_enabled: bool,
-    /// D-PHY configuration clock source (`peri_clk_ctrl03.mipi_csi_dphy_clk_src_sel`).
-    pub phy_cfg_clock_source: PhyCfgClockSource,
-    /// Bridge-controlled CSI host clock-lane module state (`host_ctrl.csi_enableclk`).
-    pub bridge_internal_clock_enabled: bool,
-    /// CSI HOST reset state (`hp_rst_en0.rst_en_csi_host`).
-    pub host_bus_reset_asserted: bool,
-    /// CSI BRIDGE reset state (`hp_rst_en0.rst_en_csi_brg`).
-    pub bridge_bus_reset_asserted: bool,
-    /// CSI BRIDGE local reset state (`csi_en.csi_brig_rst`).
-    pub bridge_soft_reset_asserted: bool,
-    /// D-PHY shutdown state (`phy_shutdownz.phy_shutdownz`, active-low).
-    pub phy_shutdown_asserted: bool,
-    /// D-PHY reset state (`dphy_rstz.dphy_rstz`, active-low).
-    pub dphy_reset_asserted: bool,
-    /// CSI-2 controller reset state (`csi2_resetn.csi2_resetn`, active-low).
-    pub csi2_controller_reset_asserted: bool,
-    /// Configured active data-lane count (`n_lanes + 1`).
-    pub configured_data_lanes: u8,
-    /// CSI virtual-channel extension mode.
-    pub virtual_channel_extension_enabled: bool,
-    /// CSI host descrambling state.
-    pub scrambling_enabled: bool,
-    /// CSI bridge enable state (`csi_en.csi_brig_en`).
-    pub bridge_enabled: bool,
-}
-
 /// CSI host error interrupt summary status.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -824,438 +814,6 @@ impl BridgeEventStatus {
     }
 }
 
-/// Result of the temporary `DISCARD` diagnostic.
-///
-/// `dma_completed` means the programmed DW-GDMA block finished. That is not the
-/// same as a frame-aligned image: a startup `CSI_BRIG_DISCARD` means the block
-/// began on a partial frame, and this diagnostic does not re-arm the destination
-/// at the next frame boundary.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct DiscardContinueDiagnostic {
-    /// The diagnostic was explicitly enabled for this capture.
-    pub enabled: bool,
-    /// 1 if `CSI_BRIG_DISCARD` was raised during the capture.
-    ///
-    /// The bridge interrupt bits are not cleared while a transfer runs, so a
-    /// second discard in the same capture cannot be told apart from the first.
-    pub discard_count: u32,
-    /// A non-discard CSI/DMA failure ended the wait.
-    pub fatal_error_seen: bool,
-    /// The programmed DMA block reported completion.
-    pub dma_completed: bool,
-    /// DMA completed with no discard and no fatal bridge/host error.
-    ///
-    /// This stays false when any discard was counted. The bytes written after a
-    /// discarded fragment are not treated as one valid frame.
-    pub valid_complete_frame: bool,
-    /// `DAR` immediately after the DMA channel was armed.
-    pub dar_start: u32,
-    /// `DAR` at the end of the capture wait, before shutdown.
-    pub dar_end: u32,
-    /// Destination-address samples taken at start, during the wait, on discard, and at the end.
-    pub dar_samples: [Option<u32>; DISCARD_DIAG_DAR_SAMPLES],
-    /// `STATUS0` completed units at the end of the wait.
-    pub completed_transfer_units: u32,
-    /// Programmed block size in 64-bit units.
-    pub expected_transfer_units: u32,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct DiscardDiag {
-    armed: bool,
-    discard_latched: bool,
-    discard_count: u32,
-    fatal_error_seen: bool,
-    dma_completed: bool,
-    dar_start: u32,
-    dar_end: u32,
-    dar_samples: [Option<u32>; DISCARD_DIAG_DAR_SAMPLES],
-    completed_units: u32,
-}
-
-impl DiscardDiag {
-    const fn idle() -> Self {
-        Self {
-            armed: false,
-            discard_latched: false,
-            discard_count: 0,
-            fatal_error_seen: false,
-            dma_completed: false,
-            dar_start: 0,
-            dar_end: 0,
-            dar_samples: [None; DISCARD_DIAG_DAR_SAMPLES],
-            completed_units: 0,
-        }
-    }
-
-    fn reset_for_capture(&mut self, dar_start: u32) {
-        let armed = self.armed;
-        *self = Self::idle();
-        self.armed = armed;
-        self.dar_start = dar_start;
-        self.dar_end = dar_start;
-        if armed {
-            self.push_dar(dar_start);
-        }
-    }
-
-    fn push_dar(&mut self, dar: u32) {
-        if self
-            .dar_samples
-            .iter()
-            .flatten()
-            .next_back()
-            .is_some_and(|previous| *previous == dar)
-        {
-            return;
-        }
-        if let Some(slot) = self.dar_samples.iter_mut().find(|slot| slot.is_none()) {
-            *slot = Some(dar);
-        }
-    }
-}
-
-/// Runtime hardware status that is not just static configuration readback.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct HardwareStatus {
-    /// CSI host error summary.
-    pub host_errors: HostErrorStatus,
-    /// CSI bridge event summary.
-    pub bridge_events: BridgeEventStatus,
-}
-
-/// Full initialization diagnostics snapshot.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct InitDiagnostics {
-    /// Configuration register readback.
-    pub config: ConfigReadback,
-    /// Runtime status/event readback.
-    pub status: HardwareStatus,
-}
-
-/// Low-level CSI/DMA snapshot for hardware bring-up diagnostics.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CaptureDebugSnapshot {
-    /// Active VDMA channel id.
-    pub dma_channel_id: u8,
-    /// `MIPI_CSI_HOST.phy_stopstate`
-    pub host_phy_stopstate_raw: u32,
-    /// `MIPI_CSI_HOST.phy_rx`
-    pub host_phy_rx_raw: u32,
-    /// `MIPI_CSI_HOST.int_st_main`
-    pub host_int_st_main_raw: u32,
-    /// `MIPI_CSI_BRIDGE.csi_en`
-    pub bridge_csi_en_raw: u32,
-    /// `MIPI_CSI_BRIDGE.frame_cfg`
-    pub bridge_frame_cfg_raw: u32,
-    /// `MIPI_CSI_BRIDGE.data_type_cfg`
-    pub bridge_data_type_cfg_raw: u32,
-    /// `MIPI_CSI_BRIDGE.host_cm_ctrl`
-    pub bridge_host_cm_ctrl_raw: u32,
-    /// `MIPI_CSI_BRIDGE.buf_flow_ctl`
-    pub bridge_buf_flow_ctl_raw: u32,
-    /// `MIPI_CSI_BRIDGE.dma_req_cfg`
-    pub bridge_dma_req_cfg_raw: u32,
-    /// `MIPI_CSI_BRIDGE.dmablk_size`
-    pub bridge_dmablk_size_raw: u32,
-    /// `MIPI_CSI_BRIDGE.int_raw`
-    pub bridge_int_raw_raw: u32,
-    /// `MIPI_CSI_BRIDGE.int_st`
-    pub bridge_int_st_raw: u32,
-    /// `MIPI_CSI_BRIDGE.int_ena`
-    pub bridge_int_ena_raw: u32,
-    /// `VDMA.CHEN0`
-    pub dma_chen0_raw: u32,
-    /// `VDMA.CHEN1`
-    pub dma_chen1_raw: u32,
-    /// `VDMA.CFG0`
-    pub dma_controller_cfg0_raw: u32,
-    /// `VDMA.RESET0`
-    pub dma_controller_reset0_raw: u32,
-    /// `VDMA.LOWPOWER_CFG0`
-    pub dma_controller_lowpower_cfg0_raw: u32,
-    /// `VDMA.LOWPOWER_CFG1`
-    pub dma_controller_lowpower_cfg1_raw: u32,
-    /// `VDMA.CHx_CFG0`
-    pub dma_cfg0_raw: u32,
-    /// `VDMA.CHx_CFG1`
-    pub dma_cfg1_raw: u32,
-    /// `VDMA.CHx_CTL0`
-    pub dma_ctl0_raw: u32,
-    /// `VDMA.CHx_CTL1`
-    pub dma_ctl1_raw: u32,
-    /// `VDMA.CHx_SAR0`
-    pub dma_sar0_raw: u32,
-    /// `VDMA.CHx_DAR0`
-    pub dma_dar0_raw: u32,
-    /// `VDMA.CHx_BLOCK_TS0`
-    pub dma_block_ts0_raw: u32,
-    /// `VDMA.CHx_SSTATAR0`
-    pub dma_sstatar0_raw: u32,
-    /// `VDMA.CHx_DSTATAR0`
-    pub dma_dstatar0_raw: u32,
-    /// `VDMA.CHx_SSTAT0`
-    pub dma_sstat0_raw: u32,
-    /// `VDMA.CHx_DSTAT0`
-    pub dma_dstat0_raw: u32,
-    /// `VDMA.CHx_STATUS0`
-    pub dma_status0_raw: u32,
-    /// `VDMA.CHx_STATUS1`
-    pub dma_status1_raw: u32,
-    /// `VDMA.CHx_INTSTATUS_ENABLE0`
-    pub dma_intstatus_enable0_raw: u32,
-    /// `VDMA.CHx_INTSTATUS0`
-    pub dma_intstatus0_raw: u32,
-}
-
-/// Aggregated D-PHY runtime activity sampled during `receive`.
-///
-/// Sampling is performed inside the capture polling loop. `*_seen` flags are
-/// only updated for samples where both CSI bridge and DMA channel are enabled,
-/// so they reflect activity during an armed capture window.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CapturePhyActivitySummary {
-    /// Total number of loop samples.
-    pub sample_count: u32,
-    /// Samples where `csi_brig_en` and DMA channel-enable were both set.
-    pub active_sample_count: u32,
-    /// Samples where bridge-enable bit was set.
-    pub bridge_enabled_sample_count: u32,
-    /// Samples where DMA channel-enable bit was set.
-    pub dma_enabled_sample_count: u32,
-    /// Bitwise OR accumulation of `phy_stopstate`.
-    pub phy_stopstate_or_raw: u32,
-    /// Bitwise AND accumulation of `phy_stopstate`.
-    pub phy_stopstate_and_raw: u32,
-    /// Bitwise OR accumulation of `phy_rx`.
-    pub phy_rx_or_raw: u32,
-    /// Bitwise AND accumulation of `phy_rx`.
-    pub phy_rx_and_raw: u32,
-    /// Bridge FIFO depth was non-zero at least once during active capture.
-    pub bridge_buf_depth_nonzero_seen: bool,
-    /// Maximum observed bridge FIFO depth during active capture.
-    pub bridge_buf_depth_max: u16,
-    /// `phy_rx.rxclkactivehs` was observed set during active capture.
-    pub clkactivehs_seen: bool,
-    /// Data lane0 left stop-state during active capture.
-    pub data_lane0_left_stopstate_seen: bool,
-    /// Data lane1 left stop-state during active capture.
-    pub data_lane1_left_stopstate_seen: bool,
-}
-
-impl CapturePhyActivitySummary {
-    const fn empty() -> Self {
-        Self {
-            sample_count: 0,
-            active_sample_count: 0,
-            bridge_enabled_sample_count: 0,
-            dma_enabled_sample_count: 0,
-            phy_stopstate_or_raw: 0,
-            phy_stopstate_and_raw: 0,
-            phy_rx_or_raw: 0,
-            phy_rx_and_raw: 0,
-            bridge_buf_depth_nonzero_seen: false,
-            bridge_buf_depth_max: 0,
-            clkactivehs_seen: false,
-            data_lane0_left_stopstate_seen: false,
-            data_lane1_left_stopstate_seen: false,
-        }
-    }
-
-    #[expect(clippy::too_many_arguments)]
-    fn record_sample(
-        &mut self,
-        phy_stopstate_raw: u32,
-        phy_rx_raw: u32,
-        bridge_enabled: bool,
-        dma_enabled: bool,
-        bridge_buf_depth: u16,
-        clkactivehs: bool,
-        data_lane0_stopstate: bool,
-        data_lane1_stopstate: bool,
-    ) {
-        if self.sample_count == 0 {
-            self.phy_stopstate_or_raw = phy_stopstate_raw;
-            self.phy_stopstate_and_raw = phy_stopstate_raw;
-            self.phy_rx_or_raw = phy_rx_raw;
-            self.phy_rx_and_raw = phy_rx_raw;
-        } else {
-            self.phy_stopstate_or_raw |= phy_stopstate_raw;
-            self.phy_stopstate_and_raw &= phy_stopstate_raw;
-            self.phy_rx_or_raw |= phy_rx_raw;
-            self.phy_rx_and_raw &= phy_rx_raw;
-        }
-
-        self.sample_count = self.sample_count.saturating_add(1);
-        if bridge_enabled {
-            self.bridge_enabled_sample_count = self.bridge_enabled_sample_count.saturating_add(1);
-        }
-        if dma_enabled {
-            self.dma_enabled_sample_count = self.dma_enabled_sample_count.saturating_add(1);
-        }
-
-        if bridge_enabled && dma_enabled {
-            self.active_sample_count = self.active_sample_count.saturating_add(1);
-            self.bridge_buf_depth_nonzero_seen |= bridge_buf_depth != 0;
-            self.bridge_buf_depth_max = self.bridge_buf_depth_max.max(bridge_buf_depth);
-            self.clkactivehs_seen |= clkactivehs;
-            self.data_lane0_left_stopstate_seen |= !data_lane0_stopstate;
-            self.data_lane1_left_stopstate_seen |= !data_lane1_stopstate;
-        }
-    }
-}
-
-/// Reason a `CaptureTraceEntry` was recorded.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum CaptureTraceEvent {
-    /// The DMA channel and the CSI bridge were enabled.
-    Armed,
-    /// The `start_source` callback of [`CsiCapture::receive_with`] returned.
-    SourceStarted,
-    /// The DMA destination address moved for the first time.
-    FirstData,
-    /// New bits were set in the bridge `int_raw` register.
-    BridgeEvent,
-    /// New bits were set in the channel `INTSTATUS0` register.
-    DmaEvent,
-    /// The destination address stopped moving for at least 2 ms.
-    Stalled,
-    /// The destination address moved again after a stall.
-    Resumed,
-    /// The wait for the frame ended, before shutdown.
-    WaitEnded,
-    /// `CH_EN` read back clear after the channel was disabled.
-    ChannelDisabled,
-    /// The channel only stopped after suspend and abort.
-    ChannelAborted,
-    /// The channel could not be shown to be stopped.
-    ShutdownFailed,
-    /// The CSI bridge was disabled after the channel stop attempt.
-    BridgeDisabled,
-}
-
-/// One entry of the capture timeline recorded by `receive`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CaptureTraceEntry {
-    /// Why this entry was recorded.
-    pub event: CaptureTraceEvent,
-    /// Microseconds since the channel was armed.
-    pub elapsed_us: u32,
-    /// `VDMA.CHx_DAR0`
-    pub dar: u32,
-    /// `MIPI_CSI_BRIDGE.int_raw`
-    pub bridge_int_raw: u32,
-    /// `MIPI_CSI_BRIDGE.buf_flow_ctl.csi_buf_depth`, in 64-bit words.
-    pub bridge_fifo_depth: u16,
-    /// `VDMA.CHx_INTSTATUS0`
-    pub dma_intstatus: u32,
-    /// `CH_EN` of the capture channel.
-    pub dma_enabled: bool,
-    /// `CH_ABORT` of the capture channel is still set.
-    pub dma_abort_pending: bool,
-    /// `MIPI_CSI_HOST.phy_stopstate`
-    pub phy_stopstate: u32,
-}
-
-impl CaptureTraceEntry {
-    const EMPTY: Self = Self {
-        event: CaptureTraceEvent::Armed,
-        elapsed_us: 0,
-        dar: 0,
-        bridge_int_raw: 0,
-        bridge_fifo_depth: 0,
-        dma_intstatus: 0,
-        dma_enabled: false,
-        dma_abort_pending: false,
-        phy_stopstate: 0,
-    };
-}
-
-/// Bounded timeline of the previous `receive`.
-///
-/// Entries are only recorded when something changes, so a stalled transfer
-/// and a completed one both fit.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CaptureTrace {
-    entries: [CaptureTraceEntry; CAPTURE_TRACE_CAPACITY],
-    len: usize,
-    /// Entries that did not fit.
-    pub dropped: u32,
-    /// Destination address programmed for the capture.
-    pub dar_start: u32,
-    /// Number of iterations of the wait loop.
-    pub polls: u32,
-}
-
-impl CaptureTrace {
-    const fn empty() -> Self {
-        Self {
-            entries: [CaptureTraceEntry::EMPTY; CAPTURE_TRACE_CAPACITY],
-            len: 0,
-            dropped: 0,
-            dar_start: 0,
-            polls: 0,
-        }
-    }
-
-    /// Recorded entries, oldest first.
-    pub fn entries(&self) -> &[CaptureTraceEntry] {
-        &self.entries[..self.len]
-    }
-
-    fn push(&mut self, entry: CaptureTraceEntry) {
-        // Events recorded while waiting leave room for the ones recorded after
-        // the wait, which describe the shutdown.
-        let limit = match entry.event {
-            CaptureTraceEvent::WaitEnded
-            | CaptureTraceEvent::ChannelDisabled
-            | CaptureTraceEvent::ChannelAborted
-            | CaptureTraceEvent::ShutdownFailed
-            | CaptureTraceEvent::BridgeDisabled => CAPTURE_TRACE_CAPACITY,
-            _ => CAPTURE_TRACE_CAPACITY - CAPTURE_TRACE_SHUTDOWN_ENTRIES,
-        };
-        if self.len < limit {
-            self.entries[self.len] = entry;
-            self.len += 1;
-        } else {
-            self.dropped = self.dropped.saturating_add(1);
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct CaptureTraceRecorder {
-    armed_at: Instant,
-    last_dar: u32,
-    last_dar_change: Instant,
-    first_data_seen: bool,
-    stalled: bool,
-    last_bridge_int_raw: u32,
-    last_dma_intstatus: u32,
-}
-
-impl CaptureTraceRecorder {
-    const fn idle() -> Self {
-        Self {
-            armed_at: Instant::EPOCH,
-            last_dar: 0,
-            last_dar_change: Instant::EPOCH,
-            first_data_seen: false,
-            stalled: false,
-            last_bridge_int_raw: 0,
-            last_dma_intstatus: 0,
-        }
-    }
-}
-
 /// What the completion interrupt of the last
 /// [`CsiCapture::receive_with_interrupt`] observed.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1283,24 +841,36 @@ pub struct MipiCsi<'d> {
     _guard: GenericPeripheralGuard<{ Peripheral::MipiCsi as u8 }>,
 }
 
-/// Blocking single-frame CSI capture handle.
+/// CSI capture handle, with one VDMA channel configured for CSI
+/// peripheral-to-memory transfers.
 ///
-/// This owns one dedicated VDMA channel and keeps the channel configured for
-/// CSI peripheral-to-memory transfers.
-pub struct CsiCapture<'d> {
+/// [`MipiCsi::with_dma`] creates it in [`Blocking`] mode. [`Self::into_async`]
+/// converts it to [`Async`] mode, where [`CsiStream::next_frame_async`] is
+/// available. The blocking methods work in both modes.
+pub struct CsiCapture<'d, Dm: DriverMode = Blocking> {
+    // Dropped first, so the DMA channel stops before the clocks are gated.
+    _shutdown: CaptureShutdown,
     csi: MipiCsi<'d>,
     config: ValidatedCaptureConfig,
     dma_channel: DwGdmaChannel,
-    dma_axi: DmaAxiConfig,
     _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
     _owned_dma_channel: OwnedCsiDmaChannel<'d>,
-    runtime_samples: [Option<CaptureStatus>; CAPTURE_RUNTIME_SAMPLE_COUNT],
-    runtime_phy_activity: CapturePhyActivitySummary,
-    trace: CaptureTrace,
-    trace_recorder: CaptureTraceRecorder,
-    /// Temporary bring-up switch. Default `armed = false` keeps `DISCARD` fatal.
-    discard_diag: DiscardDiag,
     completion_interrupt: CompletionInterruptReport,
+    _mode: PhantomData<Dm>,
+}
+
+/// Stops the capture channel and the ISP bypass when a [`CsiCapture`] is
+/// dropped.
+struct CaptureShutdown(DwGdmaChannel);
+
+impl Drop for CaptureShutdown {
+    fn drop(&mut self) {
+        if let Err(reason) = stop_transfer(self.0) {
+            panic!("mipi-csi DMA shutdown failed in Drop: {:?}", reason);
+        }
+        clear_transfer_status(self.0);
+        disable_isp_bypass();
+    }
 }
 
 impl<'d> MipiCsi<'d> {
@@ -1324,9 +894,10 @@ impl<'d> MipiCsi<'d> {
         };
 
         this.init_phy_cfg_clock();
-        // Bridge host clocks must be running before the D-PHY test-interface
-        // write. IDF claims the bridge, and enables `csi_enableclk`, before
-        // `mipi_csi_hal_init`.
+        // The D-PHY test interface is clocked through the bridge
+        // (`csi_enableclk`), so the bridge clocks must run before the host
+        // setup writes it. ESP-IDF also claims the bridge first:
+        // <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L124-L136>.
         this.prepare_bridge();
         this.init_host(config);
 
@@ -1339,7 +910,7 @@ impl<'d> MipiCsi<'d> {
         self,
         channel: impl CsiDmaChannel + 'd,
         config: CaptureConfig,
-    ) -> Result<CsiCapture<'d>, CaptureConfigError> {
+    ) -> Result<CsiCapture<'d, Blocking>, CaptureConfigError> {
         let config = config.validate()?;
         let (owned_dma_channel, channel_id) = take_owned_csi_dma_channel(channel);
 
@@ -1348,95 +919,37 @@ impl<'d> MipiCsi<'d> {
 
         let dma_channel = DwGdmaChannel::new(channel_id);
         dma_channel.set_enabled(false);
-        dma_channel.configure(csi_dma_channel_config(DmaAxiConfig::DEFAULT));
+        dma_channel.configure(csi_dma_channel_config(config.dma_axi));
         dma_channel.set_interrupt_status_enable(DMA_STATUS_ENABLE_MASK);
         dma_channel.set_interrupt_signal_enable(0);
         dma_channel.clear_all_interrupts();
 
         self.configure_bridge_capture(config);
-        self.clear_bridge_interrupts();
+        clear_bridge_interrupts();
         enable_isp_bypass(config);
 
         Ok(CsiCapture {
+            _shutdown: CaptureShutdown(dma_channel),
             csi: self,
             config,
             dma_channel,
-            dma_axi: DmaAxiConfig::DEFAULT,
             _vdma_guard: vdma_guard,
             _owned_dma_channel: owned_dma_channel,
-            runtime_samples: [None; CAPTURE_RUNTIME_SAMPLE_COUNT],
-            runtime_phy_activity: CapturePhyActivitySummary::empty(),
-            trace: CaptureTrace::empty(),
-            trace_recorder: CaptureTraceRecorder::idle(),
-            discard_diag: DiscardDiag::idle(),
             completion_interrupt: CompletionInterruptReport::default(),
+            _mode: PhantomData,
         })
     }
 
-    /// Returns a readback snapshot of initialization-related CSI state.
-    ///
-    /// Register readback is useful to verify software configuration, but it
-    /// does not prove a working MIPI CSI physical link.
-    pub fn init_diagnostics(&self) -> InitDiagnostics {
-        let host = MIPI_CSI_HOST::regs();
-        let bridge = MIPI_CSI_BRIDGE::regs();
-        let clkrst = HP_SYS_CLKRST::regs();
-
-        let host_clk = clkrst.soc_clk_ctrl1().read();
-        let rst = clkrst.hp_rst_en0().read();
-        let phy_cfg_clk = clkrst.peri_clk_ctrl03().read();
-        let bridge_csi_en = bridge.csi_en().read();
-
-        let phy_cfg_clock_source = match phy_cfg_clk.mipi_csi_dphy_clk_src_sel().bits() {
-            0 => PhyCfgClockSource::PllF20m,
-            1 => PhyCfgClockSource::RcFast,
-            2 => PhyCfgClockSource::PllF25m,
-            other => PhyCfgClockSource::Unknown(other),
-        };
-
-        InitDiagnostics {
-            config: ConfigReadback {
-                host_bus_clock_enabled: host_clk.csi_host_sys_clk_en().bit_is_set(),
-                bridge_bus_clock_enabled: host_clk.csi_brg_sys_clk_en().bit_is_set(),
-                phy_cfg_clock_enabled: phy_cfg_clk.mipi_csi_dphy_cfg_clk_en().bit_is_set(),
-                phy_cfg_clock_source,
-                bridge_internal_clock_enabled: bridge
-                    .host_ctrl()
-                    .read()
-                    .csi_enableclk()
-                    .bit_is_set(),
-                host_bus_reset_asserted: rst.rst_en_csi_host().bit_is_set(),
-                bridge_bus_reset_asserted: rst.rst_en_csi_brg().bit_is_set(),
-                bridge_soft_reset_asserted: bridge_csi_en.csi_brig_rst().bit_is_set(),
-                phy_shutdown_asserted: host.phy_shutdownz().read().phy_shutdownz().bit_is_clear(),
-                dphy_reset_asserted: host.dphy_rstz().read().dphy_rstz().bit_is_clear(),
-                csi2_controller_reset_asserted: host
-                    .csi2_resetn()
-                    .read()
-                    .csi2_resetn()
-                    .bit_is_clear(),
-                configured_data_lanes: host.n_lanes().read().n_lanes().bits() + 1,
-                virtual_channel_extension_enabled: host.vc_extension().read().vcx().bit_is_clear(),
-                scrambling_enabled: host.scrambling().read().scramble_enable().bit_is_set(),
-                bridge_enabled: bridge_csi_en.csi_brig_en().bit_is_set(),
-            },
-            status: HardwareStatus {
-                host_errors: self.read_host_error_status(),
-                bridge_events: self.read_bridge_event_status(),
-            },
-        }
-    }
-
     fn init_phy_cfg_clock(&self) {
-        // IDF `esp_clk_tree_enable_src(MIPI_CSI_PHY_CLK_SRC_PLL_F20M)` opens
-        // this gate before any D-PHY test-interface access. The P4 clock
-        // driver leaves `enable_pll_f20m` as a stub, so CSI has to do it.
+        // The 20 MHz PLL output gate must be open before any D-PHY
+        // test-interface access. The ESP32-P4 clock driver does not open it
+        // (`enable_pll_f20m` is a stub), so this driver does.
         HP_SYS_CLKRST::regs()
             .ref_clk_ctrl2()
             .modify(|_, w| w.ref_20m_clk_en().set_bit());
 
-        // Match IDF CSI LL default: select PLL_F20M for CSI D-PHY cfg clock,
-        // then pulse cfg-clk gate low -> high.
+        // Select the 20 MHz D-PHY configuration clock, then pulse its gate low
+        // and high, in ESP-IDF's order: <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L128-L136>.
         HP_SYS_CLKRST::regs()
             .peri_clk_ctrl03()
             .modify(|_, w| unsafe { w.mipi_csi_dphy_clk_src_sel().bits(PHY_CFG_CLK_SRC_PLL_F20M) });
@@ -1508,9 +1021,9 @@ impl<'d> MipiCsi<'d> {
             w.data_type_min().bits(CSI_DATA_TYPE_MIN);
             w.data_type_max().bits(CSI_DATA_TYPE_MAX)
         });
-        // Rev3 RAW8 path: enable the bridge color-mode block and bypass it
-        // when input and output formats match. IDF does this in
-        // `s_csi_ctlr_format_conversion` for every equal-format capture.
+        // Input and output formats are equal, so the bridge colour-mode block
+        // is enabled and bypassed, as ESP-IDF does for equal formats:
+        // <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L594-L601>.
         bridge.host_cm_ctrl().modify(|_, w| {
             w.csi_host_cm_en().set_bit();
             w.csi_host_cm_bypass().set_bit()
@@ -1520,33 +1033,16 @@ impl<'d> MipiCsi<'d> {
             w.hadr_num().bits(config.frame_width)
         });
         bridge.dma_req_cfg().modify(|_, w| unsafe {
-            // Keep bridge-side flow control (default=1) and use 512x64-bit
-            // request bursts to match Espressif's CSI reference driver setup.
+            // The bridge stays the flow controller (reset value) and requests
+            // bursts of 512 64-bit words, the DMA burst size of the channel.
+            // ESP-IDF sets the same: <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L185>.
             w.dma_burst_len().bits(512);
             w.dma_cfg_upd_by_blk().clear_bit();
             w.dma_force_rd_status().clear_bit();
             w.csi_dma_flow_controller().set_bit()
         });
-        // `int_ena` stays at its reset value of 0, as in IDF, which never
-        // writes the bridge interrupt registers. Events are read from `int_raw`.
-    }
-
-    /// Clears the bridge event bits. Only called while the bridge is disabled.
-    fn clear_bridge_interrupts(&self) {
-        let bridge = MIPI_CSI_BRIDGE::regs();
-        unsafe {
-            bridge
-                .int_clr()
-                .write(|w| w.bits(CSI_BRIDGE_INTERRUPT_MASK))
-        };
-    }
-
-    fn read_host_error_status(&self) -> HostErrorStatus {
-        host_error_status()
-    }
-
-    fn read_bridge_event_status(&self) -> BridgeEventStatus {
-        bridge_event_status()
+        // `int_ena` stays at its reset value of 0: the bridge has no interrupt
+        // line of its own here, and events are read from `int_raw`.
     }
 
     fn shutdown(&self) {
@@ -1572,138 +1068,34 @@ impl<'d> MipiCsi<'d> {
     }
 }
 
-impl CsiCapture<'_> {
-    /// Returns a low-level CSI/DMA register snapshot for bring-up diagnostics.
-    pub fn debug_snapshot(&self) -> CaptureDebugSnapshot {
-        let host = MIPI_CSI_HOST::regs();
-        let bridge = MIPI_CSI_BRIDGE::regs();
-        let dma = self.dma_channel.debug_registers();
-
-        CaptureDebugSnapshot {
-            dma_channel_id: self._owned_dma_channel.channel_id(),
-            host_phy_stopstate_raw: host.phy_stopstate().read().bits(),
-            host_phy_rx_raw: host.phy_rx().read().bits(),
-            host_int_st_main_raw: host.int_st_main().read().bits(),
-            bridge_csi_en_raw: bridge.csi_en().read().bits(),
-            bridge_frame_cfg_raw: bridge.frame_cfg().read().bits(),
-            bridge_data_type_cfg_raw: bridge.data_type_cfg().read().bits(),
-            bridge_host_cm_ctrl_raw: bridge.host_cm_ctrl().read().bits(),
-            bridge_buf_flow_ctl_raw: bridge.buf_flow_ctl().read().bits(),
-            bridge_dma_req_cfg_raw: bridge.dma_req_cfg().read().bits(),
-            bridge_dmablk_size_raw: bridge.dmablk_size().read().bits(),
-            bridge_int_raw_raw: bridge.int_raw().read().bits(),
-            bridge_int_st_raw: bridge.int_st().read().bits(),
-            bridge_int_ena_raw: bridge.int_ena().read().bits(),
-            dma_chen0_raw: dma.chen0,
-            dma_chen1_raw: dma.chen1,
-            dma_controller_cfg0_raw: dma.controller_cfg0,
-            dma_controller_reset0_raw: dma.controller_reset0,
-            dma_controller_lowpower_cfg0_raw: dma.controller_lowpower_cfg0,
-            dma_controller_lowpower_cfg1_raw: dma.controller_lowpower_cfg1,
-            dma_cfg0_raw: dma.cfg0,
-            dma_cfg1_raw: dma.cfg1,
-            dma_ctl0_raw: dma.ctl0,
-            dma_ctl1_raw: dma.ctl1,
-            dma_sar0_raw: dma.sar0,
-            dma_dar0_raw: dma.dar0,
-            dma_block_ts0_raw: dma.block_ts0,
-            dma_sstatar0_raw: dma.sstatar0,
-            dma_dstatar0_raw: dma.dstatar0,
-            dma_sstat0_raw: dma.sstat0,
-            dma_dstat0_raw: dma.dstat0,
-            dma_status0_raw: dma.status0,
-            dma_status1_raw: dma.status1,
-            dma_intstatus_enable0_raw: dma.intstatus_enable0,
-            dma_intstatus0_raw: dma.intstatus0,
-        }
-    }
-
-    /// Returns periodic status samples collected during the previous `receive` call.
-    pub fn runtime_status_samples(&self) -> &[Option<CaptureStatus>] {
-        &self.runtime_samples
-    }
-
-    /// Returns aggregated D-PHY runtime activity from the previous `receive`.
-    pub fn runtime_phy_activity_summary(&self) -> CapturePhyActivitySummary {
-        self.runtime_phy_activity
-    }
-
-    /// Returns the timeline recorded during the previous `receive`.
-    pub fn capture_trace(&self) -> &CaptureTrace {
-        &self.trace
-    }
-
-    /// Overrides only the DMA block length used by the next `receive`.
+impl<'d> CsiCapture<'d, Blocking> {
+    /// Converts the capture to [`Async`] mode.
     ///
-    /// The CSI bridge pixel geometry programmed by `with_dma` is left unchanged.
-    /// `receive` refuses a buffer shorter than `bytes`, and the DW-GDMA block
-    /// size is this length, so the destination is not expected to advance past it.
-    pub fn set_diagnostic_dma_transfer_bytes(
-        &mut self,
-        bytes: usize,
-    ) -> Result<(), CaptureConfigError> {
-        if bytes == 0 || !bytes.is_multiple_of(8) {
-            return Err(CaptureConfigError::FrameSizeNotAlignedToTransferWidth);
-        }
-        let units = (bytes / 8) as u32;
-        if units > MAX_BLOCK_TRANSFER_SIZE_UNITS {
-            return Err(CaptureConfigError::FrameTooLargeForSingleDmaBlock);
-        }
-        self.config.frame_bytes = bytes;
-        self.config.transfer_size_units = units;
-        Ok(())
+    /// [`CsiStream::next_frame_async`] is woken from the shared VDMA
+    /// interrupt, which the first VDMA driver to need it binds on its core.
+    pub fn into_async(self) -> CsiCapture<'d, Async> {
+        self.into_mode()
     }
+}
 
-    /// Replaces the [`DmaAxiConfig::DEFAULT`] AXI settings used by the next
-    /// `receive`.
-    ///
-    /// Flow control, handshake, addressing, transfer width and burst items stay
-    /// as ESP-IDF programs them.
-    pub fn set_diagnostic_dma_axi_config(
-        &mut self,
-        config: DmaAxiConfig,
-    ) -> Result<(), CaptureConfigError> {
-        if !config.is_valid() {
-            return Err(CaptureConfigError::InvalidDmaAxiConfig);
-        }
-        // `CFG1` may only be written while the channel is disabled. `receive`
-        // either leaves the channel stopped or panics.
-        debug_assert!(!self.dma_channel.is_enabled());
-        self.dma_axi = config;
-        self.dma_channel.configure(csi_dma_channel_config(config));
-        Ok(())
+impl<'d> CsiCapture<'d, Async> {
+    /// Converts the capture back to [`Blocking`] mode.
+    pub fn into_blocking(self) -> CsiCapture<'d, Blocking> {
+        self.into_mode()
     }
+}
 
-    /// Returns the AXI settings the next `receive` programs.
-    pub fn dma_axi_config(&self) -> DmaAxiConfig {
-        self.dma_axi
-    }
-
-    /// Enables the temporary diagnostic that continues after `CSI_BRIG_DISCARD`.
-    ///
-    /// Default capture behavior is unchanged until this is called. Overrun,
-    /// asynchronous-FIFO overflow, and vertical-count errors still stop the wait.
-    /// This does not resynchronize DMA to the next frame boundary.
-    pub fn enable_discard_continue_diagnostic(&mut self) {
-        self.discard_diag.armed = true;
-    }
-
-    /// Returns the last discard-continue diagnostic result.
-    pub fn discard_continue_diagnostic(&self) -> DiscardContinueDiagnostic {
-        DiscardContinueDiagnostic {
-            enabled: self.discard_diag.armed,
-            discard_count: self.discard_diag.discard_count,
-            fatal_error_seen: self.discard_diag.fatal_error_seen,
-            dma_completed: self.discard_diag.dma_completed,
-            valid_complete_frame: self.discard_diag.armed
-                && self.discard_diag.dma_completed
-                && self.discard_diag.discard_count == 0
-                && !self.discard_diag.fatal_error_seen,
-            dar_start: self.discard_diag.dar_start,
-            dar_end: self.discard_diag.dar_end,
-            dar_samples: self.discard_diag.dar_samples,
-            completed_transfer_units: self.discard_diag.completed_units,
-            expected_transfer_units: self.config.transfer_size_units,
+impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
+    fn into_mode<Dm2: DriverMode>(self) -> CsiCapture<'d, Dm2> {
+        CsiCapture {
+            _shutdown: self._shutdown,
+            csi: self.csi,
+            config: self.config,
+            dma_channel: self.dma_channel,
+            _vdma_guard: self._vdma_guard,
+            _owned_dma_channel: self._owned_dma_channel,
+            completion_interrupt: self.completion_interrupt,
+            _mode: PhantomData,
         }
     }
 
@@ -1725,10 +1117,9 @@ impl CsiCapture<'_> {
     /// Arms the DMA channel and the CSI bridge, calls `start_source`, then
     /// blocks until one frame completes or the timeout expires.
     ///
-    /// Espressif's esp-video framework enables the sensor stream only after the
-    /// CSI controller, the ISP and the DMA are running, so the bridge starts on
-    /// a frame boundary. Enable the sensor stream in `start_source` to follow
-    /// the same order. The timeout starts when `start_source` returns.
+    /// Enable the sensor stream in `start_source`: the DMA and the bridge are
+    /// armed by then, so the bridge sees the first frame from its start. The
+    /// timeout starts when `start_source` returns.
     ///
     /// # Panics
     ///
@@ -1798,24 +1189,14 @@ impl CsiCapture<'_> {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         dma_buffer.writeback();
 
-        reset_runtime_samples(self);
-        reset_runtime_phy_activity(self);
-
         let dst_start = dma_buffer.as_mut_ptr() as u32;
         self.clear_transfer_status();
         if wait == CompletionWait::Interrupt {
             self.arm_completion_interrupt();
         }
         self.start_transfer(dst_start);
-        trace_arm(self, dst_start);
-        let dar_at_arm = self.dma_channel.destination_address();
-        self.discard_diag.reset_for_capture(dar_at_arm);
 
         start_source();
-        trace_record(self, CaptureTraceEvent::SourceStarted);
-
-        let mut runtime_sampler = RuntimeSampler::new();
-        let mut poll_index: u32 = 0;
 
         let deadline = Instant::now() + self.config.timeout;
         if wait == CompletionWait::Interrupt {
@@ -1824,64 +1205,20 @@ impl CsiCapture<'_> {
             self.wait_for_completion_interrupt(deadline);
         }
         let outcome = loop {
-            sample_runtime_phy_activity(self);
             let status = self.capture_status();
-            maybe_record_runtime_sample(self, &mut runtime_sampler, status);
-            trace_poll(self, status);
-            poll_index = poll_index.wrapping_add(1);
-            if self.discard_diag.armed && poll_index.is_multiple_of(4096) {
-                let dar = self.dma_channel.destination_address();
-                self.discard_diag.push_dar(dar);
-            }
-
             if status.dma_status.any_error() {
-                self.discard_diag.fatal_error_seen = true;
                 break ReceiveOutcome::DmaError(status);
             }
-
             if status.csi_error() {
-                let fatal_bridge_error = status.host_errors.any_error()
-                    || status.bridge_events.vadr_num_gt
-                    || status.bridge_events.vadr_num_lt
-                    || status.bridge_events.csi_buf_overrun
-                    || status.bridge_events.csi_async_fifo_ovf;
-                // Diagnostic mode tolerates only a lone DISCARD. Any real bridge
-                // or host error still ends the wait, including when DISCARD is
-                // also set. The bit stays set in `int_raw` until the next capture.
-                if self.discard_diag.armed && !fatal_bridge_error {
-                    if !self.discard_diag.discard_latched {
-                        self.discard_diag.discard_count =
-                            self.discard_diag.discard_count.saturating_add(1);
-                        let dar = self.dma_channel.destination_address();
-                        self.discard_diag.push_dar(dar);
-                        self.discard_diag.discard_latched = true;
-                    }
-                } else {
-                    self.discard_diag.fatal_error_seen = true;
-                    break ReceiveOutcome::CsiError(status);
-                }
-            } else {
-                self.discard_diag.discard_latched = false;
+                break ReceiveOutcome::CsiError(status);
             }
-
             if status.dma_status.transfer_done() {
                 break ReceiveOutcome::Completed(status);
             }
-
             if Instant::now() > deadline {
                 break ReceiveOutcome::Timeout(status);
             }
         };
-        trace_record(self, CaptureTraceEvent::WaitEnded);
-
-        if self.discard_diag.armed {
-            let status = outcome.status();
-            let dar_end = self.dma_channel.destination_address();
-            self.discard_diag.dar_end = dar_end;
-            self.discard_diag.push_dar(dar_end);
-            self.discard_diag.dma_completed = matches!(outcome, ReceiveOutcome::Completed(_));
-            self.discard_diag.completed_units = status.dma_status.completed_transfer_units;
-        }
 
         if let Err(reason) = self.stop_transfer() {
             let status_before_shutdown = outcome.status();
@@ -1894,112 +1231,21 @@ impl CsiCapture<'_> {
             // definitely quiesced. If shutdown did not complete and the channel might still be
             // active, abort execution instead of returning a potentially writable buffer.
             if dma_may_still_be_active {
-                let debug = self.debug_snapshot();
-                let runtime_phy = self.runtime_phy_activity;
-                let last_runtime_sample =
-                    self.runtime_samples.iter().rev().flatten().next().copied();
-
-                if let Some(last) = last_runtime_sample {
-                    panic!(
-                        "mipi-csi DMA shutdown failed ({:?}); outcome={} before={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} after={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} runtime={{samples={},active_samples={},bridge_fifo_nonzero_seen={},bridge_fifo_max={},clkactivehs_seen={},lane0_left_stopstate_seen={},lane1_left_stopstate_seen={}}} last_sample={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} regs={{host_phy_stopstate=0x{:08x},host_phy_rx=0x{:08x},host_int_st_main=0x{:08x},bridge_buf_flow_ctl=0x{:08x},bridge_dma_req_cfg=0x{:08x},bridge_int_raw=0x{:08x},bridge_int_st=0x{:08x},bridge_int_ena=0x{:08x},dma_chen0=0x{:08x},dma_chen1=0x{:08x},dma_sar0=0x{:08x},dma_dar0=0x{:08x},dma_block_ts0=0x{:08x},dma_status0=0x{:08x},dma_status1=0x{:08x},dma_intstatus0=0x{:08x},dma_intstatus_enable0=0x{:08x}}} abort_in_progress_after_shutdown={} discard_diag={{armed={},count={},dar_start=0x{:08x},dar_end=0x{:08x}}} channel may still be active",
-                        reason,
-                        outcome.kind(),
-                        status_before_shutdown.host_errors.raw_main_status,
-                        status_before_shutdown.bridge_events.raw_status,
-                        status_before_shutdown.dma_status.raw_status,
-                        status_before_shutdown.dma_status.channel_enabled,
-                        status_before_shutdown.dma_status.completed_transfer_units,
-                        status_before_shutdown.dma_status.fifo_remaining_units,
-                        status_after_shutdown.host_errors.raw_main_status,
-                        status_after_shutdown.bridge_events.raw_status,
-                        status_after_shutdown.dma_status.raw_status,
-                        status_after_shutdown.dma_status.channel_enabled,
-                        status_after_shutdown.dma_status.completed_transfer_units,
-                        status_after_shutdown.dma_status.fifo_remaining_units,
-                        runtime_phy.sample_count,
-                        runtime_phy.active_sample_count,
-                        runtime_phy.bridge_buf_depth_nonzero_seen,
-                        runtime_phy.bridge_buf_depth_max,
-                        runtime_phy.clkactivehs_seen,
-                        runtime_phy.data_lane0_left_stopstate_seen,
-                        runtime_phy.data_lane1_left_stopstate_seen,
-                        last.host_errors.raw_main_status,
-                        last.bridge_events.raw_status,
-                        last.dma_status.raw_status,
-                        last.dma_status.channel_enabled,
-                        last.dma_status.completed_transfer_units,
-                        last.dma_status.fifo_remaining_units,
-                        debug.host_phy_stopstate_raw,
-                        debug.host_phy_rx_raw,
-                        debug.host_int_st_main_raw,
-                        debug.bridge_buf_flow_ctl_raw,
-                        debug.bridge_dma_req_cfg_raw,
-                        debug.bridge_int_raw_raw,
-                        debug.bridge_int_st_raw,
-                        debug.bridge_int_ena_raw,
-                        debug.dma_chen0_raw,
-                        debug.dma_chen1_raw,
-                        debug.dma_sar0_raw,
-                        debug.dma_dar0_raw,
-                        debug.dma_block_ts0_raw,
-                        debug.dma_status0_raw,
-                        debug.dma_status1_raw,
-                        debug.dma_intstatus0_raw,
-                        debug.dma_intstatus_enable0_raw,
-                        abort_in_progress_after_shutdown,
-                        self.discard_diag.armed,
-                        self.discard_diag.discard_count,
-                        self.discard_diag.dar_start,
-                        self.discard_diag.dar_end,
-                    );
-                } else {
-                    panic!(
-                        "mipi-csi DMA shutdown failed ({:?}); outcome={} before={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} after={{host=0x{:08x},bridge=0x{:08x},dma=0x{:08x},enabled={},units={},fifo_left={}}} runtime={{samples={},active_samples={},bridge_fifo_nonzero_seen={},bridge_fifo_max={},clkactivehs_seen={},lane0_left_stopstate_seen={},lane1_left_stopstate_seen={}}} regs={{host_phy_stopstate=0x{:08x},host_phy_rx=0x{:08x},host_int_st_main=0x{:08x},bridge_buf_flow_ctl=0x{:08x},bridge_dma_req_cfg=0x{:08x},bridge_int_raw=0x{:08x},bridge_int_st=0x{:08x},bridge_int_ena=0x{:08x},dma_chen0=0x{:08x},dma_chen1=0x{:08x},dma_sar0=0x{:08x},dma_dar0=0x{:08x},dma_block_ts0=0x{:08x},dma_status0=0x{:08x},dma_status1=0x{:08x},dma_intstatus0=0x{:08x},dma_intstatus_enable0=0x{:08x}}} abort_in_progress_after_shutdown={} discard_diag={{armed={},count={},dar_start=0x{:08x},dar_end=0x{:08x}}} no_runtime_sample channel may still be active",
-                        reason,
-                        outcome.kind(),
-                        status_before_shutdown.host_errors.raw_main_status,
-                        status_before_shutdown.bridge_events.raw_status,
-                        status_before_shutdown.dma_status.raw_status,
-                        status_before_shutdown.dma_status.channel_enabled,
-                        status_before_shutdown.dma_status.completed_transfer_units,
-                        status_before_shutdown.dma_status.fifo_remaining_units,
-                        status_after_shutdown.host_errors.raw_main_status,
-                        status_after_shutdown.bridge_events.raw_status,
-                        status_after_shutdown.dma_status.raw_status,
-                        status_after_shutdown.dma_status.channel_enabled,
-                        status_after_shutdown.dma_status.completed_transfer_units,
-                        status_after_shutdown.dma_status.fifo_remaining_units,
-                        runtime_phy.sample_count,
-                        runtime_phy.active_sample_count,
-                        runtime_phy.bridge_buf_depth_nonzero_seen,
-                        runtime_phy.bridge_buf_depth_max,
-                        runtime_phy.clkactivehs_seen,
-                        runtime_phy.data_lane0_left_stopstate_seen,
-                        runtime_phy.data_lane1_left_stopstate_seen,
-                        debug.host_phy_stopstate_raw,
-                        debug.host_phy_rx_raw,
-                        debug.host_int_st_main_raw,
-                        debug.bridge_buf_flow_ctl_raw,
-                        debug.bridge_dma_req_cfg_raw,
-                        debug.bridge_int_raw_raw,
-                        debug.bridge_int_st_raw,
-                        debug.bridge_int_ena_raw,
-                        debug.dma_chen0_raw,
-                        debug.dma_chen1_raw,
-                        debug.dma_sar0_raw,
-                        debug.dma_dar0_raw,
-                        debug.dma_block_ts0_raw,
-                        debug.dma_status0_raw,
-                        debug.dma_status1_raw,
-                        debug.dma_intstatus0_raw,
-                        debug.dma_intstatus_enable0_raw,
-                        abort_in_progress_after_shutdown,
-                        self.discard_diag.armed,
-                        self.discard_diag.discard_count,
-                        self.discard_diag.dar_start,
-                        self.discard_diag.dar_end,
-                    );
-                }
+                let dma = self.dma_channel;
+                panic!(
+                    "mipi-csi DMA shutdown failed ({:?}) after {}, the channel may still be active: before={:?} after={:?} abort_in_progress={} dar=0x{:08x} bridge_fifo_words={}",
+                    reason,
+                    outcome.kind(),
+                    status_before_shutdown,
+                    status_after_shutdown,
+                    abort_in_progress_after_shutdown,
+                    dma.destination_address(),
+                    MIPI_CSI_BRIDGE::regs()
+                        .buf_flow_ctl()
+                        .read()
+                        .csi_buf_depth()
+                        .bits(),
+                );
             }
 
             self.check_destination_bounds(dst_start, buffer_len);
@@ -2094,7 +1340,7 @@ impl CsiCapture<'_> {
                 ll_pointer_master: LlPointerMasterSelect::Peripheral,
                 addr_inc_mode: AddressIncrementMode::Fixed,
                 burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
-                axi_burst_len: self.dma_axi.src_burst_len,
+                axi_burst_len: self.config.dma_axi.src_burst_len,
                 width: DW_GDMA_WIDTH_64_BITS,
             },
             dst: BlockTransferEndpointConfig {
@@ -2102,58 +1348,18 @@ impl CsiCapture<'_> {
                 ll_pointer_master: LlPointerMasterSelect::Memory,
                 addr_inc_mode: AddressIncrementMode::Increment,
                 burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
-                axi_burst_len: self.dma_axi.dst_burst_len,
+                axi_burst_len: self.config.dma_axi.dst_burst_len,
                 width: DW_GDMA_WIDTH_64_BITS,
             },
             transfer_size_in_units: self.config.transfer_size_units,
-            // Match IDF contiguous-transfer path, which relies on DMA
-            // transfer-done status instead of block-marker interrupts.
+            // One contiguous block per frame. The transfer-done status ends
+            // it, so no block-done interrupt is needed.
             interrupt_on_block_done: false,
         }
     }
 
-    /// Stops the capture in the order of TRM §42.7.2: the DMA channel first,
-    /// then the bridge.
     fn stop_transfer(&mut self) -> Result<(), ShutdownFailureReason> {
-        let result = self.stop_dma_channel();
-        MIPI_CSI_BRIDGE::regs()
-            .csi_en()
-            .modify(|_, w| w.csi_brig_en().clear_bit());
-        trace_record(self, CaptureTraceEvent::BridgeDisabled);
-        result
-    }
-
-    fn stop_dma_channel(&mut self) -> Result<(), ShutdownFailureReason> {
-        let channel = self.dma_channel;
-        if !channel.is_enabled() {
-            return Ok(());
-        }
-
-        // TRM §7.5.7.2: the channel halts only after the source reads it has
-        // already issued complete. The bridge serves those reads, so it must
-        // stay enabled until `CH_EN` reads back clear.
-        channel.set_enabled(false);
-        if wait_until(DMA_CHANNEL_DISABLE_TIMEOUT_MS, || !channel.is_enabled()) {
-            trace_record(self, CaptureTraceEvent::ChannelDisabled);
-            return Ok(());
-        }
-
-        // TRM §7.5.6: suspend halts the source the same way and reports
-        // `CH_SUSPENDED`. Abort is the last resort for a hung channel.
-        channel.set_suspended(true);
-        wait_until(DMA_CHANNEL_SUSPEND_TIMEOUT_MS, || {
-            !channel.is_enabled() || channel.interrupt_status() & DMA_STATUS_CH_SUSPENDED != 0
-        });
-        channel.trigger_abort();
-        if wait_until(DMA_CHANNEL_ABORT_TIMEOUT_MS, || {
-            !channel.is_enabled() && !channel.abort_in_progress()
-        }) {
-            trace_record(self, CaptureTraceEvent::ChannelAborted);
-            Ok(())
-        } else {
-            trace_record(self, CaptureTraceEvent::ShutdownFailed);
-            Err(ShutdownFailureReason::AbortTimedOut)
-        }
+        stop_transfer(self.dma_channel)
     }
 
     /// Returns the number of bytes the stopped channel wrote from `dst_start`.
@@ -2176,14 +1382,13 @@ impl CsiCapture<'_> {
     }
 
     fn clear_transfer_status(&self) {
-        self.dma_channel.clear_all_interrupts();
-        self.csi.clear_bridge_interrupts();
+        clear_transfer_status(self.dma_channel);
     }
 
     fn capture_status(&self) -> CaptureStatus {
         CaptureStatus {
-            host_errors: self.csi.read_host_error_status(),
-            bridge_events: self.csi.read_bridge_event_status(),
+            host_errors: host_error_status(),
+            bridge_events: bridge_event_status(),
             dma_status: DmaStatus {
                 raw_status: self.dma_channel.interrupt_status(),
                 channel_enabled: self.dma_channel.is_enabled(),
@@ -2191,146 +1396,6 @@ impl CsiCapture<'_> {
                 fifo_remaining_units: self.dma_channel.fifo_remaining_units(),
             },
         }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct RuntimeSampler {
-    next_index: usize,
-    next_sample_deadline: Instant,
-}
-
-impl RuntimeSampler {
-    fn new() -> Self {
-        Self {
-            next_index: 0,
-            next_sample_deadline: Instant::now()
-                + Duration::from_millis(CAPTURE_RUNTIME_SAMPLE_INTERVAL_MS),
-        }
-    }
-}
-
-fn reset_runtime_samples(capture: &mut CsiCapture<'_>) {
-    capture.runtime_samples = [None; CAPTURE_RUNTIME_SAMPLE_COUNT];
-}
-
-fn maybe_record_runtime_sample(
-    capture: &mut CsiCapture<'_>,
-    sampler: &mut RuntimeSampler,
-    status: CaptureStatus,
-) {
-    if sampler.next_index >= CAPTURE_RUNTIME_SAMPLE_COUNT {
-        return;
-    }
-
-    if Instant::now() < sampler.next_sample_deadline {
-        return;
-    }
-
-    capture.runtime_samples[sampler.next_index] = Some(status);
-    sampler.next_index += 1;
-    sampler.next_sample_deadline =
-        Instant::now() + Duration::from_millis(CAPTURE_RUNTIME_SAMPLE_INTERVAL_MS);
-}
-
-fn reset_runtime_phy_activity(capture: &mut CsiCapture<'_>) {
-    capture.runtime_phy_activity = CapturePhyActivitySummary::empty();
-}
-
-fn sample_runtime_phy_activity(capture: &mut CsiCapture<'_>) {
-    let host = MIPI_CSI_HOST::regs();
-    let bridge = MIPI_CSI_BRIDGE::regs();
-
-    let phy_stopstate = host.phy_stopstate().read();
-    let phy_rx = host.phy_rx().read();
-    let bridge_buf_depth = bridge.buf_flow_ctl().read().csi_buf_depth().bits();
-    let bridge_enabled = bridge.csi_en().read().csi_brig_en().bit_is_set();
-    let dma_enabled = capture.dma_channel.is_enabled();
-
-    capture.runtime_phy_activity.record_sample(
-        phy_stopstate.bits(),
-        phy_rx.bits(),
-        bridge_enabled,
-        dma_enabled,
-        bridge_buf_depth,
-        phy_rx.phy_rxclkactivehs().bit_is_set(),
-        phy_stopstate.phy_stopstatedata_0().bit_is_set(),
-        phy_stopstate.phy_stopstatedata_1().bit_is_set(),
-    );
-}
-
-fn trace_arm(capture: &mut CsiCapture<'_>, dar_start: u32) {
-    let now = Instant::now();
-    capture.trace = CaptureTrace::empty();
-    capture.trace.dar_start = dar_start;
-    capture.trace_recorder = CaptureTraceRecorder {
-        armed_at: now,
-        last_dar: dar_start,
-        last_dar_change: now,
-        ..CaptureTraceRecorder::idle()
-    };
-    trace_record(capture, CaptureTraceEvent::Armed);
-    let armed = capture.trace.entries()[0];
-    capture.trace_recorder.last_bridge_int_raw = armed.bridge_int_raw;
-    capture.trace_recorder.last_dma_intstatus = armed.dma_intstatus;
-}
-
-fn trace_record(capture: &mut CsiCapture<'_>, event: CaptureTraceEvent) {
-    let bridge = MIPI_CSI_BRIDGE::regs();
-    let channel = capture.dma_channel;
-    let entry = CaptureTraceEntry {
-        event,
-        elapsed_us: capture
-            .trace_recorder
-            .armed_at
-            .elapsed()
-            .as_micros()
-            .min(u32::MAX as u64) as u32,
-        dar: channel.destination_address(),
-        bridge_int_raw: bridge.int_raw().read().bits(),
-        bridge_fifo_depth: bridge.buf_flow_ctl().read().csi_buf_depth().bits(),
-        dma_intstatus: channel.interrupt_status(),
-        dma_enabled: channel.is_enabled(),
-        dma_abort_pending: channel.abort_in_progress(),
-        phy_stopstate: MIPI_CSI_HOST::regs().phy_stopstate().read().bits(),
-    };
-    capture.trace.push(entry);
-}
-
-fn trace_poll(capture: &mut CsiCapture<'_>, status: CaptureStatus) {
-    capture.trace.polls = capture.trace.polls.saturating_add(1);
-
-    let bridge_raw = status.bridge_events.raw_status;
-    if bridge_raw & !capture.trace_recorder.last_bridge_int_raw != 0 {
-        capture.trace_recorder.last_bridge_int_raw |= bridge_raw;
-        trace_record(capture, CaptureTraceEvent::BridgeEvent);
-    }
-
-    let dma_raw = status.dma_status.raw_status;
-    if dma_raw & !capture.trace_recorder.last_dma_intstatus != 0 {
-        capture.trace_recorder.last_dma_intstatus |= dma_raw;
-        trace_record(capture, CaptureTraceEvent::DmaEvent);
-    }
-
-    let dar = capture.dma_channel.destination_address();
-    let now = Instant::now();
-    let recorder = &mut capture.trace_recorder;
-    if dar != recorder.last_dar {
-        recorder.last_dar = dar;
-        recorder.last_dar_change = now;
-        if !recorder.first_data_seen {
-            recorder.first_data_seen = true;
-            trace_record(capture, CaptureTraceEvent::FirstData);
-        } else if recorder.stalled {
-            recorder.stalled = false;
-            trace_record(capture, CaptureTraceEvent::Resumed);
-        }
-    } else if recorder.first_data_seen
-        && !recorder.stalled
-        && (now - recorder.last_dar_change).as_micros() >= CAPTURE_TRACE_STALL_US
-    {
-        recorder.stalled = true;
-        trace_record(capture, CaptureTraceEvent::Stalled);
     }
 }
 
@@ -2418,14 +1483,65 @@ impl ReceiveOutcome {
     }
 }
 
-impl Drop for CsiCapture<'_> {
-    fn drop(&mut self) {
-        if let Err(reason) = self.stop_transfer() {
-            panic!("mipi-csi DMA shutdown failed in Drop: {:?}", reason);
-        }
-        self.clear_transfer_status();
-        disable_isp_bypass();
+/// Stops the capture in the order of TRM §42.7.2: the DMA channel first,
+/// then the bridge.
+fn stop_transfer(channel: DwGdmaChannel) -> Result<(), ShutdownFailureReason> {
+    let result = stop_dma_channel(channel);
+    MIPI_CSI_BRIDGE::regs()
+        .csi_en()
+        .modify(|_, w| w.csi_brig_en().clear_bit());
+    result
+}
+
+fn stop_dma_channel(channel: DwGdmaChannel) -> Result<(), ShutdownFailureReason> {
+    if !channel.is_enabled() {
+        return Ok(());
     }
+
+    // TRM §7.5.7.2: the channel halts only after the source reads it has
+    // already issued complete. The bridge serves those reads, so it must
+    // stay enabled until `CH_EN` reads back clear.
+    channel.set_enabled(false);
+    if wait_until(DMA_CHANNEL_DISABLE_TIMEOUT_MS, || !channel.is_enabled()) {
+        return Ok(());
+    }
+
+    // TRM §7.5.6: suspend halts the source the same way and reports
+    // `CH_SUSPENDED`. Abort is the last resort for a hung channel.
+    channel.set_suspended(true);
+    wait_until(DMA_CHANNEL_SUSPEND_TIMEOUT_MS, || {
+        !channel.is_enabled() || channel.interrupt_status() & DMA_STATUS_CH_SUSPENDED != 0
+    });
+    channel.trigger_abort();
+    if wait_until(DMA_CHANNEL_ABORT_TIMEOUT_MS, || {
+        !channel.is_enabled() && !channel.abort_in_progress()
+    }) {
+        Ok(())
+    } else {
+        Err(ShutdownFailureReason::AbortTimedOut)
+    }
+}
+
+fn clear_transfer_status(channel: DwGdmaChannel) {
+    channel.clear_all_interrupts();
+    clear_bridge_interrupts();
+    clear_host_errors();
+}
+
+/// Drops the host errors latched since the last read, for example the frame
+/// boundary error left by a source that stopped mid-frame. `INT_ST_MAIN`
+/// clears on read.
+fn clear_host_errors() {
+    MIPI_CSI_HOST::regs().int_st_main().read();
+}
+
+/// Clears the bridge event bits. Only called while the bridge is disabled.
+fn clear_bridge_interrupts() {
+    unsafe {
+        MIPI_CSI_BRIDGE::regs()
+            .int_clr()
+            .write(|w| w.bits(CSI_BRIDGE_INTERRUPT_MASK))
+    };
 }
 
 /// Drops what the bridge FIFO still holds of a frame that a stop cut short.
@@ -2447,8 +1563,7 @@ pub(super) fn flush_bridge_fifo() {
     bridge.csi_en().modify(|_, w| w.csi_brig_rst().clear_bit());
 }
 
-/// Passes the CSI input through the ISP unprocessed, as IDF
-/// `esp_isp_new_processor` does for a bypassed ISP. The bridge receives no
+/// Passes the CSI input through the ISP unprocessed. The bridge receives no
 /// data while the ISP clock or its MIPI input gate is off.
 fn enable_isp_bypass(config: ValidatedCaptureConfig) {
     let clkrst = HP_SYS_CLKRST::regs();
