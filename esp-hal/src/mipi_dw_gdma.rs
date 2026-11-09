@@ -172,8 +172,11 @@ pub(crate) type ChannelInterruptHandler = fn(channel: DwGdmaChannel, pending: u3
 
 static CHANNEL_HANDLERS: [AtomicPtr<()>; CHANNEL_COUNT] =
     [const { AtomicPtr::new(ptr::null_mut()) }; CHANNEL_COUNT];
-/// Bit `n` is set while the dispatcher runs the handler slot of channel `n`.
-static HANDLERS_RUNNING: AtomicU32 = AtomicU32::new(0);
+/// Number of dispatcher runs currently between reading a channel's pending
+/// sources and finishing with them. A count rather than a flag, so that it
+/// stays correct if [`Interrupt::DMA`] is ever serviced on both cores.
+static CHANNEL_DISPATCHES_IN_FLIGHT: [AtomicU32; CHANNEL_COUNT] =
+    [const { AtomicU32::new(0) }; CHANNEL_COUNT];
 static DISPATCHER_INSTALLED: AtomicBool = AtomicBool::new(false);
 
 /// Routes the pending interrupt sources of `channel` to `handler`.
@@ -205,11 +208,23 @@ pub(crate) fn register_channel_handler(channel: DwGdmaChannel, handler: ChannelI
 /// Must not be called from an interrupt handler that can preempt the
 /// dispatcher on the same core.
 pub(crate) fn unregister_channel_handler(channel: DwGdmaChannel) {
-    let bit = 1 << channel.channel_id;
-    CHANNEL_HANDLERS[channel.channel_id as usize].store(ptr::null_mut(), Ordering::SeqCst);
-    while HANDLERS_RUNNING.load(Ordering::SeqCst) & bit != 0 {
+    let index = channel.channel_id as usize;
+    CHANNEL_HANDLERS[index].store(ptr::null_mut(), Ordering::SeqCst);
+    while CHANNEL_DISPATCHES_IN_FLIGHT[index].load(Ordering::SeqCst) != 0 {
         core::hint::spin_loop();
     }
+}
+
+/// Returns whether `channel` can take interrupts through the dispatcher, that
+/// is, no handler is registered for it.
+///
+/// Whether something else rebound [`Interrupt::DMA`] is not checked:
+/// `interrupt::bound_handler` reads the vector table non-volatilely and was
+/// seen on hardware to return the link-time default after `bind_handler`.
+pub(crate) fn channel_interrupt_available(channel: DwGdmaChannel) -> bool {
+    CHANNEL_HANDLERS[channel.channel_id as usize]
+        .load(Ordering::SeqCst)
+        .is_null()
 }
 
 /// The only handler bound to [`Interrupt::DMA`].
@@ -222,26 +237,29 @@ pub(crate) fn unregister_channel_handler(channel: DwGdmaChannel) {
 #[crate::handler]
 fn channel_interrupt_dispatcher() {
     let regs = VDMA::regs();
-    for (channel_id, slot) in CHANNEL_HANDLERS.iter().enumerate() {
+    for (channel_id, (slot, in_flight)) in CHANNEL_HANDLERS
+        .iter()
+        .zip(CHANNEL_DISPATCHES_IN_FLIGHT.iter())
+        .enumerate()
+    {
+        // Counted before the registers are read: once `unregister` has seen 0,
+        // a later run reads the sources only after the owner masked them.
+        in_flight.fetch_add(1, Ordering::SeqCst);
         let ch = regs.ch(channel_id);
         let pending = ch.intstatus0().read().bits() & ch.intsignal_enable0().read().bits();
-        if pending == 0 {
-            continue;
+        if pending != 0 {
+            let handler = slot.load(Ordering::SeqCst);
+            if handler.is_null() {
+                ch.intsignal_enable0()
+                    .modify(|r, w| unsafe { w.bits(r.bits() & !pending) });
+            } else {
+                // SAFETY: non-null slots only ever hold a `ChannelInterruptHandler`.
+                let handler =
+                    unsafe { core::mem::transmute::<*mut (), ChannelInterruptHandler>(handler) };
+                handler(DwGdmaChannel::new(channel_id as u8), pending);
+            }
         }
-
-        let bit = 1 << channel_id;
-        HANDLERS_RUNNING.fetch_or(bit, Ordering::SeqCst);
-        let handler = slot.load(Ordering::SeqCst);
-        if handler.is_null() {
-            ch.intsignal_enable0()
-                .modify(|r, w| unsafe { w.bits(r.bits() & !pending) });
-        } else {
-            // SAFETY: non-null slots only ever hold a `ChannelInterruptHandler`.
-            let handler =
-                unsafe { core::mem::transmute::<*mut (), ChannelInterruptHandler>(handler) };
-            handler(DwGdmaChannel::new(channel_id as u8), pending);
-        }
-        HANDLERS_RUNNING.fetch_and(!bit, Ordering::SeqCst);
+        in_flight.fetch_sub(1, Ordering::SeqCst);
     }
 
     let common = regs.commonreg_intstatus0().read().bits()

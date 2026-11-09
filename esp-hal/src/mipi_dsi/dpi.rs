@@ -3,6 +3,7 @@
 use core::{
     marker::PhantomData,
     pin::Pin,
+    sync::atomic::{AtomicU32, Ordering},
     task::{Context, Poll},
 };
 
@@ -145,7 +146,12 @@ fn vdma_block_done_isr(channel: DwGdmaChannel, _pending: u32) {
 
         storage.writeback();
     });
+
+    DMA_INTERRUPTS.fetch_add(1, Ordering::Relaxed);
 }
+
+/// Runs of [`vdma_block_done_isr`] since the last `DsiDpi` was created.
+static DMA_INTERRUPTS: AtomicU32 = AtomicU32::new(0);
 
 // ── Async waker ───────────────────────────────────────────────────────────────
 
@@ -182,7 +188,9 @@ impl Drop for DsiDpi<'_> {
         let channel = VdmaChannel::from_channel_id(self._guard.vdma_channel_id);
         channel.set_block_done_interrupt(false);
         channel.stop();
-        unregister_channel_handler(DwGdmaChannel::new(self._guard.vdma_channel_id));
+        let dw_channel = DwGdmaChannel::new(self._guard.vdma_channel_id);
+        dw_channel.set_interrupt_signal_enable(0);
+        unregister_channel_handler(dw_channel);
 
         MIPI_DSI_BRIDGE::regs()
             .dpi_misc_config()
@@ -384,6 +392,7 @@ impl<'d> DsiDpi<'d> {
         // ── VDMA block-done interrupt ──────────────────────────────────────
         // Enable the block-transfer-done signal so the ISR fires after every
         // frame block and re-arms the consumed LLI.
+        DMA_INTERRUPTS.store(0, Ordering::Relaxed);
         register_channel_handler(DwGdmaChannel::new(vdma_channel_id), vdma_block_done_isr);
         VdmaChannel::from_channel_id(vdma_channel_id).set_block_done_interrupt(true);
 
@@ -446,6 +455,13 @@ impl<'d> DsiDpi<'d> {
         // The ISR will flush the cache, no need to do it here.
 
         self.current_fb = back;
+    }
+
+    /// Returns how often the VDMA channel's interrupt, which re-arms the
+    /// link-list ring, was handled since this handle was created. It only
+    /// advances while the DMA moves pixels. Wraps on overflow.
+    pub fn dma_interrupt_count(&self) -> u32 {
+        DMA_INTERRUPTS.load(Ordering::Relaxed)
     }
 
     /// Blocks until the DSI bridge signals the start of the next vertical blank.

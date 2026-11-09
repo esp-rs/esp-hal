@@ -58,6 +58,7 @@ use crate::{
         LlPointerMasterSelect,
         MAX_BLOCK_TRANSFER_SIZE_UNITS,
         asserted_interrupt_sources,
+        channel_interrupt_available,
         enable_controller,
         enabled_channels,
         register_channel_handler,
@@ -581,9 +582,10 @@ pub enum ReceiveError {
         /// Status sampled after shutdown failure.
         status_after_shutdown: CaptureStatus,
     },
-    /// [`CsiCapture::receive_with_interrupt`] did not arm, because another
-    /// user of the shared DW-GDMA interrupt line may be active. Nothing was
-    /// started and the buffer was not accessed.
+    /// [`CsiCapture::receive_with_interrupt`] did not arm, because the capture
+    /// channel already has a handler in the shared DW-GDMA interrupt
+    /// dispatcher. Nothing was started and the buffer was not accessed. The
+    /// fields describe the line at that point.
     InterruptUnavailable {
         /// Other VDMA channels with `CH_EN` set, one bit per channel.
         enabled_channels: u32,
@@ -615,7 +617,7 @@ impl fmt::Display for ReceiveError {
                 asserted_sources,
             } => write!(
                 f,
-                "DW-GDMA interrupt line in use (enabled channels 0x{enabled_channels:x}, asserted sources 0x{asserted_sources:x})"
+                "DW-GDMA interrupt unavailable for the capture channel (enabled channels 0x{enabled_channels:x}, asserted sources 0x{asserted_sources:x})"
             ),
         }
     }
@@ -1691,9 +1693,10 @@ impl CsiCapture<'_> {
     ///
     /// All VDMA channels share [`Interrupt::DMA`](crate::peripherals::Interrupt::DMA). Its handler
     /// hands each channel only its own interrupt sources, and this method only masks the
-    /// sources of the capture channel. It still returns
-    /// [`ReceiveError::InterruptUnavailable`] without starting anything if
-    /// another VDMA channel is enabled or already drives the line.
+    /// sources of the capture channel, so it can run while other VDMA
+    /// channels, such as a MIPI-DSI DPI stream, are active. It returns
+    /// [`ReceiveError::InterruptUnavailable`] without starting anything if the
+    /// capture channel already has a handler.
     ///
     /// # Panics
     ///
@@ -1967,13 +1970,11 @@ impl CsiCapture<'_> {
     }
 
     fn check_completion_interrupt_free(&self) -> Result<(), ReceiveError> {
-        let own = 1 << self.dma_channel.channel_id();
-        let enabled_channels = enabled_channels() & !own;
-        let asserted_sources = asserted_interrupt_sources() & !own;
-        if enabled_channels != 0 || asserted_sources != 0 {
+        if !channel_interrupt_available(self.dma_channel) {
+            let own = 1 << self.dma_channel.channel_id();
             return Err(ReceiveError::InterruptUnavailable {
-                enabled_channels,
-                asserted_sources,
+                enabled_channels: enabled_channels() & !own,
+                asserted_sources: asserted_interrupt_sources() & !own,
             });
         }
         Ok(())

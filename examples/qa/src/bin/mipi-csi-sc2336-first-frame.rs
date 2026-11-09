@@ -31,7 +31,12 @@
 //! - `CSI_COMPLETION`: `poll` (default) waits with `receive_with`, `interrupt` with
 //!   `receive_with_interrupt`. In interrupt mode a frame also fails if the channel's own DW-GDMA
 //!   completion interrupt did not end the wait.
-//% CHIP_FILTER: mipi_csi_driver_supported && i2c_master_driver_supported
+//! - `CSI_DSI_COEXIST=1`: with `CSI_REPEAT_FRAMES`, first start the `lcd-mipi-dsi` colour wheel on
+//!   the EK79007 panel (MIPI-DSI DPI on `VDMA_CH0`, LCD reset GPIO27, backlight GPIO26), then
+//!   capture on `VDMA_CH1` while it streams. A frame also fails if the DSI block-done counter did
+//!   not advance during its capture. At the end CSI and then DSI are dropped and their channels
+//!   checked.
+//% CHIP_FILTER: mipi_csi_driver_supported && mipi_dsi_driver_supported
 //% FEATURES: unstable
 
 #![no_std]
@@ -46,8 +51,10 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     Blocking,
+    clock::ll::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk},
     delay::Delay,
     dma::aligned::{DmaAlignedMut, InternalMemory},
+    gpio::{Level, Output, OutputConfig},
     i2c::{
         self,
         master::{Config as I2cConfig, I2c},
@@ -69,7 +76,22 @@ use esp_hal::{
         MipiCsi,
         ReceiveError,
     },
-    peripherals::{MIPI_CSI_BRIDGE, MIPI_CSI_HOST, PMU},
+    mipi_dsi::{
+        Config as DsiConfig,
+        DataLanes as DsiDataLanes,
+        MipiDsi,
+        dpi::{ColorFormat, DpiClockSource, DpiConfig, DsiDpi, FrameTiming},
+    },
+    peripherals::{
+        HP_SYS_CLKRST,
+        INTERRUPT_CORE0,
+        INTERRUPT_CORE1,
+        MIPI_CSI_BRIDGE,
+        MIPI_CSI_HOST,
+        MIPI_DSI_BRIDGE,
+        PMU,
+        VDMA,
+    },
     psram,
     time::{Duration, Rate},
 };
@@ -511,6 +533,351 @@ fn completion_interrupt_ok(
         );
     }
     ok
+}
+
+const LCD_H_ACTIVE: u32 = 1024;
+const LCD_V_ACTIVE: u32 = 600;
+const LCD_FB_BYTES: usize = LCD_H_ACTIVE as usize * LCD_V_ACTIVE as usize * 2;
+/// About six frames at the panel's 58.8 Hz.
+const LCD_VSYNC_TIMEOUT_MS: u64 = 100;
+const LCD_BASELINE_STEPS: u32 = 60;
+const LCD_TAIL_MS: u64 = 500;
+
+/// `CSI_DSI_COEXIST=1`: the EK79007 panel and colour wheel of `lcd-mipi-dsi`,
+/// streaming from PSRAM through MIPI-DSI DPI on `VDMA_CH0`.
+struct Lcd {
+    dpi: DsiDpi<'static>,
+    /// Start addresses of the two `LCD_FB_BYTES` frame buffers.
+    framebuffers: [usize; 2],
+    hue: u32,
+    vsync_timeouts: u32,
+    baseline_rate_per_ms_x10: u64,
+    capture_stats: LcdCaptureStats,
+    _reset: Output<'static>,
+    _backlight: Output<'static>,
+}
+
+/// DSI progress during CSI captures, from `DsiDpi::dma_interrupt_count`.
+#[derive(Clone, Copy, Default)]
+struct LcdCaptureStats {
+    irqs: u32,
+    min_irqs_per_capture: Option<u32>,
+    min_rate_per_ms_x10: Option<u64>,
+    captures_without_progress: u32,
+    captures_with_underrun: u32,
+}
+
+impl Lcd {
+    fn start(
+        dsi: esp_hal::peripherals::MIPI_DSI<'static>,
+        vdma_channel: esp_hal::peripherals::VDMA_CH0<'static>,
+        reset: esp_hal::peripherals::GPIO27<'static>,
+        backlight: esp_hal::peripherals::GPIO26<'static>,
+        delay: &Delay,
+    ) -> Self {
+        let mut reset = Output::new(reset, Level::Low, OutputConfig::default());
+        delay.delay_millis(10);
+        reset.set_high();
+        delay.delay_millis(120);
+        let backlight = Output::new(backlight, Level::High, OutputConfig::default());
+
+        let mut bus = MipiDsi::new(
+            dsi,
+            vdma_channel,
+            DsiConfig::default()
+                .with_num_data_lanes(DsiDataLanes::_2)
+                .with_lane_bit_rate_mbps(1000.0)
+                .with_phy_pll_refclk(MipiDsiPhyPllRefclkConfig::new(
+                    MipiDsiPhyPllRefclkSclk::Xtal,
+                    0,
+                ))
+                .with_force_clock_lane_hs(false),
+        )
+        .expect("MipiDsi init failed");
+        {
+            let mut dbi = bus.dbi(0);
+            for &(cmd, params) in EK79007_INIT {
+                dbi.write_cmd(cmd, params).unwrap();
+            }
+            dbi.write_cmd(0x11, &[]).unwrap();
+            delay.delay_millis(120);
+            dbi.write_cmd(0x29, &[]).unwrap();
+            delay.delay_millis(20);
+        }
+
+        let layout = Layout::from_size_align(LCD_FB_BYTES, PSRAM_DMA_ALIGNMENT).unwrap();
+        let allocate = || {
+            let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) };
+            assert!(!ptr.is_null(), "LCD frame buffer allocation failed");
+            unsafe { core::slice::from_raw_parts_mut(ptr, LCD_FB_BYTES) }
+        };
+        let fb1: &'static mut [u8] = allocate();
+        let fb2: &'static mut [u8] = allocate();
+        let framebuffers = [fb1.as_ptr() as usize, fb2.as_ptr() as usize];
+        let fbs: [&'static mut [u8]; 2] = [fb1, fb2];
+
+        let dpi = bus
+            .dpi(
+                DpiConfig {
+                    virtual_channel: 0,
+                    pixel_clock_mhz: 48.0,
+                    dpi_clk_src: DpiClockSource::PllF240m,
+                    in_color_format: ColorFormat::Rgb565,
+                    out_color_format: ColorFormat::Rgb565,
+                    timing: FrameTiming {
+                        h_active: LCD_H_ACTIVE,
+                        hsw: 10,
+                        hbp: 120,
+                        hfp: 120,
+                        v_active: LCD_V_ACTIVE,
+                        vsw: 1,
+                        vbp: 20,
+                        vfp: 20,
+                    },
+                },
+                &fbs,
+            )
+            .expect("DPI init failed");
+
+        Self {
+            dpi,
+            framebuffers,
+            hue: 0,
+            vsync_timeouts: 0,
+            baseline_rate_per_ms_x10: 0,
+            capture_stats: LcdCaptureStats::default(),
+            _reset: reset,
+            _backlight: backlight,
+        }
+    }
+
+    /// One colour-wheel step of `lcd-mipi-dsi`, with a bounded vsync wait.
+    fn render_step(&mut self) {
+        let bridge = MIPI_DSI_BRIDGE::regs();
+        let start = esp_hal::time::Instant::now();
+        while !bridge.int_raw().read().vsync().bit_is_set() {
+            if start.elapsed() > Duration::from_millis(LCD_VSYNC_TIMEOUT_MS) {
+                self.vsync_timeouts += 1;
+                break;
+            }
+        }
+        bridge.int_clr().write(|w| w.vsync().clear_bit_by_one());
+
+        let px = hue_to_rgb565(self.hue);
+        let w = px as u32 | (px as u32) << 16;
+        let c = w as u128 | (w as u128) << 32 | (w as u128) << 64 | (w as u128) << 96;
+        for chunk in self.dpi.framebuffer_mut().as_chunks_mut::<16>().0 {
+            *chunk = c.to_le_bytes();
+        }
+        self.dpi.commit();
+        self.hue = (self.hue + 1) % 360;
+    }
+
+    /// Renders the next step and starts measuring DSI progress for a capture.
+    fn before_capture(&mut self) -> (u32, esp_hal::time::Instant) {
+        self.render_step();
+        self.clear_underrun();
+        (
+            self.dpi.dma_interrupt_count(),
+            esp_hal::time::Instant::now(),
+        )
+    }
+
+    /// Returns the DSI DMA interrupts since [`Self::before_capture`], their
+    /// rate per millisecond times 10, and whether the bridge FIFO ran empty.
+    fn after_capture(
+        &mut self,
+        (irqs_before, start): (u32, esp_hal::time::Instant),
+    ) -> (u32, u64, bool) {
+        let irqs = self.dpi.dma_interrupt_count().wrapping_sub(irqs_before);
+        let rate_x10 = irqs as u64 * 10_000 / start.elapsed().as_micros().max(1);
+        let underrun = self.underrun_seen();
+        let stats = &mut self.capture_stats;
+        stats.irqs += irqs;
+        stats.min_irqs_per_capture = Some(stats.min_irqs_per_capture.map_or(irqs, |m| m.min(irqs)));
+        stats.min_rate_per_ms_x10 = Some(
+            stats
+                .min_rate_per_ms_x10
+                .map_or(rate_x10, |m| m.min(rate_x10)),
+        );
+        stats.captures_without_progress += (irqs == 0) as u32;
+        stats.captures_with_underrun += underrun as u32;
+        (irqs, rate_x10, underrun)
+    }
+
+    fn clear_underrun(&self) {
+        MIPI_DSI_BRIDGE::regs()
+            .int_clr()
+            .write(|w| w.underrun().clear_bit_by_one());
+    }
+
+    fn underrun_seen(&self) -> bool {
+        MIPI_DSI_BRIDGE::regs()
+            .int_raw()
+            .read()
+            .underrun()
+            .bit_is_set()
+    }
+
+    fn overlaps(&self, buffer: &[u8]) -> bool {
+        let start = buffer.as_ptr() as usize;
+        let end = start + buffer.len();
+        self.framebuffers
+            .iter()
+            .any(|&fb_start| start < fb_start + LCD_FB_BYTES && fb_start < end)
+    }
+
+    /// Runs the colour wheel alone, as the reference for the capture phase.
+    fn baseline(&mut self) -> bool {
+        self.clear_underrun();
+        let timeouts_before = self.vsync_timeouts;
+        let irqs_before = self.dpi.dma_interrupt_count();
+        let start = esp_hal::time::Instant::now();
+        for _ in 0..LCD_BASELINE_STEPS {
+            self.render_step();
+        }
+        let elapsed_us = start.elapsed().as_micros().max(1);
+        let irqs = self.dpi.dma_interrupt_count().wrapping_sub(irqs_before);
+        let timeouts = self.vsync_timeouts - timeouts_before;
+        let underrun = self.underrun_seen();
+        self.baseline_rate_per_ms_x10 = irqs as u64 * 10_000 / elapsed_us;
+        println!(
+            "LCD-only baseline: steps={} elapsed_ms={} steps_per_s_x10={} dsi_dma_irqs={} dsi_dma_irqs_per_ms_x10={} vsync_timeouts={} underrun={}",
+            LCD_BASELINE_STEPS,
+            elapsed_us / 1000,
+            LCD_BASELINE_STEPS as u64 * 10_000_000 / elapsed_us,
+            irqs,
+            self.baseline_rate_per_ms_x10,
+            timeouts,
+            underrun
+        );
+        irqs > 0 && timeouts == 0
+    }
+}
+
+fn hue_to_rgb565(hue: u32) -> u16 {
+    let region = hue / 60;
+    let frac = hue % 60;
+    let (r, g, b) = match region {
+        0 => (255, (frac * 255 / 60) as u8, 0),
+        1 => ((255 - frac * 255 / 60) as u8, 255, 0),
+        2 => (0, 255, (frac * 255 / 60) as u8),
+        3 => (0, (255 - frac * 255 / 60) as u8, 255),
+        4 => ((frac * 255 / 60) as u8, 0, 255),
+        _ => (255, 0, (255 - frac * 255 / 60) as u8),
+    };
+    ((r as u16) >> 3) << 11 | ((g as u16) >> 2) << 5 | (b as u16) >> 3
+}
+
+/// EK79007 vendor init sequence, as in `lcd-mipi-dsi`.
+static EK79007_INIT: &[(u8, &[u8])] = &[
+    (0xB2, &[0x10]),
+    (0x80, &[0x8B]),
+    (0x81, &[0x78]),
+    (0x82, &[0x84]),
+    (0x83, &[0x88]),
+    (0x84, &[0xA8]),
+    (0x85, &[0xE3]),
+    (0x86, &[0x88]),
+];
+
+/// Interrupt-matrix entries of `Interrupt::DMA` on both cores, 0 when unmapped.
+fn dma_interrupt_map() -> (u32, u32) {
+    let index = esp_hal::peripherals::Interrupt::DMA as usize;
+    (
+        INTERRUPT_CORE0::regs().core_0_intr_map(index).read().bits(),
+        INTERRUPT_CORE1::regs().core_1_intr_map(index).read().bits(),
+    )
+}
+
+/// Enable and signal-enable state of the two VDMA channels in use.
+fn print_vdma_channel_state(label: &str) {
+    let vdma = VDMA::regs();
+    let (core0, core1) = dma_interrupt_map();
+    println!(
+        "{label}: chen0={:#x} ch0_signal_enable={:#x} ch1_signal_enable={:#x} ch1_status_enable={:#x} ch1_routable={:#x} ch0_status={:#x} ch1_status={:#x} dma_irq_map core0={} core1={}",
+        vdma.chen0().read().bits() & 0xf,
+        vdma.ch(0).intsignal_enable0().read().bits(),
+        vdma.ch(1).intsignal_enable0().read().bits(),
+        vdma.ch(1).intstatus_enable0().read().bits(),
+        routable_signal_enable(1),
+        vdma.ch(0).intstatus0().read().bits(),
+        vdma.ch(1).intstatus0().read().bits(),
+        core0,
+        core1
+    );
+}
+
+/// Prints the DSI side of the run, then drops CSI and DSI in turn and checks
+/// that each leaves the other's channel, and no stale interrupt state, behind.
+fn coexistence_teardown(capture: CsiCapture<'_>, mut lcd: Lcd) -> bool {
+    let stats = lcd.capture_stats;
+    println!(
+        "DSI DMA interrupts during CSI captures: total={} min_per_capture={:?} min_per_ms_x10={:?} lcd_only_per_ms_x10={} captures_without_progress={} captures_with_underrun={} vsync_timeouts={}",
+        stats.irqs,
+        stats.min_irqs_per_capture,
+        stats.min_rate_per_ms_x10,
+        lcd.baseline_rate_per_ms_x10,
+        stats.captures_without_progress,
+        stats.captures_with_underrun,
+        lcd.vsync_timeouts
+    );
+    let mut ok = stats.captures_without_progress == 0 && lcd.vsync_timeouts == 0;
+
+    print_vdma_channel_state("before-csi-drop");
+    drop(capture);
+    let vdma = VDMA::regs();
+    let chen = vdma.chen0().read().bits();
+    let csi_released = chen & 0b10 == 0
+        && routable_signal_enable(1) == 0
+        && vdma.ch(1).intstatus0().read().bits() == 0;
+    let dsi_running = chen & 0b01 != 0;
+    print_vdma_channel_state("after-csi-drop");
+    println!(
+        "after-csi-drop: csi_channel_released={csi_released} dsi_channel_enabled={dsi_running}"
+    );
+    ok &= csi_released && dsi_running;
+
+    let irqs_before = lcd.dpi.dma_interrupt_count();
+    let timeouts_before = lcd.vsync_timeouts;
+    let start = esp_hal::time::Instant::now();
+    let mut steps = 0;
+    while start.elapsed() < Duration::from_millis(LCD_TAIL_MS) {
+        lcd.render_step();
+        steps += 1;
+    }
+    let tail_irqs = lcd.dpi.dma_interrupt_count().wrapping_sub(irqs_before);
+    let tail_timeouts = lcd.vsync_timeouts - timeouts_before;
+    println!(
+        "LCD after CSI drop: {}ms steps={} dsi_dma_irqs={} vsync_timeouts={}",
+        LCD_TAIL_MS, steps, tail_irqs, tail_timeouts
+    );
+    ok &= tail_irqs > 0 && tail_timeouts == 0;
+
+    drop(lcd);
+    // The last VDMA guard is gone, so the controller registers are no longer
+    // readable; with the clock gated no channel can raise the interrupt.
+    let vdma_clock = HP_SYS_CLKRST::regs()
+        .soc_clk_ctrl1()
+        .read()
+        .gdma_sys_clk_en()
+        .bit();
+    println!("after-dsi-drop: vdma_clock_enabled={vdma_clock}");
+    ok && !vdma_clock
+}
+
+/// Read back from `INTSIGNAL_ENABLE0` and `INTSTATUS_ENABLE0` after writing 0:
+/// the bits the PAC leaves undefined plus bit 25. None of them latched a status
+/// in any capture.
+const VDMA_ENABLE_STUCK_AT_ONE: u32 = 0x07c0_8004;
+
+/// Signal-enable bits of `channel` that a driver set and that can raise the
+/// interrupt.
+fn routable_signal_enable(channel: usize) -> u32 {
+    let ch = VDMA::regs().ch(channel);
+    ch.intsignal_enable0().read().bits()
+        & ch.intstatus_enable0().read().bits()
+        & !VDMA_ENABLE_STUCK_AT_ONE
 }
 
 /// Same names and changes as `VDMA_MEM2MEM_DMA_PROFILE` in `vdma-mem2mem-psram`.
@@ -1763,6 +2130,7 @@ const MAX_REPEAT_FRAMES: u32 = 100;
 /// Captures `frames` RAW8 frames into the same PSRAM buffer, one full
 /// single-shot capture per frame: the sensor streams only while a DMA block
 /// is armed, and the buffer is checked before it is reused.
+#[expect(clippy::too_many_arguments)]
 fn run_repeated_capture(
     capture: &mut CsiCapture<'_>,
     i2c: &mut I2c<'_, Blocking>,
@@ -1771,6 +2139,7 @@ fn run_repeated_capture(
     frames: u32,
     frame_export: bool,
     completion: Completion,
+    mut lcd: Option<&mut Lcd>,
 ) -> bool {
     let mode = CaptureMode::Raw8Psram;
     let label = mode.label();
@@ -1790,10 +2159,15 @@ fn run_repeated_capture(
             .expect("capture allocation is DMA aligned")
             .writeback();
 
+        let lcd_before = lcd.as_deref_mut().map(Lcd::before_capture);
         let mut stream_on = None;
         let result = receive_frame(capture, completion, &mut allocation[..capture_len], || {
             stream_on = Some(set_sc2336_stream(i2c, true));
         });
+        let lcd_progress = lcd
+            .as_deref_mut()
+            .zip(lcd_before)
+            .map(|(lcd, before)| lcd.after_capture(before));
         let isp_int_raw = read_mmio_u32(ISP_INT_RAW_REG_ADDR);
         let stream_off = set_sc2336_stream(i2c, false);
         DmaAlignedMut::new(&mut *allocation)
@@ -1815,7 +2189,8 @@ fn run_repeated_capture(
         let sensor_ok = matches!(stream_on, Some(Ok(_))) && stream_off.is_ok();
         let received = result.as_ref().map_or(0, |frame| frame.received_bytes);
         let irq_ok = completion_interrupt_ok(label, capture, completion, false);
-        let ok = assessment.valid && sensor_ok && received == capture_len && irq_ok;
+        let lcd_ok = lcd_progress.is_none_or(|(irqs, _, _)| irqs > 0);
+        let ok = assessment.valid && sensor_ok && received == capture_len && irq_ok && lcd_ok;
         let checksum = checksum32(&allocation[..capture_len]);
 
         print!(
@@ -1845,6 +2220,11 @@ fn run_repeated_capture(
             print!(
                 " irq_latency={:?}us",
                 capture.completion_interrupt_report().latency_from_arm_us
+            );
+        }
+        if let Some((irqs, rate_x10, underrun)) = lcd_progress {
+            print!(
+                " dsi_dma_irqs={irqs} dsi_dma_irqs_per_ms_x10={rate_x10} dsi_underrun={underrun}"
             );
         }
         println!();
@@ -2424,6 +2804,11 @@ fn main() -> ! {
     let exposure_lines = env_number("CSI_EXPOSURE_LINES", option_env!("CSI_EXPOSURE_LINES"));
     let gain_index = env_number("CSI_GAIN_INDEX", option_env!("CSI_GAIN_INDEX"));
     let repeat_frames = env_number("CSI_REPEAT_FRAMES", option_env!("CSI_REPEAT_FRAMES"));
+    let coexist = env_flag(option_env!("CSI_DSI_COEXIST"));
+    assert!(
+        !coexist || repeat_frames.is_some(),
+        "CSI_DSI_COEXIST needs CSI_REPEAT_FRAMES"
+    );
     if let Some(frames) = repeat_frames {
         assert!(
             (1..=MAX_REPEAT_FRAMES).contains(&frames),
@@ -2449,9 +2834,35 @@ fn main() -> ! {
     println!("Board assumptions: SCCB SCL=GPIO8, SDA=GPIO7, addr=0x30");
     println!("Board assumptions: reset/pwdn/xclk are hardware-managed on this sub-board");
 
-    enable_mipi_dphy_power(&delay);
-    delay.delay_millis(20);
-    println!("MIPI D-PHY 2.5V rail enabled");
+    let mut lcd = if coexist {
+        println!("CSI/DSI coexistence test");
+        let mut lcd = Lcd::start(
+            peripherals.MIPI_DSI,
+            peripherals.VDMA_CH0,
+            peripherals.GPIO27,
+            peripherals.GPIO26,
+            &delay,
+        );
+        println!("LCD streaming: started, dsi_channel=VDMA_CH0 csi_channel=VDMA_CH1");
+        print_vdma_channel_state("after-dsi-start");
+        if !lcd.baseline() {
+            panic!("LCD-only baseline made no DSI progress");
+        }
+        Some(lcd)
+    } else {
+        None
+    };
+
+    if coexist {
+        // `MipiDsi::new` already powered the shared rail, and only its drop
+        // turns it off again.
+        delay.delay_millis(20);
+        println!("MIPI D-PHY 2.5V rail enabled by MIPI-DSI");
+    } else {
+        enable_mipi_dphy_power(&delay);
+        delay.delay_millis(20);
+        println!("MIPI D-PHY 2.5V rail enabled");
+    }
 
     let mut i2c = I2c::new(
         peripherals.I2C0,
@@ -2523,6 +2934,20 @@ fn main() -> ! {
     );
 
     let allocation = allocate_capture_buffer(mode);
+    if let Some(lcd) = &lcd {
+        let overlap = lcd.overlaps(allocation);
+        println!(
+            "buffers: csi=0x{:08x}+{} dsi_fb0=0x{:08x}+{} dsi_fb1=0x{:08x}+{} overlap={}",
+            allocation.as_ptr() as u32,
+            allocation.len(),
+            lcd.framebuffers[0] as u32,
+            LCD_FB_BYTES,
+            lcd.framebuffers[1] as u32,
+            LCD_FB_BYTES,
+            overlap
+        );
+        assert!(!overlap, "CSI buffer overlaps a DSI frame buffer");
+    }
 
     let mut capture = MipiCsi::new(
         peripherals.MIPI_CSI,
@@ -2589,6 +3014,7 @@ fn main() -> ! {
             frames,
             frame_export,
             completion,
+            lcd.as_mut(),
         ),
         None => run_capture(
             &mut capture,
@@ -2604,6 +3030,13 @@ fn main() -> ! {
         panic!("{}: no valid aligned frame", mode.label());
     }
     println!("{}: PASS", mode.label());
+
+    if let Some(lcd) = lcd {
+        if !coexistence_teardown(capture, lcd) {
+            panic!("COEXISTENCE RESULT: FAIL");
+        }
+        println!("COEXISTENCE RESULT: PASS");
+    }
 
     loop {}
 }
