@@ -48,7 +48,6 @@ use procmacros::BuilderLite;
 
 use crate::{
     dma::{DmaBufError, aligned::DmaAlignedMut},
-    interrupt,
     mipi_dw_gdma::{
         AddressIncrementMode,
         BlockTransferConfig,
@@ -61,10 +60,12 @@ use crate::{
         asserted_interrupt_sources,
         enable_controller,
         enabled_channels,
+        register_channel_handler,
+        unregister_channel_handler,
     },
-    peripherals::{HP_SYS_CLKRST, Interrupt, MIPI_CSI, MIPI_CSI_BRIDGE, MIPI_CSI_HOST},
+    peripherals::{HP_SYS_CLKRST, MIPI_CSI, MIPI_CSI_BRIDGE, MIPI_CSI_HOST},
     private::Sealed,
-    system::{Cpu, GenericPeripheralGuard, Peripheral},
+    system::{GenericPeripheralGuard, Peripheral},
     time::{Duration, Instant},
 };
 
@@ -1688,12 +1689,11 @@ impl CsiCapture<'_> {
     /// handed back exactly as in [`Self::receive_with`]: a completion
     /// interrupt is not taken as proof that the channel stopped writing.
     ///
-    /// All VDMA channels share [`Interrupt::DMA`], which has a single handler
-    /// and is also used by the MIPI-DSI DPI driver. This method returns
+    /// All VDMA channels share [`Interrupt::DMA`](crate::peripherals::Interrupt::DMA). Its handler
+    /// hands each channel only its own interrupt sources, and this method only masks the
+    /// sources of the capture channel. It still returns
     /// [`ReceiveError::InterruptUnavailable`] without starting anything if
-    /// another VDMA channel is enabled or already drives the line. Otherwise
-    /// it binds its own handler, which runs at most once per capture, and
-    /// leaves [`Interrupt::DMA`] disabled when it returns.
+    /// another VDMA channel is enabled or already drives the line.
     ///
     /// # Panics
     ///
@@ -1982,10 +1982,9 @@ impl CsiCapture<'_> {
     /// Must run after the channel status was cleared and before the channel is
     /// enabled.
     fn arm_completion_interrupt(&self) {
-        COMPLETION_IRQ_CHANNEL.store(self.dma_channel.channel_id(), Ordering::Relaxed);
         COMPLETION_IRQ_ARMED_AT_US.store(now_us(), Ordering::Relaxed);
         COMPLETION_IRQ_STATE.store(COMPLETION_IRQ_ARMED, Ordering::Release);
-        interrupt::bind_handler(Interrupt::DMA, completion_interrupt_handler);
+        register_channel_handler(self.dma_channel, completion_interrupt_handler);
         self.dma_channel
             .set_interrupt_signal_enable(DMA_COMPLETION_INTERRUPT_MASK);
     }
@@ -1998,7 +1997,7 @@ impl CsiCapture<'_> {
         }
 
         self.dma_channel.set_interrupt_signal_enable(0);
-        interrupt::disable(Cpu::current(), Interrupt::DMA);
+        unregister_channel_handler(self.dma_channel);
         // The handler can no longer run, so its results are final.
         let state = COMPLETION_IRQ_STATE.swap(COMPLETION_IRQ_IDLE, Ordering::AcqRel);
         let fired = state != COMPLETION_IRQ_ARMED;
@@ -2283,7 +2282,6 @@ const COMPLETION_IRQ_OWN: u8 = 2;
 const COMPLETION_IRQ_FOREIGN: u8 = 3;
 
 static COMPLETION_IRQ_STATE: AtomicU8 = AtomicU8::new(COMPLETION_IRQ_IDLE);
-static COMPLETION_IRQ_CHANNEL: AtomicU8 = AtomicU8::new(0);
 static COMPLETION_IRQ_STATUS: AtomicU32 = AtomicU32::new(0);
 static COMPLETION_IRQ_ARMED_AT_US: AtomicU32 = AtomicU32::new(0);
 static COMPLETION_IRQ_AT_US: AtomicU32 = AtomicU32::new(0);
@@ -2292,23 +2290,19 @@ fn now_us() -> u32 {
     Instant::now().duration_since_epoch().as_micros() as u32
 }
 
-/// Records the channel status and unmaps [`Interrupt::DMA`].
+/// Records the channel status, called by the shared DW-GDMA dispatcher only for
+/// the capture channel.
 ///
-/// The status is left latched for the waiting thread, so the line is released
-/// by clearing the channel's signal enable. Other channels and the common
-/// register block can also drive the shared line and this handler cannot clear
-/// their sources, so it unmaps the interrupt to run at most once.
+/// The status is left latched for the waiting thread, so the source is
+/// released by clearing the channel's signal enable, which also makes the
+/// handler run at most once per capture.
 #[crate::ram]
-#[crate::handler]
-fn completion_interrupt_handler() {
+fn completion_interrupt_handler(channel: DwGdmaChannel, _pending: u32) {
+    channel.set_interrupt_signal_enable(0);
     if COMPLETION_IRQ_STATE.load(Ordering::Acquire) != COMPLETION_IRQ_ARMED {
-        interrupt::disable(Cpu::current(), Interrupt::DMA);
         return;
     }
-    let channel = DwGdmaChannel::new(COMPLETION_IRQ_CHANNEL.load(Ordering::Relaxed));
     let status = channel.interrupt_status();
-    channel.set_interrupt_signal_enable(0);
-    interrupt::disable(Cpu::current(), Interrupt::DMA);
 
     COMPLETION_IRQ_STATUS.store(status, Ordering::Relaxed);
     COMPLETION_IRQ_AT_US.store(now_us(), Ordering::Relaxed);
