@@ -25,9 +25,23 @@
 //!   894 (`0x3e00..=0x3e02`).
 //! - `CSI_GAIN_INDEX=0..=193`: entry of the official SC2336 gain map (`0x3e06`, `0x3e07`,
 //!   `0x3e09`); 0 is 1x, 193 is the driver's default 66x limit. Unset leaves the reset value.
-//! - `CSI_REPEAT_FRAMES=1..=100`: mode A only, capture this many frames one after another into the
+//! - `CSI_REPEAT_FRAMES=1..=1000`: mode A only, capture this many frames one after another into the
 //!   same buffer and print one summary line per frame. With `CSI_FRAME_EXPORT=1`, the last frame is
 //!   exported.
+//! - `CSI_SENSOR_CONTINUOUS=1`: with `CSI_REPEAT_FRAMES`, start the SC2336 stream once before the
+//!   first frame and stop it after the last, instead of around every frame. Each frame is still one
+//!   `receive_with`/`receive_with_interrupt` call that arms the DMA and the bridge while the sensor
+//!   streams.
+//! - `CSI_STREAM=1`: with `CSI_REPEAT_FRAMES`, capture with `CsiCapture::into_stream` into two
+//!   PSRAM buffers that the DMA interrupt handler alternates between, with the sensor streaming
+//!   throughout, and take this many frames with `CsiStream::next_frame`. Each buffer is followed by
+//!   a guard region, and both start filled with a sentinel that the first frame in each buffer must
+//!   fully overwrite.
+//! - `CSI_STREAM_FAULTS=1`: with `CSI_STREAM`, after the stream run, check a `next_frame` timeout
+//!   with the sensor stopped, a consumer holding a frame while the sensor streams, and repeated
+//!   stop/start at varying points of the frame.
+//! - `CSI_QUIET=1`: with `CSI_REPEAT_FRAMES`, print the per-frame line only for failures and every
+//!   100th frame, so the console does not slow the capture loop.
 //! - `CSI_COMPLETION`: `poll` (default) waits with `receive_with`, `interrupt` with
 //!   `receive_with_interrupt`. In interrupt mode a frame also fails if the channel's own DW-GDMA
 //!   completion interrupt did not end the wait.
@@ -44,7 +58,7 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
+use alloc::{format, string::String, vec::Vec};
 use core::alloc::Layout;
 
 use esp_alloc as _;
@@ -75,6 +89,7 @@ use esp_hal::{
         DmaAxiConfig,
         MipiCsi,
         ReceiveError,
+        StreamError,
     },
     mipi_dsi::{
         Config as DsiConfig,
@@ -551,7 +566,7 @@ struct Lcd {
     framebuffers: [usize; 2],
     hue: u32,
     vsync_timeouts: u32,
-    baseline_rate_per_ms_x10: u64,
+    baseline_rate_per_s: u64,
     capture_stats: LcdCaptureStats,
     _reset: Output<'static>,
     _backlight: Output<'static>,
@@ -562,7 +577,7 @@ struct Lcd {
 struct LcdCaptureStats {
     irqs: u32,
     min_irqs_per_capture: Option<u32>,
-    min_rate_per_ms_x10: Option<u64>,
+    min_rate_per_s: Option<u64>,
     captures_without_progress: u32,
     captures_with_underrun: u32,
 }
@@ -644,7 +659,7 @@ impl Lcd {
             framebuffers,
             hue: 0,
             vsync_timeouts: 0,
-            baseline_rate_per_ms_x10: 0,
+            baseline_rate_per_s: 0,
             capture_stats: LcdCaptureStats::default(),
             _reset: reset,
             _backlight: backlight,
@@ -684,25 +699,25 @@ impl Lcd {
     }
 
     /// Returns the DSI DMA interrupts since [`Self::before_capture`], their
-    /// rate per millisecond times 10, and whether the bridge FIFO ran empty.
+    /// rate per second, and whether the bridge FIFO ran empty.
     fn after_capture(
         &mut self,
         (irqs_before, start): (u32, esp_hal::time::Instant),
     ) -> (u32, u64, bool) {
         let irqs = self.dpi.dma_interrupt_count().wrapping_sub(irqs_before);
-        let rate_x10 = irqs as u64 * 10_000 / start.elapsed().as_micros().max(1);
+        let rate_per_s = irqs as u64 * 1_000_000 / start.elapsed().as_micros().max(1);
         let underrun = self.underrun_seen();
         let stats = &mut self.capture_stats;
         stats.irqs += irqs;
         stats.min_irqs_per_capture = Some(stats.min_irqs_per_capture.map_or(irqs, |m| m.min(irqs)));
-        stats.min_rate_per_ms_x10 = Some(
+        stats.min_rate_per_s = Some(
             stats
-                .min_rate_per_ms_x10
-                .map_or(rate_x10, |m| m.min(rate_x10)),
+                .min_rate_per_s
+                .map_or(rate_per_s, |m| m.min(rate_per_s)),
         );
         stats.captures_without_progress += (irqs == 0) as u32;
         stats.captures_with_underrun += underrun as u32;
-        (irqs, rate_x10, underrun)
+        (irqs, rate_per_s, underrun)
     }
 
     fn clear_underrun(&self) {
@@ -740,14 +755,14 @@ impl Lcd {
         let irqs = self.dpi.dma_interrupt_count().wrapping_sub(irqs_before);
         let timeouts = self.vsync_timeouts - timeouts_before;
         let underrun = self.underrun_seen();
-        self.baseline_rate_per_ms_x10 = irqs as u64 * 10_000 / elapsed_us;
+        self.baseline_rate_per_s = irqs as u64 * 1_000_000 / elapsed_us;
         println!(
-            "LCD-only baseline: steps={} elapsed_ms={} steps_per_s_x10={} dsi_dma_irqs={} dsi_dma_irqs_per_ms_x10={} vsync_timeouts={} underrun={}",
+            "LCD-only baseline: steps={} elapsed_ms={} steps_per_s_x10={} dsi_dma_irqs={} dsi_dma_irqs_per_s={} vsync_timeouts={} underrun={}",
             LCD_BASELINE_STEPS,
             elapsed_us / 1000,
             LCD_BASELINE_STEPS as u64 * 10_000_000 / elapsed_us,
             irqs,
-            self.baseline_rate_per_ms_x10,
+            self.baseline_rate_per_s,
             timeouts,
             underrun
         );
@@ -813,11 +828,11 @@ fn print_vdma_channel_state(label: &str) {
 fn coexistence_teardown(capture: CsiCapture<'_>, mut lcd: Lcd) -> bool {
     let stats = lcd.capture_stats;
     println!(
-        "DSI DMA interrupts during CSI captures: total={} min_per_capture={:?} min_per_ms_x10={:?} lcd_only_per_ms_x10={} captures_without_progress={} captures_with_underrun={} vsync_timeouts={}",
+        "DSI DMA interrupts during CSI captures: total={} min_per_capture={:?} min_per_s={:?} lcd_only_per_s={} captures_without_progress={} captures_with_underrun={} vsync_timeouts={}",
         stats.irqs,
         stats.min_irqs_per_capture,
-        stats.min_rate_per_ms_x10,
-        lcd.baseline_rate_per_ms_x10,
+        stats.min_rate_per_s,
+        lcd.baseline_rate_per_s,
         stats.captures_without_progress,
         stats.captures_with_underrun,
         lcd.vsync_timeouts
@@ -2125,11 +2140,413 @@ fn run_capture(
     valid
 }
 
-const MAX_REPEAT_FRAMES: u32 = 100;
+const MAX_REPEAT_FRAMES: u32 = 1000;
+
+/// Buffer, guard, buffer, guard, from one PSRAM allocation.
+fn allocate_stream_buffers(
+    frame_bytes: usize,
+) -> (
+    &'static mut [u8],
+    &'static mut [u8],
+    &'static mut [u8],
+    &'static mut [u8],
+) {
+    let len = 2 * (frame_bytes + GUARD_BYTES);
+    let layout = Layout::from_size_align(len, PSRAM_DMA_ALIGNMENT).unwrap();
+    let ptr = unsafe { alloc::alloc::alloc(layout) };
+    if ptr.is_null() {
+        panic!("stream buffer allocation failed");
+    }
+    let region = unsafe { core::slice::from_raw_parts_mut(ptr, len) };
+    let (first, second) = region.split_at_mut(frame_bytes + GUARD_BYTES);
+    let (buffer0, guard0) = first.split_at_mut(frame_bytes);
+    let (buffer1, guard1) = second.split_at_mut(frame_bytes);
+    (buffer0, guard0, buffer1, guard1)
+}
+
+fn sentinel_writeback(region: &mut [u8]) {
+    fill_sentinel(region);
+    DmaAlignedMut::new(region)
+        .expect("stream region is DMA aligned")
+        .writeback();
+}
+
+fn guard_written_words(guard: &mut [u8]) -> usize {
+    DmaAlignedMut::new(&mut *guard)
+        .expect("guard is DMA aligned")
+        .invalidate();
+    scan_sentinel(guard, 0..guard.len()).written_words
+}
+
+/// While streaming, the SC2336 test pattern varies by one LSB in part of the
+/// image. Frames match exactly only when each follows a fresh stream on.
+const STREAMING_TEST_PATTERN_MAX_DELTA: u8 = 1;
+
+/// Where `frame` differs from `reference`, as rows and columns of the RAW8
+/// image. Returns the largest per-byte difference.
+fn frame_difference(index: u32, sequence: u32, reference: &[u8], frame: &[u8], print: bool) -> u8 {
+    let width = SC2336_FRAME_WIDTH as usize;
+    let mut differing = 0usize;
+    let mut first = None;
+    let mut last = 0;
+    let mut rows = (usize::MAX, 0usize);
+    let mut cols = (usize::MAX, 0usize);
+    let mut max_delta = 0u8;
+    for (offset, (a, b)) in reference.iter().zip(frame).enumerate() {
+        if a != b {
+            differing += 1;
+            first.get_or_insert(offset);
+            last = offset;
+            let (row, col) = (offset / width, offset % width);
+            rows = (rows.0.min(row), rows.1.max(row));
+            cols = (cols.0.min(col), cols.1.max(col));
+            max_delta = max_delta.max(a.abs_diff(*b));
+        }
+    }
+    if print || max_delta > STREAMING_TEST_PATTERN_MAX_DELTA {
+        println!(
+            "stream[{index}]: sequence={sequence} differs_from_first: bytes={differing} first_offset={first:?} last_offset={last} rows={}..={} cols={}..={} max_delta={max_delta}",
+            rows.0, rows.1, cols.0, cols.1
+        );
+    }
+    max_delta
+}
+
+/// Stop/start cycles in the `CSI_STREAM_FAULTS` start/stop case.
+const STREAM_RESTART_CYCLES: u32 = 20;
+/// How long the slow consumer holds a frame, about nine sensor frames.
+const STREAM_HOLD_MS: u64 = 300;
+
+fn fault_case(name: &str, ok: bool, detail: String) -> bool {
+    println!(
+        "stream-fault[{name}]: {} {detail}",
+        if ok { "PASS" } else { "FAIL" }
+    );
+    ok
+}
+
+fn buffers_untouched(buffers: &mut [&'static mut [u8]; 2]) -> bool {
+    buffers
+        .iter_mut()
+        .all(|buffer| guard_written_words(buffer) == 0)
+}
+
+/// `CSI_STREAM_FAULTS=1`: bounded failure cases for `CsiStream`, starting with
+/// the sensor stopped.
+fn run_stream_fault_cases<'d>(
+    capture: CsiCapture<'d>,
+    i2c: &mut I2c<'_, Blocking>,
+) -> (CsiCapture<'d>, bool) {
+    let frame_bytes = CaptureMode::Raw8Psram.expected_bytes();
+    let channel = capture.debug_snapshot().dma_channel_id as usize;
+    let (buffer0, guard0, buffer1, guard1) = allocate_stream_buffers(frame_bytes);
+    for region in [&mut *buffer0, &mut *guard0, &mut *buffer1, &mut *guard1] {
+        sentinel_writeback(region);
+    }
+    let mut capture = capture;
+    let mut buffers = [buffer0, buffer1];
+    let mut passed = true;
+    let delay = Delay::new();
+
+    // No sensor frames: `next_frame` times out, and stopping a stream whose DMA
+    // is armed but never started writing leaves both buffers untouched.
+    let mut stream = match capture.into_stream(buffers) {
+        Ok(stream) => stream,
+        Err((capture, _, error)) => {
+            println!("stream-fault: FAIL, did not start: {error:?}");
+            return (capture, false);
+        }
+    };
+    let start = esp_hal::time::Instant::now();
+    let result = stream
+        .next_frame(Duration::from_millis(200))
+        .map(|frame| frame.sequence());
+    let waited_ms = start.elapsed().as_millis();
+    let stats = stream.stats();
+    (capture, buffers) = stream.stop();
+    let untouched = buffers_untouched(&mut buffers);
+    passed &= fault_case(
+        "timeout",
+        matches!(result, Err(StreamError::Timeout))
+            && (200..=210).contains(&waited_ms)
+            && stats.completed == 0
+            && stats.errored == 0
+            && untouched,
+        format!(
+            "result={result:?} waited_ms={waited_ms} completed={} errored={} buffers_untouched={untouched}",
+            stats.completed, stats.errored
+        ),
+    );
+
+    // Slow consumer: hold one frame while the sensor keeps streaming. The DMA
+    // destination never enters the held buffer, and newer frames overwrite
+    // each other in the other buffer.
+    let mut stream = match capture.into_stream(buffers) {
+        Ok(stream) => stream,
+        Err((capture, _, error)) => {
+            println!("stream-fault: FAIL, did not restart: {error:?}");
+            return (capture, false);
+        }
+    };
+    let stream_on = set_sc2336_stream(i2c, true);
+    // The first block can be the tail of the frame the previous stop cut.
+    let warm_up = stream
+        .next_frame(Duration::from_millis(500))
+        .map(|frame| frame.sequence());
+    let before = stream.stats();
+    let held = match stream.next_frame(Duration::from_millis(500)) {
+        Ok(frame) => {
+            let range = frame.as_ptr() as u32..frame.as_ptr() as u32 + frame.len() as u32;
+            let sequence = frame.sequence();
+            let hold_start = esp_hal::time::Instant::now();
+            let (mut samples, mut inside) = (0u32, 0u32);
+            while hold_start.elapsed() < Duration::from_millis(STREAM_HOLD_MS) {
+                let dar = VDMA::regs().ch(channel).dar0().read().bits();
+                samples += 1;
+                inside += u32::from(range.contains(&dar));
+            }
+            drop(frame);
+            Some((sequence, samples, inside))
+        }
+        Err(e) => {
+            println!("stream-fault[slow-consumer]: first frame {e:?}");
+            None
+        }
+    };
+    let next = stream
+        .next_frame(Duration::from_millis(500))
+        .map(|frame| frame.sequence());
+    let after = stream.stats();
+    let overwritten = after.overwritten - before.overwritten;
+    passed &= fault_case(
+        "slow-consumer",
+        stream_on.is_ok()
+            && warm_up.is_ok()
+            && held.is_some_and(|(_, samples, inside)| samples > 0 && inside == 0)
+            && next.is_ok()
+            && overwritten >= 5
+            && after.errored == before.errored,
+        format!(
+            "held=(sequence, dar_samples, dar_inside_held)={held:?} next={next:?} overwritten_during_hold={overwritten} errored_during_hold={}",
+            after.errored - before.errored
+        ),
+    );
+
+    // Repeated start/stop with the sensor streaming. Each stop lands at a
+    // different point of the frame, swept in 1.7 ms steps. The bridge keeps
+    // its place in a frame it was disabled in, so the first block after a
+    // restart can be short. The stream drops it and resyncs.
+    let mut cycles_ok = 0;
+    let (mut errored, mut resyncs) = (0, 0);
+    for cycle in 0..STREAM_RESTART_CYCLES {
+        let stop_delay_us = cycle * 1_700 % 33_000;
+        delay.delay_micros(stop_delay_us);
+        if cycle > 0 {
+            let stats = stream.stats();
+            errored += stats.errored;
+            resyncs += stats.resyncs;
+        }
+        (capture, buffers) = stream.stop();
+        stream = match capture.into_stream(buffers) {
+            Ok(stream) => stream,
+            Err((capture, _, error)) => {
+                println!("stream-fault[restart]: cycle {cycle} did not start: {error:?}");
+                let _ = set_sc2336_stream(i2c, false);
+                return (capture, false);
+            }
+        };
+        let frames: Vec<_> = (0..2)
+            .map(|_| {
+                stream
+                    .next_frame(Duration::from_millis(500))
+                    .map(|frame| frame.sequence())
+            })
+            .collect();
+        if frames.iter().all(Result::is_ok) {
+            cycles_ok += 1;
+        } else {
+            println!(
+                "stream-fault[restart]: cycle {cycle} stop_delay_us={stop_delay_us} frames={frames:?}"
+            );
+        }
+    }
+    let stats = stream.stats();
+    errored += stats.errored;
+    resyncs += stats.resyncs;
+    let stream_off = set_sc2336_stream(i2c, false);
+    (capture, buffers) = stream.stop();
+    let _ = buffers;
+    let guards = [guard_written_words(guard0), guard_written_words(guard1)];
+    passed &= fault_case(
+        "restart",
+        cycles_ok == STREAM_RESTART_CYCLES
+            && errored == resyncs
+            && errored <= STREAM_RESTART_CYCLES
+            && stream_off.is_ok()
+            && guards == [0, 0],
+        format!(
+            "cycles_ok={cycles_ok}/{STREAM_RESTART_CYCLES} errored={errored} resyncs={resyncs} guard_written_words={guards:?}"
+        ),
+    );
+
+    println!("stream-fault: {}", if passed { "PASS" } else { "FAIL" });
+    (capture, passed)
+}
+
+/// `CSI_STREAM=1`: continuous capture with the sensor streaming throughout.
+fn run_stream_capture<'d>(
+    capture: CsiCapture<'d>,
+    i2c: &mut I2c<'_, Blocking>,
+    frames: u32,
+    test_pattern: bool,
+    quiet: bool,
+    mut lcd: Option<&mut Lcd>,
+) -> (CsiCapture<'d>, bool) {
+    let frame_bytes = CaptureMode::Raw8Psram.expected_bytes();
+    let (buffer0, guard0, buffer1, guard1) = allocate_stream_buffers(frame_bytes);
+    for region in [&mut *buffer0, &mut *guard0, &mut *buffer1, &mut *guard1] {
+        sentinel_writeback(region);
+    }
+    let addrs = [buffer0.as_ptr() as usize, buffer1.as_ptr() as usize];
+    let lcd_overlap = lcd
+        .as_deref()
+        .is_some_and(|lcd| lcd.overlaps(buffer0) || lcd.overlaps(buffer1));
+    println!(
+        "stream: buffer0=0x{:08x}+{} buffer1=0x{:08x}+{} guard={} bytes each lcd_overlap={}",
+        addrs[0], frame_bytes, addrs[1], frame_bytes, GUARD_BYTES, lcd_overlap
+    );
+    assert!(!lcd_overlap, "stream buffer overlaps a DSI frame buffer");
+
+    let mut stream = match capture.into_stream([buffer0, buffer1]) {
+        Ok(stream) => stream,
+        Err((capture, _, error)) => {
+            println!("stream: FAIL, did not start: {error:?}");
+            return (capture, false);
+        }
+    };
+    let stream_on = set_sc2336_stream(i2c, true);
+    let lcd_irqs_before = lcd.as_deref().map(|lcd| lcd.dpi.dma_interrupt_count());
+
+    let mut checksums = Vec::with_capacity(frames as usize);
+    let mut first_fill_untouched = [None::<usize>; 2];
+    let mut last_sequence = None::<u32>;
+    let mut max_sequence_gap = 0;
+    let mut error = None::<StreamError>;
+    let mut reference = None::<Vec<u8>>;
+    let mut pattern_max_delta = 0u8;
+    let start = esp_hal::time::Instant::now();
+    for index in 1..=frames {
+        if let Some(lcd) = lcd.as_deref_mut() {
+            lcd.render_step();
+        }
+        let frame = match stream.next_frame(Duration::from_millis(500)) {
+            Ok(frame) => frame,
+            Err(e) => {
+                println!("stream[{index}/{frames}]: FAIL {e:?}");
+                error = Some(e);
+                break;
+            }
+        };
+        let slot = usize::from(frame.as_ptr() as usize == addrs[1]);
+        if first_fill_untouched[slot].is_none() {
+            first_fill_untouched[slot] =
+                Some(scan_sentinel(&frame, 0..frame_bytes).untouched_words);
+        }
+        let sequence = frame.sequence();
+        if let Some(last) = last_sequence {
+            max_sequence_gap = max_sequence_gap.max(sequence.wrapping_sub(last));
+        }
+        last_sequence = Some(sequence);
+        let checksum = checksum32(&frame);
+        if test_pattern {
+            match &reference {
+                None => reference = Some(frame.to_vec()),
+                Some(reference) => {
+                    let print = !quiet || index % 100 == 0;
+                    let delta = frame_difference(index, sequence, reference, &frame, print);
+                    pattern_max_delta = pattern_max_delta.max(delta);
+                }
+            }
+        }
+        drop(frame);
+        checksums.push(checksum);
+        if !quiet || index % 100 == 0 {
+            // Not `{:08x}` with a `0x` prefix: the monitor resolves those as addresses.
+            println!(
+                "stream[{index}/{frames}]: sequence={sequence} buffer={slot} checksum32={checksum:08x} elapsed_ms={}",
+                start.elapsed().as_millis()
+            );
+        }
+    }
+    let elapsed_ms = start.elapsed().as_millis().max(1);
+    let stats = stream.stats();
+    let stream_off = set_sc2336_stream(i2c, false);
+    let (capture, [_, _]) = stream.stop();
+    let guards = [guard_written_words(guard0), guard_written_words(guard1)];
+
+    let lcd_progress = lcd.zip(lcd_irqs_before).map(|(lcd, before)| {
+        (
+            lcd.dpi.dma_interrupt_count().wrapping_sub(before),
+            lcd.underrun_seen(),
+        )
+    });
+
+    let mut distinct = checksums.clone();
+    distinct.sort_unstable();
+    distinct.dedup();
+    println!(
+        "stream: delivered={}/{} completed={} overwritten={} errored={} resyncs={} dma_irqs={} elapsed_ms={}",
+        checksums.len(),
+        frames,
+        stats.completed,
+        stats.overwritten,
+        stats.errored,
+        stats.resyncs,
+        stats.interrupts,
+        elapsed_ms
+    );
+    println!(
+        "stream: completed_frames_per_s_x10={} delivered_frames_per_s_x10={} max_sequence_gap={} first_fill_untouched_words={:?} guard_written_words={:?} distinct_checksums={}{} sensor=continuous stream_on={:?} stream_off={:?}",
+        stats.completed as u64 * 10_000 / elapsed_ms,
+        checksums.len() as u64 * 10_000 / elapsed_ms,
+        max_sequence_gap,
+        first_fill_untouched,
+        guards,
+        distinct.len(),
+        if test_pattern {
+            format!(
+                " test_pattern_max_delta={pattern_max_delta} (expected <= {STREAMING_TEST_PATTERN_MAX_DELTA})"
+            )
+        } else {
+            String::new()
+        },
+        stream_on,
+        stream_off
+    );
+    if let Some((irqs, underrun)) = lcd_progress {
+        println!("stream: dsi_dma_irqs={irqs} dsi_underrun={underrun}");
+    }
+
+    let passed = error.is_none()
+        && checksums.len() == frames as usize
+        && stats.errored == 0
+        && stats.resyncs == 0
+        && first_fill_untouched
+            .iter()
+            .all(|untouched| untouched.is_none_or(|words| words == 0))
+        && guards == [0, 0]
+        && (!test_pattern || pattern_max_delta <= STREAMING_TEST_PATTERN_MAX_DELTA)
+        && stream_on.is_ok()
+        && stream_off.is_ok()
+        && lcd_progress.is_none_or(|(irqs, underrun)| irqs > 0 && !underrun);
+    println!("stream: {}", if passed { "PASS" } else { "FAIL" });
+    (capture, passed)
+}
 
 /// Captures `frames` RAW8 frames into the same PSRAM buffer, one full
-/// single-shot capture per frame: the sensor streams only while a DMA block
-/// is armed, and the buffer is checked before it is reused.
+/// single-shot capture per frame, and checks the buffer before it is reused.
+/// The sensor streams only while a DMA block is armed, or throughout with
+/// `continuous_sensor`.
 #[expect(clippy::too_many_arguments)]
 fn run_repeated_capture(
     capture: &mut CsiCapture<'_>,
@@ -2140,6 +2557,8 @@ fn run_repeated_capture(
     frame_export: bool,
     completion: Completion,
     mut lcd: Option<&mut Lcd>,
+    continuous_sensor: bool,
+    quiet: bool,
 ) -> bool {
     let mode = CaptureMode::Raw8Psram;
     let label = mode.label();
@@ -2150,6 +2569,9 @@ fn run_repeated_capture(
     print_dma_axi_readback("before-arm", &before_arm);
 
     let mut checksums = Vec::with_capacity(frames as usize);
+    let continuous_stream_on = continuous_sensor.then(|| set_sc2336_stream(i2c, true));
+    let mut last_done = None::<esp_hal::time::Instant>;
+    let mut interval_ms = (u64::MAX, 0u64);
     let run_start = esp_hal::time::Instant::now();
     for frame in 1..=frames {
         let frame_start = esp_hal::time::Instant::now();
@@ -2160,16 +2582,28 @@ fn run_repeated_capture(
             .writeback();
 
         let lcd_before = lcd.as_deref_mut().map(Lcd::before_capture);
-        let mut stream_on = None;
+        let mut stream_on = continuous_stream_on;
         let result = receive_frame(capture, completion, &mut allocation[..capture_len], || {
-            stream_on = Some(set_sc2336_stream(i2c, true));
+            if !continuous_sensor {
+                stream_on = Some(set_sc2336_stream(i2c, true));
+            }
         });
+        let done = esp_hal::time::Instant::now();
+        if let Some(last) = last_done {
+            let ms = (done - last).as_millis();
+            interval_ms = (interval_ms.0.min(ms), interval_ms.1.max(ms));
+        }
+        last_done = Some(done);
         let lcd_progress = lcd
             .as_deref_mut()
             .zip(lcd_before)
             .map(|(lcd, before)| lcd.after_capture(before));
         let isp_int_raw = read_mmio_u32(ISP_INT_RAW_REG_ADDR);
-        let stream_off = set_sc2336_stream(i2c, false);
+        let stream_off = if continuous_sensor {
+            Ok(())
+        } else {
+            set_sc2336_stream(i2c, false)
+        };
         DmaAlignedMut::new(&mut *allocation)
             .expect("capture allocation is DMA aligned")
             .invalidate();
@@ -2193,6 +2627,10 @@ fn run_repeated_capture(
         let ok = assessment.valid && sensor_ok && received == capture_len && irq_ok && lcd_ok;
         let checksum = checksum32(&allocation[..capture_len]);
 
+        if ok && quiet && frame % 100 != 0 {
+            checksums.push(checksum);
+            continue;
+        }
         print!(
             "repeat[{}/{}]: ok={} receive={} received_bytes={} first_data={:?}us done={:?}us untouched_words={} guard_words_written={} bridge_errors=0x{:02x} discard={} host_error={} isp_errors={:#x} stalls={} checksum32=",
             frame,
@@ -2222,10 +2660,8 @@ fn run_repeated_capture(
                 capture.completion_interrupt_report().latency_from_arm_us
             );
         }
-        if let Some((irqs, rate_x10, underrun)) = lcd_progress {
-            print!(
-                " dsi_dma_irqs={irqs} dsi_dma_irqs_per_ms_x10={rate_x10} dsi_underrun={underrun}"
-            );
+        if let Some((irqs, rate_per_s, underrun)) = lcd_progress {
+            print!(" dsi_dma_irqs={irqs} dsi_dma_irqs_per_s={rate_per_s} dsi_underrun={underrun}");
         }
         println!();
 
@@ -2245,10 +2681,15 @@ fn run_repeated_capture(
                 print_receive_error(label, err);
             }
             print_verdict(label, &evidence);
+            if continuous_sensor {
+                let _ = set_sc2336_stream(i2c, false);
+            }
             return false;
         }
         checksums.push(checksum);
     }
+    let run_ms = run_start.elapsed().as_millis();
+    let continuous_stream_off = continuous_sensor.then(|| set_sc2336_stream(i2c, false));
 
     let after = capture.debug_snapshot();
     print_dma_axi_readback("after-shutdown", &after);
@@ -2259,15 +2700,31 @@ fn run_repeated_capture(
         "repeat: {}/{} frames valid in {} ms, distinct_checksums={}{}",
         checksums.len(),
         frames,
-        run_start.elapsed().as_millis(),
+        run_ms,
         distinct.len(),
-        if test_pattern {
+        if test_pattern && !continuous_sensor {
             " (test pattern: expected 1)"
         } else {
             ""
         }
     );
-    if test_pattern && distinct.len() != 1 {
+    println!(
+        "repeat: sensor={} stream_off={:?} valid_frames_per_s_x10={} frame_interval_ms min={} max={}",
+        if continuous_sensor {
+            "continuous"
+        } else {
+            "restarted-per-frame"
+        },
+        continuous_stream_off,
+        checksums.len() as u64 * 10_000 / run_ms.max(1),
+        if frames > 1 { interval_ms.0 } else { 0 },
+        interval_ms.1
+    );
+    if continuous_stream_off.is_some_and(|r| r.is_err()) {
+        println!("repeat: FAIL, sensor stream did not stop");
+        return false;
+    }
+    if test_pattern && !continuous_sensor && distinct.len() != 1 {
         println!("repeat: FAIL, test pattern frames differ");
         return false;
     }
@@ -2805,9 +3262,20 @@ fn main() -> ! {
     let gain_index = env_number("CSI_GAIN_INDEX", option_env!("CSI_GAIN_INDEX"));
     let repeat_frames = env_number("CSI_REPEAT_FRAMES", option_env!("CSI_REPEAT_FRAMES"));
     let coexist = env_flag(option_env!("CSI_DSI_COEXIST"));
+    let continuous_sensor = env_flag(option_env!("CSI_SENSOR_CONTINUOUS"));
+    let stream = env_flag(option_env!("CSI_STREAM"));
+    let quiet = env_flag(option_env!("CSI_QUIET"));
     assert!(
         !coexist || repeat_frames.is_some(),
         "CSI_DSI_COEXIST needs CSI_REPEAT_FRAMES"
+    );
+    assert!(
+        !stream || repeat_frames.is_some(),
+        "CSI_STREAM needs CSI_REPEAT_FRAMES"
+    );
+    assert!(
+        !continuous_sensor || repeat_frames.is_some(),
+        "CSI_SENSOR_CONTINUOUS needs CSI_REPEAT_FRAMES"
     );
     if let Some(frames) = repeat_frames {
         assert!(
@@ -3005,26 +3473,43 @@ fn main() -> ! {
     }
     print_capture_plan(mode, &bridge_after_isp, allocation);
 
-    let passed = match repeat_frames {
-        Some(frames) => run_repeated_capture(
-            &mut capture,
-            &mut i2c,
-            allocation,
-            test_pattern,
-            frames,
-            frame_export,
-            completion,
-            lcd.as_mut(),
-        ),
-        None => run_capture(
-            &mut capture,
-            &mut i2c,
-            mode,
-            allocation,
-            test_pattern,
-            frame_export,
-            completion,
-        ),
+    let (capture, passed) = match repeat_frames {
+        Some(frames) if stream => {
+            let (capture, passed) =
+                run_stream_capture(capture, &mut i2c, frames, test_pattern, quiet, lcd.as_mut());
+            if passed && env_flag(option_env!("CSI_STREAM_FAULTS")) {
+                run_stream_fault_cases(capture, &mut i2c)
+            } else {
+                (capture, passed)
+            }
+        }
+        Some(frames) => {
+            let passed = run_repeated_capture(
+                &mut capture,
+                &mut i2c,
+                allocation,
+                test_pattern,
+                frames,
+                frame_export,
+                completion,
+                lcd.as_mut(),
+                continuous_sensor,
+                quiet,
+            );
+            (capture, passed)
+        }
+        None => {
+            let passed = run_capture(
+                &mut capture,
+                &mut i2c,
+                mode,
+                allocation,
+                test_pattern,
+                frame_export,
+                completion,
+            );
+            (capture, passed)
+        }
     };
     if !passed {
         panic!("{}: no valid aligned frame", mode.label());

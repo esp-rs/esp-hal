@@ -16,11 +16,12 @@ use crate::{
     mipi_dsi::{
         ConfigError,
         MipiDsi,
-        vdma::{VdmaChannel, VdmaLinkItem},
+        vdma::{BLOCK_TFR_DONE, VdmaChannel, VdmaLinkItem},
     },
     mipi_dw_gdma::{DwGdmaChannel, register_channel_handler, unregister_channel_handler},
     peripherals::{Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST},
     soc::clocks::{ClockTree, MipiDsiDpiClkConfig, MipiDsiInstance},
+    time::{Duration, Instant},
 };
 
 const MAX_FBS: usize = 3;
@@ -30,6 +31,7 @@ const MAX_FBS: usize = 3;
 const NUM_LLIS: usize = 2;
 const DMA_BURST_LEN: u32 = 256;
 const FIFO_EMPTY_THRESHOLD: u32 = 1024 - DMA_BURST_LEN;
+const DMA_CHANNEL_DISABLE_TIMEOUT: Duration = Duration::from_millis(10);
 
 // ── Static link-list storage ──────────────────────────────────────────────────
 
@@ -167,6 +169,17 @@ fn dsi_bridge_isr() {
     }
 }
 
+/// Polls `condition` until it holds or `timeout` passes, then checks it once more.
+fn wait_until(timeout: Duration, mut condition: impl FnMut() -> bool) -> bool {
+    let deadline = Instant::now() + timeout;
+    while Instant::now() <= deadline {
+        if condition() {
+            return true;
+        }
+    }
+    condition()
+}
+
 // ── DsiDpi ────────────────────────────────────────────────────────────────────
 
 /// Video-mode (DPI) streaming handle.
@@ -186,9 +199,17 @@ impl Drop for DsiDpi<'_> {
     fn drop(&mut self) {
         // Disable block-done IRQ generation and stop only this channel.
         let channel = VdmaChannel::from_channel_id(self._guard.vdma_channel_id);
-        channel.set_block_done_interrupt(false);
         channel.stop();
         let dw_channel = DwGdmaChannel::new(self._guard.vdma_channel_id);
+        // The bridge keeps draining the FIFO, so the in-flight burst completes.
+        // The interrupt enables ignore writes until `CH_EN` reads back clear.
+        if !wait_until(DMA_CHANNEL_DISABLE_TIMEOUT, || !dw_channel.is_enabled()) {
+            dw_channel.trigger_abort();
+            wait_until(DMA_CHANNEL_DISABLE_TIMEOUT, || {
+                !dw_channel.is_enabled() && !dw_channel.abort_in_progress()
+            });
+        }
+        channel.set_block_done_interrupt(false);
         dw_channel.set_interrupt_signal_enable(0);
         unregister_channel_handler(dw_channel);
 
@@ -385,16 +406,20 @@ impl<'d> DsiDpi<'d> {
 
             // Flush the LLI descriptors from CPU cache → SRAM so the DMA sees them.
             storage.writeback();
-
-            VdmaChannel::new(vdma_channel_id).start(&storage[0]);
         });
+        let channel = VdmaChannel::new(vdma_channel_id);
 
         // ── VDMA block-done interrupt ──────────────────────────────────────
-        // Enable the block-transfer-done signal so the ISR fires after every
-        // frame block and re-arms the consumed LLI.
+        // Route only block-transfer-done, so the ISR fires after every frame
+        // block and re-arms the consumed LLI. The signal enable does not take
+        // writes once the channel is enabled, so this precedes `start`.
         DMA_INTERRUPTS.store(0, Ordering::Relaxed);
         register_channel_handler(DwGdmaChannel::new(vdma_channel_id), vdma_block_done_isr);
-        VdmaChannel::from_channel_id(vdma_channel_id).set_block_done_interrupt(true);
+        channel.set_block_done_interrupt(true);
+        DwGdmaChannel::new(vdma_channel_id).set_interrupt_signal_enable(BLOCK_TFR_DONE);
+        channel.clear_all_interrupts();
+
+        LLI_STORAGE.with(|storage| channel.start(&storage.get_mut()[0]));
 
         // ── Enable video mode ──────────────────────────────────────────────
         host.mode_cfg()
@@ -446,13 +471,12 @@ impl<'d> DsiDpi<'d> {
         // block is unaffected; the new pixels appear on the next block boundary.
         let src = self.fb_ptrs[back] as u32;
         LLI_STORAGE.with(|storage| {
-            let storage = storage.get_mut();
+            let mut storage = storage.get_mut();
             for lli in storage.iter() {
                 lli.set_source(src);
             }
+            storage.writeback();
         });
-
-        // The ISR will flush the cache, no need to do it here.
 
         self.current_fb = back;
     }
