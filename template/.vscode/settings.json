@@ -1,0 +1,12 @@
+{
+  "rust-analyzer.cargo.allTargets": false,
+  "rust-analyzer.cargo.target": "{{ chip.rust_target }}",
+  //%if chip.xtensa
+  "rust-analyzer.server.extraEnv": {
+    "RUSTUP_TOOLCHAIN": "stable"
+  },
+  "rust-analyzer.cargo.extraEnv": {
+    "RUSTUP_TOOLCHAIN": "{{ rust_toolchain }}"
+  },
+  //%endif
+}

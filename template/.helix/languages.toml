@@ -1,0 +1,14 @@
+[[language]]
+name = "rust"
+
+#%if chip.xtensa
+[language-server.rust-analyzer]
+environment.RUSTUP_TOOLCHAIN = "stable"
+
+#%endif
+[language-server.rust-analyzer.config]
+cargo.allTargets = false
+cargo.target = "{{ chip.rust_target }}"
+#%if chip.xtensa
+cargo.extraEnv.RUSTUP_TOOLCHAIN = "{{ rust_toolchain }}"
+#%endif

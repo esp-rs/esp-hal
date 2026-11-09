@@ -1,3 +1,7 @@
 # Keep user/runtime configuration values in this file.
 [env]
+#%if option("defmt")
+DEFMT_LOG="info"
+#%else if option("log")
 ESP_LOG="info"
+#%endif

@@ -31,7 +31,7 @@ jobs:
               '[.[] | select(.arch == $a) | .soc]' .github/chips.json)" >> "$GITHUB_OUTPUT"
           done
           echo "template=$(jq -c \
-            '[.[] | select(.soc != "esp32h4") | {soc, arch}]' \
+            '[.[] | select(.soc != "esp32h4") | {soc, arch, target: ."rust-target"}]' \
             .github/chips.json)" >> "$GITHUB_OUTPUT"
 
   esp-hal-riscv-nightly:
@@ -93,6 +93,15 @@ jobs:
     name: esp-generate template (${{ matrix.chip.soc }})
     needs: chips
     runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      TEMPLATE_SWEEP: >-
+        --all-combinations
+        --exclude-group module
+        --exclude-category editor
+        --exclude-category optional
+        --exclude-category toolchain
+        --cross-group base-template
     strategy:
       fail-fast: false
       matrix:
@@ -106,6 +115,10 @@ jobs:
           xtensa-buildtargets: ${{ matrix.chip.arch == 'xtensa' && matrix.chip.soc || '' }}
           riscv: ${{ matrix.chip.arch == 'riscv' }}
 
+      - name: Install nightly for stack-smashing-protection
+        if: matrix.chip.arch == 'riscv'
+        run: rustup toolchain install nightly --profile minimal --component rust-src,clippy,rustfmt --target ${{ matrix.chip.target }}
+
       - name: Install esp-generate
         run: |
           mkdir -p "$RUNNER_TEMP/esp-generate"
@@ -116,7 +129,7 @@ jobs:
           echo "$RUNNER_TEMP/esp-generate" >> "$GITHUB_PATH"
 
       - name: Build the esp-generate template
-        run: esp-generate --template template check -o ${{ matrix.chip.soc }} --all-combinations --build
+        run: esp-generate --template template check -o ${{ matrix.chip.soc }} $TEMPLATE_SWEEP --build
 
   check-global-symbols:
     name: Check Global Symbols in esp-hal

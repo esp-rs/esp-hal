@@ -1,0 +1,24 @@
+{
+    "lsp": {
+        "rust-analyzer": {
+            "initialization_options": {
+                "cargo": {
+                    "allTargets": false,
+                    "target": "{{ chip.rust_target }}",
+                    //%if chip.xtensa
+                    "extraEnv": {
+                        "RUSTUP_TOOLCHAIN": "{{ rust_toolchain }}"
+                    }
+                    //%endif
+                },
+                //%if chip.xtensa
+                "server": {
+                    "extraEnv": {
+                        "RUSTUP_TOOLCHAIN": "stable"
+                    }
+                },
+                //%endif
+            }
+        }
+    }
+}

@@ -1,26 +1,25 @@
 required:
   - chip
-
 options:
   - !Include plugin:chip
 
+  - !Include .template/module.yaml
+
   - !Option
     name: unstable-hal
-    display_name: Enable unstable esp-hal features.
+    display_name: Enable unstable HAL features.
+    help: "This configuration enables unstable esp-hal features.
+      These come with no stability guarantees, and could be changed or removed at any time."
 
   - !Option
     name: alloc
-    display_name: Enable allocations via esp-alloc.
-
-  - !Option
-    name: embassy
-    display_name: Add embassy framework support.
-    requires:
-      - unstable-hal
+    display_name: Enable allocations via the esp-alloc crate.
+    help: esp-alloc comes with no stability guarantees at this time.
 
   - !Option
     name: wifi
-    display_name: Enable Wi-Fi via esp-radio.
+    display_name: Enable Wi-Fi via the esp-radio crate.
+    help: esp-radio comes with no stability guarantees at this time.
     requires:
       - alloc
       - unstable-hal
@@ -30,10 +29,203 @@ options:
 
   - !Option
     name: ble-trouble
-    display_name: Enable BLE via esp-radio (embassy-trouble).
+    display_name: Enable BLE via the esp-radio crate (embassy-trouble).
+    help: esp-radio comes with no stability guarantees at this time.
     requires:
       - alloc
       - unstable-hal
       - embassy
     requires_capabilities:
       - chip.soc_has_bt
+
+  - !Option
+    name: embassy
+    display_name: Add embassy framework support.
+    help: esp-rtos module responsible for embassy support comes with no stability guarantees at this time.
+    selection_group: base-template
+    requires:
+      - unstable-hal
+
+  - !Option
+    name: stack-smashing-protection
+    display_name: Enable stack smashing protection.
+    requires_nightly: true
+    help: Requires nightly Rust. Note that this option generates additional checks in most functions
+      and will slow down your code.
+
+  - !Option
+    name: probe-rs
+    requires_tools: [probe-rs]
+    display_name: Use probe-rs to flash and monitor instead of espflash.
+    help: probe-rs is a debugger that connects to the chips over JTAG. It can be used to flash and
+      monitor, and it can also be used to interactively debug an application, or run tests on the
+      hardware. Semihosting or RTT-based technologies like defmt-rtt require probe-rs.
+    compatible:
+      chip:
+        - esp32c5
+        - esp32c6
+        - esp32c61
+        - esp32h2
+        - esp32s3
+        - esp32s31
+        - esp32p4
+
+  - !Option
+    name: probe-rs
+    requires_tools: [probe-rs]
+    display_name: Use probe-rs to flash and monitor instead of espflash.
+    help: probe-rs is a debugger that connects to the chips over JTAG. It can be used to flash and
+      monitor, and it can also be used to interactively debug an application, or run tests on the
+      hardware. Semihosting or RTT-based technologies like defmt-rtt require probe-rs.
+
+      probe-rs requires a debug probe like esp-prog, and will not work with USB-UART adapters that
+      often come on development boards.
+    compatible:
+      chip:
+        - esp32
+        - esp32s2
+        - esp32c2
+        - esp32c3
+
+  - !Category
+    name: flashing-probe-rs
+    display_name: Flashing, logging and debugging (probe-rs)
+    requires:
+      - probe-rs
+    options:
+      - !Option
+        name: defmt
+        display_name: Use defmt to print messages.
+        selection_group: log-frontend
+      - !Option
+        name: panic-rtt-target
+        display_name: Use panic-rtt-target as the panic handler.
+        selection_group: panic-handler
+        requires:
+          - probe-rs
+      - !Option
+        name: embedded-test
+        display_name: Enable embedded-test support.
+        requires:
+          - probe-rs
+      - !Option
+        name: cargo-embed
+        display_name: Add cargo-embed configuration.
+        help: Generates an Embed.toml file for flashing and monitoring with cargo-embed.
+        requires:
+          - probe-rs
+
+  - !Category
+    name: flashing-espflash
+    display_name: Flashing, logging and debugging (espflash)
+    requires:
+      - "!probe-rs"
+    options:
+      - !Option
+        name: log
+        display_name: Use the log crate to print messages.
+        selection_group: log-frontend
+        requires:
+          - "!probe-rs"
+      - !Option
+        name: defmt
+        display_name: Use defmt to print messages.
+        selection_group: log-frontend
+      - !Option
+        name: esp-backtrace
+        display_name: Use esp-backtrace as the panic handler.
+        selection_group: panic-handler
+        requires:
+          - "!probe-rs"
+
+  - !Category
+    name: optional
+    display_name: Options
+    options:
+      - !Option
+        name: wokwi
+        display_name: Add support for Wokwi simulation using VS Code Wokwi extension.
+        compatible:
+          chip:
+            - esp32
+            - esp32c3
+            - esp32c6
+            - esp32h2
+            - esp32s2
+            - esp32s3
+
+      - !Option
+        name: ci
+        display_name: Add GitHub Actions support with some basic checks.
+
+      - !Category
+        name: coding-agent-guidance
+        display_name: Add agent guidance file for coding agents.
+        help: Select the guidance filename that matches the coding agent you use.
+        options:
+          - !Option
+            name: agents
+            display_name: AGENTS.md
+            sets:
+              coding_agent_guidance_file: AGENTS.md
+            selection_group: coding-agent-guidance
+            help: Adds an AGENTS.md file with project-specific guidance and links that coding agents can use while working on this generated project.
+
+          - !Option
+            name: claude
+            display_name: CLAUDE.md
+            sets:
+              coding_agent_guidance_file: CLAUDE.md
+            selection_group: coding-agent-guidance
+            help: Adds a CLAUDE.md file with project-specific guidance and links that Claude can use while working on this generated project.
+
+          - !Option
+            name: codex
+            display_name: CODEX.md
+            sets:
+              coding_agent_guidance_file: CODEX.md
+            selection_group: coding-agent-guidance
+            help: Adds a CODEX.md file with project-specific guidance and links that Codex can use while working on this generated project.
+
+          - !Option
+            name: gemini
+            display_name: GEMINI.md
+            sets:
+              coding_agent_guidance_file: GEMINI.md
+            selection_group: coding-agent-guidance
+            help: Adds a GEMINI.md file with project-specific guidance and links that Gemini can use while working on this generated project.
+
+  - !Category
+    name: editor
+    display_name: Optional editor integration
+    options:
+      - !Option
+        name: helix
+        display_name: Add settings for Helix Editor
+
+      - !Option
+        name: neovim-classic
+        selection_group: neovim
+        display_name: Add settings for Neovim
+
+      - !Option
+        name: neovim-rustaceanvim
+        selection_group: neovim
+        display_name: Add settings for Neovim (with rustaceanvim)
+
+      - !Option
+        name: vscode
+        display_name: Add settings for Visual Studio Code
+
+      - !Option
+        name: zed
+        display_name: Add settings for Zed
+
+  - !Category
+    name: toolchain
+    display_name: Rust toolchain
+    options:
+      - !Option
+        name: ""
+        display_name: "Scanning installed toolchains..."
+        selection_group: toolchain

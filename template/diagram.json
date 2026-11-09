@@ -1,0 +1,45 @@
+{
+    "version": 1,
+    "editor": "wokwi",
+    "parts": [
+        {
+            //%if chip.name == "esp32"
+            "type": "board-esp32-devkit-c-v4",
+            //%else if chip.name == "esp32c3"
+            "type": "board-esp32-c3-devkitm-1",
+            //%else if chip.name == "esp32c6"
+            "type": "board-esp32-c6-devkitc-1",
+            //%else if chip.name == "esp32h2"
+            "type": "board-esp32-h2-devkitm-1",
+            //%else if chip.name == "esp32s2"
+            "type": "board-esp32-s2-devkitm-1",
+            //%else if chip.name == "esp32s3"
+            "type": "board-esp32-s3-devkitc-1",
+            //%endif
+            "id": "esp",
+            "top": 0.59,
+            "left": 0.67,
+            "attrs": {
+                "flashSize": "16"
+            }
+        }
+    ],
+    "connections": [
+        [
+            "esp:TX",
+            "$serialMonitor:RX",
+            "",
+            []
+        ],
+        [
+            "esp:RX",
+            "$serialMonitor:TX",
+            "",
+            []
+        ]
+    ],
+    "serialMonitor": {
+        "display": "terminal",
+        "convertEol": true
+    }
+}

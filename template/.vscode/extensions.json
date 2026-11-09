@@ -1,0 +1,13 @@
+{
+    "recommendations": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        //%if option("wokwi")
+        "Wokwi.wokwi-vscode",
+        //%endif
+        //%if option("probe-rs")
+        "probe-rs.probe-rs-debugger",
+        //%endif
+        "fill-labs.dependi"
+    ]
+}

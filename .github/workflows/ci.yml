@@ -487,6 +487,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      TEMPLATE_SWEEP: >-
+        --exclude-category editor
+        --exclude-category optional
+        --exclude-category toolchain
+        --cross-group base-template
     steps:
       - uses: actions/checkout@v6
 
@@ -495,6 +500,9 @@ jobs:
           xtensa: "true"
           xtensa-buildtargets: esp32s3
           riscv: "true"
+
+      - name: Install nightly for stack-smashing-protection
+        run: rustup toolchain install nightly --profile minimal --component rust-src,clippy,rustfmt --target riscv32imac-unknown-none-elf
 
       - uses: Swatinem/rust-cache@v2
 
@@ -511,10 +519,10 @@ jobs:
         run: esp-generate --template template check
 
       - name: Build the esp-generate template (RISC-V)
-        run: esp-generate --template template check -o esp32c6 --all-combinations --build
+        run: esp-generate --template template check -o esp32c6 $TEMPLATE_SWEEP --build
 
       - name: Build the esp-generate template (Xtensa)
-        run: esp-generate --template template check -o esp32s3 --all-combinations --build
+        run: esp-generate --template template check -o esp32s3 $TEMPLATE_SWEEP --build
 
   # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files

@@ -21,6 +21,12 @@ wokwi.toml
 **/.vscode/
 **/.zed/
 
+# ...except in the esp-generate template, which ships them for generated projects
+!/template/.vscode/
+!/template/.zed/
+!/template/diagram.json
+!/template/wokwi.toml
+
 # Ignore generated documentation
 docs/
 

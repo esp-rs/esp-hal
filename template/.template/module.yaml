@@ -1,0 +1,397 @@
+# Each module option declares:
+#   * `compatible.chip`     — limits it to its matching chip(s); the rest
+#                             are pruned at tree-build time by
+#                             `prune_chip_incompatible_options`.
+#   * `sets.remove_pins`    — limitation tags (from `esp_metadata_generated`
+#                             pin info) that the module reserves; the
+#                             generator emits `let _ = peripherals.GPIOn;`
+#                             stanzas for every chip pin that carries any
+#                             of these tags.
+
+!Category
+name: module
+display_name: Module/Board selection
+help: Select your specific ESP32 module. This selection is optional, but it will generate code to help you avoid using reserved GPIOs.
+options:
+  # ----- ESP32 -----
+  - !Option
+    name: esp32-wroom-32e
+    display_name: ESP32-WROOM-32E/32UE (4/8/16MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash, esp32_pico_v3]
+  - !Option
+    name: esp32-wrover-e
+    display_name: ESP32-WROVER-E/IE (4/8/16MB flash, 8MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash, spi_psram, esp32_pico_v3]
+  - !Option
+    name: esp32-mini-1
+    display_name: ESP32-MINI-1/1U (4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash, esp32_pico_v3]
+  - !Option
+    name: esp32-pico-mini-01
+    display_name: ESP32-PICO-MINI-02/02U (8MB flash, 2MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+  - !Option
+    name: esp32-pico-v3-zero
+    display_name: ESP32-PICO-V3-ZERO (4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32-wroom-32d
+    display_name: ESP32-WROOM-32D/32U (4/8/16MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash, esp32_pico_v3]
+  # ESP32-SOLO-1 omitted, weird single-core ESP32 variant
+  - !Option
+    name: esp32-wroom-32
+    display_name: ESP32-WROOM-32 (4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash, esp32_pico_v3]
+  - !Option
+    name: esp32-wrover-b
+    display_name: ESP32-WROVER-B/IB (4/8/16MB flash, 8MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash, spi_psram, esp32_pico_v3]
+  - !Option
+    name: esp32-wroom-da
+    display_name: ESP32-WROOM-DA (4/8/16MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash, esp32_pico_v3]
+  - !Option
+    name: esp32-du1906
+    display_name: ESP32-DU1906/DU1906-U (8MB flash, 8MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32]
+    sets:
+      remove_pins: [spi_flash, spi_psram, esp32_pico_v3]
+
+  # ----- ESP32-C2 -----
+  - !Option
+    name: esp32c2-mini-1
+    display_name: ESP8684-MINI-1/1U (1/2/4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32c2]
+    sets:
+      remove_pins: [spi_flash]
+  # TODO: these have different pins exposed, maybe separate them?
+  - !Option
+    name: esp32c2-wroom
+    display_name: ESP8684-WROOM-01C/02C/02UC/03/04C/05/06C/07 (2/4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32c2]
+    sets:
+      remove_pins: [spi_flash]
+
+  # ----- ESP32-C3 -----
+  - !Option
+    name: esp32c3-mini-1
+    display_name: ESP32-C3-MINI-1/1U (4MB embedded flash)
+    selection_group: module
+    compatible:
+      chip: [esp32c3]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32c3-wroom-02
+    display_name: ESP32-C3-WROOM-02/02U (4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32c3]
+    sets:
+      remove_pins: [spi_flash]
+  # TODO: these have different pins exposed, maybe separate them?
+  - !Option
+    name: esp32c3-wroom-03
+    display_name: ESP8685-WROOM-03/04/05/06/07 (2/4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32c3]
+    sets:
+      remove_pins: [spi_flash]
+
+  # ----- ESP32-C5 -----
+  - !Option
+    name: esp32c5-wroom-1
+    display_name: ESP32-C5-WROOM-1/1U (Without PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32c5]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32c5-wroom-1-psram
+    display_name: ESP32-C5-WROOM-1/1U (8MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32c5]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+  - !Option
+    name: esp32c5-mini-1
+    display_name: ESP32-C5-MINI-1/1U (Without PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32c5]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32c5-mini-1-psram
+    display_name: ESP32-C5-MINI-1/1U (8MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32c5]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+
+  # ----- ESP32-C6 -----
+  - !Option
+    name: esp32c6-mini-1
+    display_name: ESP32-C6-MINI-1/1U (4/8MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32c6]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32c6-wroom-1
+    display_name: ESP32-C6-WROOM-1/1U (4/8/16MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32c6]
+    sets:
+      remove_pins: [spi_flash]
+
+  # ----- ESP32-C61 -----
+  - !Option
+    name: esp32c61-wroom-1
+    display_name: ESP32-C61-WROOM-1/1U
+    selection_group: module
+    compatible:
+      chip: [esp32c61]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+  - !Option
+    name: esp32c61-mini-1
+    display_name: ESP32-C61-MINI-1/1U
+    selection_group: module
+    compatible:
+      chip: [esp32c61]
+    sets:
+      remove_pins: [spi_flash]
+
+  # ----- ESP32-H2 -----
+  - !Option
+    name: esp32h2-mini-1
+    display_name: ESP32-H2-MINI-1/1U (1/2/4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32h2]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32h2-wroom-02c
+    display_name: ESP32-H2-WROOM-02C (2/4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32h2]
+    sets:
+      remove_pins: [spi_flash]
+
+  # ----- ESP32-S2 -----
+  - !Option
+    name: esp32s2-mini-2
+    display_name: ESP32-S2-MINI-2/2U (4MB embedded flash)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32s2-mini-2-psram
+    display_name: ESP32-S2-MINI-2/2U (4MB embedded flash, 2MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+  - !Option
+    name: esp32s2-solo-2
+    display_name: ESP32-S2-SOLO-2/2U (4MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32s2-solo-2-psram
+    display_name: ESP32-S2-SOLO-2/2U (4MB embedded flash, 2MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+  - !Option
+    name: esp32s2-mini-1
+    display_name: ESP32-S2-MINI-1/1U (4MB embedded flash)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32s2-mini-1-psram
+    display_name: ESP32-S2-MINI-1/1U (4MB embedded flash, 2MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+  - !Option
+    name: esp32s2-solo
+    display_name: ESP32-S2-SOLO/SOLO-U (4/8/16MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32s2-solo-psram
+    display_name: ESP32-S2-SOLO/SOLO-U (4/8/16MB embedded flash, 2MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+  - !Option
+    name: esp32s2-wrover
+    display_name: ESP32-S2-WROVER/WROVER-I (4/8/16MB flash, 2MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+  - !Option
+    name: esp32s2-wroom
+    display_name: ESP32-S2-WROOM/WROOM-I (4/8/16MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32s2]
+    sets:
+      remove_pins: [spi_flash]
+
+  # ----- ESP32-S3 -----
+  - !Option
+    name: esp32s3-wroom-1
+    display_name: ESP32-S3-WROOM-1/1U (4/8/16MB flash)
+    selection_group: module
+    compatible:
+      chip: [esp32s3]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32s3-wroom-1-psram
+    display_name: ESP32-S3-WROOM-1/1U (4/8/16MB flash, 2MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s3]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+  - !Option
+    name: esp32s3-wroom-1-octal-psram
+    display_name: ESP32-S3-WROOM-1/1U (4/8/16MB flash, 8/16MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s3]
+    sets:
+      remove_pins: [spi_flash, octal_psram]
+  - !Option
+    name: esp32s3-wroom-2
+    display_name: ESP32-S3-WROOM-2 (16/32MB flash, 8/16MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s3]
+    sets:
+      remove_pins: [octal_flash, octal_psram]
+  - !Option
+    name: esp32s3-mini-1
+    display_name: ESP32-S3-MINI-1/1U (4/8MB embedded flash)
+    selection_group: module
+    compatible:
+      chip: [esp32s3]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32s3-mini-1-psram
+    display_name: ESP32-S3-MINI-1/1U (4/8MB embedded flash, 2MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s3]
+    sets:
+      remove_pins: [spi_flash, spi_psram]
+
+  # ----- ESP32-S31 -----
+  - !Option
+    name: esp32s31-wroom-1
+    display_name: ESP32-S31-WROOM-1 (8/16/32MB flash, 16/32MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s31]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32s31-wroom-1u
+    display_name: ESP32-S31-WROOM-1U (16MB flash, 16MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s31]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32s31-wroom-3
+    display_name: ESP32-S31-WROOM-3 (8/16/32MB flash, 16/32MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s31]
+    sets:
+      remove_pins: [spi_flash]
+  - !Option
+    name: esp32s31-wroom-3u
+    display_name: ESP32-S31-WROOM-3U (16MB flash, 16MB PSRAM)
+    selection_group: module
+    compatible:
+      chip: [esp32s31]
+    sets:
+      remove_pins: [spi_flash]

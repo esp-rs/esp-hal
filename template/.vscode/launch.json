@@ -1,0 +1,60 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        //%if option("probe-rs")
+        {
+            "type": "probe-rs-debug",
+            "request": "launch",
+            "name": "Launch",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "build-debug",
+            "chip": "{{ chip.name }}",
+            "flashingConfig": {
+                "flashingEnabled": true,
+                "haltAfterReset": true,
+                "verifyBeforeFlashing": true,
+                "formatOptions": {
+                    "binaryFormat": "idf"
+                }
+            },
+            "coreConfigs": [
+                {
+                    "coreIndex": 0,
+                    "programBinary": "target/{{ chip.rust_target }}/debug/${workspaceFolderBasename}",
+                    "rttEnabled": true,
+                    //%if option("defmt")
+                    "rttChannelFormats": [
+                        {
+                            "channelNumber": 0,
+                            "dataFormat": "Defmt",
+                        }
+                    ],
+                    //%endif
+                }
+            ]
+        },
+        {
+            "type": "probe-rs-debug",
+            "request": "attach",
+            "name": "Attach",
+            "cwd": "${workspaceFolder}",
+            "chip": "{{ chip.name }}",
+            "coreConfigs": [
+                {
+                    "coreIndex": 0,
+                    "programBinary": "target/{{ chip.rust_target }}/debug/${workspaceFolderBasename}",
+                    "rttEnabled": true,
+                    //%if option("defmt")
+                    "rttChannelFormats": [
+                        {
+                            "channelNumber": 0,
+                            "dataFormat": "Defmt",
+                        }
+                    ],
+                    //%endif
+                }
+            ]
+        }
+        //%endif
+    ]
+}

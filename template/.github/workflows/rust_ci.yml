@@ -1,0 +1,57 @@
+---
+# GitHub Actions uses `${{ … }}`, which collides with the default `{{ … }}`
+# interpolation. Pick delimiters that cannot occur in a workflow file.
+expr: <% %>
+---
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/README.md"
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+#%if chip.xtensa
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#%endif
+
+jobs:
+  rust-checks:
+    name: Rust Checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        action:
+          - command: build
+            args: --release
+          - command: fmt
+            args: --all -- --check
+          - command: clippy
+            args: --all-features --workspace -- -D warnings
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Rust
+#%if chip.riscv
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: <% chip.rust_target %>
+          toolchain: stable
+          components: rust-src, rustfmt, clippy
+#%else if chip.xtensa
+#+        uses: esp-rs/xtensa-toolchain@v1.5
+#+        with:
+#+          default: true
+#+          buildtargets: <% chip.name %>
+#+          ldproxy: false
+#%endif
+      - name: Enable caching
+        uses: Swatinem/rust-cache@v2
+      - name: Run command
+        run: cargo ${{ matrix.action.command }} ${{ matrix.action.args }}

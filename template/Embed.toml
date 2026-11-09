@@ -1,0 +1,18 @@
+# For all available options, see the probe-rs default configuration:
+# https://github.com/probe-rs/probe-rs/blob/master/probe-rs-tools/src/bin/probe-rs/cmd/cargo_embed/config/default.toml
+[default.probe]
+protocol = "Jtag"
+
+[default.general]
+chip = "{{ chip.name }}"
+
+[default.rtt]
+enabled = true
+#%if option("defmt")
+up_channels = [
+    { channel = 0, format = "Defmt" },
+]
+tabs = [
+    { up_channel = 0, name = "Logs" },
+]
+#%endif
