@@ -15,6 +15,10 @@
 //! - `CSI_TEST_PATTERN=1`: SC2336 test pattern instead of the image.
 //! - `CSI_HOST_ERRORS=1`: unmask the CSI host error interrupts, so that host errors end the
 //!   capture.
+//! - `CSI_DMA_PROFILE`: AXI settings of the CSI DMA channel. `dst-osr-1` (default) allows one
+//!   outstanding frame-buffer write, `dst-awlen-4` uses 4-beat frame-buffer writes, `src-osr-1`
+//!   allows one outstanding bridge read, and `idf` keeps the ESP-IDF driver settings. The first
+//!   three passed `vdma-mem2mem-psram` into 250 MHz PSRAM, where the `idf` settings stalled.
 //% CHIP_FILTER: mipi_csi_driver_supported && i2c_master_driver_supported
 //% FEATURES: unstable
 
@@ -48,6 +52,7 @@ use esp_hal::{
         CsiCapture,
         DataLanes,
         DiscardContinueDiagnostic,
+        DmaAxiConfig,
         MipiCsi,
         ReceiveError,
     },
@@ -426,6 +431,66 @@ impl CaptureMode {
 
 fn env_flag(value: Option<&str>) -> bool {
     value == Some("1")
+}
+
+/// Same names and changes as `VDMA_MEM2MEM_DMA_PROFILE` in `vdma-mem2mem-psram`.
+fn selected_dma_profile() -> (&'static str, DmaAxiConfig) {
+    let idf = DmaAxiConfig::ESP_IDF;
+    match option_env!("CSI_DMA_PROFILE") {
+        None | Some("dst-osr-1") => (
+            "dst-osr-1",
+            DmaAxiConfig {
+                dst_outstanding_requests: 1,
+                ..idf
+            },
+        ),
+        Some("dst-awlen-4") => (
+            "dst-awlen-4",
+            DmaAxiConfig {
+                dst_burst_len: 4,
+                ..idf
+            },
+        ),
+        Some("src-osr-1") => (
+            "src-osr-1",
+            DmaAxiConfig {
+                src_outstanding_requests: 1,
+                ..idf
+            },
+        ),
+        Some("idf") => ("idf", idf),
+        Some(other) => panic!(
+            "CSI_DMA_PROFILE must be dst-osr-1, dst-awlen-4, src-osr-1, or idf, got '{other}'"
+        ),
+    }
+}
+
+/// Decodes the channel registers that the AXI profile and the CSI flow setup
+/// program. `CTL0` and `CTL1` are only written when a capture is armed.
+fn print_dma_axi_readback(stage: &str, snapshot: &CaptureDebugSnapshot) {
+    let cfg1 = snapshot.dma_cfg1_raw;
+    let ctl0 = snapshot.dma_ctl0_raw;
+    let ctl1 = snapshot.dma_ctl1_raw;
+    println!(
+        "dma-axi({stage}): tt_fc={} hs_sel_src={} src_per={} src_outstanding={} dst_outstanding={} sms={} dms={} sinc_fixed={} dinc_fixed={} src_width={} dst_width={} src_msize={} dst_msize={} arlen_en={} arlen={} awlen_en={} awlen={}",
+        cfg1 & 0x7,
+        (cfg1 >> 3) & 1,
+        (cfg1 >> 7) & 0x3,
+        ((cfg1 >> 23) & 0xf) + 1,
+        ((cfg1 >> 27) & 0xf) + 1,
+        ctl0 & 1,
+        (ctl0 >> 2) & 1,
+        (ctl0 >> 4) & 1,
+        (ctl0 >> 6) & 1,
+        (ctl0 >> 8) & 0x7,
+        (ctl0 >> 11) & 0x7,
+        (ctl0 >> 14) & 0xf,
+        (ctl0 >> 18) & 0xf,
+        (ctl1 >> 6) & 1,
+        (ctl1 >> 7) & 0xff,
+        (ctl1 >> 15) & 1,
+        (ctl1 >> 16) & 0xff,
+    );
 }
 
 // Words after the capture slice. The driver panics when the DMA destination
@@ -1206,7 +1271,9 @@ fn run_capture(
     let capture_len = mode.expected_bytes();
 
     let _ = print_isp_input_gate_readback("before-arm");
-    print_capture_debug_snapshot("before-arm", &capture.debug_snapshot());
+    let before_arm = capture.debug_snapshot();
+    print_capture_debug_snapshot("before-arm", &before_arm);
+    print_dma_axi_readback("before-arm", &before_arm);
     clear_isp_interrupts();
 
     fill_sentinel(allocation);
@@ -1232,6 +1299,7 @@ fn run_capture(
     );
     let after = capture.debug_snapshot();
     print_capture_debug_snapshot("after-shutdown", &after);
+    print_dma_axi_readback("after-shutdown", &after);
     print_dma_block_registers(label, &after);
     print!("{label}: isp int_raw at receive return=0x{isp_int_raw:08x}");
     print_bit_names(isp_int_raw, ISP_INT_NAMES);
@@ -1605,11 +1673,13 @@ fn main() -> ! {
     let mode = CaptureMode::selected();
     let test_pattern = env_flag(option_env!("CSI_TEST_PATTERN"));
     let host_errors = env_flag(option_env!("CSI_HOST_ERRORS"));
+    let (dma_profile_name, dma_profile) = selected_dma_profile();
     println!(
-        "SC2336 capture start: mode={} test_pattern={} host_errors_unmasked={}",
+        "SC2336 capture start: mode={} test_pattern={} host_errors_unmasked={} dma_profile={}",
         mode.label(),
         test_pattern,
-        host_errors
+        host_errors,
+        dma_profile_name
     );
     println!("Board assumptions: SCCB SCL=GPIO8, SDA=GPIO7, addr=0x30");
     println!("Board assumptions: reset/pwdn/xclk are hardware-managed on this sub-board");
@@ -1696,6 +1766,19 @@ fn main() -> ! {
             .with_timeout(Duration::from_millis(500)),
     )
     .unwrap();
+
+    capture
+        .set_diagnostic_dma_axi_config(dma_profile)
+        .expect("DMA profile fields are in range");
+    let applied = capture.dma_axi_config();
+    println!(
+        "dma-profile: name={} src_burst_len={} dst_burst_len={} src_outstanding={} dst_outstanding={}",
+        dma_profile_name,
+        applied.src_burst_len,
+        applied.dst_burst_len,
+        applied.src_outstanding_requests,
+        applied.dst_outstanding_requests
+    );
 
     apply_idf_default_bridge_data_type_filter();
     println!(

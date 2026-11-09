@@ -78,7 +78,8 @@ const DW_GDMA_BURST_SIZE_512_ITEMS: u8 = 8;
 const DW_GDMA_WIDTH_64_BITS: u8 = 3;
 const DW_GDMA_AXI_BURST_LEN_16: u8 = 16;
 const DW_GDMA_CHANNEL_PRIORITY: u8 = 1;
-const DW_GDMA_OSR_LIMIT_5_REQUESTS: u8 = 4;
+const DW_GDMA_OUTSTANDING_REQUESTS_5: u8 = 5;
+const DW_GDMA_MAX_OUTSTANDING_REQUESTS: u8 = 16;
 const DW_GDMA_HW_HANDSHAKE_PERIPH_CSI: u8 = 1;
 // TRM v0.7 §7.5.7.2: after `CH_EN` is cleared, the channel stops reading the
 // source only once the AXI reads it already issued there complete. The bridge
@@ -138,24 +139,76 @@ const DMA_STATUS_ENABLE_MASK: u32 = DMA_STATUS_BLOCK_TRANSFER_DONE
 const CSI_BRIDGE_INTERRUPT_MASK: u32 = 0x3F;
 const DISCARD_DIAG_DAR_SAMPLES: usize = 8;
 
-const CSI_DMA_CHANNEL_CONFIG: ChannelConfig = ChannelConfig {
-    src_multblk_type: 0,
-    dst_multblk_type: 0,
-    // P->M transfer with source (CSI peripheral) flow control.
-    transfer_type_flow_control: DW_GDMA_TT_FC_P2M_SRC,
-    src_handshake: HandshakeSelect::Hardware,
-    dst_handshake: HandshakeSelect::Hardware,
-    // DW-GDMA HW handshake peripheral selector: CSI=1 (DSI=0, CSI=1, ISP=2).
-    src_peripheral: DW_GDMA_HW_HANDSHAKE_PERIPH_CSI,
-    dst_peripheral: 0,
-    // IDF configures the CSI bridge status aperture as source status-fetch
-    // address for this source-controlled P2M transfer path.
-    src_status_fetch_addr: CSI_BRG_MEM_BASE,
-    dst_status_fetch_addr: 0,
-    priority: DW_GDMA_CHANNEL_PRIORITY,
-    src_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
-    dst_outstanding_limit: DW_GDMA_OSR_LIMIT_5_REQUESTS,
-};
+const fn csi_dma_channel_config(axi: DmaAxiConfig) -> ChannelConfig {
+    ChannelConfig {
+        src_multblk_type: 0,
+        dst_multblk_type: 0,
+        // P->M transfer with source (CSI peripheral) flow control.
+        transfer_type_flow_control: DW_GDMA_TT_FC_P2M_SRC,
+        src_handshake: HandshakeSelect::Hardware,
+        dst_handshake: HandshakeSelect::Hardware,
+        // DW-GDMA HW handshake peripheral selector: CSI=1 (DSI=0, CSI=1, ISP=2).
+        src_peripheral: DW_GDMA_HW_HANDSHAKE_PERIPH_CSI,
+        dst_peripheral: 0,
+        // IDF configures the CSI bridge status aperture as source status-fetch
+        // address for this source-controlled P2M transfer path.
+        src_status_fetch_addr: CSI_BRG_MEM_BASE,
+        dst_status_fetch_addr: 0,
+        priority: DW_GDMA_CHANNEL_PRIORITY,
+        // `CFG1.*_OSR_LMT` holds the request count minus one.
+        src_outstanding_limit: axi.src_outstanding_requests - 1,
+        dst_outstanding_limit: axi.dst_outstanding_requests - 1,
+    }
+}
+
+/// AXI burst lengths and outstanding-request limits of the CSI DMA channel.
+///
+/// [`Self::ESP_IDF`] is used unless a bring-up diagnostic replaces it with
+/// `CsiCapture::set_diagnostic_dma_axi_config`.
+#[instability::unstable]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct DmaAxiConfig {
+    /// `CTL1.ARLEN` for reads from the CSI bridge FIFO, 1 to 16.
+    ///
+    /// The hardware reads a written 16 back as 15.
+    pub src_burst_len: u8,
+    /// `CTL1.AWLEN` for writes into the frame buffer, 1 to 16.
+    ///
+    /// The hardware reads a written 16 back as 15.
+    pub dst_burst_len: u8,
+    /// Outstanding read requests to the CSI bridge, 1 to 16.
+    pub src_outstanding_requests: u8,
+    /// Outstanding write requests to the frame buffer, 1 to 16.
+    pub dst_outstanding_requests: u8,
+}
+
+impl DmaAxiConfig {
+    /// Settings of the ESP-IDF v6.1 CSI driver (`esp_cam_ctlr_csi.c`).
+    pub const ESP_IDF: Self = Self {
+        src_burst_len: DW_GDMA_AXI_BURST_LEN_16,
+        dst_burst_len: DW_GDMA_AXI_BURST_LEN_16,
+        src_outstanding_requests: DW_GDMA_OUTSTANDING_REQUESTS_5,
+        dst_outstanding_requests: DW_GDMA_OUTSTANDING_REQUESTS_5,
+    };
+
+    #[cfg(feature = "unstable")]
+    const fn is_valid(&self) -> bool {
+        const fn in_range(value: u8, max: u8) -> bool {
+            value >= 1 && value <= max
+        }
+        in_range(self.src_burst_len, DW_GDMA_AXI_BURST_LEN_16)
+            && in_range(self.dst_burst_len, DW_GDMA_AXI_BURST_LEN_16)
+            && in_range(
+                self.src_outstanding_requests,
+                DW_GDMA_MAX_OUTSTANDING_REQUESTS,
+            )
+            && in_range(
+                self.dst_outstanding_requests,
+                DW_GDMA_MAX_OUTSTANDING_REQUESTS,
+            )
+    }
+}
 
 // IDF: MIPI_CSI_PHY_CLK_SRC_PLL_F20M
 const PHY_CFG_CLK_SRC_PLL_F20M: u8 = 0;
@@ -388,6 +441,9 @@ pub enum CaptureConfigError {
     FrameSizeNotAlignedToTransferWidth,
     /// The frame transfer exceeds the DW-GDMA single-block limit.
     FrameTooLargeForSingleDmaBlock,
+    /// A [`DmaAxiConfig`] field is outside its documented range.
+    #[cfg(feature = "unstable")]
+    InvalidDmaAxiConfig,
 }
 
 impl fmt::Display for CaptureConfigError {
@@ -404,6 +460,13 @@ impl fmt::Display for CaptureConfigError {
             }
             Self::FrameTooLargeForSingleDmaBlock => {
                 write!(f, "frame exceeds DW-GDMA single-block transfer limit")
+            }
+            #[cfg(feature = "unstable")]
+            Self::InvalidDmaAxiConfig => {
+                write!(
+                    f,
+                    "DMA AXI burst length or outstanding-request limit out of range"
+                )
             }
         }
     }
@@ -1143,6 +1206,7 @@ pub struct CsiCapture<'d> {
     csi: MipiCsi<'d>,
     config: ValidatedCaptureConfig,
     dma_channel: DwGdmaChannel,
+    dma_axi: DmaAxiConfig,
     _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
     _owned_dma_channel: OwnedCsiDmaChannel<'d>,
     #[cfg(feature = "unstable")]
@@ -1201,7 +1265,7 @@ impl<'d> MipiCsi<'d> {
 
         let dma_channel = DwGdmaChannel::new(channel_id);
         dma_channel.set_enabled(false);
-        dma_channel.configure(CSI_DMA_CHANNEL_CONFIG);
+        dma_channel.configure(csi_dma_channel_config(DmaAxiConfig::ESP_IDF));
         dma_channel.set_interrupt_status_enable(DMA_STATUS_ENABLE_MASK);
         dma_channel.set_interrupt_signal_enable(0);
         dma_channel.clear_all_interrupts();
@@ -1213,6 +1277,7 @@ impl<'d> MipiCsi<'d> {
             csi: self,
             config,
             dma_channel,
+            dma_axi: DmaAxiConfig::ESP_IDF,
             _vdma_guard: vdma_guard,
             _owned_dma_channel: owned_dma_channel,
             #[cfg(feature = "unstable")]
@@ -1539,6 +1604,35 @@ impl CsiCapture<'_> {
         self.config.frame_bytes = bytes;
         self.config.transfer_size_units = units;
         Ok(())
+    }
+
+    /// Replaces the [`DmaAxiConfig::ESP_IDF`] AXI settings used by the next
+    /// `receive`.
+    ///
+    /// Flow control, handshake, addressing, transfer width and burst items stay
+    /// as ESP-IDF programs them.
+    #[cfg(feature = "unstable")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    pub fn set_diagnostic_dma_axi_config(
+        &mut self,
+        config: DmaAxiConfig,
+    ) -> Result<(), CaptureConfigError> {
+        if !config.is_valid() {
+            return Err(CaptureConfigError::InvalidDmaAxiConfig);
+        }
+        // `CFG1` may only be written while the channel is disabled. `receive`
+        // either leaves the channel stopped or panics.
+        debug_assert!(!self.dma_channel.is_enabled());
+        self.dma_axi = config;
+        self.dma_channel.configure(csi_dma_channel_config(config));
+        Ok(())
+    }
+
+    /// Returns the AXI settings the next `receive` programs.
+    #[cfg(feature = "unstable")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    pub fn dma_axi_config(&self) -> DmaAxiConfig {
+        self.dma_axi
     }
 
     /// Enables the temporary diagnostic that continues after `CSI_BRIG_DISCARD`.
@@ -1871,7 +1965,7 @@ impl CsiCapture<'_> {
                     ll_pointer_master: LlPointerMasterSelect::Peripheral,
                     addr_inc_mode: AddressIncrementMode::Fixed,
                     burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
-                    axi_burst_len: DW_GDMA_AXI_BURST_LEN_16,
+                    axi_burst_len: self.dma_axi.src_burst_len,
                     width: DW_GDMA_WIDTH_64_BITS,
                 },
                 dst: BlockTransferEndpointConfig {
@@ -1879,7 +1973,7 @@ impl CsiCapture<'_> {
                     ll_pointer_master: LlPointerMasterSelect::Memory,
                     addr_inc_mode: AddressIncrementMode::Increment,
                     burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
-                    axi_burst_len: DW_GDMA_AXI_BURST_LEN_16,
+                    axi_burst_len: self.dma_axi.dst_burst_len,
                     width: DW_GDMA_WIDTH_64_BITS,
                 },
                 transfer_size_in_units: self.config.transfer_size_units,
