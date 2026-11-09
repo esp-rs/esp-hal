@@ -158,7 +158,8 @@ impl Ipc {
     /// - If `core` holds a different function, this call waits until `core` takes that function.
     ///   `core` takes it in a minimum-priority interrupt. That interrupt cannot run in an
     ///   interrupt-free context, and cannot run on the APP CPU while that CPU is in reset. The wait
-    ///   never ends in those cases.
+    ///   never ends in those cases. That interrupt also cannot run while `core` is parked. Do not
+    ///   call this function from code that interrupts the code that parked `core`.
     ///
     /// The wait does not mask interrupts. Code at a higher run level can run, and can post a
     /// function of its own.
