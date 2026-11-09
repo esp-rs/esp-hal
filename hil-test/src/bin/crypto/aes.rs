@@ -680,4 +680,91 @@ mod work_queue_dma_tests {
         // Different alignments in external memory
         run_unaligned_dma_tests::<MAX_SHIFT>(&mut external_memory);
     }
+
+    // 128 bytes is the longest data cache line in front of memory that the DMA writes.
+    const SHARED_LINE: usize = 128;
+    // The output is long, so that its last line stays unwritten while the CPU reads the bytes
+    // beside it.
+    const SHARED_LINE_OUTPUT_LEN: usize = 4_000;
+    const SHARED_LINE_MEMORY_LEN: usize = SHARED_LINE + 16 + SHARED_LINE_OUTPUT_LEN + 16;
+
+    /// Encrypts into an output that shares its first and last cache lines with other bytes. The
+    /// CPU reads and writes those bytes while the DMA runs. The output must hold the DMA's data,
+    /// and the other bytes must keep the CPU's writes.
+    ///
+    /// The output starts 16 bytes into a cache line, which meets the DMA's block alignment, and
+    /// ends partway into another line.
+    fn run_output_shares_cache_lines(memory: &mut [u8]) {
+        let addr = memory.as_ptr().addr();
+        let line_start = addr.next_multiple_of(SHARED_LINE) - addr;
+        let (before, rest) = memory[line_start..].split_at_mut(16);
+        let (output, rest) = rest.split_at_mut(SHARED_LINE_OUTPUT_LEN);
+        let after = &mut rest[..16];
+
+        // ECB encrypts block by block, so a repeated plaintext has a repeated ciphertext.
+        let mut block = [0; PLAINTEXT_BUF_SIZE];
+        fill_with_plaintext(&mut block);
+        let mut plaintext =
+            Vec::with_capacity_in(SHARED_LINE_OUTPUT_LEN, esp_alloc::InternalMemory);
+        plaintext.extend((0..SHARED_LINE_OUTPUT_LEN).map(|i| block[i % PLAINTEXT_BUF_SIZE]));
+        let mut expected = Vec::with_capacity_in(SHARED_LINE_OUTPUT_LEN, esp_alloc::InternalMemory);
+        expected.extend(
+            (0..SHARED_LINE_OUTPUT_LEN).map(|i| CIPHERTEXT_ECB_128[i % PLAINTEXT_BUF_SIZE]),
+        );
+
+        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+        let mut handle = ecb_encrypt.process(&plaintext, output).unwrap();
+
+        let mut last = 0xa5;
+        for byte in before.iter_mut().chain(after.iter_mut()) {
+            unsafe { core::ptr::write_volatile(byte, last) };
+        }
+        let mut count: u32 = 0;
+        while !handle.poll() {
+            count = count.wrapping_add(1);
+            last = count as u8;
+            for byte in before.iter_mut().chain(after.iter_mut()) {
+                // The read pulls the shared line into the cache, and the write dirties it.
+                let _ = unsafe { core::ptr::read_volatile(byte) };
+                unsafe { core::ptr::write_volatile(byte, last) };
+            }
+        }
+        core::mem::drop(handle);
+
+        let expected = &expected[..];
+        hil_test::assert_eq!(&output[..], expected, "output, {} polls", count);
+        hil_test::assert!(
+            before.iter().all(|&b| b == last),
+            "bytes before the output, {} polls",
+            count
+        );
+        hil_test::assert!(
+            after.iter().all(|&b| b == last),
+            "bytes after the output, {} polls",
+            count
+        );
+    }
+
+    #[test]
+    fn test_aes_dma_output_shares_cache_lines(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let mut internal_memory =
+            Vec::with_capacity_in(SHARED_LINE_MEMORY_LEN, esp_alloc::InternalMemory);
+        internal_memory.resize(SHARED_LINE_MEMORY_LEN, 0);
+
+        run_output_shares_cache_lines(&mut internal_memory);
+    }
+
+    #[test]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
+    fn test_aes_dma_psram_output_shares_cache_lines(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let mut external_memory =
+            Vec::with_capacity_in(SHARED_LINE_MEMORY_LEN, esp_alloc::ExternalMemory);
+        external_memory.resize(SHARED_LINE_MEMORY_LEN, 0);
+
+        run_output_shares_cache_lines(&mut external_memory);
+    }
 }
