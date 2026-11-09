@@ -589,6 +589,17 @@ mod tests {
         let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
         let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
+        // Without DMA burst, the ESP32-C6 RX DMA falls behind 16 lines at 20 MHz while TX DMA
+        // runs. The RX FIFO then overwrites unread samples and sets no overflow flag.
+        let burst = cfg_select! {
+            dma_can_access_psram => {
+                esp_hal::dma::BurstConfig::from(esp_hal::dma::InternalBurstConfig::Enabled)
+            }
+            _ => esp_hal::dma::BurstConfig::Enabled,
+        };
+        dma_rx_buf.set_burst_config(burst).unwrap();
+        dma_tx_buf.set_burst_config(burst).unwrap();
+
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
         let [
