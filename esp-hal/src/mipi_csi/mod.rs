@@ -1,14 +1,59 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
 //! MIPI CSI-2 receiver controller (ESP32-P4).
 //!
-//! Configures CSI HOST + CSI BRIDGE and supports single-frame blocking
-//! peripheral-to-memory capture through the shared DW-GDMA VDMA controller.
+//! Configures the CSI host, the CSI bridge and the ISP in bypass, and captures
+//! frames into memory through one channel of the shared DW-GDMA (VDMA)
+//! controller. Sensor setup, for example over SCCB, is not part of this
+//! driver.
 //!
-//! # Power requirements
+//! # Supported configurations
 //!
-//! `VDD_MIPI_DPHY` must already be powered and stable before calling
-//! [`MipiCsi::new`]. This module does not currently own or control the PMU VO3
-//! rail that supplies the D-PHY domain.
+//! - 1 or 2 data lanes, 90 to 1500 Mbps per lane.
+//! - RAW8 (data type `0x2a`) only, stored one byte per pixel, unprocessed. The Bayer order is
+//!   whatever the sensor sends.
+//! - Frame width and height up to 4095 pixels, with a frame size that is a multiple of 8 bytes and
+//!   fits one DMA block.
+//!
+//! Verified on hardware with an SC2336 sensor on the ESP32-P4 Function EV
+//! Board: 2 lanes at 288 Mbps, 1024 × 600 RAW8 at 30 fps into PSRAM, and
+//! 64 KiB blocks into internal memory, alone and while MIPI-DSI streams to a
+//! panel. 1 lane, other lane rates, other resolutions and other sensors use the
+//! same code but are not verified.
+//!
+//! # Power
+//!
+//! The CSI and DSI D-PHYs share the `VDD_MIPI_DPHY` rail (PMU VO3 at 2.5 V).
+//! [`MipiCsi::new`] switches it on if it is off, and the rail stays on until
+//! neither this driver nor the MIPI-DSI driver uses it.
+//!
+//! # Buffers
+//!
+//! Frame buffers must be DMA-capable and DMA-aligned, in internal memory or
+//! PSRAM. The driver does the cache maintenance: it writes the buffer back
+//! before the DMA starts and invalidates it before handing it back.
+//!
+//! # Capture modes
+//!
+//! - Single frame: [`CsiCapture::receive`], [`CsiCapture::receive_with`] and
+//!   [`CsiCapture::receive_with_interrupt`] borrow the buffer for one frame and block until it
+//!   completes, fails or times out.
+//! - Continuous: [`CsiCapture::into_stream`] takes two `'static` buffers. The DMA interrupt starts
+//!   each frame on the other buffer, and [`CsiStream::next_frame`] hands out the newest completed
+//!   frame, which the DMA does not write while the [`StreamFrame`] lives. `next_frame` waits by
+//!   polling, there is no async interface yet.
+//!
+//! # Shutdown
+//!
+//! The DMA channel is always stopped, with a bounded wait, before a buffer is
+//! handed back. If the channel cannot be shown to be stopped, the driver
+//! panics instead of returning memory that the DMA can still write. Each
+//! capture start drops whatever a stopped capture left in the bridge FIFO.
+//!
+//! # Limitations
+//!
+//! - No RAW10, RAW12, YUV422 or RGB formats, and no ISP processing.
+//! - One frame per DMA block, so no frames larger than one block.
+//! - Embedded data and other non-image packets are not captured.
 //!
 //! # Example
 //!
@@ -56,6 +101,7 @@ pub use stream::{
 
 use crate::{
     dma::{DmaBufError, aligned::DmaAlignedMut},
+    mipi_dphy_power::DphyPower,
     mipi_dw_gdma::{
         AddressIncrementMode,
         BlockTransferConfig,
@@ -1232,6 +1278,7 @@ pub struct CompletionInterruptReport {
 /// Owns the `MIPI_CSI` virtual peripheral singleton and keeps HOST/BRIDGE
 /// clocks enabled for as long as this value lives.
 pub struct MipiCsi<'d> {
+    _dphy_power: DphyPower,
     _csi: MIPI_CSI<'d>,
     _guard: GenericPeripheralGuard<{ Peripheral::MipiCsi as u8 }>,
 }
@@ -1263,14 +1310,15 @@ impl<'d> MipiCsi<'d> {
     /// `GenericPeripheralGuard`, then applies the minimal verified D-PHY/HOST
     /// sequence for ESP32-P4.
     ///
-    /// `VDD_MIPI_DPHY` must already be powered and stable before calling this
-    /// constructor.
+    /// Powers the `VDD_MIPI_DPHY` rail, which the MIPI-DSI driver shares,
+    /// if it is not powered yet. It stays on until neither driver uses it.
     pub fn new(csi: MIPI_CSI<'d>, config: Config) -> Result<Self, ConfigError> {
         if !(MIN_LANE_RATE_MBPS..=MAX_LANE_RATE_MBPS).contains(&config.lane_bit_rate_mbps) {
             return Err(ConfigError::InvalidLaneBitRate);
         }
 
         let this = Self {
+            _dphy_power: DphyPower::acquire(),
             _csi: csi,
             _guard: GenericPeripheralGuard::new(),
         };
@@ -2029,6 +2077,7 @@ impl CsiCapture<'_> {
     }
 
     fn start_transfer(&self, dst_addr: u32) {
+        flush_bridge_fifo();
         self.dma_channel
             .configure_block_transfer(self.block_transfer(dst_addr));
 
@@ -2377,6 +2426,25 @@ impl Drop for CsiCapture<'_> {
         self.clear_transfer_status();
         disable_isp_bypass();
     }
+}
+
+/// Drops what the bridge FIFO still holds of a frame that a stop cut short.
+///
+/// Disabling the bridge keeps its FIFO, so without this the next capture
+/// starts with the tail of the old frame. After a mid-frame stop the bridge
+/// could then stop requesting DMA bursts altogether, with more than a burst
+/// buffered. The soft reset empties the FIFO and keeps the bridge
+/// configuration (checked on hardware for every configuration register).
+///
+/// Only call this with the bridge disabled and the capture channel idle.
+pub(super) fn flush_bridge_fifo() {
+    let bridge = MIPI_CSI_BRIDGE::regs();
+    debug_assert!(
+        !bridge.csi_en().read().csi_brig_en().bit(),
+        "the CSI bridge FIFO is only flushed with the bridge disabled"
+    );
+    bridge.csi_en().modify(|_, w| w.csi_brig_rst().set_bit());
+    bridge.csi_en().modify(|_, w| w.csi_brig_rst().clear_bit());
 }
 
 /// Passes the CSI input through the ISP unprocessed, as IDF

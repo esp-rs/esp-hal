@@ -39,7 +39,10 @@
 //!   fully overwrite.
 //! - `CSI_STREAM_FAULTS=1`: with `CSI_STREAM`, after the stream run, check a `next_frame` timeout
 //!   with the sensor stopped, a consumer holding a frame while the sensor streams, and repeated
-//!   stop/start at varying points of the frame.
+//!   stop/start at varying points of the frame. Prints `restart-snap` lines with the sensor, D-PHY,
+//!   host, bridge, ISP and DMA state around the sensor restart.
+//! - `CSI_FAULT_ROUNDS=<n>`: with `CSI_STREAM`, repeat the stream run (and the fault cases) `n`
+//!   times in one boot.
 //! - `CSI_QUIET=1`: with `CSI_REPEAT_FRAMES`, print the per-frame line only for failures and every
 //!   100th frame, so the console does not slow the capture loop.
 //! - `CSI_SKIP_ISP=1`: ISP bypass modes only, leave the ISP clock, reset and input gate untouched,
@@ -52,6 +55,11 @@
 //!   capture on `VDMA_CH1` while it streams. A frame also fails if the DSI block-done counter did
 //!   not advance during its capture. At the end CSI and then DSI are dropped and their channels
 //!   checked.
+//! - `CSI_DPHY_LIFECYCLE=1`: instead of the capture run, check the `VDD_MIPI_DPHY` rail that CSI
+//!   and DSI share: CSI alone, DSI alone, both in either creation and drop order, then the combined
+//!   cases again. After every step the PMU rail must be on exactly while a driver lives, a live CSI
+//!   driver must capture a full RAW8 frame, and a live DSI driver must keep its PHY PLL locked.
+//!   Prints `DPHY LIFECYCLE RESULT: PASS` or `FAIL`.
 //% CHIP_FILTER: mipi_csi_driver_supported && mipi_dsi_driver_supported
 //% FEATURES: unstable
 
@@ -103,11 +111,16 @@ use esp_hal::{
         HP_SYS_CLKRST,
         INTERRUPT_CORE0,
         INTERRUPT_CORE1,
+        MIPI_CSI,
         MIPI_CSI_BRIDGE,
         MIPI_CSI_HOST,
+        MIPI_DSI,
         MIPI_DSI_BRIDGE,
+        MIPI_DSI_HOST,
         PMU,
         VDMA,
+        VDMA_CH0,
+        VDMA_CH1,
     },
     psram,
     time::{Duration, Rate},
@@ -982,6 +995,189 @@ fn enable_mipi_dphy_power(delay: &Delay) {
 
     // Let the CSI PHY rail settle before sensor checks and CSI init.
     delay.delay_micros(500);
+}
+
+/// Cycles of the combined cases after the first pass of `CSI_DPHY_LIFECYCLE`.
+const DPHY_LIFECYCLE_REPEATS: u32 = 3;
+
+/// The PMU drives `VDD_MIPI_DPHY` (VO3 `xpd`, bit 8 of `ext_ldo_p0_0p2a`).
+fn dphy_rail_on() -> bool {
+    PMU::regs().ext_ldo_p0_0p2a().read().bits() & (1 << 8) != 0
+}
+
+fn lifecycle_rail(step: &str, expect_on: bool) -> bool {
+    let on = dphy_rail_on();
+    let ok = on == expect_on;
+    println!(
+        "dphy-lifecycle[{step}]: rail_on={on} expected={expect_on} {}",
+        if ok { "ok" } else { "FAIL" }
+    );
+    ok
+}
+
+fn lifecycle_csi<'d>(csi: MIPI_CSI<'d>, channel: VDMA_CH1<'d>) -> CsiCapture<'d> {
+    let capture = MipiCsi::new(
+        csi,
+        Config::default()
+            .with_num_data_lanes(SC2336_LANES)
+            .with_lane_bit_rate_mbps(SC2336_LANE_BIT_RATE_MBPS),
+    )
+    .unwrap()
+    .with_dma(
+        channel,
+        CaptureConfig::default()
+            .with_frame_width(SC2336_FRAME_WIDTH)
+            .with_frame_height(SC2336_FRAME_HEIGHT)
+            .with_pixel_format(CapturePixelFormat::Raw8)
+            .with_timeout(Duration::from_millis(500)),
+    )
+    .unwrap();
+    apply_idf_default_bridge_data_type_filter();
+    configure_isp_like_idf(false);
+    capture
+}
+
+fn lifecycle_frame(
+    step: &str,
+    capture: &mut CsiCapture<'_>,
+    i2c: &mut I2c<'_, Blocking>,
+    buffer: &mut [u8],
+) -> bool {
+    let result = capture.receive_with(&mut buffer[..SC2336_FRAME_BYTES], || {
+        let _ = set_sc2336_stream(i2c, true);
+    });
+    let _ = set_sc2336_stream(i2c, false);
+    let ok = matches!(result, Ok(frame) if frame.received_bytes == SC2336_FRAME_BYTES);
+    println!(
+        "dphy-lifecycle[{step}]: csi_frame={:?} {}",
+        result.map(|frame| frame.received_bytes),
+        if ok { "ok" } else { "FAIL" }
+    );
+    ok
+}
+
+fn lifecycle_dsi<'d>(dsi: MIPI_DSI<'d>, channel: VDMA_CH0<'d>) -> MipiDsi<'d> {
+    MipiDsi::new(
+        dsi,
+        channel,
+        DsiConfig::default()
+            .with_num_data_lanes(DsiDataLanes::_2)
+            .with_lane_bit_rate_mbps(1000.0)
+            .with_phy_pll_refclk(MipiDsiPhyPllRefclkConfig::new(
+                MipiDsiPhyPllRefclkSclk::Xtal,
+                0,
+            )),
+    )
+    .expect("MipiDsi init failed")
+}
+
+/// Only read while a `MipiDsi` lives, so that the DSI host is clocked.
+fn lifecycle_dsi_locked(step: &str) -> bool {
+    let ok = MIPI_DSI_HOST::regs()
+        .phy_status()
+        .read()
+        .phy_lock()
+        .bit_is_set();
+    println!(
+        "dphy-lifecycle[{step}]: dsi_pll_locked={ok} {}",
+        if ok { "ok" } else { "FAIL" }
+    );
+    ok
+}
+
+/// Creates CSI and DSI in the order `csi_first`, and drops them in the order
+/// `drop_csi_first`, checking the rail and both drivers after every step.
+fn lifecycle_pair(
+    label: &str,
+    csi: &mut MIPI_CSI<'_>,
+    csi_channel: &mut VDMA_CH1<'_>,
+    dsi: &mut MIPI_DSI<'_>,
+    dsi_channel: &mut VDMA_CH0<'_>,
+    i2c: &mut I2c<'_, Blocking>,
+    buffer: &mut [u8],
+    csi_first: bool,
+    drop_csi_first: bool,
+) -> bool {
+    let mut ok = true;
+    let (mut capture, bus) = if csi_first {
+        let capture = lifecycle_csi(csi.reborrow(), csi_channel.reborrow());
+        ok &= lifecycle_rail(&format!("{label}/csi-up"), true);
+        (
+            capture,
+            lifecycle_dsi(dsi.reborrow(), dsi_channel.reborrow()),
+        )
+    } else {
+        let bus = lifecycle_dsi(dsi.reborrow(), dsi_channel.reborrow());
+        ok &= lifecycle_rail(&format!("{label}/dsi-up"), true);
+        (lifecycle_csi(csi.reborrow(), csi_channel.reborrow()), bus)
+    };
+    ok &= lifecycle_rail(&format!("{label}/both-up"), true);
+    ok &= lifecycle_frame(&format!("{label}/both-up"), &mut capture, i2c, buffer);
+    ok &= lifecycle_dsi_locked(&format!("{label}/both-up"));
+    if drop_csi_first {
+        drop(capture);
+        ok &= lifecycle_rail(&format!("{label}/csi-dropped"), true);
+        ok &= lifecycle_dsi_locked(&format!("{label}/csi-dropped"));
+        drop(bus);
+    } else {
+        drop(bus);
+        ok &= lifecycle_rail(&format!("{label}/dsi-dropped"), true);
+        ok &= lifecycle_frame(&format!("{label}/dsi-dropped"), &mut capture, i2c, buffer);
+        drop(capture);
+    }
+    ok &= lifecycle_rail(&format!("{label}/both-dropped"), false);
+    ok
+}
+
+fn run_dphy_lifecycle(
+    mut csi: MIPI_CSI<'_>,
+    mut csi_channel: VDMA_CH1<'_>,
+    mut dsi: MIPI_DSI<'_>,
+    mut dsi_channel: VDMA_CH0<'_>,
+    i2c: &mut I2c<'_, Blocking>,
+) -> bool {
+    let buffer = allocate_capture_buffer(CaptureMode::Raw8Psram);
+    let mut ok = lifecycle_rail("start", false);
+
+    let mut capture = lifecycle_csi(csi.reborrow(), csi_channel.reborrow());
+    ok &= lifecycle_rail("1-csi-alone/up", true);
+    ok &= lifecycle_frame("1-csi-alone/up", &mut capture, i2c, buffer);
+    drop(capture);
+    ok &= lifecycle_rail("1-csi-alone/dropped", false);
+
+    let bus = lifecycle_dsi(dsi.reborrow(), dsi_channel.reborrow());
+    ok &= lifecycle_rail("2-dsi-alone/up", true);
+    ok &= lifecycle_dsi_locked("2-dsi-alone/up");
+    drop(bus);
+    ok &= lifecycle_rail("2-dsi-alone/dropped", false);
+
+    let cases = [
+        ("3-csi-dsi-drop-dsi", true, false),
+        ("4-csi-dsi-drop-csi", true, true),
+        ("5-dsi-csi-drop-csi", false, true),
+        ("6-dsi-csi-drop-dsi", false, false),
+    ];
+    for cycle in 0..=DPHY_LIFECYCLE_REPEATS {
+        for (name, csi_first, drop_csi_first) in cases {
+            let label = if cycle == 0 {
+                String::from(name)
+            } else {
+                format!("7-repeat{cycle}-{name}")
+            };
+            ok &= lifecycle_pair(
+                &label,
+                &mut csi,
+                &mut csi_channel,
+                &mut dsi,
+                &mut dsi_channel,
+                i2c,
+                buffer,
+                csi_first,
+                drop_csi_first,
+            );
+        }
+    }
+    ok
 }
 
 fn read_reg_u8(i2c: &mut I2c<'_, Blocking>, reg: u16) -> Result<u8, i2c::master::Error> {
@@ -2153,11 +2349,20 @@ fn allocate_stream_buffers(
     &'static mut [u8],
     &'static mut [u8],
 ) {
+    // One region for every caller: each stops its stream and drops the
+    // buffers before the next one allocates, so `CSI_FAULT_ROUNDS` does not
+    // run out of PSRAM.
+    static REGION: core::sync::atomic::AtomicPtr<u8> =
+        core::sync::atomic::AtomicPtr::new(core::ptr::null_mut());
     let len = 2 * (frame_bytes + GUARD_BYTES);
-    let layout = Layout::from_size_align(len, PSRAM_DMA_ALIGNMENT).unwrap();
-    let ptr = unsafe { alloc::alloc::alloc(layout) };
+    let mut ptr = REGION.load(core::sync::atomic::Ordering::Relaxed);
     if ptr.is_null() {
-        panic!("stream buffer allocation failed");
+        let layout = Layout::from_size_align(len, PSRAM_DMA_ALIGNMENT).unwrap();
+        ptr = unsafe { alloc::alloc::alloc(layout) };
+        if ptr.is_null() {
+            panic!("stream buffer allocation failed");
+        }
+        REGION.store(ptr, core::sync::atomic::Ordering::Relaxed);
     }
     let region = unsafe { core::slice::from_raw_parts_mut(ptr, len) };
     let (first, second) = region.split_at_mut(frame_bytes + GUARD_BYTES);
@@ -2219,6 +2424,59 @@ const STREAM_RESTART_CYCLES: u32 = 20;
 /// How long the slow consumer holds a frame, about nine sensor frames.
 const STREAM_HOLD_MS: u64 = 300;
 
+const ISP_STATE_REG_ADDR: usize = 0x500A_126C;
+/// `INT_RAW` bit of the real input frame end of `isp_input`.
+const ISP_INT_INPUT_FRAME_END: u32 = 1 << 28;
+
+/// One line of the state that decides whether frames reach the DMA after a
+/// restart: sensor stream bit, D-PHY lanes, host, bridge, ISP and the
+/// capture channel. Reads only, apart from clearing the ISP raw interrupts
+/// when `clear_isp` is set, so the next snapshot shows new input frames.
+fn restart_snapshot(label: &str, i2c: &mut I2c<'_, Blocking>, channel: usize, clear_isp: bool) {
+    let sensor = read_reg_u8(i2c, SC2336_REG_STREAM_CTRL);
+    let host = MIPI_CSI_HOST::regs();
+    let bridge = MIPI_CSI_BRIDGE::regs();
+    let clkrst = HP_SYS_CLKRST::regs();
+    let isp_clock =
+        clkrst.peri_clk_ctrl25().read().bits() & HP_SYS_CLKRST_PERI_CLK_CTRL25_ISP_CLK_EN_BIT != 0;
+    let isp_reset =
+        clkrst.hp_rst_en0().read().bits() & HP_SYS_CLKRST_HP_RST_EN0_RST_EN_ISP_BIT != 0;
+    let isp = if isp_clock && !isp_reset {
+        let regs = [
+            read_mmio_u32(ISP_CNTL_REG_ADDR),
+            read_mmio_u32(ISP_FRAME_CFG_REG_ADDR),
+            read_mmio_u32(ISP_INT_RAW_REG_ADDR),
+            read_mmio_u32(ISP_STATE_REG_ADDR),
+        ];
+        if clear_isp {
+            write_mmio_u32(ISP_INT_CLR_REG_ADDR, u32::MAX);
+        }
+        Some(regs)
+    } else {
+        None
+    };
+    let vdma = VDMA::regs();
+    let ch = vdma.ch(channel);
+    let buf = bridge.buf_flow_ctl().read().bits();
+    println!(
+        "restart-snap[{label}]: sensor_0100={sensor:?} phy_stopstate=0x{:x} phy_rx=0x{:x} host_int_st_main=0x{:x} bridge_en={} bridge_int_raw=0x{:x} bridge_fifo_count={} isp_clk={isp_clock} isp_rst={isp_reset} isp(cntl,frame_cfg,int_raw,state)={:x?} isp_input_frame_end={} chen0=0x{:x} sar=0x{:08x} dar=0x{:08x} block_ts=0x{:x} intstatus=0x{:x} intsignal=0x{:x}",
+        host.phy_stopstate().read().bits(),
+        host.phy_rx().read().bits(),
+        host.int_st_main().read().bits(),
+        bridge.csi_en().read().csi_brig_en().bit(),
+        bridge.int_raw().read().bits(),
+        (buf >> 16) & 0x3fff,
+        isp,
+        isp.is_some_and(|r| r[2] & ISP_INT_INPUT_FRAME_END != 0),
+        vdma.chen0().read().bits() & 0xf,
+        ch.sar0().read().bits(),
+        ch.dar0().read().bits(),
+        ch.block_ts0().read().bits(),
+        ch.intstatus0().read().bits(),
+        ch.intsignal_enable0().read().bits(),
+    );
+}
+
 fn fault_case(name: &str, ok: bool, detail: String) -> bool {
     println!(
         "stream-fault[{name}]: {} {detail}",
@@ -2249,6 +2507,7 @@ fn run_stream_fault_cases<'d>(
     let mut buffers = [buffer0, buffer1];
     let mut passed = true;
     let delay = Delay::new();
+    restart_snapshot("Z-after-main-stream", i2c, channel, true);
 
     // No sensor frames: `next_frame` times out, and stopping a stream whose DMA
     // is armed but never started writing leaves both buffers untouched.
@@ -2259,6 +2518,7 @@ fn run_stream_fault_cases<'d>(
             return (capture, false);
         }
     };
+    restart_snapshot("A-before-timeout", i2c, channel, false);
     let start = esp_hal::time::Instant::now();
     let result = stream
         .next_frame(Duration::from_millis(200))
@@ -2266,6 +2526,7 @@ fn run_stream_fault_cases<'d>(
     let waited_ms = start.elapsed().as_millis();
     let stats = stream.stats();
     (capture, buffers) = stream.stop();
+    restart_snapshot("B-after-timeout-cleanup", i2c, channel, false);
     let untouched = buffers_untouched(&mut buffers);
     passed &= fault_case(
         "timeout",
@@ -2290,11 +2551,24 @@ fn run_stream_fault_cases<'d>(
             return (capture, false);
         }
     };
+    restart_snapshot("C-before-sensor-on", i2c, channel, true);
     let stream_on = set_sc2336_stream(i2c, true);
+    delay.delay_millis(50);
+    restart_snapshot("D-50ms-after-sensor-on", i2c, channel, true);
     // The first block can be the tail of the frame the previous stop cut.
     let warm_up = stream
         .next_frame(Duration::from_millis(500))
         .map(|frame| frame.sequence());
+    restart_snapshot(
+        if warm_up.is_ok() {
+            "E-first-frame-ok"
+        } else {
+            "F-first-frame-timeout"
+        },
+        i2c,
+        channel,
+        false,
+    );
     let before = stream.stats();
     let held = match stream.next_frame(Duration::from_millis(500)) {
         Ok(frame) => {
@@ -2335,9 +2609,9 @@ fn run_stream_fault_cases<'d>(
     );
 
     // Repeated start/stop with the sensor streaming. Each stop lands at a
-    // different point of the frame, swept in 1.7 ms steps. The bridge keeps
-    // its place in a frame it was disabled in, so the first block after a
-    // restart can be short. The stream drops it and resyncs.
+    // different point of the frame, swept in 1.7 ms steps. The driver flushes
+    // the bridge FIFO on every start, so the first block after a restart
+    // should be whole; a short one is dropped and resynced.
     let mut cycles_ok = 0;
     let (mut errored, mut resyncs) = (0, 0);
     for cycle in 0..STREAM_RESTART_CYCLES {
@@ -3304,6 +3578,34 @@ fn main() -> ! {
     println!("Board assumptions: SCCB SCL=GPIO8, SDA=GPIO7, addr=0x30");
     println!("Board assumptions: reset/pwdn/xclk are hardware-managed on this sub-board");
 
+    if env_flag(option_env!("CSI_DPHY_LIFECYCLE")) {
+        let mut i2c = I2c::new(
+            peripherals.I2C0,
+            I2cConfig::default().with_frequency(Rate::from_khz(100)),
+        )
+        .unwrap()
+        .with_sda(peripherals.GPIO7)
+        .with_scl(peripherals.GPIO8);
+        assert_eq!(
+            verify_sc2336_id(&mut i2c).ok(),
+            Some(SC2336_EXPECTED_PID),
+            "SC2336 ID check failed"
+        );
+        program_sc2336_mode_1024x600_raw8(&mut i2c, &delay).expect("SC2336 mode programming");
+        let ok = run_dphy_lifecycle(
+            peripherals.MIPI_CSI,
+            peripherals.VDMA_CH1,
+            peripherals.MIPI_DSI,
+            peripherals.VDMA_CH0,
+            &mut i2c,
+        );
+        println!(
+            "DPHY LIFECYCLE RESULT: {}",
+            if ok { "PASS" } else { "FAIL" }
+        );
+        loop {}
+    }
+
     let mut lcd = if coexist {
         println!("CSI/DSI coexistence test");
         let mut lcd = Lcd::start(
@@ -3482,13 +3784,39 @@ fn main() -> ! {
 
     let (capture, passed) = match repeat_frames {
         Some(frames) if stream => {
-            let (capture, passed) =
-                run_stream_capture(capture, &mut i2c, frames, test_pattern, quiet, lcd.as_mut());
-            if passed && env_flag(option_env!("CSI_STREAM_FAULTS")) {
-                run_stream_fault_cases(capture, &mut i2c)
-            } else {
-                (capture, passed)
+            let rounds: u32 = option_env!("CSI_FAULT_ROUNDS").map_or(1, |r| r.parse().unwrap());
+            let (mut capture, mut passed) = (capture, true);
+            let mut failed_rounds = 0;
+            for round in 0..rounds {
+                if rounds > 1 {
+                    println!("fault-round[{round}]: start");
+                }
+                let (c, ok) = run_stream_capture(
+                    capture,
+                    &mut i2c,
+                    frames,
+                    test_pattern,
+                    quiet,
+                    lcd.as_mut(),
+                );
+                capture = c;
+                let ok = if ok && env_flag(option_env!("CSI_STREAM_FAULTS")) {
+                    let (c, ok) = run_stream_fault_cases(capture, &mut i2c);
+                    capture = c;
+                    ok
+                } else {
+                    ok
+                };
+                failed_rounds += u32::from(!ok);
+                passed &= ok;
+                if rounds > 1 {
+                    println!("fault-round[{round}]: {}", if ok { "PASS" } else { "FAIL" });
+                }
             }
+            if rounds > 1 {
+                println!("fault-rounds: total={rounds} failed={failed_rounds}");
+            }
+            (capture, passed)
         }
         Some(frames) => {
             let passed = run_repeated_capture(

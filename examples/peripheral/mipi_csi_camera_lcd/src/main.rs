@@ -16,8 +16,6 @@
 //! - SC2336 SCCB => SDA GPIO7, SCL GPIO8
 //! - LCD reset   => GPIO27
 //! - LCD backlight => GPIO26
-//! - VDD_MIPI_DPHY, shared by CSI and DSI, is switched by the MIPI-DSI driver, so the camera
-//!   capture must be dropped before the panel.
 
 //% CHIP_FILTER: mipi_csi_driver_supported && mipi_dsi_driver_supported
 
@@ -90,7 +88,6 @@ fn main() -> ! {
     );
     let delay = Delay::new();
 
-    // The panel first: the MIPI-DSI driver powers the D-PHY rail CSI needs.
     let _reset = {
         let mut reset = Output::new(peripherals.GPIO27, Level::Low, OutputConfig::default());
         delay.delay_millis(10);

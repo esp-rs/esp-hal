@@ -15,6 +15,7 @@ use crate::{
         DMA_STATUS_DMA_TRANSFER_DONE,
         DMA_STATUS_ERROR_MASK,
         bridge_event_status,
+        flush_bridge_fifo,
         host_error_status,
     },
     mipi_dw_gdma::{
@@ -306,6 +307,7 @@ impl<'d> CsiStream<'d> {
                 frame_bytes: frame_bytes as u32,
                 ..Shared::IDLE
             };
+            flush_bridge_fifo();
             self.capture.clear_transfer_status();
             register_channel_handler(channel, stream_interrupt_handler);
             channel.set_interrupt_signal_enable(DMA_COMPLETION_INTERRUPT_MASK);
@@ -431,11 +433,13 @@ fn enable_bridge(enable: bool) {
 }
 
 /// Rearms the bridge and the channel after a failed frame. The bridge is off,
-/// so its event bits can be cleared, and it waits for the next frame start.
+/// so its FIFO can be flushed and its event bits cleared, and it waits for the
+/// next frame start.
 fn resync(shared: &mut Shared, channel: DwGdmaChannel) {
     let Some(slot) = shared.slots.iter().position(|slot| *slot == Slot::Free) else {
         return;
     };
+    flush_bridge_fifo();
     channel.clear_all_interrupts();
     unsafe {
         MIPI_CSI_BRIDGE::regs()
