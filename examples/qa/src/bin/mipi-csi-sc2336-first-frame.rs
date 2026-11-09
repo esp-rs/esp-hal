@@ -28,6 +28,9 @@
 //! - `CSI_REPEAT_FRAMES=1..=100`: mode A only, capture this many frames one after another into the
 //!   same buffer and print one summary line per frame. With `CSI_FRAME_EXPORT=1`, the last frame is
 //!   exported.
+//! - `CSI_COMPLETION`: `poll` (default) waits with `receive_with`, `interrupt` with
+//!   `receive_with_interrupt`. In interrupt mode a frame also fails if the channel's own DW-GDMA
+//!   completion interrupt did not end the wait.
 //% CHIP_FILTER: mipi_csi_driver_supported && i2c_master_driver_supported
 //% FEATURES: unstable
 
@@ -441,6 +444,73 @@ impl CaptureMode {
 
 fn env_flag(value: Option<&str>) -> bool {
     value == Some("1")
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Completion {
+    Polling,
+    Interrupt,
+}
+
+impl Completion {
+    fn selected() -> Self {
+        match option_env!("CSI_COMPLETION") {
+            None | Some("poll") => Self::Polling,
+            Some("interrupt") => Self::Interrupt,
+            Some(other) => panic!("unknown CSI_COMPLETION '{other}', use poll or interrupt"),
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Polling => "poll",
+            Self::Interrupt => "interrupt",
+        }
+    }
+}
+
+fn receive_frame(
+    capture: &mut CsiCapture<'_>,
+    completion: Completion,
+    buffer: &mut [u8],
+    start_source: impl FnOnce(),
+) -> Result<CaptureFrame, ReceiveError> {
+    match completion {
+        Completion::Polling => capture.receive_with(buffer, start_source),
+        Completion::Interrupt => capture.receive_with_interrupt(buffer, start_source),
+    }
+}
+
+/// In interrupt mode, a frame only counts if the capture channel's own
+/// completion interrupt ended the wait, not the timeout or the polling fallback.
+fn completion_interrupt_ok(
+    label: &str,
+    capture: &CsiCapture<'_>,
+    completion: Completion,
+    verbose: bool,
+) -> bool {
+    if completion == Completion::Polling {
+        return true;
+    }
+    let report = capture.completion_interrupt_report();
+    let ok = report.fired && report.own_source;
+    if verbose || !ok {
+        println!(
+            "{label}: completion_irq fired={} own_source={} latency_from_arm={:?}us channel_status={:#x}",
+            report.fired, report.own_source, report.latency_from_arm_us, report.channel_status
+        );
+    }
+    if !ok {
+        println!(
+            "{label}: completion_irq FAIL, {}",
+            if !report.fired {
+                "the wait ended at the timeout without the interrupt"
+            } else {
+                "another source drove the DW-GDMA line, the wait fell back to polling"
+            }
+        );
+    }
+    ok
 }
 
 /// Same names and changes as `VDMA_MEM2MEM_DMA_PROFILE` in `vdma-mem2mem-psram`.
@@ -1606,6 +1676,7 @@ fn run_capture(
     allocation: &mut [u8],
     test_pattern: bool,
     frame_export: bool,
+    completion: Completion,
 ) -> bool {
     let label = mode.label();
     let capture_len = mode.expected_bytes();
@@ -1622,7 +1693,7 @@ fn run_capture(
         .writeback();
 
     let mut stream_on = None;
-    let result = capture.receive_with(&mut allocation[..capture_len], || {
+    let result = receive_frame(capture, completion, &mut allocation[..capture_len], || {
         stream_on = Some(set_sc2336_stream(i2c, true));
     });
     // Before the next frame reaches the stopped bridge and can set ISP
@@ -1667,7 +1738,7 @@ fn run_capture(
             allocation,
             test_pattern,
         },
-    );
+    ) && completion_interrupt_ok(label, capture, completion, true);
 
     if frame_export {
         // `receive` returning `Ok` means the DMA block completed and the
@@ -1699,6 +1770,7 @@ fn run_repeated_capture(
     test_pattern: bool,
     frames: u32,
     frame_export: bool,
+    completion: Completion,
 ) -> bool {
     let mode = CaptureMode::Raw8Psram;
     let label = mode.label();
@@ -1719,7 +1791,7 @@ fn run_repeated_capture(
             .writeback();
 
         let mut stream_on = None;
-        let result = capture.receive_with(&mut allocation[..capture_len], || {
+        let result = receive_frame(capture, completion, &mut allocation[..capture_len], || {
             stream_on = Some(set_sc2336_stream(i2c, true));
         });
         let isp_int_raw = read_mmio_u32(ISP_INT_RAW_REG_ADDR);
@@ -1742,7 +1814,8 @@ fn run_repeated_capture(
         let assessment = assess(&evidence);
         let sensor_ok = matches!(stream_on, Some(Ok(_))) && stream_off.is_ok();
         let received = result.as_ref().map_or(0, |frame| frame.received_bytes);
-        let ok = assessment.valid && sensor_ok && received == capture_len;
+        let irq_ok = completion_interrupt_ok(label, capture, completion, false);
+        let ok = assessment.valid && sensor_ok && received == capture_len && irq_ok;
         let checksum = checksum32(&allocation[..capture_len]);
 
         print!(
@@ -1763,11 +1836,18 @@ fn run_repeated_capture(
             assessment.stalls,
         );
         // Not `{:08x}` with a `0x` prefix: the monitor resolves those as addresses.
-        println!(
+        print!(
             "{:08x} frame_ms={}",
             checksum,
             frame_start.elapsed().as_millis()
         );
+        if completion == Completion::Interrupt {
+            print!(
+                " irq_latency={:?}us",
+                capture.completion_interrupt_report().latency_from_arm_us
+            );
+        }
+        println!();
 
         if !ok {
             println!(
@@ -2340,6 +2420,7 @@ fn main() -> ! {
     let host_errors = env_flag(option_env!("CSI_HOST_ERRORS"));
     let frame_export = env_flag(option_env!("CSI_FRAME_EXPORT"));
     let (dma_profile_name, dma_profile) = selected_dma_profile();
+    let completion = Completion::selected();
     let exposure_lines = env_number("CSI_EXPOSURE_LINES", option_env!("CSI_EXPOSURE_LINES"));
     let gain_index = env_number("CSI_GAIN_INDEX", option_env!("CSI_GAIN_INDEX"));
     let repeat_frames = env_number("CSI_REPEAT_FRAMES", option_env!("CSI_REPEAT_FRAMES"));
@@ -2354,7 +2435,7 @@ fn main() -> ! {
         );
     }
     println!(
-        "SC2336 capture start: mode={} test_pattern={} host_errors_unmasked={} dma_profile={} frame_export={} exposure_lines={:?} gain_index={:?} repeat_frames={:?}",
+        "SC2336 capture start: mode={} test_pattern={} host_errors_unmasked={} dma_profile={} frame_export={} exposure_lines={:?} gain_index={:?} repeat_frames={:?} completion={}",
         mode.label(),
         test_pattern,
         host_errors,
@@ -2362,7 +2443,8 @@ fn main() -> ! {
         frame_export,
         exposure_lines,
         gain_index,
-        repeat_frames
+        repeat_frames,
+        completion.label()
     );
     println!("Board assumptions: SCCB SCL=GPIO8, SDA=GPIO7, addr=0x30");
     println!("Board assumptions: reset/pwdn/xclk are hardware-managed on this sub-board");
@@ -2506,6 +2588,7 @@ fn main() -> ! {
             test_pattern,
             frames,
             frame_export,
+            completion,
         ),
         None => run_capture(
             &mut capture,
@@ -2514,6 +2597,7 @@ fn main() -> ! {
             allocation,
             test_pattern,
             frame_export,
+            completion,
         ),
     };
     if !passed {

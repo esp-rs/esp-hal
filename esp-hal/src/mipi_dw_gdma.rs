@@ -124,6 +124,36 @@ pub(crate) fn enable_controller() {
     });
 }
 
+const CHANNEL_COUNT: usize = 4;
+/// Bit of the common register block in [`asserted_interrupt_sources`].
+pub(crate) const COMMON_INTERRUPT_SOURCE: u32 = 1 << 16;
+
+/// Returns one bit per channel whose `CH_EN` is set.
+pub(crate) fn enabled_channels() -> u32 {
+    VDMA::regs().chen0().read().bits() & ((1 << CHANNEL_COUNT) - 1)
+}
+
+/// Returns the sources that currently drive the shared DW-GDMA interrupt line:
+/// bit `n` for channel `n`, and [`COMMON_INTERRUPT_SOURCE`] for the common
+/// register block. A source drives the line when a latched status bit is also
+/// enabled in its `INTSIGNAL_ENABLE` register.
+pub(crate) fn asserted_interrupt_sources() -> u32 {
+    let regs = VDMA::regs();
+    let mut sources = 0;
+    for channel in 0..CHANNEL_COUNT {
+        let ch = regs.ch(channel);
+        if ch.intstatus0().read().bits() & ch.intsignal_enable0().read().bits() != 0 {
+            sources |= 1 << channel;
+        }
+    }
+    if regs.commonreg_intstatus0().read().bits() & regs.commonreg_intsignal_enable0().read().bits()
+        != 0
+    {
+        sources |= COMMON_INTERRUPT_SOURCE;
+    }
+    sources
+}
+
 /// Register-level handle for one DW-GDMA channel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct DwGdmaChannel {
@@ -159,6 +189,11 @@ impl DwGdmaChannel {
     #[inline]
     pub(crate) const fn new(channel_id: u8) -> Self {
         Self { channel_id }
+    }
+
+    #[inline]
+    pub(crate) const fn channel_id(&self) -> u8 {
+        self.channel_id
     }
 
     /// Programs channel mode/handshake/direction settings.
