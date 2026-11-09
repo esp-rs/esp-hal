@@ -35,7 +35,7 @@
 //!
 //! ## Examples
 //!
-//! ### Run a Function on the PRO CPU
+//! ### Run a Function on the APP CPU
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -45,18 +45,26 @@
 //!     // Runs on the selected CPU at minimum interrupt priority.
 //! }
 //!
+//! // The APP CPU must run. A CPU cannot post a function to itself.
 //! let ipc = Ipc::new(peripherals.IPC);
-//! ipc.call_function(Cpu::ProCpu, on_cpu);
+//! ipc.call_function(Cpu::AppCpu, on_cpu);
 //! # {after_snippet}
 //! ```
 
-use portable_atomic::{AtomicPtr, Ordering};
+use portable_atomic::{AtomicPtr, AtomicU32, Ordering};
 
 use crate::{
-    interrupt::__rtos_implementation::ContextSwitchHandler,
+    interrupt::{
+        __rtos_implementation::ContextSwitchHandler,
+        ElevatedRunLevel,
+        current_raw_runlevel,
+    },
     peripherals::IPC,
     system::Cpu,
 };
+
+/// The number of run levels, thread mode included.
+const RUN_LEVELS: usize = ElevatedRunLevel::max() as usize + 1;
 
 #[cfg_attr(riscv, path = "riscv.rs")]
 #[cfg_attr(xtensa, path = "xtensa.rs")]
@@ -73,8 +81,15 @@ pub(crate) use self::implem::install_app;
 /// Every CPU has its own handler, which reads the fields at constant addresses.
 #[repr(C)]
 struct CoreState {
-    /// The function that [`Ipc::call_function`] posts, or null if the CPU has none.
-    callback: AtomicPtr<()>,
+    /// The functions that [`Ipc::call_function`] posts, one entry for each run level of the
+    /// caller. An entry is null if the CPU has no function from that run level.
+    ///
+    /// Code cannot interrupt other code at the same run level. A caller thus never waits for a
+    /// function from a different run level.
+    callbacks: [AtomicPtr<()>; RUN_LEVELS],
+
+    /// One bit for each entry of `callbacks` that can hold a function.
+    pending_callbacks: AtomicU32,
 
     /// The context-switch handler that the CPU runs, or null if the CPU has none pending.
     ///
@@ -95,7 +110,8 @@ struct CoreState {
 impl CoreState {
     const fn new() -> Self {
         Self {
-            callback: AtomicPtr::new(core::ptr::null_mut()),
+            callbacks: [const { AtomicPtr::new(core::ptr::null_mut()) }; RUN_LEVELS],
+            pending_callbacks: AtomicU32::new(0),
             pending_context_switch: AtomicPtr::new(core::ptr::null_mut()),
             context_switch_handler: AtomicPtr::new(core::ptr::null_mut()),
             #[cfg(riscv)]
@@ -132,8 +148,9 @@ impl Ipc {
     /// clobber, except the floating-point registers. `handler` must not use those registers, and
     /// must be callable with the cache disabled.
     ///
-    /// A CPU holds one posted function at a time. If `core` already holds one, this call behaves
-    /// as follows:
+    /// `core` holds one posted function for each run level of the caller. `core` runs the
+    /// functions from the highest run level first. If `core` already holds a function from the
+    /// run level of this call, this call behaves as follows:
     ///
     /// - If `core` holds `handler`, that function has not run yet, and it runs after this call. The
     ///   two calls coalesce into one run, and this call returns. A caller that needs a run of its
@@ -143,29 +160,72 @@ impl Ipc {
     ///   interrupt-free context, and cannot run on the APP CPU while that CPU is in reset. The wait
     ///   never ends in those cases.
     ///
+    /// The wait does not mask interrupts. Code at a higher run level can run, and can post a
+    /// function of its own.
+    ///
     /// # Panics
+    ///
+    /// Panics if `core` is the current CPU. A post to the current CPU can wait for an interrupt
+    /// that the caller masks.
     ///
     /// In debug builds, panics if `core` is the APP CPU and that CPU is not running.
     pub fn call_function(self, core: Cpu, handler: fn()) {
-        let handler = handler as *mut ();
+        assert_ne!(
+            core,
+            Cpu::current(),
+            "A CPU cannot post a function to itself"
+        );
         assert_target_runs(core);
 
-        while let Err(pending) = STATE[core as usize].callback.compare_exchange(
-            core::ptr::null_mut(),
-            handler,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            // The IPC handler takes the callback before it runs it, so a pending copy of `handler`
-            // has not run yet. It runs after this call, which covers this call, too.
-            if pending == handler {
-                break;
-            }
+        let handler = handler as *mut ();
+        let level = current_raw_runlevel() as usize;
+        let state = &STATE[core as usize];
 
+        loop {
+            // The IPC handler takes a callback before it runs it, so a pending copy of `handler`
+            // has not run yet. It runs after this call, which covers this call, too.
+            let posted = match state.callbacks[level].compare_exchange(
+                core::ptr::null_mut(),
+                handler,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => true,
+                Err(pending) => pending == handler,
+            };
+
+            // A context switch can stop a caller after it fills the entry, and before it raises
+            // the interrupt. Each caller thus marks the entry and raises the interrupt, also if
+            // the entry was full.
+            state
+                .pending_callbacks
+                .fetch_or(1 << level, Ordering::Release);
+            raise(core);
+
+            if posted {
+                return;
+            }
             core::hint::spin_loop();
         }
+    }
+}
 
-        raise(core);
+/// Takes and runs the posted functions of the current CPU, from the highest run level first.
+///
+/// The IPC handler calls this function.
+#[crate::ram]
+extern "C" fn run_callbacks() {
+    let state = &STATE[Cpu::current() as usize];
+    let pending = state.pending_callbacks.swap(0, Ordering::AcqRel);
+    for level in (0..RUN_LEVELS).rev() {
+        if pending & (1 << level) == 0 {
+            continue;
+        }
+        let callback = state.callbacks[level].swap(core::ptr::null_mut(), Ordering::AcqRel);
+        if !callback.is_null() {
+            let callback = unsafe { core::mem::transmute::<*mut (), fn()>(callback) };
+            callback();
+        }
     }
 }
 

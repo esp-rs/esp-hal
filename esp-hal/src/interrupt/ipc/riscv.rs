@@ -5,7 +5,7 @@
 
 use portable_atomic::Ordering;
 
-use super::{CoreState, STATE};
+use super::{CoreState, STATE, run_callbacks};
 use crate::{
     interrupt::{CpuInterrupt, Priority},
     peripherals::{CLINT, CLINT_OTHER_CORE},
@@ -62,7 +62,7 @@ fn install_core(core: Cpu) {
 
 /// Handles the IPC interrupt of one CPU.
 ///
-/// The handler clears the request, runs the posted function, then jumps to the context-switch
+/// The handler clears the request, runs the posted functions, then jumps to the context-switch
 /// handler. It borrows `ra`, `t0`, and `t1` only. `t0` goes to `mscratch`. That CSR is free,
 /// because the hardware clears `mstatus.MIE` on trap entry, and nothing here enables
 /// interrupts again.
@@ -87,10 +87,10 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         lw   t0, {request}(t1)
         sw   zero, 0(t0)
 
-        # The callback returns here, so it runs first. A CPU rarely has one, so the callback
-        # runs out of line: a taken branch costs two cycles, and the context switch that the
+        # The callbacks return here, so they run first. A CPU rarely has one, so the callbacks
+        # run out of line: a taken branch costs two cycles, and the context switch that the
         # scheduler asks for on every yield must not pay them.
-        lw   t0, {callback}(t1)
+        lw   t0, {pending_callbacks}(t1)
         bnez t0, 3f
 
     1:
@@ -108,7 +108,7 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         mret
 
     3:
-        # `callback_handler` takes the callback from `t1`, and may clobber `ra`, `t0` and `t1`.
+        # `callback_handler` may clobber `ra`, `t0` and `t1`.
         sw   ra, 4(sp)
         la   t0, {callback_handler}
         jalr ra, 0(t0)
@@ -118,19 +118,18 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         ",
         state = sym STATE,
         base = const CORE * size_of::<CoreState>(),
-        callback = const core::mem::offset_of!(CoreState, callback),
+        pending_callbacks = const core::mem::offset_of!(CoreState, pending_callbacks),
         pending_context_switch = const core::mem::offset_of!(CoreState, pending_context_switch),
         request = const core::mem::offset_of!(CoreState, request),
         callback_handler = sym callback_handler,
     )
 }
 
-/// Runs the posted function of one CPU, then returns to [`ipc_handler`].
+/// Runs the posted functions of the current CPU, then returns to [`ipc_handler`].
 ///
-/// `t1` holds the address of the `CoreState` of the CPU. This function saves the registers
-/// that the RISC-V calling convention lets the callee clobber, except `ra`, `t0`, and `t1`,
-/// which [`ipc_handler`] saves. It leaves `mscratch` alone, because the context-switch handler
-/// that runs next reads the interrupted `t0` from it.
+/// This function saves the registers that the RISC-V calling convention lets the callee
+/// clobber, except `ra`, `t0`, and `t1`, which [`ipc_handler`] saves. It leaves `mscratch` alone,
+/// because the context-switch handler that runs next reads the interrupted `t0` from it.
 #[cfg_attr(
     not(interrupt_controller = "clic"),
     unsafe(link_section = ".trap.rust")
@@ -156,8 +155,7 @@ unsafe extern "C" fn callback_handler() {
         sw   a6, 48(sp)
         sw   a7, 52(sp)
 
-        lw   t0, {callback}(t1)
-        sw   zero, {callback}(t1)
+        la   t0, {run_callbacks}
         jalr ra, 0(t0)
 
         lw   ra, 0(sp)
@@ -177,6 +175,6 @@ unsafe extern "C" fn callback_handler() {
         addi sp, sp, 64
         ret
         ",
-        callback = const core::mem::offset_of!(CoreState, callback),
+        run_callbacks = sym run_callbacks,
     )
 }
