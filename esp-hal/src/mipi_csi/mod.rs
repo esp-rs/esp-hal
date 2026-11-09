@@ -39,12 +39,16 @@
 //! # {after_snippet}
 //! ```
 
-use core::fmt;
+use core::{
+    fmt,
+    sync::atomic::{AtomicU8, AtomicU32, Ordering},
+};
 
 use procmacros::BuilderLite;
 
 use crate::{
     dma::{DmaBufError, aligned::DmaAlignedMut},
+    interrupt,
     mipi_dw_gdma::{
         AddressIncrementMode,
         BlockTransferConfig,
@@ -54,11 +58,13 @@ use crate::{
         HandshakeSelect,
         LlPointerMasterSelect,
         MAX_BLOCK_TRANSFER_SIZE_UNITS,
+        asserted_interrupt_sources,
         enable_controller,
+        enabled_channels,
     },
-    peripherals::{HP_SYS_CLKRST, MIPI_CSI, MIPI_CSI_BRIDGE, MIPI_CSI_HOST},
+    peripherals::{HP_SYS_CLKRST, Interrupt, MIPI_CSI, MIPI_CSI_BRIDGE, MIPI_CSI_HOST},
     private::Sealed,
-    system::{GenericPeripheralGuard, Peripheral},
+    system::{Cpu, GenericPeripheralGuard, Peripheral},
     time::{Duration, Instant},
 };
 
@@ -131,6 +137,9 @@ const DMA_STATUS_ENABLE_MASK: u32 = DMA_STATUS_BLOCK_TRANSFER_DONE
     | DMA_STATUS_CH_SUSPENDED
     | DMA_STATUS_CH_DISABLED
     | DMA_STATUS_CH_ABORTED;
+// The statuses that end the polling wait. `DMA_STATUS_ENABLE_MASK` latches them all.
+const DMA_COMPLETION_INTERRUPT_MASK: u32 =
+    DMA_STATUS_BLOCK_TRANSFER_DONE | DMA_STATUS_DMA_TRANSFER_DONE | DMA_STATUS_ERROR_MASK;
 const CSI_BRIDGE_INTERRUPT_MASK: u32 = 0x3F;
 const DISCARD_DIAG_DAR_SAMPLES: usize = 8;
 
@@ -571,6 +580,16 @@ pub enum ReceiveError {
         /// Status sampled after shutdown failure.
         status_after_shutdown: CaptureStatus,
     },
+    /// [`CsiCapture::receive_with_interrupt`] did not arm, because another
+    /// user of the shared DW-GDMA interrupt line may be active. Nothing was
+    /// started and the buffer was not accessed.
+    InterruptUnavailable {
+        /// Other VDMA channels with `CH_EN` set, one bit per channel.
+        enabled_channels: u32,
+        /// Other sources driving the DW-GDMA interrupt line: bit `n` for
+        /// channel `n`, bit 16 for the common register block.
+        asserted_sources: u32,
+    },
 }
 
 impl fmt::Display for ReceiveError {
@@ -590,6 +609,13 @@ impl fmt::Display for ReceiveError {
                     "failed to stop CSI DMA channel safely after capture ({reason:?})"
                 )
             }
+            Self::InterruptUnavailable {
+                enabled_channels,
+                asserted_sources,
+            } => write!(
+                f,
+                "DW-GDMA interrupt line in use (enabled channels 0x{enabled_channels:x}, asserted sources 0x{asserted_sources:x})"
+            ),
         }
     }
 }
@@ -1151,6 +1177,23 @@ impl CaptureTraceRecorder {
     }
 }
 
+/// What the completion interrupt of the last
+/// [`CsiCapture::receive_with_interrupt`] observed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct CompletionInterruptReport {
+    /// The handler ran before the wait ended.
+    pub fired: bool,
+    /// The capture channel raised it. `false` with `fired` means another
+    /// source drove the shared line, and the wait fell back to polling.
+    pub own_source: bool,
+    /// Channel `INTSTATUS0` read by the handler.
+    pub channel_status: u32,
+    /// Microseconds from arming the interrupt, just before the channel is
+    /// enabled, to the handler.
+    pub latency_from_arm_us: Option<u32>,
+}
+
 /// MIPI CSI controller handle.
 ///
 /// Owns the `MIPI_CSI` virtual peripheral singleton and keeps HOST/BRIDGE
@@ -1177,6 +1220,7 @@ pub struct CsiCapture<'d> {
     trace_recorder: CaptureTraceRecorder,
     /// Temporary bring-up switch. Default `armed = false` keeps `DISCARD` fatal.
     discard_diag: DiscardDiag,
+    completion_interrupt: CompletionInterruptReport,
 }
 
 impl<'d> MipiCsi<'d> {
@@ -1243,6 +1287,7 @@ impl<'d> MipiCsi<'d> {
             trace: CaptureTrace::empty(),
             trace_recorder: CaptureTraceRecorder::idle(),
             discard_diag: DiscardDiag::idle(),
+            completion_interrupt: CompletionInterruptReport::default(),
         })
     }
 
@@ -1632,6 +1677,47 @@ impl CsiCapture<'_> {
         buffer: &mut [u8],
         start_source: impl FnOnce(),
     ) -> Result<CaptureFrame, ReceiveError> {
+        self.receive_impl(buffer, start_source, CompletionWait::Polling)
+    }
+
+    /// Same as [`Self::receive_with`], but waits for the DW-GDMA completion
+    /// interrupt instead of polling the hardware during the frame.
+    ///
+    /// The interrupt only ends the wait. The capture is then classified from
+    /// the same status registers, and the channel is stopped and the buffer
+    /// handed back exactly as in [`Self::receive_with`]: a completion
+    /// interrupt is not taken as proof that the channel stopped writing.
+    ///
+    /// All VDMA channels share [`Interrupt::DMA`], which has a single handler
+    /// and is also used by the MIPI-DSI DPI driver. This method returns
+    /// [`ReceiveError::InterruptUnavailable`] without starting anything if
+    /// another VDMA channel is enabled or already drives the line. Otherwise
+    /// it binds its own handler, which runs at most once per capture, and
+    /// leaves [`Interrupt::DMA`] disabled when it returns.
+    ///
+    /// # Panics
+    ///
+    /// Same as [`Self::receive`].
+    pub fn receive_with_interrupt(
+        &mut self,
+        buffer: &mut [u8],
+        start_source: impl FnOnce(),
+    ) -> Result<CaptureFrame, ReceiveError> {
+        self.receive_impl(buffer, start_source, CompletionWait::Interrupt)
+    }
+
+    /// Returns what the completion interrupt observed during the last
+    /// [`Self::receive_with_interrupt`].
+    pub fn completion_interrupt_report(&self) -> CompletionInterruptReport {
+        self.completion_interrupt
+    }
+
+    fn receive_impl(
+        &mut self,
+        buffer: &mut [u8],
+        start_source: impl FnOnce(),
+        wait: CompletionWait,
+    ) -> Result<CaptureFrame, ReceiveError> {
         if buffer.len() < self.config.frame_bytes {
             return Err(ReceiveError::BufferTooSmall {
                 required: self.config.frame_bytes,
@@ -1643,6 +1729,11 @@ impl CsiCapture<'_> {
         let mut dma_buffer = DmaAlignedMut::new(&mut buffer[..self.config.frame_bytes])
             .map_err(ReceiveError::InvalidBuffer)?;
 
+        if wait == CompletionWait::Interrupt {
+            self.completion_interrupt = CompletionInterruptReport::default();
+            self.check_completion_interrupt_free()?;
+        }
+
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         dma_buffer.writeback();
 
@@ -1651,6 +1742,9 @@ impl CsiCapture<'_> {
 
         let dst_start = dma_buffer.as_mut_ptr() as u32;
         self.clear_transfer_status();
+        if wait == CompletionWait::Interrupt {
+            self.arm_completion_interrupt();
+        }
         self.start_transfer(dst_start);
         trace_arm(self, dst_start);
         let dar_at_arm = self.dma_channel.destination_address();
@@ -1663,6 +1757,11 @@ impl CsiCapture<'_> {
         let mut poll_index: u32 = 0;
 
         let deadline = Instant::now() + self.config.timeout;
+        if wait == CompletionWait::Interrupt {
+            // The polling loop below then classifies the capture from the
+            // registers. After a completion it ends on its first pass.
+            self.wait_for_completion_interrupt(deadline);
+        }
         let outcome = loop {
             sample_runtime_phy_activity(self);
             let status = self.capture_status();
@@ -1865,6 +1964,58 @@ impl CsiCapture<'_> {
             ReceiveOutcome::DmaError(status) => Err(ReceiveError::DmaError(status)),
             ReceiveOutcome::CsiError(status) => Err(ReceiveError::CsiError(status)),
         }
+    }
+
+    fn check_completion_interrupt_free(&self) -> Result<(), ReceiveError> {
+        let own = 1 << self.dma_channel.channel_id();
+        let enabled_channels = enabled_channels() & !own;
+        let asserted_sources = asserted_interrupt_sources() & !own;
+        if enabled_channels != 0 || asserted_sources != 0 {
+            return Err(ReceiveError::InterruptUnavailable {
+                enabled_channels,
+                asserted_sources,
+            });
+        }
+        Ok(())
+    }
+
+    /// Must run after the channel status was cleared and before the channel is
+    /// enabled.
+    fn arm_completion_interrupt(&self) {
+        COMPLETION_IRQ_CHANNEL.store(self.dma_channel.channel_id(), Ordering::Relaxed);
+        COMPLETION_IRQ_ARMED_AT_US.store(now_us(), Ordering::Relaxed);
+        COMPLETION_IRQ_STATE.store(COMPLETION_IRQ_ARMED, Ordering::Release);
+        interrupt::bind_handler(Interrupt::DMA, completion_interrupt_handler);
+        self.dma_channel
+            .set_interrupt_signal_enable(DMA_COMPLETION_INTERRUPT_MASK);
+    }
+
+    fn wait_for_completion_interrupt(&mut self, deadline: Instant) {
+        while COMPLETION_IRQ_STATE.load(Ordering::Acquire) == COMPLETION_IRQ_ARMED
+            && Instant::now() <= deadline
+        {
+            core::hint::spin_loop();
+        }
+
+        self.dma_channel.set_interrupt_signal_enable(0);
+        interrupt::disable(Cpu::current(), Interrupt::DMA);
+        // The handler can no longer run, so its results are final.
+        let state = COMPLETION_IRQ_STATE.swap(COMPLETION_IRQ_IDLE, Ordering::AcqRel);
+        let fired = state != COMPLETION_IRQ_ARMED;
+        self.completion_interrupt = CompletionInterruptReport {
+            fired,
+            own_source: state == COMPLETION_IRQ_OWN,
+            channel_status: if fired {
+                COMPLETION_IRQ_STATUS.load(Ordering::Relaxed)
+            } else {
+                0
+            },
+            latency_from_arm_us: fired.then(|| {
+                COMPLETION_IRQ_AT_US
+                    .load(Ordering::Relaxed)
+                    .wrapping_sub(COMPLETION_IRQ_ARMED_AT_US.load(Ordering::Relaxed))
+            }),
+        };
     }
 
     fn start_transfer(&self, dst_addr: u32) {
@@ -2118,6 +2269,55 @@ fn trace_poll(capture: &mut CsiCapture<'_>, status: CaptureStatus) {
         recorder.stalled = true;
         trace_record(capture, CaptureTraceEvent::Stalled);
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CompletionWait {
+    Polling,
+    Interrupt,
+}
+
+const COMPLETION_IRQ_IDLE: u8 = 0;
+const COMPLETION_IRQ_ARMED: u8 = 1;
+const COMPLETION_IRQ_OWN: u8 = 2;
+const COMPLETION_IRQ_FOREIGN: u8 = 3;
+
+static COMPLETION_IRQ_STATE: AtomicU8 = AtomicU8::new(COMPLETION_IRQ_IDLE);
+static COMPLETION_IRQ_CHANNEL: AtomicU8 = AtomicU8::new(0);
+static COMPLETION_IRQ_STATUS: AtomicU32 = AtomicU32::new(0);
+static COMPLETION_IRQ_ARMED_AT_US: AtomicU32 = AtomicU32::new(0);
+static COMPLETION_IRQ_AT_US: AtomicU32 = AtomicU32::new(0);
+
+fn now_us() -> u32 {
+    Instant::now().duration_since_epoch().as_micros() as u32
+}
+
+/// Records the channel status and unmaps [`Interrupt::DMA`].
+///
+/// The status is left latched for the waiting thread, so the line is released
+/// by clearing the channel's signal enable. Other channels and the common
+/// register block can also drive the shared line and this handler cannot clear
+/// their sources, so it unmaps the interrupt to run at most once.
+#[crate::ram]
+#[crate::handler]
+fn completion_interrupt_handler() {
+    if COMPLETION_IRQ_STATE.load(Ordering::Acquire) != COMPLETION_IRQ_ARMED {
+        interrupt::disable(Cpu::current(), Interrupt::DMA);
+        return;
+    }
+    let channel = DwGdmaChannel::new(COMPLETION_IRQ_CHANNEL.load(Ordering::Relaxed));
+    let status = channel.interrupt_status();
+    channel.set_interrupt_signal_enable(0);
+    interrupt::disable(Cpu::current(), Interrupt::DMA);
+
+    COMPLETION_IRQ_STATUS.store(status, Ordering::Relaxed);
+    COMPLETION_IRQ_AT_US.store(now_us(), Ordering::Relaxed);
+    let state = if status & DMA_COMPLETION_INTERRUPT_MASK != 0 {
+        COMPLETION_IRQ_OWN
+    } else {
+        COMPLETION_IRQ_FOREIGN
+    };
+    COMPLETION_IRQ_STATE.store(state, Ordering::Release);
 }
 
 /// Polls `condition` until it holds or `timeout_ms` passes, then checks it once
