@@ -40,10 +40,21 @@ impl I2sInstance {
 
     pub(crate) fn configure_tx_clk_impl(
         self,
-        _clocks: &mut ClockTree,
+        clocks: &mut ClockTree,
         _old_config: Option<I2sClkConfig>,
         new_config: I2sClkConfig,
     ) {
+        // The divider can lose the fraction if the module clock is gated while the coefficients
+        // change.
+        let enabled = PCR::regs().i2s_tx_clkm_conf().read().i2s_tx_clkm_en().bit();
+        self.enable_tx_clk_impl(clocks, true);
+        self.set_tx_divider(new_config);
+        if !enabled {
+            self.enable_tx_clk_impl(clocks, false);
+        }
+    }
+
+    fn set_tx_divider(self, new_config: I2sClkConfig) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
         let pcr = PCR::regs();
 
@@ -85,10 +96,21 @@ impl I2sInstance {
 
     pub(crate) fn configure_rx_clk_impl(
         self,
-        _clocks: &mut ClockTree,
+        clocks: &mut ClockTree,
         _old_config: Option<I2sClkConfig>,
         new_config: I2sClkConfig,
     ) {
+        // The divider can lose the fraction if the module clock is gated while the coefficients
+        // change.
+        let enabled = PCR::regs().i2s_rx_clkm_conf().read().i2s_rx_clkm_en().bit();
+        self.enable_rx_clk_impl(clocks, true);
+        self.set_rx_divider(new_config);
+        if !enabled {
+            self.enable_rx_clk_impl(clocks, false);
+        }
+    }
+
+    fn set_rx_divider(self, new_config: I2sClkConfig) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
         let pcr = PCR::regs();
 
