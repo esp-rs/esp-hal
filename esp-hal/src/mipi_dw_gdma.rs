@@ -4,7 +4,15 @@
 //! future MIPI-CSI code can share controller/channel programming without
 //! introducing public abstractions.
 
-use crate::peripherals::VDMA;
+use core::{
+    ptr,
+    sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, Ordering},
+};
+
+use crate::{
+    interrupt,
+    peripherals::{Interrupt, VDMA},
+};
 
 const CHANNEL_ENABLE_WRITE: u32 = 0x0100;
 const CHANNEL_ENABLE_SET: u32 = 0x0101;
@@ -152,6 +160,95 @@ pub(crate) fn asserted_interrupt_sources() -> u32 {
         sources |= COMMON_INTERRUPT_SOURCE;
     }
     sources
+}
+
+/// Channel interrupt handler, called from the shared DW-GDMA interrupt with the
+/// channel's pending sources (`INTSTATUS & INTSIGNAL_ENABLE`, never 0).
+///
+/// The handler must clear or mask its pending sources before returning, and
+/// must only touch its own channel. It runs in interrupt context on the core
+/// that installed the dispatcher, so it must be in RAM and must not block.
+pub(crate) type ChannelInterruptHandler = fn(channel: DwGdmaChannel, pending: u32);
+
+static CHANNEL_HANDLERS: [AtomicPtr<()>; CHANNEL_COUNT] =
+    [const { AtomicPtr::new(ptr::null_mut()) }; CHANNEL_COUNT];
+/// Bit `n` is set while the dispatcher runs the handler slot of channel `n`.
+static HANDLERS_RUNNING: AtomicU32 = AtomicU32::new(0);
+static DISPATCHER_INSTALLED: AtomicBool = AtomicBool::new(false);
+
+/// Routes the pending interrupt sources of `channel` to `handler`.
+///
+/// The caller must own the channel, and must call this before it unmasks any
+/// of the channel's sources in `INTSIGNAL_ENABLE`. On first use this binds the
+/// dispatcher to [`Interrupt::DMA`] on the current core. The dispatcher then
+/// stays bound and mapped there, later registrations never remap it.
+pub(crate) fn register_channel_handler(channel: DwGdmaChannel, handler: ChannelInterruptHandler) {
+    let previous =
+        CHANNEL_HANDLERS[channel.channel_id as usize].swap(handler as *mut (), Ordering::SeqCst);
+    debug_assert!(
+        previous.is_null(),
+        "DW-GDMA channel handler registered twice"
+    );
+
+    if DISPATCHER_INSTALLED
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_ok()
+    {
+        interrupt::bind_handler(Interrupt::DMA, channel_interrupt_dispatcher);
+    }
+}
+
+/// Removes the handler of `channel` and waits until the dispatcher no longer
+/// runs it, on any core.
+///
+/// The caller must mask the channel's sources in `INTSIGNAL_ENABLE` first.
+/// Must not be called from an interrupt handler that can preempt the
+/// dispatcher on the same core.
+pub(crate) fn unregister_channel_handler(channel: DwGdmaChannel) {
+    let bit = 1 << channel.channel_id;
+    CHANNEL_HANDLERS[channel.channel_id as usize].store(ptr::null_mut(), Ordering::SeqCst);
+    while HANDLERS_RUNNING.load(Ordering::SeqCst) & bit != 0 {
+        core::hint::spin_loop();
+    }
+}
+
+/// The only handler bound to [`Interrupt::DMA`].
+///
+/// Hands each channel's pending sources to that channel's handler. Pending
+/// sources of a channel without a handler are masked, so that they cannot keep
+/// the shared line asserted, and pending common-register sources (slave
+/// interface errors) are cleared. Nothing else of another channel is touched.
+#[crate::ram]
+#[crate::handler]
+fn channel_interrupt_dispatcher() {
+    let regs = VDMA::regs();
+    for (channel_id, slot) in CHANNEL_HANDLERS.iter().enumerate() {
+        let ch = regs.ch(channel_id);
+        let pending = ch.intstatus0().read().bits() & ch.intsignal_enable0().read().bits();
+        if pending == 0 {
+            continue;
+        }
+
+        let bit = 1 << channel_id;
+        HANDLERS_RUNNING.fetch_or(bit, Ordering::SeqCst);
+        let handler = slot.load(Ordering::SeqCst);
+        if handler.is_null() {
+            ch.intsignal_enable0()
+                .modify(|r, w| unsafe { w.bits(r.bits() & !pending) });
+        } else {
+            // SAFETY: non-null slots only ever hold a `ChannelInterruptHandler`.
+            let handler =
+                unsafe { core::mem::transmute::<*mut (), ChannelInterruptHandler>(handler) };
+            handler(DwGdmaChannel::new(channel_id as u8), pending);
+        }
+        HANDLERS_RUNNING.fetch_and(!bit, Ordering::SeqCst);
+    }
+
+    let common = regs.commonreg_intstatus0().read().bits()
+        & regs.commonreg_intsignal_enable0().read().bits();
+    if common != 0 {
+        unsafe { regs.commonreg_intclear0().write(|w| w.bits(common)) };
+    }
 }
 
 /// Register-level handle for one DW-GDMA channel.
