@@ -21,6 +21,13 @@
 //!   three passed `vdma-mem2mem-psram` into 250 MHz PSRAM, where the `idf` settings stalled.
 //! - `CSI_FRAME_EXPORT=1`: after a valid mode A frame, print it as `@@SC2336FRAME` text lines for
 //!   `examples/qa/tools/csi_frame_extract.py`. About 860 KB of console output.
+//! - `CSI_EXPOSURE_LINES=1..=994`: exposure in rows of 33.333 us, instead of the mode default of
+//!   894 (`0x3e00..=0x3e02`).
+//! - `CSI_GAIN_INDEX=0..=193`: entry of the official SC2336 gain map (`0x3e06`, `0x3e07`,
+//!   `0x3e09`); 0 is 1x, 193 is the driver's default 66x limit. Unset leaves the reset value.
+//! - `CSI_REPEAT_FRAMES=1..=100`: mode A only, capture this many frames one after another into the
+//!   same buffer and print one summary line per frame. With `CSI_FRAME_EXPORT=1`, the last frame is
+//!   exported.
 //% CHIP_FILTER: mipi_csi_driver_supported && i2c_master_driver_supported
 //% FEATURES: unstable
 
@@ -29,6 +36,7 @@
 
 extern crate alloc;
 
+use alloc::vec::Vec;
 use core::alloc::Layout;
 
 use esp_alloc as _;
@@ -1095,6 +1103,335 @@ fn set_sc2336_test_pattern(
     read_reg_u8(i2c, SC2336_REG_TEST_PATTERN)
 }
 
+// Register names, encodings and limits from esp-cam-sensor `sc2336_regs.h` and
+// `sc2336.c` (`sc2336_set_exp_val`, `sc2336_set_total_gain_val`).
+const SC2336_REG_SHUTTER_TIME_H: u16 = 0x3e00;
+const SC2336_REG_SHUTTER_TIME_M: u16 = 0x3e01;
+const SC2336_REG_SHUTTER_TIME_L: u16 = 0x3e02;
+const SC2336_REG_DIG_COARSE_GAIN: u16 = 0x3e06;
+const SC2336_REG_DIG_FINE_GAIN: u16 = 0x3e07;
+const SC2336_REG_ANG_GAIN: u16 = 0x3e09;
+// `isp_v1_info` of `MIPI_2lane_24Minput_RAW8_1024x600_30fps`.
+const SC2336_MODE_VTS: u32 = 1000;
+const SC2336_MODE_TLINE_NS: u32 = 33_333;
+const SC2336_EXPOSURE_MIN_LINES: u32 = 1;
+// `SC2336_EXP_MAX_OFFSET`.
+const SC2336_EXPOSURE_MAX_LINES: u32 = SC2336_MODE_VTS - 6;
+// Last entry not above `CONFIG_CAMERA_SC2336_ABSOLUTE_GAIN_LIMIT` (default 66016),
+// the same as the driver's `s_limited_gain_index`.
+const SC2336_GAIN_INDEX_LIMIT: usize = 193;
+
+// esp-cam-sensor `sc2336.c`, `CONFIG_CAMERA_SC2336_DIG_GAIN_PRIORITY` (the Kconfig default):
+// (total gain x1000, 0x3e07 digital fine, 0x3e06 digital coarse, 0x3e09 analog).
+const SC2336_GAIN_MAP: [(u32, u8, u8, u8); 224] = [
+    (1000, 0x80, 0x00, 0x00),
+    (1031, 0x84, 0x00, 0x00),
+    (1063, 0x88, 0x00, 0x00),
+    (1094, 0x8c, 0x00, 0x00),
+    (1125, 0x90, 0x00, 0x00),
+    (1156, 0x94, 0x00, 0x00),
+    (1188, 0x98, 0x00, 0x00),
+    (1219, 0x9c, 0x00, 0x00),
+    (1250, 0xa0, 0x00, 0x00),
+    (1281, 0xa4, 0x00, 0x00),
+    (1313, 0xa8, 0x00, 0x00),
+    (1344, 0xac, 0x00, 0x00),
+    (1375, 0xb0, 0x00, 0x00),
+    (1406, 0xb4, 0x00, 0x00),
+    (1438, 0xb8, 0x00, 0x00),
+    (1469, 0xbc, 0x00, 0x00),
+    (1500, 0xc0, 0x00, 0x00),
+    (1531, 0xc4, 0x00, 0x00),
+    (1563, 0xc8, 0x00, 0x00),
+    (1594, 0xcc, 0x00, 0x00),
+    (1625, 0xd0, 0x00, 0x00),
+    (1656, 0xd4, 0x00, 0x00),
+    (1688, 0xd8, 0x00, 0x00),
+    (1719, 0xdc, 0x00, 0x00),
+    (1750, 0xe0, 0x00, 0x00),
+    (1781, 0xe4, 0x00, 0x00),
+    (1813, 0xe8, 0x00, 0x00),
+    (1844, 0xec, 0x00, 0x00),
+    (1875, 0xf0, 0x00, 0x00),
+    (1906, 0xf4, 0x00, 0x00),
+    (1938, 0xf8, 0x00, 0x00),
+    (1969, 0xfc, 0x00, 0x00),
+    (2000, 0x80, 0x01, 0x00),
+    (2063, 0x84, 0x01, 0x00),
+    (2125, 0x88, 0x01, 0x00),
+    (2188, 0x8c, 0x01, 0x00),
+    (2250, 0x90, 0x01, 0x00),
+    (2313, 0x94, 0x01, 0x00),
+    (2375, 0x98, 0x01, 0x00),
+    (2438, 0x9c, 0x01, 0x00),
+    (2500, 0xa0, 0x01, 0x00),
+    (2563, 0xa4, 0x01, 0x00),
+    (2625, 0xa8, 0x01, 0x00),
+    (2688, 0xac, 0x01, 0x00),
+    (2750, 0xb0, 0x01, 0x00),
+    (2813, 0xb4, 0x01, 0x00),
+    (2875, 0xb8, 0x01, 0x00),
+    (2938, 0xbc, 0x01, 0x00),
+    (3000, 0xc0, 0x01, 0x00),
+    (3063, 0xc4, 0x01, 0x00),
+    (3125, 0xc8, 0x01, 0x00),
+    (3188, 0xcc, 0x01, 0x00),
+    (3250, 0xd0, 0x01, 0x00),
+    (3313, 0xd4, 0x01, 0x00),
+    (3375, 0xd8, 0x01, 0x00),
+    (3438, 0xdc, 0x01, 0x00),
+    (3500, 0xe0, 0x01, 0x00),
+    (3563, 0xe4, 0x01, 0x00),
+    (3625, 0xe8, 0x01, 0x00),
+    (3688, 0xec, 0x01, 0x00),
+    (3750, 0xf0, 0x01, 0x00),
+    (3813, 0xf4, 0x01, 0x00),
+    (3875, 0xf8, 0x01, 0x00),
+    (3938, 0xfc, 0x01, 0x00),
+    (4000, 0x80, 0x01, 0x08),
+    (4126, 0x84, 0x01, 0x08),
+    (4250, 0x88, 0x01, 0x08),
+    (4376, 0x8c, 0x01, 0x08),
+    (4500, 0x90, 0x01, 0x08),
+    (4626, 0x94, 0x01, 0x08),
+    (4750, 0x98, 0x01, 0x08),
+    (4876, 0x9c, 0x01, 0x08),
+    (5000, 0xa0, 0x01, 0x08),
+    (5126, 0xa4, 0x01, 0x08),
+    (5250, 0xa8, 0x01, 0x08),
+    (5376, 0xac, 0x01, 0x08),
+    (5500, 0xb0, 0x01, 0x08),
+    (5626, 0xb4, 0x01, 0x08),
+    (5750, 0xb8, 0x01, 0x08),
+    (5876, 0xbc, 0x01, 0x08),
+    (6000, 0xc0, 0x01, 0x08),
+    (6126, 0xc4, 0x01, 0x08),
+    (6250, 0xc8, 0x01, 0x08),
+    (6376, 0xcc, 0x01, 0x08),
+    (6500, 0xd0, 0x01, 0x08),
+    (6626, 0xd4, 0x01, 0x08),
+    (6750, 0xd8, 0x01, 0x08),
+    (6876, 0xdc, 0x01, 0x08),
+    (7000, 0xe0, 0x01, 0x08),
+    (7126, 0xe4, 0x01, 0x08),
+    (7250, 0xe8, 0x01, 0x08),
+    (7376, 0xec, 0x01, 0x08),
+    (7500, 0xf0, 0x01, 0x08),
+    (7626, 0xf4, 0x01, 0x08),
+    (7750, 0xf8, 0x01, 0x08),
+    (7876, 0xfc, 0x01, 0x08),
+    (8000, 0x80, 0x01, 0x09),
+    (8252, 0x84, 0x01, 0x09),
+    (8500, 0x88, 0x01, 0x09),
+    (8752, 0x8c, 0x01, 0x09),
+    (9000, 0x90, 0x01, 0x09),
+    (9252, 0x94, 0x01, 0x09),
+    (9500, 0x98, 0x01, 0x09),
+    (9752, 0x9c, 0x01, 0x09),
+    (10000, 0xa0, 0x01, 0x09),
+    (10252, 0xa4, 0x01, 0x09),
+    (10500, 0xa8, 0x01, 0x09),
+    (10752, 0xac, 0x01, 0x09),
+    (11000, 0xb0, 0x01, 0x09),
+    (11252, 0xb4, 0x01, 0x09),
+    (11500, 0xb8, 0x01, 0x09),
+    (11752, 0xbc, 0x01, 0x09),
+    (12000, 0xc0, 0x01, 0x09),
+    (12252, 0xc4, 0x01, 0x09),
+    (12500, 0xc8, 0x01, 0x09),
+    (12752, 0xcc, 0x01, 0x09),
+    (13000, 0xd0, 0x01, 0x09),
+    (13252, 0xd4, 0x01, 0x09),
+    (13500, 0xd8, 0x01, 0x09),
+    (13752, 0xdc, 0x01, 0x09),
+    (14000, 0xe0, 0x01, 0x09),
+    (14252, 0xe4, 0x01, 0x09),
+    (14500, 0xe8, 0x01, 0x09),
+    (14752, 0xec, 0x01, 0x09),
+    (15000, 0xf0, 0x01, 0x09),
+    (15252, 0xf4, 0x01, 0x09),
+    (15500, 0xf8, 0x01, 0x09),
+    (15752, 0xfc, 0x01, 0x09),
+    (16000, 0x80, 0x01, 0x0b),
+    (16504, 0x84, 0x01, 0x0b),
+    (17000, 0x88, 0x01, 0x0b),
+    (17504, 0x8c, 0x01, 0x0b),
+    (18000, 0x90, 0x01, 0x0b),
+    (18504, 0x94, 0x01, 0x0b),
+    (19000, 0x98, 0x01, 0x0b),
+    (19504, 0x9c, 0x01, 0x0b),
+    (20000, 0xa0, 0x01, 0x0b),
+    (20504, 0xa4, 0x01, 0x0b),
+    (21000, 0xa8, 0x01, 0x0b),
+    (21504, 0xac, 0x01, 0x0b),
+    (22000, 0xb0, 0x01, 0x0b),
+    (22504, 0xb4, 0x01, 0x0b),
+    (23000, 0xb8, 0x01, 0x0b),
+    (23504, 0xbc, 0x01, 0x0b),
+    (24000, 0xc0, 0x01, 0x0b),
+    (24504, 0xc4, 0x01, 0x0b),
+    (25000, 0xc8, 0x01, 0x0b),
+    (25504, 0xcc, 0x01, 0x0b),
+    (26000, 0xd0, 0x01, 0x0b),
+    (26504, 0xd4, 0x01, 0x0b),
+    (27000, 0xd8, 0x01, 0x0b),
+    (27504, 0xdc, 0x01, 0x0b),
+    (28000, 0xe0, 0x01, 0x0b),
+    (28504, 0xe4, 0x01, 0x0b),
+    (29000, 0xe8, 0x01, 0x0b),
+    (29504, 0xec, 0x01, 0x0b),
+    (30000, 0xf0, 0x01, 0x0b),
+    (30504, 0xf4, 0x01, 0x0b),
+    (31000, 0xf8, 0x01, 0x0b),
+    (31504, 0xfc, 0x01, 0x0b),
+    (32000, 0x80, 0x01, 0x0f),
+    (33008, 0x84, 0x01, 0x0f),
+    (34000, 0x88, 0x01, 0x0f),
+    (35008, 0x8c, 0x01, 0x0f),
+    (36000, 0x90, 0x01, 0x0f),
+    (37008, 0x94, 0x01, 0x0f),
+    (38000, 0x98, 0x01, 0x0f),
+    (39008, 0x9c, 0x01, 0x0f),
+    (40000, 0xa0, 0x01, 0x0f),
+    (41008, 0xa4, 0x01, 0x0f),
+    (42000, 0xa8, 0x01, 0x0f),
+    (43008, 0xac, 0x01, 0x0f),
+    (44000, 0xb0, 0x01, 0x0f),
+    (45008, 0xb4, 0x01, 0x0f),
+    (46000, 0xb8, 0x01, 0x0f),
+    (47008, 0xbc, 0x01, 0x0f),
+    (48000, 0xc0, 0x01, 0x0f),
+    (49008, 0xc4, 0x01, 0x0f),
+    (50000, 0xc8, 0x01, 0x0f),
+    (51008, 0xcc, 0x01, 0x0f),
+    (52000, 0xd0, 0x01, 0x0f),
+    (53008, 0xd4, 0x01, 0x0f),
+    (54000, 0xd8, 0x01, 0x0f),
+    (55008, 0xdc, 0x01, 0x0f),
+    (56000, 0xe0, 0x01, 0x0f),
+    (57008, 0xe4, 0x01, 0x0f),
+    (58000, 0xe8, 0x01, 0x0f),
+    (59008, 0xec, 0x01, 0x0f),
+    (60000, 0xf0, 0x01, 0x0f),
+    (61008, 0xf4, 0x01, 0x0f),
+    (62000, 0xf8, 0x01, 0x0f),
+    (63008, 0xfc, 0x01, 0x0f),
+    (64000, 0x80, 0x01, 0x1f),
+    (66016, 0x84, 0x01, 0x1f),
+    (68000, 0x88, 0x01, 0x1f),
+    (70016, 0x8c, 0x01, 0x1f),
+    (72000, 0x90, 0x01, 0x1f),
+    (74016, 0x94, 0x01, 0x1f),
+    (76000, 0x98, 0x01, 0x1f),
+    (78016, 0x9c, 0x01, 0x1f),
+    (80000, 0xa0, 0x01, 0x1f),
+    (82016, 0xa4, 0x01, 0x1f),
+    (84000, 0xa8, 0x01, 0x1f),
+    (86016, 0xac, 0x01, 0x1f),
+    (88000, 0xb0, 0x01, 0x1f),
+    (90016, 0xb4, 0x01, 0x1f),
+    (92000, 0xb8, 0x01, 0x1f),
+    (94016, 0xbc, 0x01, 0x1f),
+    (96000, 0xc0, 0x01, 0x1f),
+    (98016, 0xc4, 0x01, 0x1f),
+    (100000, 0xc8, 0x01, 0x1f),
+    (102016, 0xcc, 0x01, 0x1f),
+    (104000, 0xd0, 0x01, 0x1f),
+    (106016, 0xd4, 0x01, 0x1f),
+    (108000, 0xd8, 0x01, 0x1f),
+    (110016, 0xdc, 0x01, 0x1f),
+    (112000, 0xe0, 0x01, 0x1f),
+    (114016, 0xe4, 0x01, 0x1f),
+    (116000, 0xe8, 0x01, 0x1f),
+    (118016, 0xec, 0x01, 0x1f),
+    (120000, 0xf0, 0x01, 0x1f),
+    (122016, 0xf4, 0x01, 0x1f),
+    (124000, 0xf8, 0x01, 0x1f),
+    (126016, 0xfc, 0x01, 0x1f),
+];
+
+fn env_number(name: &str, value: Option<&str>) -> Option<u32> {
+    value.map(|text| {
+        text.parse()
+            .unwrap_or_else(|_| panic!("{name} must be a decimal number, got '{text}'"))
+    })
+}
+
+/// Writes the exposure and gain overrides while the sensor is in standby, in
+/// the register order of the official driver.
+fn apply_sc2336_exposure_gain(
+    i2c: &mut I2c<'_, Blocking>,
+    exposure_lines: Option<u32>,
+    gain_index: Option<u32>,
+) -> Result<(), i2c::master::Error> {
+    if let Some(lines) = exposure_lines {
+        assert!(
+            (SC2336_EXPOSURE_MIN_LINES..=SC2336_EXPOSURE_MAX_LINES).contains(&lines),
+            "CSI_EXPOSURE_LINES must be {SC2336_EXPOSURE_MIN_LINES}..={SC2336_EXPOSURE_MAX_LINES}, got {lines}"
+        );
+        // The low 4 bits of 0x3e02 are a fraction of a line and stay 0.
+        write_reg_u8(i2c, SC2336_REG_SHUTTER_TIME_H, ((lines >> 12) & 0xf) as u8)?;
+        write_reg_u8(i2c, SC2336_REG_SHUTTER_TIME_M, ((lines >> 4) & 0xff) as u8)?;
+        write_reg_u8(i2c, SC2336_REG_SHUTTER_TIME_L, ((lines & 0xf) << 4) as u8)?;
+        println!(
+            "SC2336 exposure override: requested={} lines ({} us)",
+            lines,
+            lines * SC2336_MODE_TLINE_NS / 1000
+        );
+    }
+    if let Some(index) = gain_index {
+        assert!(
+            index as usize <= SC2336_GAIN_INDEX_LIMIT,
+            "CSI_GAIN_INDEX must be 0..={SC2336_GAIN_INDEX_LIMIT}, got {index}"
+        );
+        let (total, fine, coarse, analog) = SC2336_GAIN_MAP[index as usize];
+        write_reg_u8(i2c, SC2336_REG_DIG_FINE_GAIN, fine)?;
+        write_reg_u8(i2c, SC2336_REG_DIG_COARSE_GAIN, coarse)?;
+        write_reg_u8(i2c, SC2336_REG_ANG_GAIN, analog)?;
+        println!(
+            "SC2336 gain override: requested index={} total_gain_x1000={} 0x3e07=0x{:02x} 0x3e06=0x{:02x} 0x3e09=0x{:02x}",
+            index, total, fine, coarse, analog
+        );
+    }
+    Ok(())
+}
+
+fn print_sc2336_exposure_gain(i2c: &mut I2c<'_, Blocking>) -> Result<(), i2c::master::Error> {
+    let high = read_reg_u8(i2c, SC2336_REG_SHUTTER_TIME_H)?;
+    let mid = read_reg_u8(i2c, SC2336_REG_SHUTTER_TIME_M)?;
+    let low = read_reg_u8(i2c, SC2336_REG_SHUTTER_TIME_L)?;
+    let lines = ((high as u32 & 0xf) << 12) | ((mid as u32) << 4) | (low as u32 >> 4);
+    println!(
+        "SC2336 exposure readback: 0x3e00=0x{:02x} 0x3e01=0x{:02x} 0x3e02=0x{:02x} lines={} ({} us of a {} us frame, max {} lines)",
+        high,
+        mid,
+        low,
+        lines,
+        lines * SC2336_MODE_TLINE_NS / 1000,
+        SC2336_MODE_VTS * SC2336_MODE_TLINE_NS / 1000,
+        SC2336_EXPOSURE_MAX_LINES
+    );
+
+    let fine = read_reg_u8(i2c, SC2336_REG_DIG_FINE_GAIN)?;
+    let coarse = read_reg_u8(i2c, SC2336_REG_DIG_COARSE_GAIN)?;
+    let analog = read_reg_u8(i2c, SC2336_REG_ANG_GAIN)?;
+    print!(
+        "SC2336 gain readback: 0x3e07=0x{:02x} 0x3e06=0x{:02x} 0x3e09=0x{:02x}",
+        fine, coarse, analog
+    );
+    match SC2336_GAIN_MAP
+        .iter()
+        .position(|&(_, f, c, a)| (f, c, a) == (fine, coarse, analog))
+    {
+        Some(index) => println!(
+            " index={} total_gain_x1000={}",
+            index, SC2336_GAIN_MAP[index].0
+        ),
+        None => println!(" (not an entry of the official gain map)"),
+    }
+    Ok(())
+}
+
 fn print_bridge_state_transition(
     before: &CaptureDebugSnapshot,
     after: &CaptureDebugSnapshot,
@@ -1350,6 +1687,140 @@ fn run_capture(
     valid
 }
 
+const MAX_REPEAT_FRAMES: u32 = 100;
+
+/// Captures `frames` RAW8 frames into the same PSRAM buffer, one full
+/// single-shot capture per frame: the sensor streams only while a DMA block
+/// is armed, and the buffer is checked before it is reused.
+fn run_repeated_capture(
+    capture: &mut CsiCapture<'_>,
+    i2c: &mut I2c<'_, Blocking>,
+    allocation: &mut [u8],
+    test_pattern: bool,
+    frames: u32,
+    frame_export: bool,
+) -> bool {
+    let mode = CaptureMode::Raw8Psram;
+    let label = mode.label();
+    let capture_len = mode.expected_bytes();
+
+    let before_arm = capture.debug_snapshot();
+    print_capture_debug_snapshot("before-arm", &before_arm);
+    print_dma_axi_readback("before-arm", &before_arm);
+
+    let mut checksums = Vec::with_capacity(frames as usize);
+    let run_start = esp_hal::time::Instant::now();
+    for frame in 1..=frames {
+        let frame_start = esp_hal::time::Instant::now();
+        clear_isp_interrupts();
+        fill_sentinel(allocation);
+        DmaAlignedMut::new(&mut *allocation)
+            .expect("capture allocation is DMA aligned")
+            .writeback();
+
+        let mut stream_on = None;
+        let result = capture.receive_with(&mut allocation[..capture_len], || {
+            stream_on = Some(set_sc2336_stream(i2c, true));
+        });
+        let isp_int_raw = read_mmio_u32(ISP_INT_RAW_REG_ADDR);
+        let stream_off = set_sc2336_stream(i2c, false);
+        DmaAlignedMut::new(&mut *allocation)
+            .expect("capture allocation is DMA aligned")
+            .invalidate();
+
+        let trace = *capture.capture_trace();
+        let discard = capture.discard_continue_diagnostic();
+        let evidence = CaptureEvidence {
+            mode,
+            result: &result,
+            trace: &trace,
+            discard,
+            isp_int_raw,
+            allocation,
+            test_pattern,
+        };
+        let assessment = assess(&evidence);
+        let sensor_ok = matches!(stream_on, Some(Ok(_))) && stream_off.is_ok();
+        let received = result.as_ref().map_or(0, |frame| frame.received_bytes);
+        let ok = assessment.valid && sensor_ok && received == capture_len;
+        let checksum = checksum32(&allocation[..capture_len]);
+
+        print!(
+            "repeat[{}/{}]: ok={} receive={} received_bytes={} first_data={:?}us done={:?}us untouched_words={} guard_words_written={} bridge_errors=0x{:02x} discard={} host_error={} isp_errors={:#x} stalls={} checksum32=",
+            frame,
+            frames,
+            ok,
+            if result.is_ok() { "Ok" } else { "Err" },
+            received,
+            assessment.first_data_us,
+            assessment.completed_us,
+            assessment.capture_scan.untouched_words,
+            assessment.guard_scan.written_words,
+            assessment.bridge_errors,
+            discard.discard_count,
+            assessment.host_error,
+            assessment.isp_errors,
+            assessment.stalls,
+        );
+        // Not `{:08x}` with a `0x` prefix: the monitor resolves those as addresses.
+        println!(
+            "{:08x} frame_ms={}",
+            checksum,
+            frame_start.elapsed().as_millis()
+        );
+
+        if !ok {
+            println!(
+                "repeat[{frame}/{frames}]: FAIL stream_on={:?} stream_off={:?} shutdown={}, full diagnostics follow",
+                stream_on, stream_off, assessment.shutdown
+            );
+            let after = capture.debug_snapshot();
+            print_capture_debug_snapshot("after-shutdown", &after);
+            print_dma_axi_readback("after-shutdown", &after);
+            print_host_detail_status("after-capture");
+            print_runtime_samples(capture.runtime_status_samples());
+            print_capture_trace(label, &trace);
+            print_discard_diagnostic(label, discard);
+            if let Err(err) = &result {
+                print_receive_error(label, err);
+            }
+            print_verdict(label, &evidence);
+            return false;
+        }
+        checksums.push(checksum);
+    }
+
+    let after = capture.debug_snapshot();
+    print_dma_axi_readback("after-shutdown", &after);
+    let mut distinct = checksums.clone();
+    distinct.sort_unstable();
+    distinct.dedup();
+    println!(
+        "repeat: {}/{} frames valid in {} ms, distinct_checksums={}{}",
+        checksums.len(),
+        frames,
+        run_start.elapsed().as_millis(),
+        distinct.len(),
+        if test_pattern {
+            " (test pattern: expected 1)"
+        } else {
+            ""
+        }
+    );
+    if test_pattern && distinct.len() != 1 {
+        println!("repeat: FAIL, test pattern frames differ");
+        return false;
+    }
+
+    if frame_export {
+        // The last frame passed the same checks as a single-shot export.
+        println!("{label}: exporting frame {frames} of {frames}");
+        let trace = *capture.capture_trace();
+        export_raw8_frame(i2c, &allocation[..capture_len], test_pattern, &trace);
+    }
+    true
+}
+
 const EXPORT_PREFIX: &str = "@@SC2336FRAME";
 const EXPORT_CHUNK_BYTES: usize = 512;
 const EXPORT_BASE64_BYTES: usize = EXPORT_CHUNK_BYTES.div_ceil(3) * 4;
@@ -1557,8 +2028,28 @@ struct CaptureEvidence<'a> {
     test_pattern: bool,
 }
 
-/// Prints the four result levels and returns whether the frame is valid.
-fn print_verdict(label: &str, evidence: &CaptureEvidence<'_>) -> bool {
+struct Assessment {
+    written: usize,
+    first_data_us: Option<u32>,
+    completed_us: Option<u32>,
+    stalls: usize,
+    capture_scan: SentinelScan,
+    guard_scan: SentinelScan,
+    bytes_moved: bool,
+    block_complete: bool,
+    frame_sized: bool,
+    bridge_errors_at: &'static str,
+    bridge_errors: u32,
+    host_error: bool,
+    isp_errors: u32,
+    isp_errors_count: bool,
+    data_before_stream_on: bool,
+    shutdown: &'static str,
+    valid: bool,
+}
+
+/// Applies the four result levels to one capture without printing.
+fn assess(evidence: &CaptureEvidence<'_>) -> Assessment {
     let mode = evidence.mode;
     let trace = evidence.trace;
     let expected = mode.expected_bytes();
@@ -1630,6 +2121,62 @@ fn print_verdict(label: &str, evidence: &CaptureEvidence<'_>) -> bool {
         && (isp_errors == 0 || !isp_errors_count)
         && !data_before_stream_on;
 
+    let shutdown = entries
+        .iter()
+        .rev()
+        .find_map(|entry| match entry.event {
+            CaptureTraceEvent::ChannelDisabled => Some("CH_EN cleared after disable"),
+            CaptureTraceEvent::ChannelAborted => Some("stopped only after suspend and abort"),
+            CaptureTraceEvent::ShutdownFailed => Some("not shown stopped"),
+            _ => None,
+        })
+        .unwrap_or("already stopped when the wait ended");
+
+    Assessment {
+        written,
+        first_data_us: first_data.map(|entry| entry.elapsed_us),
+        completed_us: completion.map(|entry| entry.elapsed_us),
+        stalls,
+        capture_scan,
+        guard_scan,
+        bytes_moved,
+        block_complete,
+        frame_sized,
+        bridge_errors_at,
+        bridge_errors,
+        host_error,
+        isp_errors,
+        isp_errors_count,
+        data_before_stream_on,
+        shutdown,
+        valid,
+    }
+}
+
+/// Prints the four result levels and returns whether the frame is valid.
+fn print_verdict(label: &str, evidence: &CaptureEvidence<'_>) -> bool {
+    let mode = evidence.mode;
+    let expected = mode.expected_bytes();
+    let Assessment {
+        written,
+        first_data_us,
+        completed_us,
+        stalls,
+        capture_scan,
+        guard_scan,
+        bytes_moved,
+        block_complete,
+        frame_sized,
+        bridge_errors_at,
+        bridge_errors,
+        host_error,
+        isp_errors,
+        isp_errors_count,
+        data_before_stream_on,
+        shutdown,
+        valid,
+    } = assess(evidence);
+
     println!("--- CSI CAPTURE VERDICT ({label}) ---");
     match evidence.result {
         Ok(frame) => println!(
@@ -1640,15 +2187,11 @@ fn print_verdict(label: &str, evidence: &CaptureEvidence<'_>) -> bool {
     }
     println!(
         "{label}: level1 bytes_moved={} written={} first_data_at={:?}us stalls={}",
-        bytes_moved,
-        written,
-        first_data.map(|entry| entry.elapsed_us),
-        stalls
+        bytes_moved, written, first_data_us, stalls
     );
     println!(
         "{label}: level2 dma_block_complete={} completed_at={:?}us",
-        block_complete,
-        completion.map(|entry| entry.elapsed_us)
+        block_complete, completed_us
     );
     println!(
         "{label}: level3 frame_sized={} written={} expected={} sentinel_written_end={} untouched_words={} first_untouched={:?} guard_words_written={}",
@@ -1696,17 +2239,7 @@ fn print_verdict(label: &str, evidence: &CaptureEvidence<'_>) -> bool {
         _ => {}
     }
 
-    let shutdown = entries
-        .iter()
-        .rev()
-        .find_map(|entry| match entry.event {
-            CaptureTraceEvent::ChannelDisabled => Some("CH_EN cleared after disable"),
-            CaptureTraceEvent::ChannelAborted => Some("stopped only after suspend and abort"),
-            CaptureTraceEvent::ShutdownFailed => Some("not shown stopped"),
-            _ => None,
-        })
-        .unwrap_or("already stopped when the wait ended");
-    if let Some(last) = entries.last() {
+    if let Some(last) = evidence.trace.entries().last() {
         println!(
             "{label}: shutdown={} last_event={:?} ch_en={} abort_pending={} bridge_fifo={}",
             shutdown, last.event, last.dma_enabled, last.dma_abort_pending, last.bridge_fifo_depth
@@ -1807,13 +2340,29 @@ fn main() -> ! {
     let host_errors = env_flag(option_env!("CSI_HOST_ERRORS"));
     let frame_export = env_flag(option_env!("CSI_FRAME_EXPORT"));
     let (dma_profile_name, dma_profile) = selected_dma_profile();
+    let exposure_lines = env_number("CSI_EXPOSURE_LINES", option_env!("CSI_EXPOSURE_LINES"));
+    let gain_index = env_number("CSI_GAIN_INDEX", option_env!("CSI_GAIN_INDEX"));
+    let repeat_frames = env_number("CSI_REPEAT_FRAMES", option_env!("CSI_REPEAT_FRAMES"));
+    if let Some(frames) = repeat_frames {
+        assert!(
+            (1..=MAX_REPEAT_FRAMES).contains(&frames),
+            "CSI_REPEAT_FRAMES must be 1..={MAX_REPEAT_FRAMES}, got {frames}"
+        );
+        assert!(
+            mode == CaptureMode::Raw8Psram,
+            "CSI_REPEAT_FRAMES needs CSI_CAPTURE_MODE=A"
+        );
+    }
     println!(
-        "SC2336 capture start: mode={} test_pattern={} host_errors_unmasked={} dma_profile={} frame_export={}",
+        "SC2336 capture start: mode={} test_pattern={} host_errors_unmasked={} dma_profile={} frame_export={} exposure_lines={:?} gain_index={:?} repeat_frames={:?}",
         mode.label(),
         test_pattern,
         host_errors,
         dma_profile_name,
-        frame_export
+        frame_export,
+        exposure_lines,
+        gain_index,
+        repeat_frames
     );
     println!("Board assumptions: SCCB SCL=GPIO8, SDA=GPIO7, addr=0x30");
     println!("Board assumptions: reset/pwdn/xclk are hardware-managed on this sub-board");
@@ -1860,6 +2409,11 @@ fn main() -> ! {
         }
     }
 
+    if let Err(err) = apply_sc2336_exposure_gain(&mut i2c, exposure_lines, gain_index) {
+        println!("[FAIL] SC2336 exposure/gain write failed: {:?}", err);
+        panic!("SC2336 exposure/gain write failed");
+    }
+
     if let Err(err) = print_sc2336_regs(
         &mut i2c,
         "after mode programming, pre-stream",
@@ -1867,6 +2421,10 @@ fn main() -> ! {
     ) {
         println!("[FAIL] SC2336 register readback failed: {:?}", err);
         panic!("SC2336 mode readback failed");
+    }
+    if let Err(err) = print_sc2336_exposure_gain(&mut i2c) {
+        println!("[FAIL] SC2336 exposure/gain readback failed: {:?}", err);
+        panic!("SC2336 exposure/gain readback failed");
     }
 
     println!(
@@ -1940,14 +2498,25 @@ fn main() -> ! {
     }
     print_capture_plan(mode, &bridge_after_isp, allocation);
 
-    if !run_capture(
-        &mut capture,
-        &mut i2c,
-        mode,
-        allocation,
-        test_pattern,
-        frame_export,
-    ) {
+    let passed = match repeat_frames {
+        Some(frames) => run_repeated_capture(
+            &mut capture,
+            &mut i2c,
+            allocation,
+            test_pattern,
+            frames,
+            frame_export,
+        ),
+        None => run_capture(
+            &mut capture,
+            &mut i2c,
+            mode,
+            allocation,
+            test_pattern,
+            frame_export,
+        ),
+    };
+    if !passed {
         panic!("{}: no valid aligned frame", mode.label());
     }
     println!("{}: PASS", mode.label());
