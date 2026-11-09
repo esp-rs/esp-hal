@@ -45,6 +45,14 @@ use core::{
 };
 
 use procmacros::BuilderLite;
+pub use stream::{
+    CsiStream,
+    STREAM_BUFFER_COUNT,
+    StreamError,
+    StreamFrame,
+    StreamStartError,
+    StreamStats,
+};
 
 use crate::{
     dma::{DmaBufError, aligned::DmaAlignedMut},
@@ -144,6 +152,8 @@ const DMA_COMPLETION_INTERRUPT_MASK: u32 =
     DMA_STATUS_BLOCK_TRANSFER_DONE | DMA_STATUS_DMA_TRANSFER_DONE | DMA_STATUS_ERROR_MASK;
 const CSI_BRIDGE_INTERRUPT_MASK: u32 = 0x3F;
 const DISCARD_DIAG_DAR_SAMPLES: usize = 8;
+
+mod stream;
 
 const fn csi_dma_channel_config(axi: DmaAxiConfig) -> ChannelConfig {
     ChannelConfig {
@@ -523,12 +533,7 @@ pub struct CaptureStatus {
 impl CaptureStatus {
     /// Returns true if CSI-side status indicates a receive failure.
     pub const fn csi_error(&self) -> bool {
-        self.host_errors.any_error()
-            || self.bridge_events.vadr_num_gt
-            || self.bridge_events.vadr_num_lt
-            || self.bridge_events.discard
-            || self.bridge_events.csi_buf_overrun
-            || self.bridge_events.csi_async_fifo_ovf
+        self.host_errors.any_error() || self.bridge_events.any_error()
     }
 }
 
@@ -737,6 +742,15 @@ pub struct BridgeEventStatus {
 }
 
 impl BridgeEventStatus {
+    /// Returns true when an event that fails a capture is set.
+    pub const fn any_error(&self) -> bool {
+        self.vadr_num_gt
+            || self.vadr_num_lt
+            || self.discard
+            || self.csi_buf_overrun
+            || self.csi_async_fifo_ovf
+    }
+
     /// Returns true when any bridge event/status bit is set.
     pub const fn any_event(&self) -> bool {
         self.vadr_num_gt
@@ -1463,32 +1477,11 @@ impl<'d> MipiCsi<'d> {
     }
 
     fn read_host_error_status(&self) -> HostErrorStatus {
-        let host_int_main = MIPI_CSI_HOST::regs().int_st_main().read();
-        HostErrorStatus {
-            phy_fatal: host_int_main.st_status_int_phy_fatal().bit_is_set(),
-            packet_fatal: host_int_main.st_status_int_pkt_fatal().bit_is_set(),
-            boundary_frame_fatal: host_int_main.st_status_int_bndry_frame_fatal().bit_is_set(),
-            sequence_frame_fatal: host_int_main.st_status_int_seq_frame_fatal().bit_is_set(),
-            crc_frame_fatal: host_int_main.st_status_int_crc_frame_fatal().bit_is_set(),
-            payload_crc_fatal: host_int_main.st_status_int_pld_crc_fatal().bit_is_set(),
-            data_id_error: host_int_main.st_status_int_data_id().bit_is_set(),
-            ecc_corrected: host_int_main.st_status_int_ecc_corrected().bit_is_set(),
-            phy_error: host_int_main.st_status_int_phy().bit_is_set(),
-            raw_main_status: host_int_main.bits(),
-        }
+        host_error_status()
     }
 
     fn read_bridge_event_status(&self) -> BridgeEventStatus {
-        let bridge_int = MIPI_CSI_BRIDGE::regs().int_raw().read();
-        BridgeEventStatus {
-            vadr_num_gt: bridge_int.vadr_num_gt().bit_is_set(),
-            vadr_num_lt: bridge_int.vadr_num_lt().bit_is_set(),
-            discard: bridge_int.discard().bit_is_set(),
-            csi_buf_overrun: bridge_int.csi_buf_overrun().bit_is_set(),
-            csi_async_fifo_ovf: bridge_int.csi_async_fifo_ovf().bit_is_set(),
-            dma_cfg_has_updated: bridge_int.dma_cfg_has_updated().bit_is_set(),
-            raw_status: bridge_int.bits(),
-        }
+        bridge_event_status()
     }
 
     fn shutdown(&self) {
@@ -2020,33 +2013,37 @@ impl CsiCapture<'_> {
 
     fn start_transfer(&self, dst_addr: u32) {
         self.dma_channel
-            .configure_block_transfer(BlockTransferConfig {
-                src: BlockTransferEndpointConfig {
-                    addr: CSI_BRG_MEM_BASE,
-                    ll_pointer_master: LlPointerMasterSelect::Peripheral,
-                    addr_inc_mode: AddressIncrementMode::Fixed,
-                    burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
-                    axi_burst_len: self.dma_axi.src_burst_len,
-                    width: DW_GDMA_WIDTH_64_BITS,
-                },
-                dst: BlockTransferEndpointConfig {
-                    addr: dst_addr,
-                    ll_pointer_master: LlPointerMasterSelect::Memory,
-                    addr_inc_mode: AddressIncrementMode::Increment,
-                    burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
-                    axi_burst_len: self.dma_axi.dst_burst_len,
-                    width: DW_GDMA_WIDTH_64_BITS,
-                },
-                transfer_size_in_units: self.config.transfer_size_units,
-                // Match IDF contiguous-transfer path, which relies on DMA
-                // transfer-done status instead of block-marker interrupts.
-                interrupt_on_block_done: false,
-            });
+            .configure_block_transfer(self.block_transfer(dst_addr));
 
         self.dma_channel.set_enabled(true);
         MIPI_CSI_BRIDGE::regs()
             .csi_en()
             .modify(|_, w| w.csi_brig_en().set_bit());
+    }
+
+    fn block_transfer(&self, dst_addr: u32) -> BlockTransferConfig {
+        BlockTransferConfig {
+            src: BlockTransferEndpointConfig {
+                addr: CSI_BRG_MEM_BASE,
+                ll_pointer_master: LlPointerMasterSelect::Peripheral,
+                addr_inc_mode: AddressIncrementMode::Fixed,
+                burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
+                axi_burst_len: self.dma_axi.src_burst_len,
+                width: DW_GDMA_WIDTH_64_BITS,
+            },
+            dst: BlockTransferEndpointConfig {
+                addr: dst_addr,
+                ll_pointer_master: LlPointerMasterSelect::Memory,
+                addr_inc_mode: AddressIncrementMode::Increment,
+                burst_size: DW_GDMA_BURST_SIZE_512_ITEMS,
+                axi_burst_len: self.dma_axi.dst_burst_len,
+                width: DW_GDMA_WIDTH_64_BITS,
+            },
+            transfer_size_in_units: self.config.transfer_size_units,
+            // Match IDF contiguous-transfer path, which relies on DMA
+            // transfer-done status instead of block-marker interrupts.
+            interrupt_on_block_done: false,
+        }
     }
 
     /// Stops the capture in the order of TRM §42.7.2: the DMA channel first,
@@ -2367,6 +2364,35 @@ impl Drop for CsiCapture<'_> {
 impl Drop for MipiCsi<'_> {
     fn drop(&mut self) {
         self.shutdown();
+    }
+}
+
+fn host_error_status() -> HostErrorStatus {
+    let host_int_main = MIPI_CSI_HOST::regs().int_st_main().read();
+    HostErrorStatus {
+        phy_fatal: host_int_main.st_status_int_phy_fatal().bit_is_set(),
+        packet_fatal: host_int_main.st_status_int_pkt_fatal().bit_is_set(),
+        boundary_frame_fatal: host_int_main.st_status_int_bndry_frame_fatal().bit_is_set(),
+        sequence_frame_fatal: host_int_main.st_status_int_seq_frame_fatal().bit_is_set(),
+        crc_frame_fatal: host_int_main.st_status_int_crc_frame_fatal().bit_is_set(),
+        payload_crc_fatal: host_int_main.st_status_int_pld_crc_fatal().bit_is_set(),
+        data_id_error: host_int_main.st_status_int_data_id().bit_is_set(),
+        ecc_corrected: host_int_main.st_status_int_ecc_corrected().bit_is_set(),
+        phy_error: host_int_main.st_status_int_phy().bit_is_set(),
+        raw_main_status: host_int_main.bits(),
+    }
+}
+
+fn bridge_event_status() -> BridgeEventStatus {
+    let bridge_int = MIPI_CSI_BRIDGE::regs().int_raw().read();
+    BridgeEventStatus {
+        vadr_num_gt: bridge_int.vadr_num_gt().bit_is_set(),
+        vadr_num_lt: bridge_int.vadr_num_lt().bit_is_set(),
+        discard: bridge_int.discard().bit_is_set(),
+        csi_buf_overrun: bridge_int.csi_buf_overrun().bit_is_set(),
+        csi_async_fifo_ovf: bridge_int.csi_async_fifo_ovf().bit_is_set(),
+        dma_cfg_has_updated: bridge_int.dma_cfg_has_updated().bit_is_set(),
+        raw_status: bridge_int.bits(),
     }
 }
 

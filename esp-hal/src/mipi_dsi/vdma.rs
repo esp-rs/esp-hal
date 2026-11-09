@@ -111,7 +111,17 @@ const CTRL_LO: u32 = PORT_MEMORY        // bit  0: sms
 /// CTL1 base: arlen_en=1, arlen=16, awlen_en=1, awlen=16.
 const CTRL_HI_BASE: u32 = (1 << 6) | (16 << 7) | (1 << 15) | (16 << 16);
 
+/// CTL1 `IOC_BlkTfr`: latch `BLOCK_TFR_DONE` when this LLI's block completes.
+const IOC_BLK_TFR: u32 = 1 << 26;
+
 const LLI_VALID: u32 = 1 << 31;
+
+/// CTL1 of a ready LLI. `LLI_LAST` is never set, so the ring loops forever.
+const CTRL_HI: u32 = CTRL_HI_BASE | IOC_BLK_TFR | LLI_VALID;
+
+/// The only channel interrupt source DSI uses. The reset value of the signal
+/// enable also routes the per-burst transaction-done sources, one per line.
+pub(super) const BLOCK_TFR_DONE: u32 = 1 << 0;
 
 const DSI_CHANNEL_CONFIG: ChannelConfig = ChannelConfig {
     src_multblk_type: 3,
@@ -182,7 +192,6 @@ impl VdmaLinkItem {
     pub(super) fn configure(&self, src_addr: u32, fb_size: usize, next: *const VdmaLinkItem) {
         debug_assert!(fb_size.is_multiple_of(8), "fb_size must be a multiple of 8");
         let block_ts = (fb_size / 8) as u32 - 1;
-        let ctrl_hi = CTRL_HI_BASE | LLI_VALID; // no LLI_LAST → loop forever
         self.sar_lo.set(src_addr);
         self.sar_hi.set(0);
         self.dar_lo.set(DSI_BRG_MEM_BASE);
@@ -194,7 +203,7 @@ impl VdmaLinkItem {
         self.llp_lo.set(next as u32 | PORT_MEMORY);
         self.llp_hi.set(0);
         self.ctrl_lo.set(CTRL_LO);
-        self.ctrl_hi.set(ctrl_hi);
+        self.ctrl_hi.set(CTRL_HI);
         self.sstat.set(0);
         self.dstat.set(0);
         self.status_lo.set(0);
@@ -220,7 +229,7 @@ impl VdmaLinkItem {
     /// **just-consumed** LLI from the ping-pong pair while the DMA is busy
     /// with the other one.
     pub(super) fn rearm(&self) {
-        self.ctrl_hi.set(CTRL_HI_BASE | LLI_VALID);
+        self.ctrl_hi.set(CTRL_HI);
     }
 }
 
