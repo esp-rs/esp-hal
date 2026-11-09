@@ -22,7 +22,9 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
     let scl_low = half_cycle;
     // default, scl_wait_high < scl_high
     let scl_high = half_cycle / 2 + 2;
-    let scl_wait_high = half_cycle - scl_high;
+    let scl_wait_high = half_cycle
+        .checked_sub(scl_high)
+        .ok_or(ConfigError::FrequencyOutOfRange)?;
     let sda_hold = half_cycle / 2;
     // scl_wait_high < sda_sample <= scl_high
     let sda_sample = half_cycle / 2 - 1;
