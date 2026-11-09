@@ -51,6 +51,7 @@ struct Shared {
     active: bool,
     slots: [Slot; STREAM_BUFFER_COUNT],
     addrs: [u32; STREAM_BUFFER_COUNT],
+    lens: [u32; STREAM_BUFFER_COUNT],
     /// The block of the slot in `Dma`, with its destination address unset.
     block: Option<BlockTransferConfig>,
     frame_bytes: u32,
@@ -69,6 +70,7 @@ impl Shared {
         active: false,
         slots: [Slot::Free; STREAM_BUFFER_COUNT],
         addrs: [0; STREAM_BUFFER_COUNT],
+        lens: [0; STREAM_BUFFER_COUNT],
         block: None,
         frame_bytes: 0,
         paused: false,
@@ -289,6 +291,7 @@ impl<'d> CsiStream<'d> {
             *addr = aligned.as_mut_ptr() as u32;
         }
 
+        let lens = [self.buffers[0].len() as u32, self.buffers[1].len() as u32];
         let channel = self.capture.dma_channel;
         let block = self.capture.block_transfer(0);
         let started = SHARED.with(|shared| {
@@ -298,6 +301,7 @@ impl<'d> CsiStream<'d> {
             *shared = Shared {
                 active: true,
                 addrs,
+                lens,
                 block: Some(block),
                 frame_bytes: frame_bytes as u32,
                 ..Shared::IDLE
@@ -469,7 +473,15 @@ fn stream_interrupt_handler(channel: DwGdmaChannel, _pending: u32) {
 
         let written = channel
             .destination_address()
-            .wrapping_sub(shared.addrs[done]);
+            .saturating_sub(shared.addrs[done]);
+        // The bridge, not `BLOCK_TS`, ends the block, so a longer source frame
+        // runs past the buffer. Memory after it is no longer known to be intact.
+        if written > shared.lens[done] {
+            panic!(
+                "mipi-csi stream DMA wrote {} bytes from 0x{:08x} into a {}-byte buffer",
+                written, shared.addrs[done], shared.lens[done]
+            );
+        }
         let csi_error = host_error_status().any_error() || bridge_event_status().any_error();
         let ok = status & (DMA_STATUS_BLOCK_TRANSFER_DONE | DMA_STATUS_DMA_TRANSFER_DONE) != 0
             && status & DMA_STATUS_ERROR_MASK == 0

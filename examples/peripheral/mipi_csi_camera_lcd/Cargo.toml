@@ -1,0 +1,38 @@
+[package]
+name    = "mipi_csi_camera_lcd"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+esp-alloc = { path = "../../../esp-alloc" }
+esp-backtrace = { path = "../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-println = { path = "../../../esp-println", default-features = false, features = ["esp32p4", "log-04", "auto", "critical-section"] }
+
+[features]
+# After the snapshot, show the camera continuously.
+live = []
+# Show eight colour bars instead of the camera, to check the RGB565 channel
+# order of the panel.
+color-bars = []
+# Scale the colour channels with gray-world gains measured on the snapshot.
+white-balance = []
+
+esp32p4 = [
+    "esp-alloc/esp32p4",
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-hal/esp32p4",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1
+opt-level        = 3
