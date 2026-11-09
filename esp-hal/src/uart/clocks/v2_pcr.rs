@@ -25,6 +25,11 @@ impl UartInstance {
             .modify(|_, w| w.sclk_en().bit(en));
     }
 
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn uart0_function_clock_enabled() -> bool {
+        PCR::regs().uart(0).clk_conf().read().sclk_en().bit()
+    }
+
     pub(crate) fn configure_function_clock_impl(
         self,
         _clocks: &mut ClockTree,

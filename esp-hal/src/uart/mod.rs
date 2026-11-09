@@ -91,7 +91,6 @@ use crate::{
     pac::uart0::RegisterBlock,
     private::DropGuard,
     rtc_cntl::WakeLock,
-    system::PeripheralGuard,
 };
 
 crate::any_peripheral! {
@@ -623,9 +622,6 @@ where
     }
 
     fn init(self, config: Config) -> Result<Uart<'d, Dm>, ConfigError> {
-        let rx_guard = PeripheralGuard::new(self.uart.info().peripheral);
-        let tx_guard = PeripheralGuard::new(self.uart.info().peripheral);
-
         let peri_clock_guard = UartClockGuard::new(unsafe { self.uart.clone_unchecked() });
 
         let rts_pin = PinGuard::new_unconnected();
@@ -635,7 +631,6 @@ where
             rx: UartRx {
                 uart: unsafe { self.uart.clone_unchecked() },
                 phantom: PhantomData,
-                guard: rx_guard,
                 peri_clock_guard: peri_clock_guard.clone(),
                 // Receiving data continuously, the peripheral can't let the system sleep.
                 _wake_lock: WakeLock::new(),
@@ -644,7 +639,6 @@ where
             tx: UartTx {
                 uart: self.uart,
                 phantom: PhantomData,
-                guard: tx_guard,
                 peri_clock_guard,
                 rts_pin,
                 tx_pin,
@@ -682,7 +676,6 @@ pub struct Uart<'d, Dm: DriverMode> {
 pub struct UartTx<'d, Dm: DriverMode> {
     uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
-    guard: PeripheralGuard,
     peri_clock_guard: UartClockGuard<'d>,
     rts_pin: PinGuard,
     tx_pin: PinGuard,
@@ -694,7 +687,6 @@ pub struct UartTx<'d, Dm: DriverMode> {
 pub struct UartRx<'d, Dm: DriverMode> {
     uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
-    guard: PeripheralGuard,
     peri_clock_guard: UartClockGuard<'d>,
     // Receiving data continuously, the peripheral can't let the system sleep.
     _wake_lock: WakeLock,
@@ -795,7 +787,6 @@ impl<'d> UartTx<'d, Blocking> {
         UartTx {
             uart: self.uart,
             phantom: PhantomData,
-            guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
@@ -819,7 +810,6 @@ impl<'d> UartTx<'d, Async> {
         UartTx {
             uart: self.uart,
             phantom: PhantomData,
-            guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
@@ -1169,7 +1159,6 @@ impl<'d> UartRx<'d, Blocking> {
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
-            guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             _wake_lock: self._wake_lock,
             reported_errors: self.reported_errors,
@@ -1192,7 +1181,6 @@ impl<'d> UartRx<'d, Async> {
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
-            guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             _wake_lock: self._wake_lock,
             reported_errors: self.reported_errors,
