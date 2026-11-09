@@ -44,7 +44,7 @@ impl I2sInstance {
     ) {
         // The divider can lose the fraction if the module clock is gated while the coefficients
         // change.
-        let enabled = self.regs().tx_clkm_conf().read().tx_clk_active().bit();
+        let enabled = clocks.i2s_tx_clk_refcount[self as usize] > 0;
         self.enable_tx_clk_impl(clocks, true);
         self.set_tx_divider(new_config);
         if !enabled {
@@ -108,7 +108,7 @@ impl I2sInstance {
     ) {
         // The divider can lose the fraction if the module clock is gated while the coefficients
         // change.
-        let enabled = self.regs().rx_clkm_conf().read().rx_clk_active().bit();
+        let enabled = clocks.i2s_rx_clk_refcount[self as usize] > 0;
         self.enable_rx_clk_impl(clocks, true);
         self.set_rx_divider(new_config);
         if !enabled {

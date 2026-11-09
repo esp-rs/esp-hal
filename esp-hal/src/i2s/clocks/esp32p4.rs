@@ -89,12 +89,7 @@ impl I2sInstance {
     ) {
         // The divider can lose the fraction if the module clock is gated while the coefficients
         // change.
-        let clkrst = HP_SYS_CLKRST::regs();
-        let enabled = match self {
-            Self::I2s0 => clkrst.peri_clk_ctrl13().read().i2s0_tx_clk_en().bit(),
-            Self::I2s1 => clkrst.peri_clk_ctrl15().read().i2s1_tx_clk_en().bit(),
-            Self::I2s2 => clkrst.peri_clk_ctrl18().read().i2s2_tx_clk_en().bit(),
-        };
+        let enabled = clocks.i2s_tx_clk_refcount[self as usize] > 0;
         self.enable_tx_clk_impl(clocks, true);
         self.set_tx_divider(new_config);
         if !enabled {
@@ -170,12 +165,7 @@ impl I2sInstance {
     ) {
         // The divider can lose the fraction if the module clock is gated while the coefficients
         // change.
-        let clkrst = HP_SYS_CLKRST::regs();
-        let enabled = match self {
-            Self::I2s0 => clkrst.peri_clk_ctrl11().read().i2s0_rx_clk_en().bit(),
-            Self::I2s1 => clkrst.peri_clk_ctrl14().read().i2s1_rx_clk_en().bit(),
-            Self::I2s2 => clkrst.peri_clk_ctrl17().read().i2s2_rx_clk_en().bit(),
-        };
+        let enabled = clocks.i2s_rx_clk_refcount[self as usize] > 0;
         self.enable_rx_clk_impl(clocks, true);
         self.set_rx_divider(new_config);
         if !enabled {
