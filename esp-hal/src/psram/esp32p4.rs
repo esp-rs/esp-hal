@@ -8,6 +8,7 @@ use crate::{
 };
 
 mod oct_hex;
+mod timing;
 
 /// PSRAM interface mode (line count of the data bus).
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -170,6 +171,12 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     // basic AXI configuration here
     oct_hex::configure_psram_mspi(&config.timing, is_hex);
 
+    // IDF runs `mspi_timing_psram_tuning` after the AXI command setup and
+    // before the rev-3 workaround and the MMU map.
+    if !timing::tune_psram(&config.timing) {
+        return false;
+    }
+
     // Silicon revision 3.0 (ECO5) requires two dummy PSRAM reads + a controller
     // reset before the real MMU mapping is committed.  Port of IDF's
     // `esp_psram_p4_rev3_workaround` in `esp_psram.c`.
@@ -181,6 +188,10 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     oct_hex::mmu_map_psram(config.size.get());
 
     true
+}
+
+pub(crate) fn log_psram_timing_pins(tag: &str) {
+    timing::log_applied_readback(tag);
 }
 
 pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {

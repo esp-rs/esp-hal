@@ -428,6 +428,56 @@ fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
     u16::from_le_bytes(rx)
 }
 
+/// Octal-DDR sync transfer on MSPI3, in chunks of at most 64 bytes.
+///
+/// Matches IDF `psram_ctrlr_ll_common_transaction` for the timing sweep:
+/// OPI-DTR, 16-bit command, 32-bit address, CS1. `dummy_bit_len` is the
+/// transaction dummy length, not the cache-path `N - 1` register field.
+pub(super) fn mspi3_transfer(
+    cmd: u16,
+    addr: u32,
+    dummy_bit_len: u32,
+    tx: &[u8],
+    rx: &mut [u8],
+) -> Result<(), ()> {
+    const CMD_BITLEN: u16 = 16;
+    const ADDR_BITLEN: u32 = 32;
+    const MAX_BYTES: usize = 64;
+
+    if tx.len() > MAX_BYTES || rx.len() > MAX_BYTES {
+        return Err(());
+    }
+
+    let mut addr_local = addr;
+    let mut tx_aligned = [0u8; MAX_BYTES];
+    tx_aligned[..tx.len()].copy_from_slice(tx);
+    let mut conf = EspRomSpiCmd {
+        cmd,
+        cmd_bit_len: CMD_BITLEN,
+        addr: &raw mut addr_local,
+        addr_bit_len: ADDR_BITLEN,
+        tx_data: if tx.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            tx_aligned.as_mut_ptr().cast()
+        },
+        tx_data_bit_len: (tx.len() * 8) as u32,
+        rx_data: if rx.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            rx.as_mut_ptr().cast()
+        },
+        rx_data_bit_len: (rx.len() * 8) as u32,
+        dummy_bit_len,
+    };
+
+    unsafe {
+        esp_rom_spi_set_op_mode(ROM_SPI_PSRAM_CMD_NUM, ESP_ROM_SPIFLASH_OPI_DTR_MODE);
+        esp_rom_spi_cmd_config(ROM_SPI_PSRAM_CMD_NUM, &raw mut conf);
+    }
+    mspi1_kick_and_collect(rx)
+}
+
 /// Issue an AP OCT PSRAM register-write command (0xC0C0) with 16-bit
 /// data through `PSRAM_MSPI1`. Same setup-via-ROM + manual-kick pattern
 /// as `mspi1_reg_read16`.
