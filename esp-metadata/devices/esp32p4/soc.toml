@@ -115,6 +115,8 @@ peripherals = [
     { name = "MIPI_CSI", virtual = true, interrupts = { csi = "CSI", bridge = "CSI_BRIDGE" }, clock_group = "MIPI_CSI" },
     { name = "MIPI_CSI_HOST", hidden = true },
     { name = "MIPI_CSI_BRIDGE", hidden = true },
+    # The CSI driver routes the CSI input through the ISP in bypass mode.
+    { name = "ISP", hidden = true },
     { name = "MIPI_DSI", virtual = true, interrupts = { dsi = "DSI", bridge = "DSI_BRIDGE" }, clock_group = "MIPI_DSI" },
     { name = "VDMA", pac = "DMA", hidden = true },
     { name = "MIPI_DSI_HOST", hidden = true },

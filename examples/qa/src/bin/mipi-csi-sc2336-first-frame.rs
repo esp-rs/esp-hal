@@ -42,6 +42,8 @@
 //!   stop/start at varying points of the frame.
 //! - `CSI_QUIET=1`: with `CSI_REPEAT_FRAMES`, print the per-frame line only for failures and every
 //!   100th frame, so the console does not slow the capture loop.
+//! - `CSI_SKIP_ISP=1`: ISP bypass modes only, leave the ISP clock, reset and input gate untouched,
+//!   to check whether the bypass path needs them.
 //! - `CSI_COMPLETION`: `poll` (default) waits with `receive_with`, `interrupt` with
 //!   `receive_with_interrupt`. In interrupt mode a frame also fails if the channel's own DW-GDMA
 //!   completion interrupt did not end the wait.
@@ -3465,7 +3467,12 @@ fn main() -> ! {
     capture.enable_discard_continue_diagnostic();
 
     let bridge_before_isp = capture.debug_snapshot();
-    configure_isp_like_idf(mode.isp_enabled());
+    if env_flag(option_env!("CSI_SKIP_ISP")) {
+        assert!(!mode.isp_enabled(), "CSI_SKIP_ISP needs an ISP bypass mode");
+        println!("isp-config: skipped (CSI_SKIP_ISP=1)");
+    } else {
+        configure_isp_like_idf(mode.isp_enabled());
+    }
     let bridge_after_isp = capture.debug_snapshot();
     print_bridge_state_transition(&bridge_before_isp, &bridge_after_isp, "isp-init");
     if host_errors {

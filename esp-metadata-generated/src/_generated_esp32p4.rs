@@ -7032,12 +7032,13 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MIPI_CSI_BRIDGE peripheral singleton"] MIPI_CSI_BRIDGE <= MIPI_CSI_BRIDGE()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "MIPI_DSI peripheral singleton"] MIPI_DSI <= virtual(DSI_BRIDGE : {
-        bind_bridge_interrupt, enable_bridge_interrupt, disable_bridge_interrupt }, DSI :
-        { bind_dsi_interrupt, enable_dsi_interrupt, disable_dsi_interrupt })
-        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "VDMA peripheral singleton"] VDMA <= DMA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "ISP peripheral singleton"] ISP <= ISP() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MIPI_DSI peripheral singleton"]
+        MIPI_DSI <= virtual(DSI_BRIDGE : { bind_bridge_interrupt,
+        enable_bridge_interrupt, disable_bridge_interrupt }, DSI : { bind_dsi_interrupt,
+        enable_dsi_interrupt, disable_dsi_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "VDMA peripheral singleton"]
+        VDMA <= DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MIPI_DSI_BRIDGE peripheral singleton"] MIPI_DSI_BRIDGE <= MIPI_DSI_BRIDGE()
@@ -7482,6 +7483,7 @@ macro_rules! for_each_peripheral {
         (@ peri_type #[doc = "MIPI_CSI_HOST peripheral singleton"] MIPI_CSI_HOST <=
         MIPI_CSI_HOST() (unstable)), (@ peri_type #[doc =
         "MIPI_CSI_BRIDGE peripheral singleton"] MIPI_CSI_BRIDGE <= MIPI_CSI_BRIDGE()
+        (unstable)), (@ peri_type #[doc = "ISP peripheral singleton"] ISP <= ISP()
         (unstable)), (@ peri_type #[doc = "MIPI_DSI peripheral singleton"] MIPI_DSI <=
         virtual(DSI_BRIDGE : { bind_bridge_interrupt, enable_bridge_interrupt,
         disable_bridge_interrupt }, DSI : { bind_dsi_interrupt, enable_dsi_interrupt,

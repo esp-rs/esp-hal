@@ -471,6 +471,16 @@ impl DwGdmaChannel {
             .bits()
     }
 
+    /// Returns the current source address (`SARx`).
+    #[inline]
+    pub(crate) fn source_address(&self) -> u32 {
+        VDMA::regs()
+            .ch(self.channel_id as usize)
+            .sar0()
+            .read()
+            .bits()
+    }
+
     /// Returns the current destination address (`DARx`).
     #[inline]
     pub(crate) fn destination_address(&self) -> u32 {

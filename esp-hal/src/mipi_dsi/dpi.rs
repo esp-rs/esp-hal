@@ -442,6 +442,10 @@ impl<'d> DsiDpi<'d> {
 
     /// Returns a mutable slice to the back (not-currently-displayed) frame buffer.
     ///
+    /// Right after [`Self::commit`] the DMA can still be reading this buffer
+    /// for the rest of the frame on screen. Call [`Self::wait_for_commit`]
+    /// first to draw into it without tearing.
+    ///
     /// With a single frame buffer this is the same buffer the DMA may be
     /// reading — the caller is responsible for synchronization in that case.
     pub fn framebuffer_mut(&mut self) -> &mut [u8] {
@@ -479,6 +483,23 @@ impl<'d> DsiDpi<'d> {
         });
 
         self.current_fb = back;
+    }
+
+    /// Blocks until the DMA reads the frame buffer of the last
+    /// [`Self::commit`], so that it no longer reads the previous one.
+    ///
+    /// Takes up to two frames: the frame on screen at the commit finishes from
+    /// the previous buffer, and the next one can still start from it if the
+    /// commit landed just as the DMA loaded its link-list item.
+    pub fn wait_for_commit(&mut self) {
+        if self.num_fbs < 2 {
+            return;
+        }
+        let front = self.fb_ptrs[self.current_fb] as u32;
+        let channel = DwGdmaChannel::new(self._guard.vdma_channel_id);
+        // The address one past the previous buffer can equal the start of this
+        // one, so only an address inside it shows that a block reads it.
+        while !(front + 1..front + self.fb_size as u32).contains(&channel.source_address()) {}
     }
 
     /// Returns how often the VDMA channel's interrupt, which re-arms the

@@ -72,7 +72,7 @@ use crate::{
         register_channel_handler,
         unregister_channel_handler,
     },
-    peripherals::{HP_SYS_CLKRST, MIPI_CSI, MIPI_CSI_BRIDGE, MIPI_CSI_HOST},
+    peripherals::{HP_SYS_CLKRST, ISP, MIPI_CSI, MIPI_CSI_BRIDGE, MIPI_CSI_HOST},
     private::Sealed,
     system::{GenericPeripheralGuard, Peripheral},
     time::{Duration, Instant},
@@ -88,6 +88,12 @@ const CSI_RAW8_DATA_TYPE: u8 = 0x2A;
 // IDF CSI controller long-packet filter for YUV, RGB, and RAW capture.
 const CSI_DATA_TYPE_MIN: u8 = 0x12;
 const CSI_DATA_TYPE_MAX: u8 = 0x2F;
+// ISP bypass setup of IDF `esp_isp_new_processor`: 80 MHz from PLL_F240M, CSI
+// input, register changes applied at the next vsync.
+const ISP_CLK_SRC_PLL_F240M: u8 = 1;
+const ISP_CLK_DIV_80MHZ: u8 = 2;
+const ISP_IN_SRC_CSI: u8 = 0;
+const ISP_SHADOW_UPDATE_NEXT_VSYNC: u8 = 2;
 
 const DW_GDMA_TT_FC_P2M_SRC: u8 = 4;
 const DW_GDMA_BURST_SIZE_512_ITEMS: u8 = 8;
@@ -179,7 +185,7 @@ const fn csi_dma_channel_config(axi: DmaAxiConfig) -> ChannelConfig {
 
 /// AXI burst lengths and outstanding-request limits of the CSI DMA channel.
 ///
-/// [`Self::ESP_IDF`] is used unless a bring-up diagnostic replaces it with
+/// [`Self::DEFAULT`] is used unless a bring-up diagnostic replaces it with
 /// `CsiCapture::set_diagnostic_dma_axi_config`.
 #[instability::unstable]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -201,11 +207,21 @@ pub struct DmaAxiConfig {
 
 impl DmaAxiConfig {
     /// Settings of the ESP-IDF v6.1 CSI driver (`esp_cam_ctlr_csi.c`).
+    ///
+    /// On ESP32-P4 v3.2 with 250 MHz HEX PSRAM, the DMA stalls with these
+    /// settings when it writes frames into PSRAM.
     pub const ESP_IDF: Self = Self {
         src_burst_len: DW_GDMA_AXI_BURST_LEN_16,
         dst_burst_len: DW_GDMA_AXI_BURST_LEN_16,
         src_outstanding_requests: DW_GDMA_OUTSTANDING_REQUESTS_5,
         dst_outstanding_requests: DW_GDMA_OUTSTANDING_REQUESTS_5,
+    };
+
+    /// [`Self::ESP_IDF`] with one outstanding frame-buffer write, which
+    /// captures into PSRAM and internal SRAM.
+    pub const DEFAULT: Self = Self {
+        dst_outstanding_requests: 1,
+        ..Self::ESP_IDF
     };
 
     const fn is_valid(&self) -> bool {
@@ -1284,19 +1300,20 @@ impl<'d> MipiCsi<'d> {
 
         let dma_channel = DwGdmaChannel::new(channel_id);
         dma_channel.set_enabled(false);
-        dma_channel.configure(csi_dma_channel_config(DmaAxiConfig::ESP_IDF));
+        dma_channel.configure(csi_dma_channel_config(DmaAxiConfig::DEFAULT));
         dma_channel.set_interrupt_status_enable(DMA_STATUS_ENABLE_MASK);
         dma_channel.set_interrupt_signal_enable(0);
         dma_channel.clear_all_interrupts();
 
         self.configure_bridge_capture(config);
         self.clear_bridge_interrupts();
+        enable_isp_bypass(config);
 
         Ok(CsiCapture {
             csi: self,
             config,
             dma_channel,
-            dma_axi: DmaAxiConfig::ESP_IDF,
+            dma_axi: DmaAxiConfig::DEFAULT,
             _vdma_guard: vdma_guard,
             _owned_dma_channel: owned_dma_channel,
             runtime_samples: [None; CAPTURE_RUNTIME_SAMPLE_COUNT],
@@ -1589,7 +1606,7 @@ impl CsiCapture<'_> {
         Ok(())
     }
 
-    /// Replaces the [`DmaAxiConfig::ESP_IDF`] AXI settings used by the next
+    /// Replaces the [`DmaAxiConfig::DEFAULT`] AXI settings used by the next
     /// `receive`.
     ///
     /// Flow control, handshake, addressing, transfer width and burst items stay
@@ -2358,7 +2375,58 @@ impl Drop for CsiCapture<'_> {
             panic!("mipi-csi DMA shutdown failed in Drop: {:?}", reason);
         }
         self.clear_transfer_status();
+        disable_isp_bypass();
     }
+}
+
+/// Passes the CSI input through the ISP unprocessed, as IDF
+/// `esp_isp_new_processor` does for a bypassed ISP. The bridge receives no
+/// data while the ISP clock or its MIPI input gate is off.
+fn enable_isp_bypass(config: ValidatedCaptureConfig) {
+    let clkrst = HP_SYS_CLKRST::regs();
+    clkrst.peri_clk_ctrl25().modify(|_, w| unsafe {
+        w.isp_clk_src_sel().bits(ISP_CLK_SRC_PLL_F240M);
+        w.isp_clk_en().set_bit()
+    });
+    clkrst
+        .peri_clk_ctrl26()
+        .modify(|_, w| unsafe { w.isp_clk_div_num().bits(ISP_CLK_DIV_80MHZ) });
+    clkrst.hp_rst_en0().modify(|_, w| w.rst_en_isp().set_bit());
+    clkrst
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_isp().clear_bit());
+
+    let isp = ISP::regs();
+    isp.cntl().write(|w| unsafe { w.bits(0) });
+    isp.int_ena().write(|w| unsafe { w.bits(0) });
+    isp.int_clr().write(|w| unsafe { w.bits(u32::MAX) });
+    // The reset values enable the processing stages and expect line start and
+    // line end packets, so every field is written from zero.
+    isp.clk_en()
+        .write(|w| unsafe { w.bits(0) }.clk_en().set_bit());
+    isp.cntl().write(|w| unsafe {
+        w.bits(0);
+        w.isp_in_src().bits(ISP_IN_SRC_CSI);
+        w.mipi_data_en().set_bit()
+    });
+    // In bypass the line length is counted in 32-bit words.
+    let line_words = (config.frame_width as u32 * 8).div_ceil(32) as u16;
+    isp.frame_cfg().write(|w| unsafe {
+        w.bits(0);
+        w.vadr_num().bits(config.frame_height - 1);
+        w.hadr_num().bits(line_words - 1)
+    });
+    isp.shadow_reg_ctrl()
+        .modify(|_, w| unsafe { w.shadow_update_sel().bits(ISP_SHADOW_UPDATE_NEXT_VSYNC) });
+}
+
+fn disable_isp_bypass() {
+    let isp = ISP::regs();
+    isp.cntl().write(|w| unsafe { w.bits(0) });
+    isp.clk_en().write(|w| w.clk_en().clear_bit());
+    HP_SYS_CLKRST::regs()
+        .peri_clk_ctrl25()
+        .modify(|_, w| w.isp_clk_en().clear_bit());
 }
 
 impl Drop for MipiCsi<'_> {
