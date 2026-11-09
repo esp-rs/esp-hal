@@ -1020,6 +1020,10 @@ impl Driver<'_> {
     }
 
     fn set_frequency(&self, config: &Config) -> Result<(), ConfigError> {
+        if config.frequency.as_hz() == 0 {
+            return Err(ConfigError::FrequencyOutOfRange);
+        }
+
         version::set_frequency(self, config)
     }
 

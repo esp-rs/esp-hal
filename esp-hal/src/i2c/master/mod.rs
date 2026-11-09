@@ -246,13 +246,16 @@ impl BusTimeout {
             BusTimeout::Disabled => Ok(None),
 
             BusTimeout::BusCycles(cycles) => {
+                let to_peri = cycles
+                    .checked_mul(2 * half_bus_cycle)
+                    .ok_or(ConfigError::TimeoutTooLong)?;
                 let raw = if cfg!(i2c_master_bus_timeout_is_exponential) {
-                    let to_peri = (cycles * 2 * half_bus_cycle).max(1);
+                    let to_peri = to_peri.max(1);
                     let log2 = to_peri.ilog2();
                     // If not a power of 2, round up so that we don't shorten timeouts.
                     if to_peri != 1 << log2 { log2 + 1 } else { log2 }
                 } else {
-                    cycles * 2 * half_bus_cycle
+                    to_peri
                 };
 
                 if raw <= property!("i2c_master.max_bus_timeout") {

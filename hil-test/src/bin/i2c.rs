@@ -13,7 +13,9 @@ use esp_hal::{
     Blocking,
     i2c::master::{
         AcknowledgeCheckFailedReason,
+        BusTimeout,
         Config,
+        ConfigError,
         Error,
         I2c,
         I2cAddress,
@@ -423,6 +425,24 @@ mod tests {
                 read_data
             );
         }
+    }
+
+    #[test]
+    fn zero_frequency_is_rejected(mut ctx: Context) {
+        assert_eq!(
+            ctx.i2c
+                .apply_config(&Config::default().with_frequency(time::Rate::from_hz(0))),
+            Err(ConfigError::FrequencyOutOfRange)
+        );
+    }
+
+    #[test]
+    fn too_long_bus_timeout_is_rejected(mut ctx: Context) {
+        assert_eq!(
+            ctx.i2c
+                .apply_config(&Config::default().with_timeout(BusTimeout::BusCycles(u32::MAX))),
+            Err(ConfigError::TimeoutTooLong)
+        );
     }
 
     // Verify that `force_scl_low(true)` drives SCL low, blocking all I2C
