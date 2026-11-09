@@ -120,8 +120,6 @@ SECTIONS {
   {
     /* Keep each object's literal pool adjacent to its code (see `.text`). */
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
-    /* Patched SPI-flash ROM functions from esp-rom-sys. */
-    *:esp_rom_spiflash.*(.literal .text .literal.* .text.*)
 
     INCLUDE "esp_hal_rwtext.x"
 

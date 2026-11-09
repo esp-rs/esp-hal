@@ -25,8 +25,6 @@ SECTIONS {
   .rwtext : ALIGN(4)
   {
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
-    /* Patched SPI-flash ROM functions from esp-rom-sys. */
-    *:esp_rom_spiflash.*(.literal .text .literal.* .text.*)
 
     INCLUDE "esp_hal_rwtext.x"
 
