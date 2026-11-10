@@ -222,13 +222,99 @@ impl_wifi_event!(
     wifi_event_ap_wps_rg_pin_t
 );
 impl_wifi_event!(AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap);
-impl_wifi_event!(IndividualTargetWakeTimeSetup);
-impl_wifi_event!(IndividualTargetWakeTimeTeardown);
-impl_wifi_event!(IndividualTargetWakeTimeProbe);
-impl_wifi_event!(IndividualTargetWakeTimeSuspend);
-impl_wifi_event!(TargetWakeTimeWakeup);
+impl_wifi_event!(IndividualTargetWakeTimeSetup, wifi_event_sta_itwt_setup_t);
+impl_wifi_event!(
+    IndividualTargetWakeTimeTeardown,
+    wifi_event_sta_itwt_teardown_t
+);
+impl_wifi_event!(IndividualTargetWakeTimeProbe, wifi_event_sta_itwt_probe_t);
+impl_wifi_event!(
+    IndividualTargetWakeTimeSuspend,
+    wifi_event_sta_itwt_suspend_t
+);
+impl_wifi_event!(TargetWakeTimeWakeup, wifi_event_sta_twt_wakeup_t);
 impl_wifi_event!(BroadcastTargetWakeTimeSetup);
 impl_wifi_event!(BroadcastTargetWakeTimeTeardown);
+
+impl IndividualTargetWakeTimeSetup<'_> {
+    /// Get the setup status. 1 indicates success, other values indicate failure.
+    pub fn status(&self) -> i32 {
+        self.0.status
+    }
+
+    /// Get the setup failure reason code.
+    pub fn reason(&self) -> u8 {
+        self.0.reason
+    }
+
+    /// Get the TWT service period start time.
+    pub fn target_wake_time(&self) -> u64 {
+        self.0.target_wake_time
+    }
+
+    /// Get the negotiated iTWT setup configuration.
+    #[cfg(wifi_has_wifi6)]
+    pub fn config(&self) -> crate::wifi::twt::ITwtSetupConfig {
+        crate::wifi::twt::ITwtSetupConfig::from_raw(&self.0.config)
+    }
+}
+
+impl IndividualTargetWakeTimeTeardown<'_> {
+    /// Get the flow ID that was torn down.
+    pub fn flow_id(&self) -> u8 {
+        self.0.flow_id
+    }
+
+    /// Get the teardown status.
+    #[cfg(wifi_has_wifi6)]
+    pub fn status(&self) -> crate::wifi::twt::ITwtTeardownStatus {
+        crate::wifi::twt::ITwtTeardownStatus::from_raw(self.0.status)
+    }
+}
+
+impl IndividualTargetWakeTimeProbe<'_> {
+    /// Get the probe status.
+    #[cfg(wifi_has_wifi6)]
+    pub fn status(&self) -> crate::wifi::twt::ITwtProbeStatus {
+        crate::wifi::twt::ITwtProbeStatus::from_raw(self.0.status)
+    }
+
+    /// Get the failure reason code.
+    pub fn reason(&self) -> u8 {
+        self.0.reason
+    }
+}
+
+impl IndividualTargetWakeTimeSuspend<'_> {
+    /// Get the suspend status. 0 (`ESP_OK`) indicates success.
+    pub fn status(&self) -> i32 {
+        self.0.status
+    }
+
+    /// Get the bitmap of suspended flow IDs.
+    pub fn flow_id_bitmap(&self) -> u8 {
+        self.0.flow_id_bitmap
+    }
+
+    /// Get the actual suspend time for each flow ID, in milliseconds.
+    pub fn actual_suspend_time_ms(&self) -> [u32; 8] {
+        self.0.actual_suspend_time_ms
+    }
+}
+
+impl TargetWakeTimeWakeup<'_> {
+    /// Get the TWT type (individual or broadcast).
+    #[cfg(wifi_has_wifi6)]
+    pub fn twt_type(&self) -> crate::wifi::twt::TwtType {
+        crate::wifi::twt::TwtType::from_raw(self.0.twt_type)
+    }
+
+    /// Get the flow ID.
+    pub fn flow_id(&self) -> u8 {
+        self.0.flow_id
+    }
+}
+
 impl_wifi_event!(NeighborAwarenessNetworkingStarted);
 impl_wifi_event!(NeighborAwarenessNetworkingStopped);
 impl_wifi_event!(
@@ -1017,19 +1103,58 @@ pub enum EventInfo {
     AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap,
 
     /// Individual Target-Wake-Time setup.
-    IndividualTargetWakeTimeSetup,
+    #[cfg(wifi_has_wifi6)]
+    IndividualTargetWakeTimeSetup {
+        /// The negotiated iTWT setup configuration.
+        config: crate::wifi::twt::ITwtSetupConfig,
+        /// Setup status. 1 indicates success, other values indicate failure.
+        status: i32,
+        /// Setup failure reason code.
+        reason: u8,
+        /// TWT service period start time.
+        target_wake_time: u64,
+    },
 
     /// Individual Target-Wake-Time teardown.
-    IndividualTargetWakeTimeTeardown,
+    #[cfg(wifi_has_wifi6)]
+    IndividualTargetWakeTimeTeardown {
+        /// The set of flows that were torn down.
+        ///
+        /// Contains a single flow, or all flows if a "teardown all" was
+        /// requested by the station or sent by the AP.
+        flows: EnumSet<crate::wifi::twt::FlowId>,
+        /// Teardown status.
+        status: crate::wifi::twt::ITwtTeardownStatus,
+    },
 
     /// Individual Target-Wake-Time probe.
-    IndividualTargetWakeTimeProbe,
+    #[cfg(wifi_has_wifi6)]
+    IndividualTargetWakeTimeProbe {
+        /// Probe status.
+        status: crate::wifi::twt::ITwtProbeStatus,
+        /// Failure reason code.
+        reason: u8,
+    },
 
     /// Individual Target-Wake-Time suspended.
-    IndividualTargetWakeTimeSuspend,
+    #[cfg(wifi_has_wifi6)]
+    IndividualTargetWakeTimeSuspend {
+        /// Suspend status. 0 (`ESP_OK`) indicates success.
+        status: i32,
+        /// The set of suspended flow IDs.
+        suspended_flows: EnumSet<crate::wifi::twt::FlowId>,
+        /// Actual suspend time for each flow ID, in milliseconds.
+        actual_suspend_time_ms: [u32; 8],
+    },
 
-    /// Target-Wake-Wakeup event.
-    TargetWakeTimeWakeup,
+    /// Target-Wake-Time wakeup event.
+    #[cfg(wifi_has_wifi6)]
+    TargetWakeTimeWakeup {
+        /// TWT type (individual or broadcast).
+        twt_type: crate::wifi::twt::TwtType,
+        /// Flow ID.
+        flow_id: crate::wifi::twt::FlowId,
+    },
 
     /// Broadcast-Target-Wake-Time setup.
     BroadcastTargetWakeTimeSetup,
@@ -1246,20 +1371,62 @@ impl EventInfo {
             WifiEvent::AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap => {
                 Some(EventInfo::AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap)
             }
+            #[cfg(wifi_has_wifi6)]
             WifiEvent::IndividualTargetWakeTimeSetup => {
-                Some(EventInfo::IndividualTargetWakeTimeSetup)
+                let ev =
+                    unsafe { IndividualTargetWakeTimeSetup::from_raw_event_data(payload) };
+                Some(EventInfo::IndividualTargetWakeTimeSetup {
+                    config: ev.config(),
+                    status: ev.status(),
+                    reason: ev.reason(),
+                    target_wake_time: ev.target_wake_time(),
+                })
             }
-             WifiEvent::IndividualTargetWakeTimeTeardown => {
-                Some(EventInfo::IndividualTargetWakeTimeTeardown)
+            #[cfg(wifi_has_wifi6)]
+            WifiEvent::IndividualTargetWakeTimeTeardown => {
+                let ev =
+                    unsafe { IndividualTargetWakeTimeTeardown::from_raw_event_data(payload) };
+                Some(EventInfo::IndividualTargetWakeTimeTeardown {
+                    flows: match ev.flow_id() {
+                        // "Teardown all" (802.11-2024 9.6.24.9), may also be sent by the AP.
+                        crate::wifi::twt::FLOW_ID_ALL => EnumSet::all(),
+                        raw => EnumSet::only(crate::wifi::twt::FlowId::from_raw(raw)),
+                    },
+                    status: ev.status(),
+                })
             }
+            #[cfg(wifi_has_wifi6)]
             WifiEvent::IndividualTargetWakeTimeProbe => {
-                Some(EventInfo::IndividualTargetWakeTimeProbe)
+                let ev =
+                    unsafe { IndividualTargetWakeTimeProbe::from_raw_event_data(payload) };
+                Some(EventInfo::IndividualTargetWakeTimeProbe {
+                    status: ev.status(),
+                    reason: ev.reason(),
+                })
             }
+            #[cfg(wifi_has_wifi6)]
             WifiEvent::IndividualTargetWakeTimeSuspend => {
-                Some(EventInfo::IndividualTargetWakeTimeSuspend)
+                let ev =
+                    unsafe { IndividualTargetWakeTimeSuspend::from_raw_event_data(payload) };
+                Some(EventInfo::IndividualTargetWakeTimeSuspend {
+                    status: ev.status(),
+                    suspended_flows: EnumSet::from_repr(ev.flow_id_bitmap()),
+                    actual_suspend_time_ms: ev.actual_suspend_time_ms(),
+                })
             }
+            #[cfg(wifi_has_wifi6)]
             WifiEvent::TargetWakeTimeWakeup => {
-                Some(EventInfo::TargetWakeTimeWakeup)
+                let ev = unsafe { TargetWakeTimeWakeup::from_raw_event_data(payload) };
+                let twt_type = ev.twt_type();
+                if twt_type == crate::wifi::twt::TwtType::Broadcast {
+                    // Broadcast TWT flow IDs may exceed 7. Only iTWT is supported.
+                    debug!("Ignoring broadcast TWT wakeup (flow {})", ev.flow_id());
+                    return None;
+                }
+                Some(EventInfo::TargetWakeTimeWakeup {
+                    twt_type,
+                    flow_id: crate::wifi::twt::FlowId::from_raw(ev.flow_id()),
+                })
             }
             WifiEvent::BroadcastTargetWakeTimeSetup => {
                 Some(EventInfo::BroadcastTargetWakeTimeSetup)
