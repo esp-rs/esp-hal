@@ -54,7 +54,7 @@ const PASSWORD: &str = env!("PASSWORD");
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 
 cfg_select! {
-    any(modem_retention = "backup_dma", modem_retention = "regdma") => {
+    supports_modem_power_down => {
         // The retention memory takes part of the reclaimed RAM.
         const RECLAIMED_HEAP_SIZE: usize =
             DRAM2_UNINIT_SIZE - core::mem::size_of::<esp_radio::wifi::RetentionStorage>();

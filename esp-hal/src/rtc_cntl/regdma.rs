@@ -25,12 +25,12 @@ const ENTRIES: usize = property!("sleep.regdma_link_count");
 /// The entry that the PMU runs between the active and the sleep state.
 pub const SLEEP_ENTRY: u32 = 1 << 0;
 
+#[cfg(regdma_bt_needs_pll)]
+const EXTRA_ENTRY_INDEX: usize = 3;
+
 /// The entry that software runs with [`run_extra_link`].
 #[cfg(regdma_bt_needs_pll)]
 pub const EXTRA_ENTRY: u32 = 1 << EXTRA_ENTRY_INDEX;
-
-#[cfg(regdma_bt_needs_pll)]
-const EXTRA_ENTRY_INDEX: usize = 3;
 
 /// The entries that [`create`] builds nodes for.
 const USED_ENTRIES: &[usize] = &[
@@ -39,6 +39,14 @@ const USED_ENTRIES: &[usize] = &[
     EXTRA_ENTRY_INDEX,
 ];
 
+/// The owner bits of [`USED_ENTRIES`].
+const USED_OWNERS: u32 = cfg_select! {
+    regdma_bt_needs_pll => SLEEP_ENTRY | EXTRA_ENTRY,
+    _ => SLEEP_ENTRY,
+};
+
+// A node is a statistics word, the head, then the body of its mode. Every link points to the head.
+// See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/soc/include/soc/regdma.h#L138-L204>.
 const MODE_CONTINUOUS: u32 = 0;
 const MODE_ADDR_MAP: u32 = 1;
 const MODE_WRITE: u32 = 2;
@@ -51,16 +59,16 @@ const HEAD_SKIP_RESTORE: u32 = 1 << 29;
 const HEAD_SKIP_BACKUP: u32 = 1 << 30;
 const HEAD_EOF: u32 = 1 << 31;
 
-const fn head(length: u32, mode: u32, skip_backup: bool, skip_restore: bool) -> u32 {
-    let mut head = (length & HEAD_LENGTH_MASK) | (mode << HEAD_MODE_SHIFT);
-    if skip_backup {
-        head |= HEAD_SKIP_BACKUP;
-    }
-    if skip_restore {
-        head |= HEAD_SKIP_RESTORE;
-    }
-    head
+const fn head(length: u32, mode: u32) -> u32 {
+    (length & HEAD_LENGTH_MASK) | (mode << HEAD_MODE_SHIFT)
 }
+
+const fn mode_of(head: u32) -> u32 {
+    (head >> HEAD_MODE_SHIFT) & 0xf
+}
+
+/// The head of a wait that the REGDMA skips in both directions.
+const SKIPPED_WAIT: u32 = head(0, MODE_WAIT) | HEAD_SKIP_BACKUP | HEAD_SKIP_RESTORE;
 
 /// One node of a REGDMA link list, and the entries that it belongs to.
 ///
@@ -84,37 +92,17 @@ impl LinkConfig {
     /// `restore` after it.
     pub const fn continuous(id: u16, backup: u32, restore: u32, length: u16, owner: u32) -> Self {
         Self {
-            head: head(length as u32, MODE_CONTINUOUS, false, false),
+            head: head(length as u32, MODE_CONTINUOUS),
             body: [0, backup, restore, 0, 0, 0, 0, 0],
             id: id as u32,
             owner,
         }
     }
 
-    /// Like [`Self::continuous`], but copies only the words that are set in the 128-bit `map`.
-    pub const fn addr_map(id: u16, backup: u32, restore: u32, map: [u32; 4], owner: u32) -> Self {
-        let length =
-            map[0].count_ones() + map[1].count_ones() + map[2].count_ones() + map[3].count_ones();
+    /// Writes `value` to the bits in `mask` of the register at `address` after the sleep.
+    pub const fn write(id: u16, address: u32, value: u32, mask: u32, owner: u32) -> Self {
         Self {
-            head: head(length, MODE_ADDR_MAP, false, false),
-            body: [0, backup, restore, 0, map[0], map[1], map[2], map[3]],
-            id: id as u32,
-            owner,
-        }
-    }
-
-    /// Writes `value` to the bits in `mask` of the register at `address`.
-    pub const fn write(
-        id: u16,
-        address: u32,
-        value: u32,
-        mask: u32,
-        skip_backup: bool,
-        skip_restore: bool,
-        owner: u32,
-    ) -> Self {
-        Self {
-            head: head(0, MODE_WRITE, skip_backup, skip_restore),
+            head: head(0, MODE_WRITE) | HEAD_SKIP_BACKUP,
             body: [0, address, value, mask, 0, 0, 0, 0],
             id: id as u32,
             owner,
@@ -122,7 +110,7 @@ impl LinkConfig {
     }
 
     const fn mode(&self) -> u32 {
-        (self.head >> HEAD_MODE_SHIFT) & 0xf
+        mode_of(self.head)
     }
 
     const fn length(&self) -> usize {
@@ -145,14 +133,8 @@ pub const fn links_size(configs: &[LinkConfig]) -> usize {
     let mut words = 0;
     let mut i = 0;
     while i < configs.len() {
-        let config = &configs[i];
-        let mut entry = 0;
-        while entry < USED_ENTRIES.len() {
-            if config.owner & (1 << USED_ENTRIES[entry]) != 0 {
-                words += config.words();
-            }
-            entry += 1;
-        }
+        let entries = (configs[i].owner & USED_OWNERS).count_ones() as usize;
+        words += configs[i].words() * entries;
         i += 1;
     }
     words * 4
@@ -224,13 +206,11 @@ struct Chain {
     last: NonNull<u32>,
 }
 
-#[derive(Clone, Copy)]
-struct Links {
-    chains: [Option<Chain>; USED_ENTRIES.len()],
-}
-
 // SAFETY: The nodes are plain memory, which only the registry touches, under its lock.
-unsafe impl Send for Links {}
+unsafe impl Send for Chain {}
+
+/// The chains of a module, one for each of [`USED_ENTRIES`].
+type Links = [Option<Chain>; USED_ENTRIES.len()];
 
 struct Registry {
     links: [Option<Links>; MODULES],
@@ -257,19 +237,14 @@ impl<const WORDS: usize> StaticNode<WORDS> {
 }
 
 /// The first node: a wait that the REGDMA skips, with a `next` pointer for each entry.
-static HEAD: StaticNode<{ 2 + ENTRIES + 3 }> = StaticNode(UnsafeCell::new(
-    [0; 2 + ENTRIES + 3],
-));
+static HEAD: StaticNode<{ 2 + ENTRIES + 3 }> = StaticNode(UnsafeCell::new({
+    let mut words = [0; 2 + ENTRIES + 3];
+    words[1] = SKIPPED_WAIT | HEAD_BRANCH;
+    words
+}));
 
 /// The last node of every entry: a wait that the REGDMA skips, and the end of the list.
-static TAIL: StaticNode<6> = StaticNode(UnsafeCell::new([
-    0,
-    head(0, MODE_WAIT, true, true) | HEAD_EOF,
-    0,
-    0,
-    0,
-    0,
-]));
+static TAIL: StaticNode<6> = StaticNode(UnsafeCell::new([0, SKIPPED_WAIT | HEAD_EOF, 0, 0, 0, 0]));
 
 /// Whether the modem domain loses power in light sleep.
 static MODEM_POWER_DOWN: AtomicBool = AtomicBool::new(false);
@@ -294,9 +269,7 @@ pub unsafe fn create(
     configs: &[&[LinkConfig]],
     memory: &mut LinkMemory,
 ) -> Result<(), OutOfMemory> {
-    let mut links = Links {
-        chains: [None; USED_ENTRIES.len()],
-    };
+    let mut links: Links = [None; USED_ENTRIES.len()];
     for (slot, &entry) in USED_ENTRIES.iter().enumerate() {
         let mut chain: Option<Chain> = None;
         for config in configs.iter().flat_map(|configs| configs.iter()) {
@@ -306,7 +279,7 @@ pub unsafe fn create(
             let link = build(config, memory)?;
             append(&mut chain, link);
         }
-        links.chains[slot] = chain;
+        links[slot] = chain;
     }
 
     REGISTRY.with(|registry| {
@@ -358,11 +331,7 @@ fn append(chain: &mut Option<Chain>, link: NonNull<u32>) {
 
 /// Points a node that is not a branch to `next`.
 fn set_next(link: *mut u32, next: *mut u32) {
-    unsafe {
-        link.add(1).write_volatile(next as u32);
-        let head = link.read_volatile();
-        link.write_volatile(head & !HEAD_EOF);
-    }
+    unsafe { link.add(1).write_volatile(next as u32) };
 }
 
 fn next_of(link: *mut u32) -> *mut u32 {
@@ -411,11 +380,8 @@ pub fn is_attached(module: Module) -> bool {
 fn join(registry: &Registry) {
     let head = HEAD.link();
     let tail = TAIL.link();
-    unsafe {
-        head.write_volatile(head_word());
-        for entry in 0..ENTRIES {
-            head.add(1 + entry).write_volatile(tail as u32);
-        }
+    for entry in 0..ENTRIES {
+        unsafe { head.add(1 + entry).write_volatile(tail as u32) };
     }
 
     for (slot, &entry) in USED_ENTRIES.iter().enumerate() {
@@ -424,7 +390,7 @@ fn join(registry: &Registry) {
             if registry.attached & (1 << module) == 0 {
                 continue;
             }
-            let Some(chain) = registry.links[module].and_then(|links| links.chains[slot]) else {
+            let Some(chain) = registry.links[module].and_then(|links| links[slot]) else {
                 continue;
             };
             set_next(chain.last.as_ptr(), next);
@@ -434,15 +400,11 @@ fn join(registry: &Registry) {
     }
 }
 
-const fn head_word() -> u32 {
-    head(0, MODE_WAIT, true, true) | HEAD_BRANCH
-}
-
 /// Returns the first node with `id`, from every module, attached or not.
 pub fn find_link_by_id(id: u16) -> Option<NonNull<u32>> {
     REGISTRY.with(|registry| {
         for links in registry.links.iter().flatten() {
-            for chain in links.chains.iter().flatten() {
+            for chain in links.iter().flatten() {
                 let mut link = chain.first.as_ptr();
                 loop {
                     let stat = unsafe { link.sub(1).read_volatile() };
@@ -468,13 +430,10 @@ pub fn find_link_by_id(id: u16) -> Option<NonNull<u32>> {
 pub unsafe fn set_write_wait_content(link: NonNull<u32>, value: u32, mask: u32) {
     let link = link.as_ptr();
     unsafe {
-        let head = link.read_volatile();
-        let mode = (head >> HEAD_MODE_SHIFT) & 0xf;
-        if head & HEAD_BRANCH != 0 || !matches!(mode, MODE_WRITE | MODE_WAIT) {
-            return;
+        if matches!(mode_of(link.read_volatile()), MODE_WRITE | MODE_WAIT) {
+            link.add(3).write_volatile(value);
+            link.add(4).write_volatile(mask);
         }
-        link.add(3).write_volatile(value);
-        link.add(4).write_volatile(mask);
     }
 }
 
@@ -486,6 +445,7 @@ pub unsafe fn set_write_wait_content(link: NonNull<u32>, value: u32, mask: u32) 
 pub fn set_modem_power_down(enabled: bool) {
     REGISTRY.with(|registry| {
         if enabled {
+            // The `next` pointers of the head stay 0 until the first join.
             join(registry);
             init_pau();
         } else {
@@ -515,18 +475,24 @@ fn set_backup(enabled: bool) {
         .modify(|_, w| w.hp_active2sleep_backup_en().bit(enabled));
 }
 
+// A wait node reads its register up to `WAIT_RETRY_COUNT` times, `WAIT_READ_INTERVAL` apart.
+// See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_hw_support/port/pau_regdma.c#L21-L24>.
 const WAIT_RETRY_COUNT: u16 = 1000;
 const WAIT_READ_INTERVAL: u8 = 32;
-#[cfg(regdma_link_configurable)]
-const WORK_TIMEOUT: u16 = 0x3ff;
-#[cfg(regdma_link_configurable)]
-const REGISTER_ACCESS_TIMEOUT: u16 = 0x3ff;
-#[cfg(not(regdma_link_configurable))]
-const REGISTER_ACCESS_TIMEOUT: u16 = 500;
-#[cfg(not(regdma_link_configurable))]
-const BURST_LIMIT: u8 = 8;
 
-/// Enables the REGDMA, and gives the PAU the head of the list.
+cfg_select! {
+    regdma_link_configurable => {
+        const WORK_TIMEOUT: u16 = 0x3ff;
+        const REGISTER_ACCESS_TIMEOUT: u16 = 0x3ff;
+    }
+    _ => {
+        // The reset values of the PAU.
+        const REGISTER_ACCESS_TIMEOUT: u16 = 500;
+        const BURST_LIMIT: u8 = 8;
+    }
+}
+
+/// Enables the REGDMA, and gives it the head of the list.
 fn init_pau() {
     cfg_select! {
         esp32s31 => {
@@ -542,6 +508,7 @@ fn init_pau() {
     }
 
     // The PMU init of the other chips sets the same retention parameters.
+    // See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_hw_support/port/esp32h2/pmu_param.c#L278-L322>.
     #[cfg(esp32h2)]
     {
         const MODEM_CLK_CODE: u8 = 3;
@@ -565,8 +532,10 @@ fn init_pau() {
                 .hp_active2sleep_backup_mode()
                 .bits(BACKUP_ENTRY_0)
         });
-        pmu.hp_active_backup_clk().write(|w| unsafe { w.bits(u32::MAX) });
-        pmu.hp_sleep_backup_clk().write(|w| unsafe { w.bits(u32::MAX) });
+        pmu.hp_active_backup_clk()
+            .write(|w| unsafe { w.bits(u32::MAX) });
+        pmu.hp_sleep_backup_clk()
+            .write(|w| unsafe { w.bits(u32::MAX) });
     }
 
     let head = HEAD.link() as u32;
@@ -646,14 +615,28 @@ pub fn run_extra_link(backup: bool) {
     if !modem_power_down() {
         return;
     }
+    // See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_hal_pmu/esp32c6/pau_hal.c#L50-L71>.
     let pau = crate::peripherals::PAU::regs();
-    pau.int_clr().write(|w| w.done().clear_bit_by_one());
-    pau.regdma_conf()
-        .modify(|_, w| unsafe { w.link_sel().bits(EXTRA_ENTRY_INDEX as u8) });
-    pau.regdma_conf().modify(|_, w| w.to_mem().bit(backup));
+    let clear = || {
+        pau.int_clr()
+            .write(|w| w.done().clear_bit_by_one().error().clear_bit_by_one())
+    };
+    clear();
+    pau.regdma_conf().modify(|_, w| unsafe {
+        w.link_sel()
+            .bits(EXTRA_ENTRY_INDEX as u8)
+            .to_mem()
+            .bit(backup)
+    });
     pau.regdma_conf().modify(|_, w| w.start().set_bit());
-    while pau.int_raw().read().done().bit_is_clear() {}
-    pau.regdma_conf().modify(|_, w| w.start().clear_bit());
-    pau.regdma_conf().modify(|_, w| unsafe { w.link_sel().bits(0) });
-    pau.int_clr().write(|w| w.done().clear_bit_by_one());
+    // After an error, `done` never comes.
+    loop {
+        let raw = pau.int_raw().read();
+        if raw.done().bit_is_set() || raw.error().bit_is_set() {
+            break;
+        }
+    }
+    pau.regdma_conf()
+        .modify(|_, w| unsafe { w.start().clear_bit().link_sel().bits(0) });
+    clear();
 }

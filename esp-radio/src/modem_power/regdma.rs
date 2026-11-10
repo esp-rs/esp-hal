@@ -17,6 +17,8 @@ const fn syscon(id: u16, address: u32, length: u16) -> LinkConfig {
 }
 
 /// The clock and reset registers of the modem, `MODEM_SYSCON` and `MODEM_LPCON`.
+// See `sleep_clock.c` of each chip in
+// <https://github.com/espressif/esp-idf/tree/4d80c1b29ae/components/esp_hw_support/lowpower/port>.
 const CLOCK_MODEM: &[LinkConfig] = cfg_select! {
     esp32c6 => &[syscon(0x0200, 0x600a_9800, 9)],
     any(esp32c5, esp32c61) => &[syscon(0x0200, 0x600a_9c00, 10)],
@@ -31,13 +33,15 @@ const CLOCK_MODEM: &[LinkConfig] = cfg_select! {
     esp32s31 => &[
         // The PMU may not ungate the PLL in time for the restore. A dummy write to the date
         // register first keeps the next nodes from a bus timeout.
-        LinkConfig::write(0x0200, 0x2010_9c30, 0x0fff_ffff, 0x0fff_ffff, true, false, SLEEP_ENTRY),
+        LinkConfig::write(0x0200, 0x2010_9c30, 0x0fff_ffff, 0x0fff_ffff, SLEEP_ENTRY),
         syscon(0x0201, 0x2010_9c00, 10),
         syscon(0x0300, 0x2010_f000, 21),
     ],
 };
 
 /// The PHY front end, which Wi-Fi and Bluetooth share.
+// See `phy_init_data.c` of each chip in
+// <https://github.com/espressif/esp-idf/tree/4d80c1b29ae/components/esp_phy>.
 const PHY_FE: &[LinkConfig] = cfg_select! {
     esp32c6 => &[syscon(0xff00, 0x600a_0000, 58)],
     esp32c61 => &[
@@ -58,7 +62,8 @@ const PHY_FE: &[LinkConfig] = cfg_select! {
         syscon(0xff02, 0x2010_0800, 57),
         syscon(0xff03, 0x2010_0c00, 22),
     ],
-    // The PHY entry, which nothing here uses, restores the front end of the ESP32-H4.
+    // ESP-IDF retains no front end on the ESP32-H2. The ESP32-H4 restores its front end in the
+    // PHY entry of the REGDMA, which nothing runs yet.
     _ => &[],
 };
 

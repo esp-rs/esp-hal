@@ -87,12 +87,7 @@ pub(crate) fn claim_wake_source() {
     WakeupSource::Wifi.enable_with_hooks(
         Some(sleep_entry),
         cfg_select! {
-            all(
-                any(modem_retention = "backup_dma", modem_retention = "regdma"),
-                feature = "unstable"
-            ) => {
-                Some(super::mac_bb::power_up)
-            }
+            all(supports_modem_power_down, feature = "unstable") => Some(super::mac_bb::power_up),
             _ => None,
         },
     );
@@ -121,10 +116,7 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     } else {
         // Only when the blob accepts the sleep, because it still uses the MAC and baseband
         // otherwise. If a later hook refuses the sleep, the exit hook restores them.
-        #[cfg(all(
-            any(modem_retention = "backup_dma", modem_retention = "regdma"),
-            feature = "unstable"
-        ))]
+        #[cfg(all(supports_modem_power_down, feature = "unstable"))]
         super::mac_bb::power_down();
     }
 }

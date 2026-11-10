@@ -21,14 +21,14 @@ pub(crate) struct SleepRetentionProperties {
     ///
     /// `backup_dma` chips copy the registers with the ROM backup DMA, into memory between
     /// `cpu_retention_mem_start` and `cpu_retention_mem_end`. `regdma` chips use REGDMA link
-    /// lists.
+    /// lists. Either method also drives the `supports_modem_power_down` cfg.
     modem_retention: Option<String>,
     /// The number of REGDMA entries, which is also the number of `next` pointers in a branch
     /// node.
     regdma_link_count: Option<u32>,
-    /// The PAU takes one link address for every entry, and needs a branch node at the head.
+    /// The REGDMA has one link address for all entries, which points to a branch node.
     ///
-    /// Without this, the PAU has one address register for each entry.
+    /// Without this, the PAU has one link address register for each entry.
     #[serde(default)]
     regdma_link_configurable: bool,
     /// The REGDMA cannot reach the Bluetooth MAC and baseband on the XTAL clock of the sleep
@@ -66,6 +66,7 @@ impl GenericProperty for SleepRetentionProperties {
         }
         if let Some(mode) = &self.modem_retention {
             cfgs.push(format!("modem_retention=\"{mode}\""));
+            cfgs.push("supports_modem_power_down".to_string());
         }
         if self.regdma_link_configurable {
             cfgs.push("regdma_link_configurable".to_string());

@@ -42,8 +42,7 @@ impl State {
 
     /// Tells the retention method whether the modem domain can lose power.
     fn update(&mut self) {
-        let allowed = self.power_down_allowed();
-        self.method.allow_power_down(allowed);
+        self.method.allow_power_down(self.power_down_allowed());
     }
 }
 

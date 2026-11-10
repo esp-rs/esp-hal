@@ -20,6 +20,7 @@ unsafe extern "C" {
 }
 
 /// The entry of the MAC and baseband.
+// See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_phy/src/btbb_init.c#L27-L31>.
 const OWNER: u32 = cfg_select! {
     regdma_bt_needs_pll => regdma::EXTRA_ENTRY,
     _ => regdma::SLEEP_ENTRY,
@@ -30,16 +31,15 @@ const fn bb(id: u16, address: u32, length: u16) -> LinkConfig {
 }
 
 /// The Bluetooth baseband.
+// See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_phy/src/btbb_init.c#L33-L46>,
+// with the addresses in `btbb_retention_reg.h` of each chip.
 const BB: &[LinkConfig] = cfg_select! {
     any(esp32c6, esp32h2) => &[
         bb(0x1500, 0x600a_2000, 93),
         bb(0x1501, 0x600a_2800, 62),
         bb(0x1502, 0x600a_2c00, 19),
     ],
-    esp32c61 => &[
-        bb(0x1500, 0x600a_2000, 128),
-        bb(0x1501, 0x600a_2800, 68),
-    ],
+    esp32c61 => &[bb(0x1500, 0x600a_2000, 128), bb(0x1501, 0x600a_2800, 68)],
     esp32c5 => &[
         bb(0x1500, 0x600a_2000, 128),
         bb(0x1501, 0x600a_2800, 68),
@@ -125,7 +125,10 @@ fn mac_tables() -> [&'static [LinkConfig]; 2] {
     cfg_select! {
         bt_controller = "btdm2" => {
             let btdm = unsafe { r_btdm_mac_retention_link_get(&mut size) };
-            [unsafe { core::slice::from_raw_parts(btdm, size as usize) }, ble]
+            [
+                unsafe { core::slice::from_raw_parts(btdm, size as usize) },
+                ble,
+            ]
         }
         _ => [ble, &[]],
     }

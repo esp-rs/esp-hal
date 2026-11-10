@@ -32,6 +32,8 @@ const fn bb(id: u16, address: u32, length: u16) -> LinkConfig {
 }
 
 /// The baseband: AGC, TX, NRX, BB, and BRX where it exists.
+// See `phy_init_data.c` of each chip in
+// <https://github.com/espressif/esp-idf/tree/4d80c1b29ae/components/esp_phy>.
 const BB: &[LinkConfig] = cfg_select! {
     esp32c6 => &[
         bb(0x0b00, 0x600a_7000, 121),
