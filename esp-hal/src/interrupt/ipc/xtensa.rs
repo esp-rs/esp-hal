@@ -69,12 +69,13 @@ fn ipc_handler(context: &mut TrapFrame) {
 
     let state = &STATE[core as usize];
 
-    // The callback returns here, so it runs first.
+    // The posted functions return here, so they run first.
     let callback = state.callback.swap(core::ptr::null_mut(), Ordering::AcqRel);
     if !callback.is_null() {
         let callback = unsafe { core::mem::transmute::<*mut (), fn()>(callback) };
         callback();
     }
+    unsafe { super::queue::drain(&state.lists, core as u32) };
 
     // The context switch chooses the context that the interrupt returns to, so it runs last.
     let handler = state
