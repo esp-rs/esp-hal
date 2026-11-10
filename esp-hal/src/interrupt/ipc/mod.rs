@@ -56,7 +56,7 @@ use portable_atomic::{AtomicPtr, Ordering};
 pub use self::queue::IpcRequest;
 #[cfg(feature = "rt")]
 use crate::interrupt::__rtos_implementation::ContextSwitchHandler;
-use crate::{peripherals::IPC, system::Cpu};
+use crate::{peripherals::IPC, system::Cpu, time::Instant};
 
 #[cfg(feature = "rt")]
 #[cfg_attr(riscv, path = "riscv.rs")]
@@ -263,6 +263,56 @@ pub struct Ticket {
     core: Cpu,
     /// The sequence number of the run, in the `seq` bits.
     seq: u32,
+}
+
+impl Ticket {
+    /// Waits until the run of this ticket ends, or until `deadline`.
+    ///
+    /// # Errors
+    ///
+    /// - [`IpcError::Offline`] when the CPU stopped before the run.
+    /// - [`IpcError::Timeout`] when the deadline passed before the run ended. The run stays
+    ///   queued, and can happen later.
+    /// - [`IpcError::WouldDeadlock`] when the run is on the current CPU, and the caller masks the
+    ///   IPC interrupt: it runs in an interrupt handler, or with interrupts disabled.
+    pub fn wait(self, deadline: Instant) -> Result<(), IpcError> {
+        // A masked context cannot move to the other CPU, so the check has no race.
+        if self.core == Cpu::current() && ipc_interrupt_masked() {
+            return Err(IpcError::WouldDeadlock);
+        }
+
+        loop {
+            if let Some(outcome) = self.poll() {
+                return outcome;
+            }
+            if Instant::now() >= deadline {
+                return Err(IpcError::Timeout);
+            }
+            core::hint::spin_loop();
+        }
+    }
+
+    /// Returns the outcome of the run of this ticket, or `None` if the run did not end.
+    ///
+    /// This function never waits.
+    pub fn poll(self) -> Option<Result<(), IpcError>> {
+        queue::poll(self.request, self.seq).map(|outcome| match outcome {
+            queue::DONE => Ok(()),
+            _ => Err(IpcError::Offline),
+        })
+    }
+}
+
+/// Returns whether the IPC interrupt cannot preempt the current code.
+fn ipc_interrupt_masked() -> bool {
+    if super::current_raw_runlevel() != 0 {
+        return true;
+    }
+    cfg_select! {
+        riscv => !riscv::register::mstatus::read().mie(),
+        // `PS.INTLEVEL` is the run level.
+        xtensa => false,
+    }
 }
 
 #[cfg(feature = "defmt")]
