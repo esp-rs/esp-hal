@@ -1,6 +1,6 @@
 use crate::{
     gpio::{GPIO_LOCK, Level, LpPin, lp_io::LpFunction},
-    peripherals::{GPIO, LPWR, RTC_IO, SENS},
+    peripherals::{GPIO, LPWR, RTC_IO},
 };
 
 #[rustfmt::skip]
@@ -283,16 +283,13 @@ pub(crate) fn reset_pin(lp: u8) {
 fn enable_iomux_clk_gate() {
     cfg_select! {
         esp32s2 => {
-            SENS::regs()
+            crate::peripherals::SENS::regs()
                 .sar_io_mux_conf()
                 .modify(|_, w| w.iomux_clk_gate_en().set_bit());
         }
-        esp32s3 => {
-            crate::soc::SENS_PERI_CLK_GATE_LOCK.lock(|| {
-                SENS::regs()
-                    .sar_peri_clk_gate_conf()
-                    .modify(|_, w| w.iomux_clk_en().set_bit());
-            });
-        }
+        esp32s3 => crate::system::PeripheralClockControl::set_enabled_untracked(
+            crate::system::Peripheral::RtcIoMux,
+            true,
+        ),
     }
 }

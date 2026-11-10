@@ -90,24 +90,20 @@ fn init_hardware<ADCX: RegisterAccess>() {
         w.hall_phase_force().set_bit()
     });
 
-    // Set power to SW power on
     cfg_select! {
         esp32s2 => {
             sensors
                 .sar_meas1_ctrl1()
                 .modify(|_, w| w.rtc_saradc_clkgate_en().set_bit());
         }
-        _ => {
-            crate::soc::SENS_PERI_CLK_GATE_LOCK.lock(|| {
-                sensors
-                    .sar_peri_clk_gate_conf()
-                    .modify(|_, w| w.saradc_clk_en().set_bit());
-            });
+        esp32s3 => {
+            crate::system::PeripheralClockControl::set_enabled_untracked(Peripheral::SarAdc, true)
         }
     }
 
     sensors.sar_power_xpd_sar().modify(|_, w| unsafe {
         w.sarclk_en().set_bit();
+        // Force the SAR ADC on.
         w.force_xpd_sar().bits(0b11)
     });
 

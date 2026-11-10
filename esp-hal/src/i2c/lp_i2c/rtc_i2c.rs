@@ -10,7 +10,7 @@ use crate::{
     },
     i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
     peripherals::{GPIO, RTC_IO, SENS},
-    soc::SENS_PERI_CLK_GATE_LOCK,
+    system::{Peripheral, PeripheralClockControl},
     time::Duration,
 };
 
@@ -56,14 +56,10 @@ for_each_lp_function! {
 
 impl<'d> LpI2c<'d> {
     pub(super) fn init(&mut self) {
-        // Clear any stale config registers
         self.i2c.register_block().ctrl().reset();
         SENS::regs().sar_i2c_ctrl().reset();
 
-        // Reset RTC I2C
-        SENS::regs()
-            .sar_peri_reset_conf()
-            .modify(|_, w| w.sar_rtc_i2c_reset().set_bit());
+        PeripheralClockControl::set_reset(Peripheral::RtcI2c, true);
         self.i2c
             .register_block()
             .ctrl()
@@ -74,9 +70,7 @@ impl<'d> LpI2c<'d> {
             .register_block()
             .ctrl()
             .modify(|_, w| w.i2c_reset().clear_bit());
-        SENS::regs()
-            .sar_peri_reset_conf()
-            .modify(|_, w| w.sar_rtc_i2c_reset().clear_bit());
+        PeripheralClockControl::set_reset(Peripheral::RtcI2c, false);
 
         // Enable internal open-drain for SDA and SCL
         self.i2c.register_block().ctrl().modify(|_, w| {
@@ -84,14 +78,8 @@ impl<'d> LpI2c<'d> {
             w.scl_force_out().clear_bit()
         });
 
-        // Enable clock gate.
-        SENS_PERI_CLK_GATE_LOCK.lock(|| {
-            SENS::regs()
-                .sar_peri_clk_gate_conf()
-                .modify(|_, w| w.rtc_i2c_clk_en().set_bit());
-        });
+        PeripheralClockControl::set_enabled_untracked(Peripheral::RtcI2c, true);
 
-        // Configure the RTC I2C controller into master mode.
         self.i2c
             .register_block()
             .ctrl()
@@ -400,16 +388,8 @@ impl<'d> LpI2c<'d> {
     }
 
     pub(super) fn disable(&mut self) {
-        // Reset and disable RTC I2C clock
-        SENS::regs()
-            .sar_peri_reset_conf()
-            .modify(|_, w| w.sar_rtc_i2c_reset().set_bit());
-
-        SENS_PERI_CLK_GATE_LOCK.lock(|| {
-            SENS::regs()
-                .sar_peri_clk_gate_conf()
-                .modify(|_, w| w.rtc_i2c_clk_en().clear_bit());
-        });
+        PeripheralClockControl::set_reset(Peripheral::RtcI2c, true);
+        PeripheralClockControl::set_enabled_untracked(Peripheral::RtcI2c, false);
     }
 }
 
