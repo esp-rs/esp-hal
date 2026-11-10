@@ -4,29 +4,36 @@
 
 use core::task::Context;
 
-use crate::ethernet::{
-    mac::{Duplex, LinkState, Speed},
-    phy::{
-        ANAR,
-        ANLPAR,
-        BMCR,
-        BMSR,
-        EXSR,
-        GBCR,
-        GBSR,
-        MdioBus,
-        PHYIDR1,
-        PHYIDR2,
-        Phy,
-        PhyError,
-        an,
-        bmcr,
-        bmsr,
-        exsr,
-        gbcr,
-        gbsr,
+use crate::{
+    asynch::wake_at,
+    ethernet::{
+        mac::{Duplex, LinkState, Speed},
+        phy::{
+            ANAR,
+            ANLPAR,
+            BMCR,
+            BMSR,
+            EXSR,
+            GBCR,
+            GBSR,
+            MdioBus,
+            PHYIDR1,
+            PHYIDR2,
+            Phy,
+            PhyError,
+            an,
+            bmcr,
+            bmsr,
+            exsr,
+            gbcr,
+            gbsr,
+        },
     },
+    time::{Duration, Instant},
 };
+
+/// Interval between link polls in async mode.
+const LINK_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Maximum iterations to wait for the PHY reset bit to self-clear.
 const RESET_POLL_LIMIT: u32 = 500_000; // us
@@ -221,11 +228,10 @@ impl Phy for GenericPhy {
             duplex: Duplex::Full,
         };
 
-        // No PHY interrupt is available, and esp-hal has no timer to defer to,
-        // so wake immediately to keep being polled. Wrap this driver to
-        // rate-limit the polling (see `Phy::poll_link`).
+        // No PHY interrupt is available, so schedule the next poll. Without the
+        // `embassy-time` feature this wakes immediately and busy-polls.
         if let Some(cx) = cx {
-            cx.waker().wake_by_ref();
+            wake_at(Instant::now() + LINK_POLL_INTERVAL, cx);
         }
 
         let Some(addr) = self.addr else {
