@@ -26,8 +26,8 @@
 //!
 //! ## Usage
 //!
-//! [`Ipc::new`] creates a handle from the `IPC` peripheral singleton, and
-//! [`Ipc::call_function`] posts a function to a CPU.
+//! [`Ipc::new`] creates a handle from the `IPC` peripheral singleton, and [`Ipc::post`] posts an
+//! [`IpcRequest`] to a CPU.
 //!
 //! The posted function runs in an interrupt handler. The handler saves the registers that the
 //! calling convention lets the callee clobber, except the floating-point registers. The posted
@@ -39,14 +39,20 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::{interrupt::ipc::Ipc, system::Cpu};
+//! use esp_hal::{
+//!     interrupt::ipc::{Ipc, IpcRequest},
+//!     system::Cpu,
+//! };
 //!
-//! fn on_cpu() {
+//! extern "C" fn on_cpu(arg: usize) {
 //!     // Runs on the selected CPU at minimum interrupt priority.
 //! }
 //!
+//! static ON_CPU: IpcRequest = IpcRequest::new(on_cpu);
+//!
 //! let ipc = Ipc::new(peripherals.IPC);
-//! ipc.call_function(Cpu::ProCpu, on_cpu);
+//! let ticket = ipc.post(Cpu::ProCpu, &ON_CPU, 42)?;
+//! ticket.wait(Instant::now() + Duration::from_millis(10))?;
 //! # {after_snippet}
 //! ```
 
@@ -79,12 +85,9 @@ pub(crate) use self::implem::install_app;
 #[cfg(feature = "rt")]
 #[repr(C)]
 struct CoreState {
-    /// The function that [`Ipc::call_function`] posts, or null if the CPU has none.
-    callback: AtomicPtr<()>,
-
     /// The context-switch handler that the CPU runs, or null if the CPU has none pending.
     ///
-    /// [`request_context_switch`] copies `context_switch_handler` here. A posted function alone
+    /// [`request_context_switch`] copies `context_switch_handler` here. A posted request alone
     /// therefore does not make the CPU switch tasks.
     pending_context_switch: AtomicPtr<()>,
 
@@ -105,7 +108,6 @@ struct CoreState {
 impl CoreState {
     const fn new() -> Self {
         Self {
-            callback: AtomicPtr::new(core::ptr::null_mut()),
             pending_context_switch: AtomicPtr::new(core::ptr::null_mut()),
             context_switch_handler: AtomicPtr::new(core::ptr::null_mut()),
             #[cfg(riscv)]
@@ -194,52 +196,6 @@ impl Ipc {
     /// path.
     pub const fn new(_ipc: IPC<'_>) -> Self {
         Self
-    }
-
-    /// Runs `handler` on `core`.
-    ///
-    /// `handler` runs in an interrupt handler at [`Priority::min`][super::Priority::min]. This
-    /// call does not wait for `handler` to return, and a context switch does not delay it.
-    ///
-    /// The interrupt handler saves the registers that the calling convention lets the callee
-    /// clobber, except the floating-point registers. `handler` must not use those registers, and
-    /// must be callable with the cache disabled.
-    ///
-    /// A CPU holds one posted function at a time. If `core` already holds one, this call behaves
-    /// as follows:
-    ///
-    /// - If `core` holds `handler`, that function has not run yet, and it runs after this call. The
-    ///   two calls coalesce into one run, and this call returns. A caller that needs a run of its
-    ///   own must wait for the pending run.
-    /// - If `core` holds a different function, this call waits until `core` takes that function.
-    ///   `core` takes it in a minimum-priority interrupt. That interrupt cannot run in an
-    ///   interrupt-free context, and cannot run on the APP CPU while that CPU is in reset. The wait
-    ///   never ends in those cases.
-    ///
-    /// # Panics
-    ///
-    /// In debug builds, panics if `core` is the APP CPU and that CPU is not running.
-    #[cfg(feature = "rt")]
-    pub fn call_function(self, core: Cpu, handler: fn()) {
-        let handler = handler as *mut ();
-        assert_target_runs(core);
-
-        while let Err(pending) = STATE[core as usize].callback.compare_exchange(
-            core::ptr::null_mut(),
-            handler,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            // The IPC handler takes the callback before it runs it, so a pending copy of `handler`
-            // has not run yet. It runs after this call, which covers this call, too.
-            if pending == handler {
-                break;
-            }
-
-            core::hint::spin_loop();
-        }
-
-        raise(core);
     }
 
     /// Queues a run of `request` on `core` with the argument `arg`, and returns at once.
@@ -399,8 +355,8 @@ pub(crate) unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitc
 
 /// Asks `core` to run its context-switch handler.
 ///
-/// The handler runs at [`Priority::min`][super::Priority::min], after the function that
-/// [`Ipc::call_function`] posts. The call does not wait, not even for a pending posted function.
+/// The handler runs at [`Priority::min`][super::Priority::min], after the requests that
+/// [`Ipc::post`] queued. The call does not wait, not even for a pending request.
 ///
 /// # Panics
 ///
@@ -409,7 +365,10 @@ pub(crate) unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitc
 #[cfg(feature = "rt")]
 #[inline]
 pub(crate) fn request_context_switch(core: Cpu) {
-    assert_target_runs(core);
+    debug_assert!(
+        core != Cpu::AppCpu || crate::soc::cpu_control::is_running(Cpu::AppCpu),
+        "IPC target APP core is not running"
+    );
 
     let state = &STATE[core as usize];
 
@@ -423,12 +382,4 @@ pub(crate) fn request_context_switch(core: Cpu) {
         .store(handler, Ordering::Release);
 
     raise(core);
-}
-
-#[cfg(feature = "rt")]
-fn assert_target_runs(core: Cpu) {
-    debug_assert!(
-        core != Cpu::AppCpu || crate::soc::cpu_control::is_running(Cpu::AppCpu),
-        "IPC target APP core is not running"
-    );
 }

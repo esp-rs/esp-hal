@@ -67,7 +67,7 @@ fn install_core(core: Cpu) {
 
 /// Handles the IPC interrupt of one CPU.
 ///
-/// The handler clears the request, runs the posted function, then jumps to the context-switch
+/// The handler clears the request, runs the posted requests, then jumps to the context-switch
 /// handler. It borrows `ra`, `t0`, and `t1` only. `t0` goes to `mscratch`. That CSR is free,
 /// because the hardware clears `mstatus.MIE` on trap entry, and nothing here enables
 /// interrupts again.
@@ -92,11 +92,9 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         lw   t0, {request}(t1)
         sw   zero, 0(t0)
 
-        # The posted functions return here, so they run first. A CPU rarely has one, so they
+        # The posted requests return here, so they run first. A CPU rarely has one, so they
         # run out of line: a taken branch costs two cycles, and the context switch that the
         # scheduler asks for on every yield must not pay them.
-        lw   t0, {callback}(t1)
-        bnez t0, 3f
         lw   t0, {head}(t1)
         bnez t0, 3f
 
@@ -115,9 +113,9 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         mret
 
     3:
-        # `callback_handler` takes the state from `t1`, and may clobber `ra`, `t0` and `t1`.
+        # `drain_handler` takes the state from `t1`, and may clobber `ra`, `t0` and `t1`.
         sw   ra, 4(sp)
-        la   t0, {callback_handler}
+        la   t0, {drain_handler}
         jalr ra, 0(t0)
         lw   ra, 4(sp)
         la   t1, {state} + {base}
@@ -125,15 +123,14 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         ",
         state = sym STATE,
         base = const CORE * size_of::<CoreState>(),
-        callback = const core::mem::offset_of!(CoreState, callback),
         head = const core::mem::offset_of!(CoreState, lists.head),
         pending_context_switch = const core::mem::offset_of!(CoreState, pending_context_switch),
         request = const core::mem::offset_of!(CoreState, request),
-        callback_handler = sym callback_handler,
+        drain_handler = sym drain_handler,
     )
 }
 
-/// Runs the posted functions of one CPU, then returns to [`ipc_handler`].
+/// Runs the posted requests of one CPU, then returns to [`ipc_handler`].
 ///
 /// `t1` holds the address of the `CoreState` of the CPU. This function saves the registers
 /// that the RISC-V calling convention lets the callee clobber, except `ra`, `t0`, and `t1`,
@@ -145,7 +142,7 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
 )]
 #[cfg_attr(interrupt_controller = "clic", unsafe(link_section = ".rwtext"))]
 #[unsafe(naked)]
-unsafe extern "C" fn callback_handler() {
+unsafe extern "C" fn drain_handler() {
     core::arch::naked_asm!(
         "
         addi sp, sp, -64
@@ -189,7 +186,7 @@ unsafe extern "C" fn callback_handler() {
     )
 }
 
-/// Runs the posted function of the current CPU, then the queued requests.
+/// Runs the queued requests of the current CPU.
 ///
 /// `func` of a request runs with `mstatus.MIE` clear, and the interrupted `t0` in `mscratch`.
 #[cfg_attr(
@@ -198,13 +195,5 @@ unsafe extern "C" fn callback_handler() {
 )]
 #[cfg_attr(interrupt_controller = "clic", unsafe(link_section = ".rwtext"))]
 extern "C" fn drain_current_core(state: &CoreState) {
-    let callback = state
-        .callback
-        .swap(core::ptr::null_mut(), Ordering::AcqRel);
-    if !callback.is_null() {
-        let callback = unsafe { core::mem::transmute::<*mut (), fn()>(callback) };
-        callback();
-    }
-
     unsafe { super::queue::drain(&state.lists, crate::system::raw_core() as u32) };
 }
