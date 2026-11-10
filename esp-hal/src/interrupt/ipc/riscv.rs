@@ -3,6 +3,7 @@
 //! A CPU reaches its own CLINT through one alias, and the CLINT of the other CPU through
 //! another alias. The machine software interrupt therefore carries the call in both directions.
 
+use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use portable_atomic::Ordering;
 
 use super::{CoreState, STATE};
@@ -16,6 +17,9 @@ use crate::{
 const CLINT_INTERRUPT: CpuInterrupt = CpuInterrupt::Interrupt3;
 
 pub(super) fn raise(core: Cpu) {
+    // An unpinned task can move to the other CPU between the read of the current CPU and the
+    // write to the CLINT alias.
+    let token = unsafe { SingleCoreInterruptLock.enter() };
     if core == Cpu::current() {
         CLINT::regs()
     } else {
@@ -23,6 +27,7 @@ pub(super) fn raise(core: Cpu) {
     }
     .msip()
     .write(|w| w.msip().set_bit());
+    unsafe { SingleCoreInterruptLock.exit(token) };
 }
 
 /// Installs the IPC interrupt handler of the PRO CPU.
