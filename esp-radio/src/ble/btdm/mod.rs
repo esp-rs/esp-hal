@@ -98,7 +98,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-static CRITICAL: CountingLock = CountingLock::new(&super::ESP_RADIO_LOCK);
+static CRITICAL: CountingLock = CountingLock::new();
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {

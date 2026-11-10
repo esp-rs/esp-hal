@@ -7,15 +7,15 @@ use portable_atomic::{AtomicU32, Ordering};
 ///
 /// Only the outermost release gives the mutex back.
 pub(crate) struct CountingLock {
-    lock: &'static RawMutex,
+    lock: RawMutex,
     nesting: AtomicU32,
     token: AtomicU32,
 }
 
 impl CountingLock {
-    pub(crate) const fn new(lock: &'static RawMutex) -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
-            lock,
+            lock: RawMutex::new(),
             nesting: AtomicU32::new(0),
             token: AtomicU32::new(0),
         }
@@ -25,14 +25,16 @@ impl CountingLock {
     ///
     /// # Safety
     ///
-    /// Each acquisition must be paired with a [`Self::release`].
+    /// Each acquisition must be paired with a [`Self::release`] on the same core.
     #[inline(always)]
     pub(crate) unsafe fn acquire(&self) {
-        // Take the mutex before the count, so that another core waits for it. A nested
-        // acquisition gets a reentry token, which needs no release.
+        // Take the mutex before the count, so that another core waits for it.
         let token = unsafe { self.lock.acquire() };
         if self.nesting.fetch_add(1, Ordering::Relaxed) == 0 {
             self.token.store(token.inner(), Ordering::Relaxed);
+        } else {
+            // A nested acquisition gets a reentry token, and its release keeps the mutex.
+            unsafe { self.lock.release(token) };
         }
     }
 
@@ -40,7 +42,8 @@ impl CountingLock {
     ///
     /// # Safety
     ///
-    /// Each release must be paired with an earlier [`Self::acquire`].
+    /// Each release must be paired with an earlier [`Self::acquire`] on the same core. Locks must
+    /// be released in the reverse order of their acquisition.
     #[inline(always)]
     pub(crate) unsafe fn release(&self) {
         if self.nesting.fetch_sub(1, Ordering::Relaxed) == 1 {

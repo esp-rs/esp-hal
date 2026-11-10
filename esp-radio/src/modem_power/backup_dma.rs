@@ -6,7 +6,6 @@
 
 use allocator_api2::boxed::Box;
 use enumset::EnumSet;
-use esp_sync::RawMutex;
 
 use super::{Radio, STATE};
 use crate::{compat::malloc::InternalMemory, counting_lock::CountingLock};
@@ -99,10 +98,9 @@ pub(crate) fn wake(radio: Radio) {
     })
 }
 
-static BACKUP_DMA_MUTEX: RawMutex = RawMutex::new();
 /// The chip has one backup DMA, so two copies must not run at the same time. The ROM gives the
 /// unlock no argument.
-static BACKUP_DMA_LOCK: CountingLock = CountingLock::new(&BACKUP_DMA_MUTEX);
+static BACKUP_DMA_LOCK: CountingLock = CountingLock::new();
 
 /// The ROM calls this before a backup DMA copy.
 extern "C" fn backup_dma_lock() {

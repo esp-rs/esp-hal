@@ -9,11 +9,6 @@ use core::{
 use portable_atomic::{AtomicPtr, Ordering};
 use static_cell::ConstStaticCell;
 
-#[cfg(not(cpu_retention = "software"))]
-const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
-#[cfg(not(cpu_retention = "software"))]
-const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
-
 /// Storage for [`RetentionMemory`].
 ///
 /// This storage must be placed in `#[ram(reclaimed, unstable(zeroed))]`, then a static mutable
@@ -91,7 +86,7 @@ impl core::fmt::Display for RetentionMemoryError {
             #[cfg(not(cpu_retention = "software"))]
             Self::OutOfRange => write!(
                 f,
-                "the memory is outside the retention memory range (0x{MEM_START:X}..0x{MEM_END:X})"
+                "the retention DMA cannot reach the memory, place it in `#[ram(reclaimed)]`"
             ),
             Self::AlreadyInstalled => write!(f, "retention memory is installed already"),
         }
@@ -129,6 +124,9 @@ impl<const SIZE: usize> RetentionSlot<SIZE> {
 
         #[cfg(not(cpu_retention = "software"))]
         {
+            const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
+            const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
+
             let start = memory as usize;
             if start < MEM_START || start + SIZE > MEM_END {
                 return Err(RetentionMemoryError::OutOfRange);

@@ -919,7 +919,7 @@ const BTDM_OSAL_INVALID_PARM: i32 = 3;
 const BTDM_OSAL_TIMEOUT: i32 = 6;
 
 static EVENTQ_DEPTH: AtomicU16 = AtomicU16::new(16);
-static CRITICAL: CountingLock = CountingLock::new(&crate::ble::ESP_RADIO_LOCK);
+static CRITICAL: CountingLock = CountingLock::new();
 
 #[repr(C)]
 #[derive(Default, Clone, Copy)]
