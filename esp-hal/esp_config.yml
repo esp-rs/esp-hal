@@ -253,18 +253,18 @@ options:
       - value: false
     active: "sleep_idle_frequency_scaling"
   - name: apb-frequency-reduction
-    description: "Lower APB_CLK to AHB_CLK / 2 or AHB_CLK / 4 while the APB bus is idle. The
-      reduction has an effect only if this divider is larger than the APB_CLK divider. Drivers
-      that need a constant APB_CLK frequency stop the reduction while they operate."
+    description: "Divide AHB_CLK by this value to get APB_CLK while the APB bus is idle. The
+      value 1 disables the reduction. The reduction has an effect only if this divider is larger
+      than the APB_CLK divider. Drivers that need a constant APB_CLK frequency stop the reduction
+      while they operate."
     default:
-      - value: '"disabled"'
+      - value: 1
     constraints:
       - type:
-          validator: enumeration
+          validator: integer_in_range
           value:
-            - "disabled"
-            - "ahb-div-2"
-            - "ahb-div-4"
+            start: 1
+            end: 257
     active: "soc_has_apb_frequency_reduction"
 
 checks:
