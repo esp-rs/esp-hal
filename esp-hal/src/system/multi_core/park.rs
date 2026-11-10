@@ -33,7 +33,7 @@ use esp_sync::{
     RestoreState,
     raw::{RawLock, SingleCoreInterruptLock},
 };
-use portable_atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering};
+use portable_atomic::{AtomicPtr, AtomicU8, AtomicU32, AtomicUsize, Ordering};
 
 use super::{
     APP_CORE_STOPPING,
@@ -64,13 +64,19 @@ enum Phase {
     Parked,
     /// The other core lets the core leave [`serve`].
     Released,
+    /// The other core lets the parked core run its [`FUNCTION`] in [`serve`].
+    Run,
 }
 
 /// The park phase of each core.
 ///
-/// Only the other core writes `Requested` and `Released`. Only the core itself writes `Parked`
-/// and `Idle`.
+/// Only the other core writes `Requested`, `Released` and `Run`. Only the core itself writes
+/// `Parked` and `Idle`.
 static PHASE: [AtomicU8; Cpu::COUNT] = [const { AtomicU8::new(Phase::Idle as u8) }; Cpu::COUNT];
+
+/// The function that each core runs in [`Phase::Run`].
+static FUNCTION: [AtomicPtr<()>; Cpu::COUNT] =
+    [const { AtomicPtr::new(core::ptr::null_mut()) }; Cpu::COUNT];
 
 /// The number of parks that hold each core.
 static COUNT: [AtomicUsize; Cpu::COUNT] = [const { AtomicUsize::new(0) }; Cpu::COUNT];
@@ -180,8 +186,53 @@ pub(crate) fn unpark(core: Cpu) {
     }
     count.store(previous - 1, Ordering::Relaxed);
     if previous == 1 {
-        PHASE[core as usize].store(Phase::Released as u8, Ordering::Release);
+        let phase = &PHASE[core as usize];
+        debug_assert!(
+            phase.load(Ordering::Relaxed) != Phase::Run as u8,
+            "A parked core must finish its run before the last unpark"
+        );
+        phase.store(Phase::Released as u8, Ordering::Release);
         unsafe { internal_park_core(core, false) };
+    }
+}
+
+/// Lets the parked `core` run `function` with masked interrupts, and returns whether `core` runs
+/// it.
+///
+/// Returns `false` if no park holds `core`, or if `core` runs no code of this program. After a
+/// `true` return, [`end_run`] must come before the last [`unpark`] of `core`.
+///
+/// `function` must be in RAM, because the other core can turn off the cache during a park.
+#[ram]
+pub(crate) fn start_run(core: Cpu, function: fn()) -> bool {
+    let _claim = Claim::take();
+    if COUNT[core as usize].load(Ordering::Relaxed) == 0 || !takes_ipc(core) {
+        return false;
+    }
+    FUNCTION[core as usize].store(function as *mut (), Ordering::Relaxed);
+    PHASE[core as usize].store(Phase::Run as u8, Ordering::Release);
+    unsafe { internal_park_core(core, false) };
+    true
+}
+
+/// Waits until `core` returns from the function of [`start_run`], then stalls `core` again.
+#[ram]
+pub(crate) fn end_run(core: Cpu) {
+    let _claim = Claim::take();
+    while PHASE[core as usize].load(Ordering::Acquire) != Phase::Parked as u8 {
+        core::hint::spin_loop();
+    }
+    unsafe { internal_park_core(core, true) };
+}
+
+/// Waits until `done` returns `true`, and answers the park requests of the other core meanwhile.
+///
+/// Use this function to wait with masked interrupts for work that the other core does.
+#[inline(always)]
+pub(crate) fn wait_until(done: impl Fn() -> bool) {
+    while !done() {
+        serve(Cpu::current());
+        core::hint::spin_loop();
     }
 }
 
@@ -267,8 +318,17 @@ fn serve(current: Cpu) {
         let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 
         phase.store(Phase::Parked as u8, Ordering::Release);
-        while phase.load(Ordering::Acquire) != Phase::Released as u8 {
-            core::hint::spin_loop();
+        loop {
+            match phase.load(Ordering::Acquire) {
+                p if p == Phase::Released as u8 => break,
+                p if p == Phase::Run as u8 => {
+                    let function = FUNCTION[current as usize].load(Ordering::Relaxed);
+                    // SAFETY: `start_run` stores a `fn()`.
+                    unsafe { core::mem::transmute::<*mut (), fn()>(function)() };
+                    phase.store(Phase::Parked as u8, Ordering::Release);
+                }
+                _ => core::hint::spin_loop(),
+            }
         }
         phase.store(Phase::Idle as u8, Ordering::Release);
     }
