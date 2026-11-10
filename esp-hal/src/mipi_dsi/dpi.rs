@@ -126,6 +126,24 @@ pub struct DpiConfig {
     pub timing: FrameTiming,
 }
 
+/// The DMA did not start reading a committed frame buffer in time.
+///
+/// Returned by [`DsiDpi::wait_for_commit`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct CommitTimeout;
+
+impl core::fmt::Display for CommitTimeout {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "the DMA did not start reading the committed frame buffer in time"
+        )
+    }
+}
+
+impl core::error::Error for CommitTimeout {}
+
 // ── VDMA block-done ISR ───────────────────────────────────────────────────────
 
 /// Fired by the DW-GDMA at the end of every frame block transfer.
@@ -490,21 +508,38 @@ impl<'d> DsiDpi<'d> {
     ///
     /// Takes up to two frames: the frame on screen at the commit finishes from
     /// the previous buffer, and the next one can still start from it if the
-    /// commit landed just as the DMA loaded its link-list item.
-    pub fn wait_for_commit(&mut self) {
+    /// commit landed just as the DMA loaded its link-list item. Returns
+    /// immediately with a single frame buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CommitTimeout`] if the DMA did not start on the committed
+    /// buffer within `timeout`. It can then still read the buffer that
+    /// [`Self::framebuffer_mut`] returns, and drawing into it can tear the
+    /// image on screen. The commit itself stays in place.
+    pub fn wait_for_commit(&mut self, timeout: Duration) -> Result<(), CommitTimeout> {
         if self.num_fbs < 2 {
-            return;
+            return Ok(());
         }
         let front = self.fb_ptrs[self.current_fb] as u32;
         let channel = DwGdmaChannel::new(self._guard.vdma_channel_id);
         // The address one past the previous buffer can equal the start of this
         // one, so only an address inside it shows that a block reads it.
-        while !(front + 1..front + self.fb_size as u32).contains(&channel.source_address()) {}
+        let reading_front = front + 1..front + self.fb_size as u32;
+        if wait_until(timeout, || {
+            reading_front.contains(&channel.source_address())
+        }) {
+            Ok(())
+        } else {
+            Err(CommitTimeout)
+        }
     }
 
-    /// Returns how often the VDMA channel's interrupt, which re-arms the
-    /// link-list ring, was handled since this handle was created. It only
-    /// advances while the DMA moves pixels. Wraps on overflow.
+    /// Returns the number of frames the DMA finished sending to the DSI bridge
+    /// since this handle was created. Wraps on overflow.
+    ///
+    /// The DMA raises one interrupt at the end of every frame. A count that
+    /// stops advancing means the DMA no longer scans out the frame buffer.
     pub fn dma_interrupt_count(&self) -> u32 {
         DMA_INTERRUPTS.load(Ordering::Relaxed)
     }

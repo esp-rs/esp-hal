@@ -1,9 +1,11 @@
 //! MIPI-CSI tests without a streaming camera
 //!
 //! No frame arrives on the CSI lanes: either no camera is connected, or its sensor does not
-//! stream. The tests check the D-PHY rail, configuration errors, capture timeouts, the shutdown
-//! of an armed capture and stream, and a dropped `next_frame_async` future. Capture with a camera
-//! is covered by `examples/qa/src/bin/mipi-csi-sc2336-first-frame.rs`.
+//! stream. A sensor keeps streaming over a reset of the chip, so a firmware that left it on, such
+//! as the live camera-to-LCD example, has to be followed by one that turns it off, or by a power
+//! cycle, before these tests run. The tests check the D-PHY rail, configuration errors, capture
+//! timeouts, the shutdown of an armed capture and stream, and a dropped `next_frame_async` future.
+//! Capture with a camera is covered by `examples/qa/src/bin/mipi-csi-sc2336-first-frame.rs`.
 
 //% CHIP_FILTER: mipi_csi_driver_supported
 //% FEATURES: unstable
@@ -45,6 +47,7 @@ mod tests {
     const FRAME_BYTES: usize = WIDTH as usize * HEIGHT as usize;
     const TIMEOUT: Duration = Duration::from_millis(20);
     const SENTINEL: u8 = 0xA5;
+    const STREAMING_SOURCE: &str = "no timeout: is a camera streaming on the CSI lanes?";
 
     #[repr(C, align(64))]
     struct Frame([u8; FRAME_BYTES]);
@@ -139,7 +142,11 @@ mod tests {
         let start = Instant::now();
         let result = capture.receive(&mut buffer.0);
         let waited = start.elapsed();
-        assert!(matches!(result, Err(ReceiveError::Timeout(_))));
+        assert!(
+            matches!(result, Err(ReceiveError::Timeout(_))),
+            "{}",
+            STREAMING_SOURCE
+        );
         assert!(waited >= TIMEOUT && waited < TIMEOUT + Duration::from_millis(10));
         assert!(untouched(&buffer.0));
 
@@ -158,7 +165,7 @@ mod tests {
 
         let start = Instant::now();
         let result = stream.next_frame(TIMEOUT).map(|frame| frame.sequence());
-        assert_eq!(result, Err(StreamError::Timeout));
+        assert_eq!(result, Err(StreamError::Timeout), "{}", STREAMING_SOURCE);
         assert!(start.elapsed() >= TIMEOUT);
         let stats = stream.stats();
         assert_eq!((stats.completed, stats.errored, stats.delivered), (0, 0, 0));

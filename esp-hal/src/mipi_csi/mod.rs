@@ -154,21 +154,21 @@ use crate::{
 const MIN_LANE_RATE_MBPS: u16 = 90;
 const MAX_LANE_RATE_MBPS: u16 = 1500;
 // DMA read aperture of the CSI bridge FIFO. The TRM register map does not list
-// it; the address is ESP-IDF's `MIPI_CSI_BRG_MEM_BASE`:
-// <https://github.com/espressif/esp-idf/blob/v6.0/components/soc/esp32p4/register/hw_ver3/soc/reg_base.h#L169-L170>.
+// it; the address is ESP-IDF's `MIPI_CSI_BRG_MEM_BASE`.
+// See <https://github.com/espressif/esp-idf/blob/662a3be3547/components/soc/esp32p4/register/hw_ver3/soc/reg_base.h#L169-L170>.
 // The next aperture, `0x5010_5000`, is the DSI bridge FIFO.
 const CSI_BRG_MEM_BASE: u32 = 0x5010_4000;
 const CSI_BRG_AFULL_THRESHOLD: u16 = 960;
 const CSI_RAW8_DATA_TYPE: u8 = 0x2A;
 // Long-packet data types the bridge passes on: the YUV, RGB and RAW ranges of
-// the CSI-2 data type table. ESP-IDF uses the same filter:
-// <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_hal_cam/mipi_csi_hal.c#L74-L75>.
+// the CSI-2 data type table. ESP-IDF uses the same filter.
+// See <https://github.com/espressif/esp-idf/blob/662a3be3547/components/esp_hal_cam/mipi_csi_hal.c#L74-L75>.
 const CSI_DATA_TYPE_MIN: u8 = 0x12;
 const CSI_DATA_TYPE_MAX: u8 = 0x2F;
 // The bridge only receives data through a clocked ISP, so a bypassed ISP still
 // gets an 80 MHz clock from PLL_F240M, the CSI input and register updates at
-// the next vsync, as in ESP-IDF's processor setup:
-// <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_isp/src/isp_core.c#L116-L178>.
+// the next vsync, as in ESP-IDF's processor setup.
+// See <https://github.com/espressif/esp-idf/blob/662a3be3547/components/esp_driver_isp/src/isp_core.c#L116-L178>.
 const ISP_CLK_SRC_PLL_F240M: u8 = 1;
 const ISP_CLK_DIV_80MHZ: u8 = 2;
 const ISP_IN_SRC_CSI: u8 = 0;
@@ -246,8 +246,8 @@ const fn csi_dma_channel_config(axi: DmaAxiConfig) -> ChannelConfig {
         src_peripheral: DW_GDMA_HW_HANDSHAKE_PERIPH_CSI,
         dst_peripheral: 0,
         // The bridge is the flow controller and reports the source status from
-        // its FIFO aperture, as in ESP-IDF's channel setup:
-        // <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L189-L204>.
+        // its FIFO aperture, as in ESP-IDF's channel setup.
+        // See <https://github.com/espressif/esp-idf/blob/662a3be3547/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L189-L204>.
         src_status_fetch_addr: CSI_BRG_MEM_BASE,
         dst_status_fetch_addr: 0,
         priority: DW_GDMA_CHANNEL_PRIORITY,
@@ -281,9 +281,11 @@ pub struct DmaAxiConfig {
 }
 
 impl DmaAxiConfig {
-    /// Settings of the ESP-IDF v6.0 CSI driver: 5 outstanding requests
-    /// ([channel](https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L189-L204)) and 16-beat bursts
-    /// ([transfer](https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L495-L511)) on both sides.
+    /// Settings of the ESP-IDF v6.0 CSI driver: 5 outstanding requests and
+    /// 16-beat bursts on both sides.
+    ///
+    /// See <https://github.com/espressif/esp-idf/blob/662a3be3547/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L189-L204>
+    /// and <https://github.com/espressif/esp-idf/blob/662a3be3547/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L495-L511>.
     ///
     /// On ESP32-P4 v3.2 with 250 MHz HEX PSRAM, the DMA stalls with these
     /// settings when it writes frames into PSRAM.
@@ -895,8 +897,8 @@ impl<'d> MipiCsi<'d> {
         this.init_phy_cfg_clock();
         // The D-PHY test interface is clocked through the bridge
         // (`csi_enableclk`), so the bridge clocks must run before the host
-        // setup writes it. ESP-IDF also claims the bridge first:
-        // <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L124-L136>.
+        // setup writes it. ESP-IDF also claims the bridge first.
+        // See <https://github.com/espressif/esp-idf/blob/662a3be3547/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L124-L136>.
         this.prepare_bridge();
         this.init_host(config);
 
@@ -948,7 +950,8 @@ impl<'d> MipiCsi<'d> {
             .modify(|_, w| w.ref_20m_clk_en().set_bit());
 
         // Select the 20 MHz D-PHY configuration clock, then pulse its gate low
-        // and high, in ESP-IDF's order: <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L128-L136>.
+        // and high, in ESP-IDF's order.
+        // See <https://github.com/espressif/esp-idf/blob/662a3be3547/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L128-L136>.
         HP_SYS_CLKRST::regs()
             .peri_clk_ctrl03()
             .modify(|_, w| unsafe { w.mipi_csi_dphy_clk_src_sel().bits(PHY_CFG_CLK_SRC_PLL_F20M) });
@@ -1021,8 +1024,8 @@ impl<'d> MipiCsi<'d> {
             w.data_type_max().bits(CSI_DATA_TYPE_MAX)
         });
         // Input and output formats are equal, so the bridge colour-mode block
-        // is enabled and bypassed, as ESP-IDF does for equal formats:
-        // <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L594-L601>.
+        // is enabled and bypassed, as ESP-IDF does for equal formats.
+        // See <https://github.com/espressif/esp-idf/blob/662a3be3547/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L594-L601>.
         bridge.host_cm_ctrl().modify(|_, w| {
             w.csi_host_cm_en().set_bit();
             w.csi_host_cm_bypass().set_bit()
@@ -1034,7 +1037,8 @@ impl<'d> MipiCsi<'d> {
         bridge.dma_req_cfg().modify(|_, w| unsafe {
             // The bridge stays the flow controller (reset value) and requests
             // bursts of 512 64-bit words, the DMA burst size of the channel.
-            // ESP-IDF sets the same: <https://github.com/espressif/esp-idf/blob/v6.0/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L185>.
+            // ESP-IDF sets the same.
+            // See <https://github.com/espressif/esp-idf/blob/662a3be3547/components/esp_driver_cam/csi/src/esp_cam_ctlr_csi.c#L185>.
             w.dma_burst_len().bits(512);
             w.dma_cfg_upd_by_blk().clear_bit();
             w.dma_force_rd_status().clear_bit();

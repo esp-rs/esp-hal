@@ -64,6 +64,8 @@ const RGB565_BYTES: usize = WIDTH * HEIGHT * 2;
 const DMA_ALIGNMENT: usize = 128;
 const EXPOSURE_LINES: u32 = 300;
 const FRAME_TIMEOUT: Duration = Duration::from_millis(500);
+/// Two panel frames take about 34 ms.
+const COMMIT_TIMEOUT: Duration = Duration::from_millis(100);
 
 /// EK79007 vendor init sequence.
 static EK79007_INIT: &[(u8, &[u8])] = &[
@@ -102,7 +104,8 @@ fn main() -> ! {
     if cfg!(feature = "color-bars") {
         draw_color_bars(dpi.framebuffer_mut());
         dpi.commit();
-        dpi.wait_for_commit();
+        dpi.wait_for_commit(COMMIT_TIMEOUT)
+            .expect("the display DMA stopped");
         println!("color bars: white yellow cyan green magenta red blue black, left to right");
         loop {
             delay.delay_millis(1000);
@@ -198,7 +201,8 @@ fn main() -> ! {
     let convert_us = start.elapsed().as_micros();
     let start = Instant::now();
     dpi.commit();
-    dpi.wait_for_commit();
+    dpi.wait_for_commit(COMMIT_TIMEOUT)
+        .expect("the display DMA stopped");
     println!(
         "snapshot: converted {RGB565_BYTES} bytes in {} ms, shown after {} us",
         convert_us / 1000,
@@ -281,7 +285,7 @@ fn live(
     };
     sc2336::set_stream(i2c, true).expect("SC2336 stream on failed");
 
-    let mut window = Window::new(stream.stats(), dpi.dma_interrupt_count());
+    let mut window = Window::new(stream.stats());
     let mut presented = 0u32;
     loop {
         let frame = match stream.next_frame(FRAME_TIMEOUT) {
@@ -306,18 +310,19 @@ fn live(
         let convert_us = start.elapsed().as_micros();
         let start = Instant::now();
         dpi.commit();
-        dpi.wait_for_commit();
+        dpi.wait_for_commit(COMMIT_TIMEOUT)
+            .expect("the display DMA stopped");
         window.add(convert_us, start.elapsed().as_micros());
         presented += 1;
 
-        if matches!(presented, 1 | 10 | 100) || presented % 1000 == 0 {
+        if matches!(presented, 1 | 10 | 100) || presented.is_multiple_of(1000) {
             println!(
                 "live[{presented}]: sequence={sequence} stats={:?}",
                 stream.stats()
             );
         }
         if window.start.elapsed() >= Duration::from_secs(5) {
-            window = window.report(stream.stats(), dpi.dma_interrupt_count());
+            window = window.report(stream.stats());
         }
     }
 }
@@ -326,7 +331,6 @@ fn live(
 struct Window {
     start: Instant,
     stats: esp_hal::mipi_csi::StreamStats,
-    dsi_irqs: u32,
     presented: u32,
     timeouts: u32,
     convert_us: u64,
@@ -335,11 +339,10 @@ struct Window {
 }
 
 impl Window {
-    fn new(stats: esp_hal::mipi_csi::StreamStats, dsi_irqs: u32) -> Self {
+    fn new(stats: esp_hal::mipi_csi::StreamStats) -> Self {
         Self {
             start: Instant::now(),
             stats,
-            dsi_irqs,
             presented: 0,
             timeouts: 0,
             convert_us: 0,
@@ -355,12 +358,12 @@ impl Window {
         self.commit_us += commit_us;
     }
 
-    fn report(self, stats: esp_hal::mipi_csi::StreamStats, dsi_irqs: u32) -> Self {
+    fn report(self, stats: esp_hal::mipi_csi::StreamStats) -> Self {
         let elapsed_us = self.start.elapsed().as_micros().max(1);
         let per_s_x10 = |n: u32| n as u64 * 10_000_000 / elapsed_us;
         let presented = self.presented.max(1) as u64;
         println!(
-            "live: camera_fps_x10={} delivered_fps_x10={} shown_fps_x10={} overwritten={} errored={} resyncs={} timeouts={} csi_irqs_per_s={} dsi_irqs_per_s={} convert_ms avg={} max={} commit_ms avg={} convert_cpu_pct={}",
+            "live: camera_fps_x10={} delivered_fps_x10={} shown_fps_x10={} overwritten={} errored={} resyncs={} timeouts={} csi_irqs_per_s={} convert_ms avg={} max={} commit_ms avg={} convert_cpu_pct={}",
             per_s_x10(stats.completed - self.stats.completed),
             per_s_x10(stats.delivered - self.stats.delivered),
             per_s_x10(self.presented),
@@ -369,13 +372,12 @@ impl Window {
             stats.resyncs - self.stats.resyncs,
             self.timeouts,
             per_s_x10(stats.interrupts - self.stats.interrupts) / 10,
-            per_s_x10(dsi_irqs.wrapping_sub(self.dsi_irqs)) / 10,
             self.convert_us / presented / 1000,
             self.max_convert_us / 1000,
             self.commit_us / presented / 1000,
             self.convert_us * 100 / elapsed_us,
         );
-        Self::new(stats, dsi_irqs)
+        Self::new(stats)
     }
 }
 

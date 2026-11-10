@@ -190,10 +190,6 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     true
 }
 
-pub(crate) fn log_psram_timing_pins(tag: &str) {
-    timing::log_applied_readback(tag);
-}
-
 pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
     let start = EXTMEM_ORIGIN;
     start..start + config.size.get()
