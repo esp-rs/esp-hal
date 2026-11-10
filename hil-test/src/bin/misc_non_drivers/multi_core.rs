@@ -307,4 +307,319 @@ mod tests {
         }
         assert_eq!(OTHER_RUNS.load(Ordering::Relaxed), 4);
     }
+
+    /// The number of FP registers that an interrupt entry must keep, and the words after them
+    /// that hold the FP control and status registers.
+    #[cfg(all(riscv, target_feature = "f"))]
+    const FP_REGS: usize = 20;
+    #[cfg(all(riscv, target_feature = "f"))]
+    const FP_WORDS: usize = FP_REGS + 1;
+    #[cfg(all(xtensa, target_feature = "fp"))]
+    const FP_REGS: usize = 16;
+    #[cfg(all(xtensa, target_feature = "fp"))]
+    const FP_WORDS: usize = FP_REGS + 2;
+
+    #[cfg(any(target_feature = "f", target_feature = "fp"))]
+    const fn fp_pattern(invert: u32) -> [u32; FP_REGS] {
+        let mut pattern = [0; FP_REGS];
+        let mut i = 0;
+        while i < FP_REGS {
+            pattern[i] = (0x3f80_0000 + i as u32 * 0x0101_0101) ^ invert;
+            i += 1;
+        }
+        pattern
+    }
+
+    /// Loads `pattern` into the FP registers, and `control` into the FP control register.
+    ///
+    /// # Safety
+    ///
+    /// The caller must declare the FP registers as clobbered.
+    #[cfg(any(target_feature = "f", target_feature = "fp"))]
+    #[inline(always)]
+    unsafe fn load_fp(pattern: &[u32; FP_REGS], control: u32) {
+        cfg_select! {
+            riscv => unsafe {
+                core::arch::asm!(
+                    "flw ft0, 0({p})",
+                    "flw ft1, 4({p})",
+                    "flw ft2, 8({p})",
+                    "flw ft3, 12({p})",
+                    "flw ft4, 16({p})",
+                    "flw ft5, 20({p})",
+                    "flw ft6, 24({p})",
+                    "flw ft7, 28({p})",
+                    "flw ft8, 32({p})",
+                    "flw ft9, 36({p})",
+                    "flw ft10, 40({p})",
+                    "flw ft11, 44({p})",
+                    "flw fa0, 48({p})",
+                    "flw fa1, 52({p})",
+                    "flw fa2, 56({p})",
+                    "flw fa3, 60({p})",
+                    "flw fa4, 64({p})",
+                    "flw fa5, 68({p})",
+                    "flw fa6, 72({p})",
+                    "flw fa7, 76({p})",
+                    "fscsr {c}",
+                    p = in(reg) pattern.as_ptr(),
+                    c = in(reg) control,
+                    out("ft0") _,
+                    out("ft1") _,
+                    out("ft2") _,
+                    out("ft3") _,
+                    out("ft4") _,
+                    out("ft5") _,
+                    out("ft6") _,
+                    out("ft7") _,
+                    out("ft8") _,
+                    out("ft9") _,
+                    out("ft10") _,
+                    out("ft11") _,
+                    out("fa0") _,
+                    out("fa1") _,
+                    out("fa2") _,
+                    out("fa3") _,
+                    out("fa4") _,
+                    out("fa5") _,
+                    out("fa6") _,
+                    out("fa7") _,
+                )
+            },
+            xtensa => unsafe {
+                core::arch::asm!(
+                    "lsi f0, {p}, 0",
+                    "lsi f1, {p}, 4",
+                    "lsi f2, {p}, 8",
+                    "lsi f3, {p}, 12",
+                    "lsi f4, {p}, 16",
+                    "lsi f5, {p}, 20",
+                    "lsi f6, {p}, 24",
+                    "lsi f7, {p}, 28",
+                    "lsi f8, {p}, 32",
+                    "lsi f9, {p}, 36",
+                    "lsi f10, {p}, 40",
+                    "lsi f11, {p}, 44",
+                    "lsi f12, {p}, 48",
+                    "lsi f13, {p}, 52",
+                    "lsi f14, {p}, 56",
+                    "lsi f15, {p}, 60",
+                    "wur.fcr {c}",
+                    p = in(reg) pattern.as_ptr(),
+                    c = in(reg) control,
+                    out("f0") _,
+                    out("f1") _,
+                    out("f2") _,
+                    out("f3") _,
+                    out("f4") _,
+                    out("f5") _,
+                    out("f6") _,
+                    out("f7") _,
+                    out("f8") _,
+                    out("f9") _,
+                    out("f10") _,
+                    out("f11") _,
+                    out("f12") _,
+                    out("f13") _,
+                    out("f14") _,
+                    out("f15") _,
+                )
+            },
+        }
+    }
+
+    #[test]
+    #[cfg(any(target_feature = "f", target_feature = "fp"))]
+    fn ipc_func_keeps_the_fpu_state_of_the_interrupted_code(p: Peripherals) {
+        // The rounding mode "toward zero", with no exception flags.
+        #[cfg(riscv)]
+        const CONTROL: u32 = 0b001 << 5;
+        #[cfg(xtensa)]
+        const CONTROL: u32 = 1;
+
+        static READY: AtomicU32 = AtomicU32::new(0);
+        static DONE: AtomicU32 = AtomicU32::new(0);
+        static RESULT: AtomicU32 = AtomicU32::new(0);
+
+        extern "C" fn use_fpu() {
+            let x = core::hint::black_box(1.5f32);
+            RESULT.store((x * x + 0.25).to_bits(), Ordering::Relaxed);
+            unsafe { load_fp(&fp_pattern(u32::MAX), 0) };
+            DONE.store(1, Ordering::Release);
+        }
+        static USE_FPU: IpcRequest = IpcRequest::new(use_fpu);
+
+        static mut APP_CORE_STACK: Stack<4096> = Stack::new();
+        let _guard = CpuControl::new(p.CPU_CTRL)
+            .start_app_core(
+                unsafe { &mut *core::ptr::addr_of_mut!(APP_CORE_STACK) },
+                || {
+                    while READY.load(Ordering::Acquire) == 0 {}
+                    let _ = ipc().post(Cpu::ProCpu, &USE_FPU);
+                    loop {}
+                },
+            )
+            .unwrap();
+
+        let pattern = fp_pattern(0);
+        let mut saved = [0u32; FP_WORDS];
+        // One block keeps the compiler away from the FP registers between the load and the store.
+        cfg_select! {
+            riscv => unsafe {
+                core::arch::asm!(
+                    "flw ft0, 0({p})",
+                    "flw ft1, 4({p})",
+                    "flw ft2, 8({p})",
+                    "flw ft3, 12({p})",
+                    "flw ft4, 16({p})",
+                    "flw ft5, 20({p})",
+                    "flw ft6, 24({p})",
+                    "flw ft7, 28({p})",
+                    "flw ft8, 32({p})",
+                    "flw ft9, 36({p})",
+                    "flw ft10, 40({p})",
+                    "flw ft11, 44({p})",
+                    "flw fa0, 48({p})",
+                    "flw fa1, 52({p})",
+                    "flw fa2, 56({p})",
+                    "flw fa3, 60({p})",
+                    "flw fa4, 64({p})",
+                    "flw fa5, 68({p})",
+                    "flw fa6, 72({p})",
+                    "flw fa7, 76({p})",
+                    "fscsr {c}",
+                    "sw {t}, 0({ready})",
+                    "2:",
+                    "lw {t}, 0({done})",
+                    "beqz {t}, 2b",
+                    "fsw ft0, 0({s})",
+                    "fsw ft1, 4({s})",
+                    "fsw ft2, 8({s})",
+                    "fsw ft3, 12({s})",
+                    "fsw ft4, 16({s})",
+                    "fsw ft5, 20({s})",
+                    "fsw ft6, 24({s})",
+                    "fsw ft7, 28({s})",
+                    "fsw ft8, 32({s})",
+                    "fsw ft9, 36({s})",
+                    "fsw ft10, 40({s})",
+                    "fsw ft11, 44({s})",
+                    "fsw fa0, 48({s})",
+                    "fsw fa1, 52({s})",
+                    "fsw fa2, 56({s})",
+                    "fsw fa3, 60({s})",
+                    "fsw fa4, 64({s})",
+                    "fsw fa5, 68({s})",
+                    "fsw fa6, 72({s})",
+                    "fsw fa7, 76({s})",
+                    "frcsr {t}",
+                    "sw {t}, 80({s})",
+                    p = in(reg) pattern.as_ptr(),
+                    s = in(reg) saved.as_mut_ptr(),
+                    c = in(reg) CONTROL,
+                    ready = in(reg) READY.as_ptr(),
+                    done = in(reg) DONE.as_ptr(),
+                    t = inout(reg) 1u32 => _,
+                    out("ft0") _,
+                    out("ft1") _,
+                    out("ft2") _,
+                    out("ft3") _,
+                    out("ft4") _,
+                    out("ft5") _,
+                    out("ft6") _,
+                    out("ft7") _,
+                    out("ft8") _,
+                    out("ft9") _,
+                    out("ft10") _,
+                    out("ft11") _,
+                    out("fa0") _,
+                    out("fa1") _,
+                    out("fa2") _,
+                    out("fa3") _,
+                    out("fa4") _,
+                    out("fa5") _,
+                    out("fa6") _,
+                    out("fa7") _,
+                )
+            },
+            xtensa => unsafe {
+                core::arch::asm!(
+                    "lsi f0, {p}, 0",
+                    "lsi f1, {p}, 4",
+                    "lsi f2, {p}, 8",
+                    "lsi f3, {p}, 12",
+                    "lsi f4, {p}, 16",
+                    "lsi f5, {p}, 20",
+                    "lsi f6, {p}, 24",
+                    "lsi f7, {p}, 28",
+                    "lsi f8, {p}, 32",
+                    "lsi f9, {p}, 36",
+                    "lsi f10, {p}, 40",
+                    "lsi f11, {p}, 44",
+                    "lsi f12, {p}, 48",
+                    "lsi f13, {p}, 52",
+                    "lsi f14, {p}, 56",
+                    "lsi f15, {p}, 60",
+                    "wur.fcr {c}",
+                    "wur.fsr {z}",
+                    "s32i {t}, {ready}, 0",
+                    "memw",
+                    "2:",
+                    "memw",
+                    "l32i {t}, {done}, 0",
+                    "beqz {t}, 2b",
+                    "ssi f0, {s}, 0",
+                    "ssi f1, {s}, 4",
+                    "ssi f2, {s}, 8",
+                    "ssi f3, {s}, 12",
+                    "ssi f4, {s}, 16",
+                    "ssi f5, {s}, 20",
+                    "ssi f6, {s}, 24",
+                    "ssi f7, {s}, 28",
+                    "ssi f8, {s}, 32",
+                    "ssi f9, {s}, 36",
+                    "ssi f10, {s}, 40",
+                    "ssi f11, {s}, 44",
+                    "ssi f12, {s}, 48",
+                    "ssi f13, {s}, 52",
+                    "ssi f14, {s}, 56",
+                    "ssi f15, {s}, 60",
+                    "rur.fcr {t}",
+                    "s32i {t}, {s}, 64",
+                    "rur.fsr {t}",
+                    "s32i {t}, {s}, 68",
+                    p = in(reg) pattern.as_ptr(),
+                    s = in(reg) saved.as_mut_ptr(),
+                    c = in(reg) CONTROL,
+                    z = in(reg) 0u32,
+                    ready = in(reg) READY.as_ptr(),
+                    done = in(reg) DONE.as_ptr(),
+                    t = inout(reg) 1u32 => _,
+                    out("f0") _,
+                    out("f1") _,
+                    out("f2") _,
+                    out("f3") _,
+                    out("f4") _,
+                    out("f5") _,
+                    out("f6") _,
+                    out("f7") _,
+                    out("f8") _,
+                    out("f9") _,
+                    out("f10") _,
+                    out("f11") _,
+                    out("f12") _,
+                    out("f13") _,
+                    out("f14") _,
+                    out("f15") _,
+                )
+            },
+        }
+
+        let x = 1.5f32;
+        assert_eq!(RESULT.load(Ordering::Relaxed), (x * x + 0.25).to_bits());
+        assert_eq!(saved[..FP_REGS], pattern[..]);
+        assert_eq!(saved[FP_REGS], CONTROL);
+        #[cfg(xtensa)]
+        assert_eq!(saved[FP_REGS + 1], 0);
+    }
 }

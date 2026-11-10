@@ -33,7 +33,8 @@ pub(crate) const POST_RESULT_MASK: u32 = (1 << SEQ_SHIFT) - 1;
 /// `func` must:
 ///
 /// - return,
-/// - not use the floating-point registers,
+/// - not use the floating-point registers if esp-hal does not have the `float-save-restore`
+///   feature,
 /// - not enable interrupts, and not lower the run level,
 /// - not wait for a run on its own CPU.
 ///
