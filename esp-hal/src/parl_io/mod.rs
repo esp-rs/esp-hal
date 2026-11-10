@@ -567,6 +567,13 @@ fn apply_clock_divider(is_tx: bool, frequency: Rate) -> Result<(), ConfigError> 
     Ok(())
 }
 
+fn run_tx_core() {
+    cfg_select! {
+        parl_io_version = "1" => unit_clock::set_reset(true, false),
+        _ => unit_clock::set_clock_enabled(true, true),
+    }
+}
+
 /// Implements a clock pin that connects no signal.
 impl TxClkPin for NoPin {
     fn configure(&mut self) {
@@ -1416,10 +1423,21 @@ where
             return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
         }
 
+        // The TX core must not run until `tx_start` is set. On version 2, a core that leaves reset
+        // after `tx_start` does not always reach EOF, so the core clock stays off instead. On
+        // version 1, a stopped core clock makes TX send two extra words on a 16-line bus.
         unit_clock::set_reset(true, true);
+        #[cfg(parl_io_version = "2")]
+        unit_clock::set_reset(true, false);
 
         Instance::clear_tx_interrupts();
         Instance::set_tx_bytes(number_of_bytes as u16);
+
+        #[cfg(parl_io_version = "2")]
+        {
+            unit_clock::set_clock_enabled(true, false);
+            Instance::reset_tx_fifo();
+        }
 
         let result = unsafe {
             self.tx_channel
@@ -1427,6 +1445,7 @@ where
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = result {
+            run_tx_core();
             return Err((Error::DmaError(err), self, buffer));
         }
 
@@ -1434,7 +1453,7 @@ where
 
         Instance::set_tx_start(true);
 
-        unit_clock::set_reset(true, false);
+        run_tx_core();
 
         Ok(ParlIoTxTransfer {
             parl_io: ManuallyDrop::new(self),
@@ -2377,6 +2396,17 @@ mod private {
                     .tx_eof()
                     .clear_bit_by_one()
             });
+        }
+
+        pub fn reset_tx_fifo() {
+            let reg_block = PARL_IO::regs();
+
+            reg_block
+                .fifo_cfg()
+                .modify(|_, w| w.tx_fifo_srst().set_bit());
+            reg_block
+                .fifo_cfg()
+                .modify(|_, w| w.tx_fifo_srst().clear_bit());
         }
 
         pub fn set_tx_bytes(len: u16) {

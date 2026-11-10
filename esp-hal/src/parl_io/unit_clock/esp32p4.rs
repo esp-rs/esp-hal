@@ -59,6 +59,19 @@ pub(super) fn set_div_num(tx: bool, div_num: u32) {
     }
 }
 
+pub(super) fn set_clock_enabled(tx: bool, enabled: bool) {
+    let clkrst = HP_SYS_CLKRST::regs();
+    if tx {
+        clkrst
+            .peri_clk_ctrl118()
+            .modify(|_, w| w.parlio_tx_clk_en().bit(enabled));
+    } else {
+        clkrst
+            .peri_clk_ctrl117()
+            .modify(|_, w| w.parlio_rx_clk_en().bit(enabled));
+    }
+}
+
 pub(super) fn set_reset(tx: bool, reset: bool) {
     HP_SYS_CLKRST::regs().hp_rst_en2().modify(|_, w| {
         if tx {
