@@ -886,8 +886,7 @@ impl CordicInstance {
             let numerator = config.numerator() as u8;
             w.clk_div_num().bits((config.divider() - 1) as u8);
             w.clk_div_numerator().bits(numerator);
-            // The hardware uses 0/0 to disable the fractional divider.
-            // See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_hal_cordic/esp32s31/include/hal/cordic_ll.h#L94-L109>.
+            // The register uses `0 / 0` for integer dividers.
             let denominator = if numerator == 0 {
                 0
             } else {
@@ -900,7 +899,10 @@ impl CordicInstance {
             CordicFunctionClockSource::RcFast => 1,
             CordicFunctionClockSource::PllF160m => 2,
         };
-        ctrl.modify(|_, w| unsafe { w.clk_src_sel().bits(source).clk_en().bit(enabled) });
+        ctrl.modify(|_, w| unsafe {
+            w.clk_src_sel().bits(source);
+            w.clk_en().bit(enabled)
+        });
     }
 }
 

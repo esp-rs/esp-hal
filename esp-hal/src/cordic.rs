@@ -187,8 +187,6 @@ impl Drop for CordicClockGuard {
     }
 }
 
-// FUNC selects the operation and the order of paired results.
-// See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_hal_cordic/esp32s31/include/hal/cordic_ll.h#L152-L182>.
 #[derive(Clone, Copy)]
 #[repr(u8)]
 enum Function {
@@ -730,23 +728,14 @@ impl<'d> Cordic<'d, Blocking> {
             q31,
         } = arguments;
         let pair = matches!(outputs, Outputs::Pair);
-        // PRES encodes four iterations as zero.
-        // See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_hal_cordic/esp32s31/include/hal/cordic_ll.h#L187-L194>.
         regs.csr_cfg().write(|w| unsafe {
-            w.func()
-                .bits(function as u8)
-                .pres()
-                .bits(iterations / 4 - 1)
-                .scale()
-                .bits(function.scale_exponent())
-                .arg_num()
-                .bit(two_inputs)
-                .res_num()
-                .bit(pair)
-                .arg_size()
-                .bit(q31)
-                .res_size()
-                .bit(q31)
+            w.func().bits(function as u8);
+            w.pres().bits(iterations / 4 - 1);
+            w.scale().bits(function.scale_exponent());
+            w.arg_num().bit(two_inputs);
+            w.res_num().bit(pair);
+            w.arg_size().bit(q31);
+            w.res_size().bit(q31)
         });
         regs.arg1().write(|w| unsafe { w.data().bits(arg1_word) });
         if q31 && two_inputs {
