@@ -36,15 +36,18 @@
 //!   a guard region, and both start filled with a sentinel that the first frame in each buffer must
 //!   fully overwrite.
 //! - `CSI_STREAM_FAULTS=1`: with `CSI_STREAM`, after the stream run, check a `next_frame` timeout
-//!   with the sensor stopped, a consumer holding a frame while the sensor streams, and repeated
-//!   stop/start at varying points of the frame. Prints `restart-snap` lines with the sensor, D-PHY,
-//!   host, bridge, ISP and DMA state around the sensor restart.
+//!   with the sensor stopped, a consumer holding a frame while the sensor streams, repeated
+//!   stop/start at varying points of the frame, and sensor stop/start in the middle of a frame
+//!   while one stream stays armed. Prints `restart-snap` lines with the sensor, D-PHY, host,
+//!   bridge, ISP and DMA state around the sensor restart.
 //! - `CSI_ASYNC=1`: with `CSI_STREAM`, convert the capture with `into_async` and take the frames
 //!   with `CsiStream::next_frame_async`, polled again only after its waker fired. Then drop a
 //!   pending `next_frame_async` future, check that frames still arrive, stop and restart the
 //!   stream, and capture one frame after `into_blocking`, with the sensor already streaming because
 //!   the sensor stop can cut a frame. `CSI_ASYNC_SENSOR_RESTART=1` also stops and restarts the
-//!   sensor while the stream stays armed, which reproduces a known stall.
+//!   sensor while the stream stays armed; the stream must drop the cut frame and deliver 5 more.
+//!   `CSI_STALL_PROBE=1` adds `stall-trace` lines with the DMA and bridge state around that sensor
+//!   restart.
 //! - `CSI_FAULT_ROUNDS=<n>`: with `CSI_STREAM`, repeat the stream run (and the fault cases) `n`
 //!   times in one boot.
 //! - `CSI_QUIET=1`: with `CSI_REPEAT_FRAMES`, print the per-frame line only for failures and every
@@ -2416,6 +2419,8 @@ fn frame_difference(index: u32, sequence: u32, reference: &[u8], frame: &[u8], p
 
 /// Stop/start cycles in the `CSI_STREAM_FAULTS` start/stop case.
 const STREAM_RESTART_CYCLES: u32 = 20;
+/// Sensor stop/start rounds while one stream stays armed.
+const STREAM_SENSOR_RESTART_ROUNDS: u32 = 5;
 /// How long the slow consumer holds a frame, about nine sensor frames.
 const STREAM_HOLD_MS: u64 = 300;
 
@@ -2469,6 +2474,77 @@ fn restart_snapshot(label: &str, i2c: &mut I2c<'_, Blocking>, channel: usize, cl
         ch.block_ts0().read().bits(),
         ch.intstatus0().read().bits(),
         ch.intsignal_enable0().read().bits(),
+    );
+}
+
+/// `CSI_STALL_PROBE=1`: prints the stream's DMA and bridge state whenever it
+/// changes, for `duration_ms`. Reads no clear-on-read register.
+fn stall_trace(
+    label: &str,
+    addrs: [u32; 2],
+    duration_ms: u64,
+    stats: &mut impl FnMut() -> [u32; 4],
+) {
+    let vdma = VDMA::regs();
+    let ch = vdma.ch(CSI_DMA_CHANNEL);
+    let bridge = MIPI_CSI_BRIDGE::regs();
+    let start = esp_hal::time::Instant::now();
+    let mut last = None;
+    let mut lines = 0;
+    // The longest gap between two samples bounds how long an interrupt
+    // handler held this core.
+    let mut previous_us = 0;
+    let mut max_gap_us = (0, 0);
+    loop {
+        let now_us = start.elapsed().as_micros();
+        if now_us - previous_us > max_gap_us.0 {
+            max_gap_us = (now_us - previous_us, now_us);
+        }
+        previous_us = now_us;
+        let dar = ch.dar0().read().bits();
+        let slot = if addrs[1] > addrs[0] {
+            usize::from(dar >= addrs[1])
+        } else {
+            usize::from(dar < addrs[0])
+        };
+        let offset = dar.wrapping_sub(addrs[slot]);
+        let fifo = (bridge.buf_flow_ctl().read().bits() >> 16) & 0x3fff;
+        let fifo_level = match fifo {
+            0 => 0,
+            1..512 => 1,
+            512..960 => 2,
+            _ => 3,
+        };
+        let chen = (vdma.chen0().read().bits() >> CSI_DMA_CHANNEL) & 1;
+        let state = (
+            chen,
+            ch.intstatus0().read().bits(),
+            bridge.int_raw().read().bits(),
+            bridge.csi_en().read().csi_brig_en().bit(),
+            fifo_level,
+            stats(),
+        );
+        if last != Some(state) && lines < 40 {
+            println!(
+                "stall-trace[{label}] t_us={} chen={} intstatus=0x{:x} bridge_int_raw=0x{:x} bridge_en={} fifo={fifo} slot={slot} dar_offset={offset} [completed,errored,resyncs,interrupts]={:?}",
+                start.elapsed().as_micros(),
+                state.0,
+                state.1,
+                state.2,
+                state.3,
+                state.5,
+            );
+            last = Some(state);
+            lines += 1;
+            previous_us = start.elapsed().as_micros();
+        }
+        if start.elapsed().as_millis() >= duration_ms {
+            break;
+        }
+    }
+    println!(
+        "stall-trace[{label}] max_gap_us={} at_t_us={}",
+        max_gap_us.0, max_gap_us.1
     );
 }
 
@@ -2646,7 +2722,6 @@ fn run_stream_fault_cases<'d>(
     resyncs += stats.resyncs;
     let stream_off = set_sc2336_stream(i2c, false);
     (capture, buffers) = stream.stop();
-    let _ = buffers;
     let guards = [guard_written_words(guard0), guard_written_words(guard1)];
     passed &= fault_case(
         "restart",
@@ -2657,6 +2732,61 @@ fn run_stream_fault_cases<'d>(
             && guards == [0, 0],
         format!(
             "cycles_ok={cycles_ok}/{STREAM_RESTART_CYCLES} errored={errored} resyncs={resyncs} guard_written_words={guards:?}"
+        ),
+    );
+
+    // Sensor restart while the stream stays armed. The sensor stop can cut a
+    // frame; the stream drops it and delivers whole frames again without a
+    // restart through `stop`.
+    let mut stream = match capture.into_stream(buffers) {
+        Ok(stream) => stream,
+        Err((capture, _, error)) => {
+            println!("stream-fault: FAIL, did not restart: {error:?}");
+            return (capture, false);
+        }
+    };
+    let stream_on = set_sc2336_stream(i2c, true);
+    let warm_up = stream
+        .next_frame(Duration::from_millis(500))
+        .map(|frame| frame.sequence());
+    let mut rounds_ok = 0;
+    for round in 0..STREAM_SENSOR_RESTART_ROUNDS {
+        // `next_frame` returns at a frame end, so this moves the stop into the
+        // next frame, at a different point each round.
+        let stop_delay_ms = 10 + round * 5;
+        delay.delay_millis(stop_delay_ms);
+        let _ = set_sc2336_stream(i2c, false);
+        delay.delay_millis(100);
+        let _ = set_sc2336_stream(i2c, true);
+        let frames = (0..5)
+            .filter(|_| stream.next_frame(Duration::from_millis(500)).is_ok())
+            .count();
+        if frames == 5 {
+            rounds_ok += 1;
+        } else {
+            println!(
+                "stream-fault[sensor-restart]: round {round} stop_delay_ms={stop_delay_ms} frames={frames}/5"
+            );
+            restart_snapshot("sensor-restart-stall", i2c, channel, false);
+        }
+    }
+    let stats = stream.stats();
+    let stream_off_restart = set_sc2336_stream(i2c, false);
+    (capture, buffers) = stream.stop();
+    let _ = buffers;
+    let guards = [guard_written_words(guard0), guard_written_words(guard1)];
+    passed &= fault_case(
+        "sensor-restart",
+        stream_on.is_ok()
+            && warm_up.is_ok()
+            && rounds_ok == STREAM_SENSOR_RESTART_ROUNDS
+            && stats.errored == stats.resyncs
+            && stats.errored <= STREAM_SENSOR_RESTART_ROUNDS
+            && stream_off_restart.is_ok()
+            && guards == [0, 0],
+        format!(
+            "rounds_ok={rounds_ok}/{STREAM_SENSOR_RESTART_ROUNDS} errored={} resyncs={} guard_written_words={guards:?}",
+            stats.errored, stats.resyncs
         ),
     );
 
@@ -2868,6 +2998,7 @@ fn run_async_stream_check<'d>(
     for region in [&mut *buffer0, &mut *guard0, &mut *buffer1, &mut *guard1] {
         sentinel_writeback(region);
     }
+    let stream_addrs = [buffer0.as_ptr() as u32, buffer1.as_ptr() as u32];
     let mut stream = match capture.into_async().into_stream([buffer0, buffer1]) {
         Ok(stream) => stream,
         Err((capture, _, error)) => {
@@ -2952,13 +3083,27 @@ fn run_async_stream_check<'d>(
         .filter(|_| take(&mut stream, "after-restart").is_some())
         .count();
 
-    // Opt-in reproducer: stopping the sensor mid-frame while the stream stays
-    // armed can leave the bridge FIFO full with no DMA interrupt, so no frame
-    // completes until the stream is restarted.
+    // Stopping the sensor mid-frame while the stream stays armed can make the
+    // bridge stop requesting DMA bursts and discard, with no DMA interrupt.
     let sensor_restart = env_flag(option_env!("CSI_ASYNC_SENSOR_RESTART")).then(|| {
+        let probe = env_flag(option_env!("CSI_STALL_PROBE"));
+        let mut stats = || {
+            let s = stream.stats();
+            [s.completed, s.errored, s.resyncs, s.interrupts]
+        };
+        if probe {
+            stall_trace("pre-stop", stream_addrs, 0, &mut stats);
+        }
         let _ = set_sc2336_stream(i2c, false);
-        Delay::new().delay_millis(100);
+        if probe {
+            stall_trace("sensor-off", stream_addrs, 100, &mut stats);
+        } else {
+            Delay::new().delay_millis(100);
+        }
         let _ = set_sc2336_stream(i2c, true);
+        if probe {
+            stall_trace("sensor-on", stream_addrs, 200, &mut stats);
+        }
         let frames = (0..5)
             .filter(|_| take(&mut stream, "after-sensor-restart").is_some())
             .count();
