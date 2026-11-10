@@ -50,29 +50,33 @@
 //! # {after_snippet}
 //! ```
 
+#[cfg(feature = "rt")]
 use portable_atomic::{AtomicPtr, Ordering};
 
-use crate::{
-    interrupt::__rtos_implementation::ContextSwitchHandler,
-    peripherals::IPC,
-    system::Cpu,
-};
+pub use self::queue::IpcRequest;
+#[cfg(feature = "rt")]
+use crate::interrupt::__rtos_implementation::ContextSwitchHandler;
+use crate::{peripherals::IPC, system::Cpu};
 
+#[cfg(feature = "rt")]
 #[cfg_attr(riscv, path = "riscv.rs")]
 #[cfg_attr(xtensa, path = "xtensa.rs")]
 mod implem;
 #[allow(dead_code)]
 mod queue;
 
+#[cfg(feature = "rt")]
 pub(crate) use implem::install;
+#[cfg(feature = "rt")]
 use implem::raise;
 
-#[cfg(riscv)]
+#[cfg(all(feature = "rt", riscv))]
 pub(crate) use self::implem::install_app;
 
 /// The IPC state of one CPU.
 ///
 /// Every CPU has its own handler, which reads the fields at constant addresses.
+#[cfg(feature = "rt")]
 #[repr(C)]
 struct CoreState {
     /// The function that [`Ipc::call_function`] posts, or null if the CPU has none.
@@ -94,6 +98,7 @@ struct CoreState {
     request: AtomicPtr<u32>,
 }
 
+#[cfg(feature = "rt")]
 impl CoreState {
     const fn new() -> Self {
         Self {
@@ -106,6 +111,7 @@ impl CoreState {
     }
 }
 
+#[cfg(feature = "rt")]
 static STATE: [CoreState; Cpu::COUNT] = [const { CoreState::new() }; Cpu::COUNT];
 
 /// Handle that posts a function to a CPU through the IPC interrupt.
@@ -148,6 +154,7 @@ impl Ipc {
     /// # Panics
     ///
     /// In debug builds, panics if `core` is the APP CPU and that CPU is not running.
+    #[cfg(feature = "rt")]
     pub fn call_function(self, core: Cpu, handler: fn()) {
         let handler = handler as *mut ();
         assert_target_runs(core);
@@ -169,7 +176,84 @@ impl Ipc {
 
         raise(core);
     }
+
+    /// Queues a run of `request` on `core` with the argument `arg`, and returns at once.
+    pub fn post(
+        self,
+        core: Cpu,
+        request: &'static IpcRequest,
+        arg: usize,
+    ) -> Result<Ticket, IpcError> {
+        // A build can hold esp-hal copies without the `rt` feature. Those copies post through the
+        // symbol of the copy with `rt`.
+        unsafe extern "C" {
+            fn esp_hal_ipc_post(core: u8, request: *const IpcRequest, arg: usize) -> u32;
+        }
+
+        let result = unsafe { esp_hal_ipc_post(core as u8, request, arg) };
+        match result & queue::POST_RESULT_MASK {
+            queue::POST_OK => Ok(Ticket {
+                request,
+                core,
+                seq: result,
+            }),
+            queue::POST_OFFLINE => Err(IpcError::Offline),
+            _ => Err(IpcError::Busy),
+        }
+    }
 }
+
+/// A run that [`Ipc::post`] queued.
+///
+/// If a later run of the request ended, the ticket gives the outcome of that later run.
+#[derive(Clone, Copy, Debug)]
+pub struct Ticket {
+    request: &'static IpcRequest,
+    core: Cpu,
+    /// The sequence number of the run, in the `seq` bits.
+    seq: u32,
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Ticket {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::write!(
+            f,
+            "Ticket {{ core: {}, seq: {} }}",
+            self.core,
+            self.seq >> queue::SEQ_SHIFT
+        )
+    }
+}
+
+/// An error of an IPC post or wait.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum IpcError {
+    /// The CPU does not take IPC interrupts.
+    Offline,
+    /// The request is pending with a different argument, another CPU posts it at this moment, or
+    /// it runs on the other CPU.
+    Busy,
+    /// The deadline passed before the run ended.
+    Timeout,
+    /// The caller waits for a run on its own CPU, and masks the IPC interrupt.
+    WouldDeadlock,
+}
+
+impl core::fmt::Display for IpcError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            IpcError::Offline => write!(f, "The CPU does not take IPC interrupts"),
+            IpcError::Busy => write!(f, "The request is busy"),
+            IpcError::Timeout => write!(f, "The deadline passed before the run ended"),
+            IpcError::WouldDeadlock => write!(f, "The wait cannot end"),
+        }
+    }
+}
+
+impl core::error::Error for IpcError {}
 
 /// Registers the context-switch handler of `core`.
 ///
@@ -186,6 +270,7 @@ impl Ipc {
 ///
 /// [`__rtos_implementation::set_context_switch_handler`]:
 ///     super::__rtos_implementation::set_context_switch_handler
+#[cfg(feature = "rt")]
 pub(crate) unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitchHandler) {
     unwrap!(
         STATE[core as usize]
@@ -209,6 +294,7 @@ pub(crate) unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitc
 ///
 /// In debug builds, panics if `core` has no context-switch handler, or if `core` is the APP CPU
 /// and that CPU is not running.
+#[cfg(feature = "rt")]
 #[inline]
 pub(crate) fn request_context_switch(core: Cpu) {
     assert_target_runs(core);
@@ -227,6 +313,7 @@ pub(crate) fn request_context_switch(core: Cpu) {
     raise(core);
 }
 
+#[cfg(feature = "rt")]
 fn assert_target_runs(core: Cpu) {
     debug_assert!(
         core != Cpu::AppCpu || crate::soc::cpu_control::is_running(Cpu::AppCpu),

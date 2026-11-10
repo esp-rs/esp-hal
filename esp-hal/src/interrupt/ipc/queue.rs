@@ -39,26 +39,55 @@ pub(crate) const POST_RESULT_MASK: u32 = (1 << SEQ_SHIFT) - 1;
 /// The bits of the sequence number in `word` and in `status`.
 const SEQ_FIELD: u32 = !((1 << SEQ_SHIFT) - 1);
 
-/// A function that [`Ipc::post`][super::Ipc::post] runs on a CPU.
+/// A function that [`Ipc::post`][super::Ipc::post] runs on a CPU, and the state of its runs.
 ///
 /// The IPC interrupt of the target CPU calls `func` at
-/// [`Priority::min`][crate::interrupt::Priority::min] with the argument of the post. A request is `'static`, because the IPC can read and write it
-/// at any time after the first post. One request has at most one pending run. Two concurrent runs
-/// need two requests.
+/// [`Priority::min`][crate::interrupt::Priority::min] with the argument of the post. A request must
+/// be `'static`, because the IPC can read and write it at any time after the first post. A request
+/// has at most one pending run. Two concurrent runs need two requests.
 ///
 /// `func` must:
 ///
 /// - return,
 /// - not use the floating-point registers,
 /// - not enable interrupts, and not lower the run level,
-/// - not wait for a run on its own CPU,
-/// - do nothing if it runs late, after its caller stopped waiting.
+/// - not wait for a run on its own CPU.
+///
+/// A caller can stop its wait before the run starts, so `func` can run late. `func` must then find
+/// its protocol state stale, and do nothing.
 ///
 /// # Frozen interface
 ///
-/// The esp-hal copies of a build share one IPC, and copies of different versions use the same
-/// requests. The layout of this type and the encoding of its fields therefore never change. A
-/// later version can add a new type, but it cannot change this one.
+/// All esp-hal copies in one build use this type, and the copy with the `rt` feature runs the
+/// posts of each copy. A later version of esp-hal can add a type, but it never changes this layout
+/// or the encoding of its fields:
+///
+/// | Offset | Field    | Type                   |
+/// |--------|----------|------------------------|
+/// | 0      | `next`   | `*mut IpcRequest`      |
+/// | 4      | `word`   | `u32`                  |
+/// | 8      | `status` | `u32`                  |
+/// | 12     | `func`   | `extern "C" fn(usize)` |
+/// | 16     | `arg`    | `usize`                |
+///
+/// The bits of `word`:
+///
+/// - 0: a run is pending.
+/// - 1: reserved, always 0.
+/// - 2: `func` runs.
+/// - 3: the CPU of the pending or running run.
+/// - 4: `arg` holds the argument of the pending run.
+/// - 5–31: the sequence number of the last post that started a run.
+///
+/// The bits of `status`:
+///
+/// - 0–1: the outcome of the run. 0 means done, 1 means that the CPU stopped before the run. 2
+///   and 3 are reserved.
+/// - 2–4: reserved, always 0.
+/// - 5–31: the sequence number of the last run that ended.
+///
+/// A sequence number has 27 bits and wraps. A sequence number `a` reached `b` if
+/// `(a - b) mod 2^27 < 2^26`. The sequence number in `status` only moves forward.
 #[repr(C)]
 #[derive(Debug)]
 pub struct IpcRequest {

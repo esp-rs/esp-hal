@@ -37,7 +37,7 @@
     doc = "Those signals can also carry cross-core communication."
 )]
 #![cfg_attr(
-    all(feature = "rt", multi_core),
+    multi_core,
     doc = "
 ## Inter-Processor Call (IPC)
 
@@ -84,7 +84,7 @@ use crate::pac;
 unstable_module! {
     pub mod software;
 
-    #[cfg(all(feature = "rt", multi_core))]
+    #[cfg(multi_core)]
     pub mod ipc;
 
     #[cfg(feature = "rt")]
