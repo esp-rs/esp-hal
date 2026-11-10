@@ -279,7 +279,10 @@ fn drain_runs_requests_in_post_order() {
 
     assert_eq!(*ORDER.lock().unwrap(), [0, 1, 2]);
     for request in &REQUESTS {
-        assert_eq!(request.status().load(Ordering::SeqCst), (1 << SEQ_SHIFT) | DONE);
+        assert_eq!(
+            request.status().load(Ordering::SeqCst),
+            (1 << SEQ_SHIFT) | DONE
+        );
         assert_eq!(flags(request), 0);
     }
     assert!(LISTS.head.load(Ordering::SeqCst).is_null());
@@ -396,9 +399,10 @@ fn fail_stranded_fails_the_running_request() {
 
     // `func` runs on the APP core, and a post to the APP core queued a new run.
     assert_eq!(post(&scratch, APP, &running, 0), Ok(1));
-    running
-        .word()
-        .store((2 << SEQ_SHIFT) | CORE | QUEUED | ARMED | RUNNING, Ordering::SeqCst);
+    running.word().store(
+        (2 << SEQ_SHIFT) | CORE | QUEUED | ARMED | RUNNING,
+        Ordering::SeqCst,
+    );
     lists.current.store(to_ptr(&running), Ordering::SeqCst);
     lists.head.store(to_ptr(&running), Ordering::SeqCst);
 

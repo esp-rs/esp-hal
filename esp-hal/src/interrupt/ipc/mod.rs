@@ -256,8 +256,8 @@ impl Ticket {
     /// # Errors
     ///
     /// - [`IpcError::Offline`] when the CPU stopped before the run.
-    /// - [`IpcError::Timeout`] when the deadline passed before the run ended. The run stays
-    ///   queued, and can happen later.
+    /// - [`IpcError::Timeout`] when the deadline passed before the run ended. The run stays queued,
+    ///   and can happen later.
     /// - [`IpcError::WouldDeadlock`] when the run is on the current CPU, and the caller masks the
     ///   IPC interrupt: it runs in an interrupt handler, or with interrupts disabled.
     pub fn wait(self, deadline: Instant) -> Result<(), IpcError> {

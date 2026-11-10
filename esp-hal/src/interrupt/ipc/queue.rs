@@ -81,8 +81,8 @@ const SEQ_FIELD: u32 = !((1 << SEQ_SHIFT) - 1);
 ///
 /// The bits of `status`:
 ///
-/// - 0–1: the outcome of the run. 0 means done, 1 means that the CPU stopped before the run. 2
-///   and 3 are reserved.
+/// - 0–1: the outcome of the run. 0 means done, 1 means that the CPU stopped before the run. 2 and
+///   3 are reserved.
 /// - 2–4: reserved, always 0.
 /// - 5–31: the sequence number of the last run that ended.
 ///
