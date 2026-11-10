@@ -11,6 +11,7 @@ pub(crate) use self::method::{sleep, wake};
 
 /// The retention method of the chip.
 #[cfg_attr(modem_retention = "backup_dma", path = "backup_dma.rs")]
+#[cfg_attr(modem_retention = "regdma", path = "regdma.rs")]
 mod method;
 
 /// A radio in the modem domain.
@@ -20,6 +21,9 @@ pub(crate) enum Radio {
     Ble,
     #[cfg(feature = "wifi")]
     Wifi,
+    /// Retains nothing, so it keeps the modem domain powered while it is up.
+    #[cfg(feature = "ieee802154")]
+    Ieee802154,
 }
 
 struct State {
@@ -35,6 +39,12 @@ impl State {
     fn power_down_allowed(&self) -> bool {
         self.up.is_subset(self.power_down)
     }
+
+    /// Tells the retention method whether the modem domain can lose power.
+    fn update(&mut self) {
+        let allowed = self.power_down_allowed();
+        self.method.allow_power_down(allowed);
+    }
 }
 
 static STATE: NonReentrantMutex<State> = NonReentrantMutex::new(State {
@@ -47,7 +57,10 @@ static STATE: NonReentrantMutex<State> = NonReentrantMutex::new(State {
 ///
 /// The radio keeps the modem domain powered, unless [`enable_power_down`] succeeds for it.
 pub(crate) fn start(radio: Radio) {
-    STATE.with(|state| state.up.insert(radio));
+    STATE.with(|state| {
+        state.up.insert(radio);
+        state.update();
+    });
 }
 
 /// Lets `radio` power the modem domain down.
@@ -59,6 +72,7 @@ pub(crate) fn enable_power_down(radio: Radio) -> bool {
         let enabled = state.method.enable();
         if enabled {
             state.power_down.insert(radio);
+            state.update();
         }
         enabled
     });
@@ -67,6 +81,17 @@ pub(crate) fn enable_power_down(radio: Radio) -> bool {
         warn!("No memory to retain the PHY state, the modem stays powered in sleep");
     }
     enabled
+}
+
+/// Keeps the modem domain powered for `radio`, until [`enable_power_down`].
+///
+/// Call this before the radio stops retaining its MAC and baseband.
+#[cfg(modem_retention = "regdma")]
+pub(crate) fn disable_power_down(radio: Radio) {
+    STATE.with(|state| {
+        state.power_down.remove(radio);
+        state.update();
+    });
 }
 
 /// Records that `radio` is down.
@@ -79,5 +104,6 @@ pub(crate) fn stop(radio: Radio) {
         if state.power_down.is_empty() {
             state.method.release();
         }
+        state.update();
     });
 }

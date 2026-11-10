@@ -137,6 +137,10 @@ cfg_select! {
     _ => {}
 }
 
+#[cfg(modem_retention = "regdma")]
+#[doc(hidden)]
+pub mod regdma;
+
 cfg_select! {
     supports_cpu_power_down => {
         mod cpu_retention;

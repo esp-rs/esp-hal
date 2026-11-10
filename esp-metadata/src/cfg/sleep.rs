@@ -23,6 +23,18 @@ pub(crate) struct SleepRetentionProperties {
     /// `cpu_retention_mem_start` and `cpu_retention_mem_end`. `regdma` chips use REGDMA link
     /// lists.
     modem_retention: Option<String>,
+    /// The number of REGDMA entries, which is also the number of `next` pointers in a branch
+    /// node.
+    regdma_link_count: Option<u32>,
+    /// The PAU takes one link address for every entry, and needs a branch node at the head.
+    ///
+    /// Without this, the PAU has one address register for each entry.
+    #[serde(default)]
+    regdma_link_configurable: bool,
+    /// The REGDMA cannot reach the Bluetooth MAC and baseband on the XTAL clock of the sleep
+    /// transition, so software saves and restores them in the extra entry, while the PLL runs.
+    #[serde(default)]
+    regdma_bt_needs_pll: bool,
     #[serde(default)]
     supports_top_power_down: bool,
     #[serde(default)]
@@ -54,6 +66,12 @@ impl GenericProperty for SleepRetentionProperties {
         }
         if let Some(mode) = &self.modem_retention {
             cfgs.push(format!("modem_retention=\"{mode}\""));
+        }
+        if self.regdma_link_configurable {
+            cfgs.push("regdma_link_configurable".to_string());
+        }
+        if self.regdma_bt_needs_pll {
+            cfgs.push("regdma_bt_needs_pll".to_string());
         }
         if self.cpu_retention.is_some() {
             cfgs.push("supports_cpu_power_down".to_string());
@@ -100,6 +118,14 @@ impl GenericProperty for SleepRetentionProperties {
             branches.extend(quote! {
                 ("sleep.cpu_retention_mem_end") => {
                     #end
+                };
+            });
+        }
+        if let Some(count) = self.regdma_link_count {
+            let count = number(count);
+            branches.extend(quote! {
+                ("sleep.regdma_link_count") => {
+                    #count
                 };
             });
         }

@@ -870,6 +870,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     let res = esp_bt_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
     assert!(res == 0, "esp_bt_controller_enable returned {}", res);
 
+    #[cfg(modem_retention = "regdma")]
+    super::mac_bb::init(config.modem_sleep() && super::lp_clk::light_sleep_supported());
+
     if config.modem_sleep() {
         super::lp_clk::claim_wake_source();
     }
@@ -884,6 +887,8 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
 pub(crate) fn ble_deinit() {
     super::lp_clk::release_wake_source();
+    #[cfg(modem_retention = "regdma")]
+    super::mac_bb::deinit();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 

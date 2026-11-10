@@ -803,7 +803,7 @@ pub unsafe extern "C" fn wifi_disable_ac_ax() -> bool {
     false
 }
 
-#[cfg(wifi_has_wifi6)]
+#[cfg(all(wifi_has_wifi6, not(feature = "unstable")))]
 pub unsafe extern "C" fn wifi_sleep_retention_unsupported() -> i32 {
     // IDF returns 1 when CONFIG_MAC_BB_PD is off.
     1

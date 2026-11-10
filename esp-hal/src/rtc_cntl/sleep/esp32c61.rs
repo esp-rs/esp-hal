@@ -779,6 +779,8 @@ impl RtcSleepConfig {
             // `AnalogSleepConfig::defaults_light_sleep`), which is the dominant saving.
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags
+                .set_pd_modem(crate::rtc_cntl::regdma::modem_power_down());
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
     }

@@ -228,13 +228,15 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     _coex_register_start_cb: Some(coex_register_start_cb),
 
     #[cfg(any(esp32c6, esp32c5, esp32c61, esp32s31))]
-    _regdma_link_set_write_wait_content: Some(
-        os_adapter_chip_specific::regdma_link_set_write_wait_content_dummy,
-    ),
+    _regdma_link_set_write_wait_content: Some(cfg_select! {
+        feature = "unstable" => super::mac_bb::regdma_link_set_write_wait_content,
+        _ => os_adapter_chip_specific::regdma_link_set_write_wait_content_dummy,
+    }),
     #[cfg(any(esp32c6, esp32c5, esp32c61, esp32s31))]
-    _sleep_retention_find_link_by_id: Some(
-        os_adapter_chip_specific::sleep_retention_find_link_by_id_dummy,
-    ),
+    _sleep_retention_find_link_by_id: Some(cfg_select! {
+        feature = "unstable" => super::mac_bb::sleep_retention_find_link_by_id,
+        _ => os_adapter_chip_specific::sleep_retention_find_link_by_id_dummy,
+    }),
     _coex_schm_process_restart: Some(coex_schm_process_restart),
     _coex_schm_register_cb: Some(coex_schm_register_cb_wrapper),
 
@@ -247,13 +249,25 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     #[cfg(wifi_has_wifi6)]
     _wifi_disable_ac_ax: Some(wifi_disable_ac_ax),
     #[cfg(wifi_has_wifi6)]
-    _wifi_bb_sleep_retention_attach: Some(wifi_sleep_retention_unsupported),
+    _wifi_bb_sleep_retention_attach: Some(cfg_select! {
+        feature = "unstable" => super::mac_bb::bb_sleep_retention_attach,
+        _ => wifi_sleep_retention_unsupported,
+    }),
     #[cfg(wifi_has_wifi6)]
-    _wifi_bb_sleep_retention_detach: Some(wifi_sleep_retention_unsupported),
+    _wifi_bb_sleep_retention_detach: Some(cfg_select! {
+        feature = "unstable" => super::mac_bb::bb_sleep_retention_detach,
+        _ => wifi_sleep_retention_unsupported,
+    }),
     #[cfg(wifi_has_wifi6)]
-    _wifi_mac_sleep_retention_attach: Some(wifi_sleep_retention_unsupported),
+    _wifi_mac_sleep_retention_attach: Some(cfg_select! {
+        feature = "unstable" => super::mac_bb::mac_sleep_retention_attach,
+        _ => wifi_sleep_retention_unsupported,
+    }),
     #[cfg(wifi_has_wifi6)]
-    _wifi_mac_sleep_retention_detach: Some(wifi_sleep_retention_unsupported),
+    _wifi_mac_sleep_retention_detach: Some(cfg_select! {
+        feature = "unstable" => super::mac_bb::mac_sleep_retention_detach,
+        _ => wifi_sleep_retention_unsupported,
+    }),
 
     _magic: ESP_WIFI_OS_ADAPTER_MAGIC as i32,
 };

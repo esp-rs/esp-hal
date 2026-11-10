@@ -7,8 +7,8 @@
 //! receive and transmit to work. It counts beacon timeouts and disconnects. A disconnect with
 //! reason 200 is a beacon timeout.
 //!
-//! On the ESP32-C3 and ESP32-S3, the example installs Wi-Fi retention memory, so light sleep also
-//! powers the Wi-Fi MAC and baseband down.
+//! On chips other than the ESP32, ESP32-C2 and ESP32-S2, the example installs Wi-Fi retention
+//! memory, so light sleep also powers the Wi-Fi MAC and baseband down.
 //!
 //! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
@@ -54,7 +54,7 @@ const PASSWORD: &str = env!("PASSWORD");
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 
 cfg_select! {
-    modem_retention = "backup_dma" => {
+    any(modem_retention = "backup_dma", modem_retention = "regdma") => {
         // The retention memory takes part of the reclaimed RAM.
         const RECLAIMED_HEAP_SIZE: usize =
             DRAM2_UNINIT_SIZE - core::mem::size_of::<esp_radio::wifi::RetentionStorage>();

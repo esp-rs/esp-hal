@@ -181,7 +181,13 @@ use esp_hal as hal;
 #[instability::unstable]
 pub use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-#[cfg(any(feature = "wifi", all(feature = "ble", modem_retention = "backup_dma")))]
+#[cfg(any(
+    feature = "wifi",
+    all(
+        feature = "ble",
+        any(modem_retention = "backup_dma", modem_retention = "regdma")
+    )
+))]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
 pub(crate) mod sys {
@@ -248,7 +254,7 @@ mod counting_lock;
 mod drop_guard;
 mod interrupt_dispatch;
 #[cfg(all(
-    modem_retention = "backup_dma",
+    any(modem_retention = "backup_dma", modem_retention = "regdma"),
     feature = "unstable",
     any(feature = "ble", feature = "wifi"),
 ))]
