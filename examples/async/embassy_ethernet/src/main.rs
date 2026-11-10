@@ -9,7 +9,7 @@
 //!
 //! The ESP32 and ESP32-P4 kits use an IP101GRI PHY, the ESP32-S31 a Motorcomm
 //! YT8531. Both are driven by `GenericPhy`, which polls the link from
-//! embassy-time through esp-hal's `embassy-time` feature.
+//! embassy-time through esp-hal's `embassy-time-05` feature.
 //!
 //! # Board pin mapping
 //!

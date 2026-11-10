@@ -252,7 +252,7 @@ impl Phy for GenericPhy {
             self.next_poll = now + LINK_POLL_INTERVAL;
         }
 
-        // No PHY interrupt is available. Without the `embassy-time` feature
+        // No PHY interrupt is available. Without the `embassy-time-05` feature
         // this wakes immediately and busy-polls.
         wake_at(self.next_poll, cx);
         self.link

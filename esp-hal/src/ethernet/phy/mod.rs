@@ -194,7 +194,7 @@ pub trait Phy {
     /// register a waker for a PHY interrupt or a timer, or wake immediately.
     /// An implementation that does neither will never be polled again.
     /// [`generic::GenericPhy`] has no interrupt source: it schedules a timer
-    /// wake-up with the `embassy-time` feature, and otherwise wakes
+    /// wake-up with the `embassy-time-05` feature, and otherwise wakes
     /// immediately, which busy-polls.
     fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, _cx: Option<&mut Context<'_>>) -> LinkState;
 

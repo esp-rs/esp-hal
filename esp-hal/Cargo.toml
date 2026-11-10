@@ -30,13 +30,13 @@ check-configs = [
     { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
     { features = ["unstable", "rt", "__sdmmc"],     if = 'sdmmc_driver_supported' },
-    { features = ["unstable", "rt", "embassy-time"], append = [
+    { features = ["unstable", "rt", "embassy-time-05"], append = [
         { if = 'sdmmc_driver_supported', features = ["__sdmmc"] },
     ] },
 ]
 # Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
 clippy-configs = [
-    { features = ["unstable", "rt", "embassy-time"], append = [
+    { features = ["unstable", "rt", "embassy-time-05"], append = [
         { if = 'usb_otg_driver_supported', features = ["__usb_otg"] },
         { if = 'bt_driver_supported', features = ["__bluetooth"] },
         { if = 'sdmmc_driver_supported', features = ["__sdmmc"] },
@@ -92,7 +92,7 @@ nb                       = { version = "1.1", optional = true }
 sdio                     = { version = "0.5", optional = true }
 
 # Timer-based waiting in async drivers.
-embassy-time             = { version = "0.5", optional = true }
+embassy-time-05          = { package = "embassy-time", version = "0.5", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
 defmt                    = { version = "1.1", optional = true }
@@ -375,11 +375,11 @@ defmt = [
 ]
 
 #! ### Async Feature Flags
-## Use `embassy-time` to wait in async drivers that would otherwise busy-poll
+## Use version 0.5 of `embassy-time` to wait in async drivers that would otherwise busy-poll
 ## a deadline (I2C timeouts, Ethernet PHY link polling, SDMMC card busy).
 ##
 ## Requires an `embassy-time` driver, for example `esp-rtos` with its `embassy` feature.
-embassy-time = ["dep:embassy-time"]
+embassy-time-05 = ["dep:embassy-time-05"]
 
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.

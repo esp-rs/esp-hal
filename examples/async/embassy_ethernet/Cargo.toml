@@ -20,7 +20,7 @@ esp-backtrace          = { path = "../../../esp-backtrace", features = [
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = [
-    "embassy-time",
+    "embassy-time-05",
     "log-04",
     "unstable",
 ] }

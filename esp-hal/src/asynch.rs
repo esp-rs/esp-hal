@@ -11,21 +11,15 @@ use crate::time::Instant;
 
 /// Arranges for the task behind `cx` to be polled again no later than `deadline`.
 ///
-/// With the `embassy-time` feature this schedules a timer wake-up. Without it, the task is woken
+/// With the `embassy-time-05` feature this schedules a timer wake-up. Without it, the task is woken
 /// immediately, so it keeps busy-polling until the deadline.
 pub(crate) fn wake_at(deadline: Instant, cx: &mut Context<'_>) {
     cfg_select! {
-        feature = "embassy-time" => {
+        feature = "embassy-time-05" => {
             use core::future::Future;
 
-            let now = Instant::now();
-            let remaining = if deadline > now {
-                (deadline - now).as_micros()
-            } else {
-                0
-            };
-
-            let mut timer = embassy_time::Timer::after_micros(remaining);
+            let remaining = deadline.saturating_sub(Instant::now());
+            let mut timer = embassy_time_05::Timer::after_micros(remaining.as_micros());
             let _ = core::pin::Pin::new(&mut timer).poll(cx);
         }
         _ => {
