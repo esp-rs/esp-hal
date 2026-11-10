@@ -921,11 +921,6 @@ impl<'rmt> Rmt<'rmt, Blocking> {
     /// converting real-time pulse durations to [`PulseCode`] lengths; this is
     /// not necessarily the APB clock frequency.
     ///
-    /// On chips other than ESP32 and ESP32-S2, the counter clock is derived from the source
-    /// clock with a fractional divider. A `frequency` that does not divide the source clock
-    /// evenly is approximated with a fractional divider, which introduces clock jitter: the
-    /// average tick rate matches [`Rmt::frequency`], but individual ticks vary in length.
-    ///
     /// # Errors
     ///
     /// [`ConfigError::UnreachableTargetFrequency`] when the target frequency cannot be reached.
