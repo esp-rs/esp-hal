@@ -1,8 +1,8 @@
 //! Shared DW-GDMA helpers for MIPI peripherals on ESP32-P4.
 //!
 //! This module intentionally stays small and register-focused so MIPI-DSI and
-//! future MIPI-CSI code can share controller/channel programming without
-//! introducing public abstractions.
+//! MIPI-CSI can share controller/channel programming without introducing
+//! public abstractions.
 
 use core::{
     ptr,

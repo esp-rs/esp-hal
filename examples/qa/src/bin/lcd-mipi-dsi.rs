@@ -145,27 +145,22 @@ fn main() -> ! {
     let mut hue: u32 = 0;
     let mut frames: u32 = 0;
     let mut report_start = Instant::now();
-    let mut report_irqs = dpi.dma_interrupt_count();
 
     loop {
         if report_start.elapsed() >= Duration::from_secs(REPORT_INTERVAL_S) {
             let elapsed_ms = report_start.elapsed().as_millis();
-            let irqs = dpi.dma_interrupt_count();
             let underrun = MIPI_DSI_BRIDGE::regs().int_raw().read().underrun().bit();
             println!(
-                "lcd: frames_rendered={} elapsed_ms={} frames_per_s_x10={} dsi_dma_irqs={} dsi_dma_irqs_per_s={} underrun={}",
+                "lcd: frames_rendered={} elapsed_ms={} frames_per_s_x10={} underrun={}",
                 frames,
                 elapsed_ms,
                 frames as u64 * 10_000 / elapsed_ms,
-                irqs.wrapping_sub(report_irqs),
-                irqs.wrapping_sub(report_irqs) as u64 * 1000 / elapsed_ms,
                 underrun
             );
             MIPI_DSI_BRIDGE::regs()
                 .int_clr()
                 .write(|w| w.underrun().clear_bit_by_one());
             frames = 0;
-            report_irqs = irqs;
             report_start = Instant::now();
         }
 

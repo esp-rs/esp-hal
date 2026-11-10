@@ -2,6 +2,10 @@
 //!
 //! This is a standalone QA binary to validate whether the DW-GDMA (VDMA)
 //! destination path to PSRAM works independently of MIPI-CSI.
+//!
+//! The HAL drivers never run memory-to-memory transfers, so this binary
+//! programs one contiguous block transfer directly through the VDMA registers.
+//! It must not run while a MIPI-CSI or MIPI-DSI driver owns VDMA.
 //% CHIP_FILTER: mipi_dsi_driver_supported && dma_can_access_psram && psram_driver_supported
 
 #![no_std]
@@ -18,7 +22,8 @@ use esp_hal::{
     Config,
     dma::aligned::{DmaAlignedMut, DmaAlignedRef},
     main,
-    mipi_dsi::{__qa_dw_gdma_mem2mem_transfer, DwGdmaMem2MemProfile, DwGdmaMem2MemReport},
+    peripherals::{HP_SYS_CLKRST, IOMUX_MSPI_PIN, MEMSPI2, VDMA},
+    time::{Duration, Instant},
 };
 use esp_println::println;
 
@@ -36,6 +41,118 @@ const INTERNAL_RAM_LOW: usize = 0x4ff0_0000;
 const INTERNAL_RAM_HIGH: usize = 0x4ffc_0000;
 const PSRAM_LOW: usize = 0x4800_0000;
 const PSRAM_HIGH: usize = 0x4c00_0000;
+
+// DW-AXI-DMAC register encodings.
+const TT_FC_M2M_DMAC: u8 = 0;
+const WIDTH_64_BITS: u8 = 3;
+const BURST_SIZE_512_ITEMS: u8 = 8;
+const AXI_BURST_LEN_16: u8 = 16;
+const CHANNEL_PRIORITY: u8 = 1;
+const OSR_LIMIT_5_REQUESTS: u8 = 4;
+const MAX_BLOCK_TRANSFER_UNITS: u32 = 0x0040_0000;
+const DISABLE_TIMEOUT_MS: u64 = 20;
+const SUSPEND_TIMEOUT_MS: u64 = 5;
+const ABORT_TIMEOUT_MS: u64 = 5;
+// Channel-0 bits of `CHEN0`/`CHEN1`: each field pairs a value bit with a
+// write-enable bit 8 positions higher. Shift left by the channel number.
+const CHANNEL_ENABLE_WRITE: u32 = 0x0100;
+const CHANNEL_ENABLE_SET: u32 = 0x0101;
+const CHANNEL_SUSPEND_SET: u32 = 0x0101_0000;
+const CHANNEL_ABORT_SET: u32 = 0x0101;
+const STATUS_DMA_TRANSFER_DONE: u32 = 1 << 1;
+const STATUS_CH_SUSPENDED: u32 = 1 << 29;
+const STATUS_ERROR_MASK: u32 = (1 << 5)
+    | (1 << 6)
+    | (1 << 7)
+    | (1 << 8)
+    | (1 << 9)
+    | (1 << 10)
+    | (1 << 11)
+    | (1 << 12)
+    | (1 << 13)
+    | (1 << 14)
+    | (1 << 16)
+    | (1 << 17)
+    | (1 << 18)
+    | (1 << 19)
+    | (1 << 20)
+    | (1 << 21)
+    | (1 << 25);
+const STATUS_ENABLE_MASK: u32 = (1 << 0)
+    | STATUS_DMA_TRANSFER_DONE
+    | (1 << 3)
+    | (1 << 4)
+    | STATUS_ERROR_MASK
+    | (1 << 28)
+    | STATUS_CH_SUSPENDED
+    | (1 << 30)
+    | (1 << 31);
+
+/// One mem2mem transfer setup. Unset `VDMA_MEM2MEM_DMA_PROFILE` uses [`Self::BASELINE`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DmaProfile {
+    /// `CTL0.DST_MSIZE` code. 8 is 512 items.
+    dst_msize: u8,
+    /// `CTL1.AWLEN` value written with `AWLEN_EN=1`.
+    dst_awlen: u8,
+    /// `CFG1.SRC_OSR_LMT` field. Outstanding reads are this value plus 1.
+    src_osr_lmt: u8,
+    /// `CFG1.DST_OSR_LMT` field. Outstanding writes are this value plus 1.
+    dst_osr_lmt: u8,
+}
+
+impl DmaProfile {
+    const BASELINE: Self = Self {
+        dst_msize: BURST_SIZE_512_ITEMS,
+        dst_awlen: AXI_BURST_LEN_16,
+        src_osr_lmt: OSR_LIMIT_5_REQUESTS,
+        dst_osr_lmt: OSR_LIMIT_5_REQUESTS,
+    };
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StopOutcome {
+    AlreadyStopped,
+    Disabled,
+    Aborted,
+    AbortTimedOut,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TransferReport {
+    src_addr: u32,
+    dst_addr: u32,
+    dar_end: u32,
+    transfer_units: u32,
+    transfer_bytes: u32,
+    bytes_written: u32,
+    width: u8,
+    burst_size: u8,
+    axi_burst_len: u8,
+    transfer_type_flow_control: u8,
+    src_outstanding_limit: u8,
+    dst_outstanding_limit: u8,
+    intstatus_enable0: u32,
+    intstatus_before: u32,
+    intstatus_after: u32,
+    cfg1_bits: u32,
+    ctl0_bits: u32,
+    ctl1_bits: u32,
+    block_ts0_bits: u32,
+    status0_after: u32,
+    status1_after: u32,
+    chen0_after_stop: u32,
+    chen1_after_stop: u32,
+    completed: bool,
+    dma_error: bool,
+    timed_out: bool,
+    poll_count: u32,
+    elapsed_us: u64,
+    stop_outcome: StopOutcome,
+    channel_enabled_after_stop: bool,
+    abort_in_progress_after_stop: bool,
+    buffers_safe_for_cpu: bool,
+}
 
 #[repr(align(128))]
 struct Align128<const N: usize>([u8; N]);
@@ -159,34 +276,34 @@ fn selected_dst_awlen_auto() -> bool {
 /// `msize` codes follow IDF `dw_gdma_burst_items_t`: 3 is 16 items, 8 is 512 items.
 /// `OSR` fields follow IDF `limit - 1`: 0 is 1 outstanding request, 4 is 5.
 /// `AWLEN` is the value written into `CTL1.AWLEN` with `AWLEN_EN=1`.
-fn selected_dma_profile() -> (&'static str, DwGdmaMem2MemProfile) {
-    let baseline = DwGdmaMem2MemProfile::BASELINE;
+fn selected_dma_profile() -> (&'static str, DmaProfile) {
+    let baseline = DmaProfile::BASELINE;
     match option_env!("VDMA_MEM2MEM_DMA_PROFILE") {
         None | Some("baseline") => ("baseline", baseline),
         Some("dst-msize-16") => (
             "dst-msize-16",
-            DwGdmaMem2MemProfile {
+            DmaProfile {
                 dst_msize: 3,
                 ..baseline
             },
         ),
         Some("dst-awlen-4") => (
             "dst-awlen-4",
-            DwGdmaMem2MemProfile {
+            DmaProfile {
                 dst_awlen: 4,
                 ..baseline
             },
         ),
         Some("dst-osr-1") => (
             "dst-osr-1",
-            DwGdmaMem2MemProfile {
+            DmaProfile {
                 dst_osr_lmt: 0,
                 ..baseline
             },
         ),
         Some("src-osr-1") => (
             "src-osr-1",
-            DwGdmaMem2MemProfile {
+            DmaProfile {
                 src_osr_lmt: 0,
                 ..baseline
             },
@@ -536,7 +653,275 @@ fn invalidate_after_dma(label: &str, buf: &[u8]) {
     println!("cache-ready-after-dma: {label}");
 }
 
-fn print_report(label: &str, report: &DwGdmaMem2MemReport, verify: Option<&VerificationResult>) {
+fn wait_until(timeout_ms: u64, mut condition: impl FnMut() -> bool) -> bool {
+    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+    while Instant::now() <= deadline {
+        if condition() {
+            return true;
+        }
+    }
+    condition()
+}
+
+/// Gates the GDMA clock on and pulses its reset. Nothing else owns VDMA in
+/// this binary, so the clock is left enabled.
+fn enable_vdma_controller() {
+    let clkrst = HP_SYS_CLKRST::regs();
+    clkrst
+        .soc_clk_ctrl1()
+        .modify(|_, w| w.gdma_sys_clk_en().set_bit());
+    clkrst.hp_rst_en0().modify(|_, w| w.rst_en_gdma().set_bit());
+    clkrst
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_gdma().clear_bit());
+    VDMA::regs().cfg0().modify(|_, w| {
+        w.dmac_en().set_bit();
+        w.int_en().set_bit()
+    });
+}
+
+fn channel_enabled(channel: usize) -> bool {
+    (VDMA::regs().chen0().read().bits() >> channel) & 1 != 0
+}
+
+fn abort_in_progress(channel: usize) -> bool {
+    VDMA::regs().chen1().read().bits() & (CHANNEL_ABORT_SET << channel) != 0
+}
+
+fn set_channel_enabled(channel: usize, enabled: bool) {
+    let value = if enabled {
+        CHANNEL_ENABLE_SET
+    } else {
+        CHANNEL_ENABLE_WRITE
+    };
+    VDMA::regs()
+        .chen0()
+        .write(|w| unsafe { w.bits(value << channel) });
+}
+
+/// Disables the channel, then falls back to suspend and abort.
+fn stop_channel(channel: usize) -> StopOutcome {
+    if !channel_enabled(channel) {
+        return StopOutcome::AlreadyStopped;
+    }
+    set_channel_enabled(channel, false);
+    if wait_until(DISABLE_TIMEOUT_MS, || !channel_enabled(channel)) {
+        return StopOutcome::Disabled;
+    }
+
+    let regs = VDMA::regs();
+    regs.chen0()
+        .write(|w| unsafe { w.bits(CHANNEL_SUSPEND_SET << channel) });
+    let _ = wait_until(SUSPEND_TIMEOUT_MS, || {
+        !channel_enabled(channel)
+            || regs.ch(channel).intstatus0().read().bits() & STATUS_CH_SUSPENDED != 0
+    });
+    regs.chen1()
+        .write(|w| unsafe { w.bits(CHANNEL_ABORT_SET << channel) });
+    if wait_until(ABORT_TIMEOUT_MS, || {
+        !channel_enabled(channel) && !abort_in_progress(channel)
+    }) {
+        StopOutcome::Aborted
+    } else {
+        StopOutcome::AbortTimedOut
+    }
+}
+
+fn print_psram_stall_snapshot() {
+    let mspi = MEMSPI2::regs();
+    let cmd = mspi.cmd().read();
+    let ecc = mspi.smem_ecc_ctrl().read();
+    let iomux = IOMUX_MSPI_PIN::regs();
+    let dqs0 = iomux.psram_dqs_0_pin0().read();
+    let dqs1 = iomux.psram_dqs_1_pin0().read();
+    // IDF `REG_PSRAM_DQS_*_DELAY_270` is bits [20:17]. The PAC `delay_270()`
+    // accessor reads bits [21:18], so take this field from the raw value.
+    let dqs_delay_270 = |bits: u32| (bits >> 17) & 0x0f;
+    println!(
+        "PSRAM stall snapshot: cmd=0x{:08x} mst_st={} slv_st={} axi=0x{:08x} ecc=0x{:08x} page_size={} ac=0x{:08x} ddr=0x{:08x} timing_cali=0x{:08x} smem_timing_cali=0x{:08x} dqs0=0x{:08x} dqs0_phase={} dqs0_dli={} dqs0_delay90={} dqs0_delay270={} dqs1=0x{:08x} dqs1_phase={} dqs1_dli={} dqs1_delay90={} dqs1_delay270={}",
+        cmd.bits(),
+        cmd.mst_st().bits(),
+        cmd.slv_st().bits(),
+        mspi.smem_axi_addr_ctrl().read().bits(),
+        ecc.bits(),
+        ecc.page_size().bits(),
+        mspi.smem_ac().read().bits(),
+        mspi.smem_ddr().read().bits(),
+        mspi.timing_cali().read().bits(),
+        mspi.smem_timing_cali().read().bits(),
+        dqs0.bits(),
+        dqs0.phase().bits(),
+        dqs0.dli().bits(),
+        dqs0.delay_90().bits(),
+        dqs_delay_270(dqs0.bits()),
+        dqs1.bits(),
+        dqs1.phase().bits(),
+        dqs1.dli().bits(),
+        dqs1.delay_90().bits(),
+        dqs_delay_270(dqs1.bits()),
+    );
+}
+
+/// Runs one contiguous SRAM-source block transfer on `channel` and polls for
+/// `DMA_TFR_DONE`, an error, or the timeout.
+fn mem2mem_transfer(
+    channel: usize,
+    src_addr: u32,
+    dst_addr: u32,
+    transfer_units: u32,
+    timeout_ms: u64,
+    dst_awlen_auto: bool,
+    profile: DmaProfile,
+) -> TransferReport {
+    assert!(transfer_units > 0 && transfer_units <= MAX_BLOCK_TRANSFER_UNITS);
+
+    enable_vdma_controller();
+    let regs = VDMA::regs();
+    let ch = regs.ch(channel);
+
+    set_channel_enabled(channel, false);
+    ch.intclear0().write(|w| unsafe { w.bits(u32::MAX) });
+    ch.intstatus_enable0()
+        .write(|w| unsafe { w.bits(STATUS_ENABLE_MASK) });
+    ch.intsignal_enable0().write(|w| unsafe { w.bits(0) });
+
+    // Contiguous source and destination, software handshake on both sides.
+    ch.cfg0().write(|w| unsafe {
+        w.ch1_src_multblk_type().bits(0);
+        w.ch1_dst_multblk_type().bits(0)
+    });
+    ch.cfg1().write(|w| unsafe {
+        w.ch1_tt_fc().bits(TT_FC_M2M_DMAC);
+        w.ch1_hs_sel_src().set_bit();
+        w.ch1_hs_sel_dst().set_bit();
+        w.ch1_src_per().bits(0);
+        w.ch1_dst_per().bits(0);
+        w.ch1_ch_prior().bits(CHANNEL_PRIORITY);
+        w.ch1_src_osr_lmt().bits(profile.src_osr_lmt);
+        w.ch1_dst_osr_lmt().bits(profile.dst_osr_lmt)
+    });
+    ch.sstatar0().write(|w| unsafe { w.bits(0) });
+    ch.dstatar0().write(|w| unsafe { w.bits(0) });
+
+    ch.sar0().write(|w| unsafe { w.ch1_sar0().bits(src_addr) });
+    unsafe { ch.sar1().write_with_zero(|w| w) };
+    ch.dar0().write(|w| unsafe { w.ch1_dar0().bits(dst_addr) });
+    unsafe { ch.dar1().write_with_zero(|w| w) };
+    ch.block_ts0()
+        .write(|w| unsafe { w.ch1_block_ts().bits(transfer_units - 1) });
+    ch.ctl0().write(|w| unsafe {
+        w.ch1_sms().set_bit();
+        w.ch1_dms().set_bit();
+        w.ch1_sinc().clear_bit();
+        w.ch1_dinc().clear_bit();
+        w.ch1_src_tr_width().bits(WIDTH_64_BITS);
+        w.ch1_dst_tr_width().bits(WIDTH_64_BITS);
+        w.ch1_src_msize().bits(BURST_SIZE_512_ITEMS);
+        w.ch1_dst_msize().bits(profile.dst_msize)
+    });
+    ch.ctl1().write(|w| unsafe {
+        w.ch1_arlen_en().set_bit();
+        w.ch1_arlen().bits(AXI_BURST_LEN_16);
+        w.ch1_awlen_en().bit(!dst_awlen_auto);
+        w.ch1_awlen()
+            .bits(if dst_awlen_auto { 0 } else { profile.dst_awlen });
+        w.ch1_ioc_blktfr().clear_bit();
+        w.ch1_shadowreg_or_lli_last().clear_bit();
+        w.ch1_shadowreg_or_lli_valid().clear_bit()
+    });
+
+    let cfg1_bits = ch.cfg1().read().bits();
+    let ctl0_bits = ch.ctl0().read().bits();
+    let ctl1_bits = ch.ctl1().read().bits();
+    let block_ts0_bits = ch.block_ts0().read().bits();
+
+    let intstatus_before = ch.intstatus0().read().bits();
+    println!(
+        "PSRAM AXI before DMA: 0x{:08x}",
+        MEMSPI2::regs().smem_axi_addr_ctrl().read().bits()
+    );
+    let start = Instant::now();
+    set_channel_enabled(channel, true);
+
+    let mut completed = false;
+    let mut dma_error = false;
+    let mut timed_out = false;
+    let mut poll_count = 0u32;
+    let deadline = start + Duration::from_millis(timeout_ms);
+    let intstatus_after = loop {
+        poll_count = poll_count.saturating_add(1);
+        let status = ch.intstatus0().read().bits();
+        if status & STATUS_DMA_TRANSFER_DONE != 0 {
+            completed = true;
+            break status;
+        }
+        if status & STATUS_ERROR_MASK != 0 {
+            dma_error = true;
+            break status;
+        }
+        if Instant::now() >= deadline {
+            timed_out = true;
+            break status;
+        }
+    };
+    let elapsed_us = start.elapsed().as_micros();
+    let dar_end = ch.dar0().read().bits();
+
+    println!(
+        "PSRAM AXI after DMA wait: 0x{:08x}",
+        MEMSPI2::regs().smem_axi_addr_ctrl().read().bits()
+    );
+    if timed_out {
+        print_psram_stall_snapshot();
+    }
+
+    let stop_outcome = stop_channel(channel);
+    let channel_enabled_after_stop = channel_enabled(channel);
+    let abort_in_progress_after_stop = abort_in_progress(channel);
+    let buffers_safe_for_cpu = !channel_enabled_after_stop
+        && !abort_in_progress_after_stop
+        && stop_outcome != StopOutcome::AbortTimedOut;
+    let report = TransferReport {
+        src_addr,
+        dst_addr,
+        dar_end,
+        transfer_units,
+        transfer_bytes: transfer_units * 8,
+        bytes_written: dar_end.saturating_sub(dst_addr),
+        width: WIDTH_64_BITS,
+        burst_size: profile.dst_msize,
+        axi_burst_len: profile.dst_awlen,
+        transfer_type_flow_control: TT_FC_M2M_DMAC,
+        src_outstanding_limit: profile.src_osr_lmt,
+        dst_outstanding_limit: profile.dst_osr_lmt,
+        intstatus_enable0: ch.intstatus_enable0().read().bits(),
+        intstatus_before,
+        intstatus_after,
+        cfg1_bits,
+        ctl0_bits,
+        ctl1_bits,
+        block_ts0_bits,
+        status0_after: ch.status0().read().bits(),
+        status1_after: ch.status1().read().bits(),
+        chen0_after_stop: regs.chen0().read().bits(),
+        chen1_after_stop: regs.chen1().read().bits(),
+        completed,
+        dma_error,
+        timed_out,
+        poll_count,
+        elapsed_us,
+        stop_outcome,
+        channel_enabled_after_stop,
+        abort_in_progress_after_stop,
+        buffers_safe_for_cpu,
+    };
+    if buffers_safe_for_cpu {
+        ch.intclear0().write(|w| unsafe { w.bits(u32::MAX) });
+    }
+    report
+}
+
+fn print_report(label: &str, report: &TransferReport, verify: Option<&VerificationResult>) {
     println!("--- {label} ---");
     println!(
         "addr: src=0x{:08x} dst=0x{:08x} dar_end=0x{:08x}",
@@ -613,17 +998,14 @@ fn print_report(label: &str, report: &DwGdmaMem2MemReport, verify: Option<&Verif
     println!("buffers-safe-for-cpu={}", report.buffers_safe_for_cpu);
 }
 
-fn run_case<CH>(
+fn run_case(
     label: &str,
-    channel: CH,
+    channel: usize,
     src: &mut [u8],
     dst_cache_region: &mut [u8],
     dst_transfer_offset: usize,
     dst_awlen_auto: bool,
-) -> CaseOutcome
-where
-    CH: esp_hal::mipi_dsi::VdmaDmaChannel + 'static,
-{
+) -> CaseOutcome {
     assert!(
         dst_transfer_offset + DEST_TOTAL_BYTES <= dst_cache_region.len(),
         "destination transfer range exceeds cache region"
@@ -637,14 +1019,14 @@ where
     step(13, "after destination sentinel initialization");
     prepare_buffers_for_dma(label, src, dst_cache_region);
 
-    step(20, "before helper call (__qa_dw_gdma_mem2mem_transfer)");
+    step(20, "before DMA transfer");
     let (_profile_name, profile) = selected_dma_profile();
     let dst_addr = {
         let dst_with_guard =
             &mut dst_cache_region[dst_transfer_offset..dst_transfer_offset + DEST_TOTAL_BYTES];
         dst_with_guard.as_mut_ptr() as u32
     };
-    let report = __qa_dw_gdma_mem2mem_transfer(
+    let report = mem2mem_transfer(
         channel,
         src.as_ptr() as u32,
         dst_addr,
@@ -653,7 +1035,7 @@ where
         dst_awlen_auto,
         profile,
     );
-    step(21, "after helper call (__qa_dw_gdma_mem2mem_transfer)");
+    step(21, "after DMA transfer");
 
     if !report.buffers_safe_for_cpu {
         println!(
@@ -716,6 +1098,8 @@ fn main() -> ! {
     let (dma_profile_name, dma_profile) = selected_dma_profile();
     let peripherals = esp_hal::init(Config::default());
     esp_println::logger::init_logger_from_env();
+    // Held so that nothing else can use the channels this binary programs.
+    let _vdma_channels = (peripherals.VDMA_CH0, peripherals.VDMA_CH1);
     if case_selection != CaseSelection::SramOnly {
         // 250 MHz on the default 500 MHz MPLL. Tuning itself follows the
         // active preset for every PSRAM user; this line is only the QA speed.
@@ -811,7 +1195,7 @@ fn main() -> ! {
             let outcome = match psram_channel {
                 0 => run_case(
                     "SRAM->PSRAM (VDMA_CH0)",
-                    peripherals.VDMA_CH0,
+                    0,
                     src_internal,
                     dst_psram_cache.expect("PSRAM destination missing in PSRAM mode"),
                     psram_dst_offset,
@@ -819,7 +1203,7 @@ fn main() -> ! {
                 ),
                 1 => run_case(
                     "SRAM->PSRAM (VDMA_CH1)",
-                    peripherals.VDMA_CH1,
+                    1,
                     src_internal,
                     dst_psram_cache.expect("PSRAM destination missing in PSRAM mode"),
                     psram_dst_offset,
@@ -835,7 +1219,7 @@ fn main() -> ! {
             let outcome = match sram_channel {
                 0 => run_case(
                     "SRAM->SRAM control (VDMA_CH0)",
-                    peripherals.VDMA_CH0,
+                    0,
                     src_internal,
                     dst_internal,
                     0,
@@ -843,7 +1227,7 @@ fn main() -> ! {
                 ),
                 1 => run_case(
                     "SRAM->SRAM control (VDMA_CH1)",
-                    peripherals.VDMA_CH1,
+                    1,
                     src_internal,
                     dst_internal,
                     0,
@@ -867,7 +1251,7 @@ VDMA_MEM2MEM_SRAM_CH to different values"
                     step(7, "before first DMA case (SRAM->PSRAM)");
                     let psram_outcome = run_case(
                         "SRAM->PSRAM (VDMA_CH0)",
-                        peripherals.VDMA_CH0,
+                        0,
                         src_internal,
                         dst_psram_cache.expect("PSRAM destination missing in both mode"),
                         psram_dst_offset,
@@ -880,7 +1264,7 @@ VDMA_MEM2MEM_SRAM_CH to different values"
                     if psram_outcome.buffers_safe_for_cpu {
                         let sram_outcome = run_case(
                             "SRAM->SRAM control (VDMA_CH1)",
-                            peripherals.VDMA_CH1,
+                            1,
                             src_internal,
                             dst_internal,
                             0,
@@ -899,7 +1283,7 @@ VDMA_MEM2MEM_SRAM_CH to different values"
                     step(7, "before first DMA case (SRAM->PSRAM)");
                     let psram_outcome = run_case(
                         "SRAM->PSRAM (VDMA_CH1)",
-                        peripherals.VDMA_CH1,
+                        1,
                         src_internal,
                         dst_psram_cache.expect("PSRAM destination missing in both mode"),
                         psram_dst_offset,
@@ -912,7 +1296,7 @@ VDMA_MEM2MEM_SRAM_CH to different values"
                     if psram_outcome.buffers_safe_for_cpu {
                         let sram_outcome = run_case(
                             "SRAM->SRAM control (VDMA_CH0)",
-                            peripherals.VDMA_CH0,
+                            0,
                             src_internal,
                             dst_internal,
                             0,
