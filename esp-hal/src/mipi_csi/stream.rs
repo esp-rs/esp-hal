@@ -32,6 +32,7 @@ use crate::{
         unregister_channel_handler,
     },
     peripherals::{Interrupt, MIPI_CSI_BRIDGE},
+    system::Cpu,
     time::{Duration, Instant},
 };
 
@@ -142,7 +143,7 @@ impl StreamStats {
 }
 
 /// Why [`CsiCapture::into_stream`] did not start.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum StreamStartError {
     /// A buffer is smaller than the configured frame size.
@@ -161,8 +162,24 @@ pub enum StreamStartError {
     InterruptUnavailable,
 }
 
+impl core::fmt::Display for StreamStartError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::BufferTooSmall { required, provided } => write!(
+                f,
+                "stream buffer too small (required {required} bytes, provided {provided} bytes)"
+            ),
+            Self::InvalidBuffer(err) => write!(f, "invalid DMA buffer: {err}"),
+            Self::BuffersOverlap => write!(f, "stream buffers overlap"),
+            Self::InterruptUnavailable => write!(f, "capture channel interrupt already in use"),
+        }
+    }
+}
+
+impl core::error::Error for StreamStartError {}
+
 /// Why [`CsiStream::next_frame`] returned no frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum StreamError {
     /// No frame completed before the timeout.
@@ -171,6 +188,17 @@ pub enum StreamError {
     /// frames; [`CsiStream::stop`] shuts the channel down.
     DmaFault,
 }
+
+impl core::fmt::Display for StreamError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Timeout => write!(f, "timed out waiting for a stream frame"),
+            Self::DmaFault => write!(f, "DMA error stopped the stream"),
+        }
+    }
+}
+
+impl core::error::Error for StreamError {}
 
 /// A [`CsiCapture`] that captures continuously into two buffers.
 ///
@@ -242,38 +270,12 @@ pub type IntoStreamError<'d, Dm> = (
     StreamStartError,
 );
 
-impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
-    /// Starts capturing continuously into `buffers`.
-    ///
-    /// The DMA channel and the bridge are armed on the first buffer before
-    /// this returns, so the source stream may already be running or be started
-    /// afterwards. The bridge waits for the next frame start, so the first
-    /// frame is whole even if the source is mid-frame.
-    ///
-    /// The buffers must be DMA-capable, as for [`Self::receive`], at least the
-    /// configured frame size, and must not overlap. They are `'static`
-    /// because the DMA writes them between calls.
-    ///
-    /// The stream binds its own handler to the
-    /// [`CSI_BRIDGE`](crate::peripherals::Interrupt::CSI_BRIDGE) interrupt on
-    /// the current core, to end a frame that the bridge discarded.
-    ///
-    /// # Errors
-    ///
-    /// Returns the capture and the buffers unchanged if a buffer is unsuitable
-    /// or the capture channel's interrupt is already in use.
-    #[allow(
-        clippy::result_large_err,
-        reason = "hands back the capture and the buffers on failure"
-    )]
-    pub fn into_stream(
-        self,
+impl<'d, Dm: DriverMode> CsiStream<'d, Dm> {
+    pub(super) fn new(
+        capture: CsiCapture<'d, Dm>,
         buffers: [&'static mut [u8]; STREAM_BUFFER_COUNT],
-    ) -> Result<CsiStream<'d, Dm>, IntoStreamError<'d, Dm>> {
-        let mut stream = CsiStream {
-            capture: self,
-            buffers,
-        };
+    ) -> Result<Self, IntoStreamError<'d, Dm>> {
+        let mut stream = Self { capture, buffers };
         match stream.start() {
             Ok(()) => Ok(stream),
             Err(error) => {
@@ -282,9 +284,7 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
             }
         }
     }
-}
 
-impl<'d, Dm: DriverMode> CsiStream<'d, Dm> {
     fn start(&mut self) -> Result<(), StreamStartError> {
         let frame_bytes = self.capture.config.frame_bytes;
         let smallest = self.buffers.iter().map(|b| b.len()).min().unwrap_or(0);
@@ -407,12 +407,13 @@ impl<'d, Dm: DriverMode> CsiStream<'d, Dm> {
         let channel = self.capture.dma_channel;
         // No interrupt handler run arms the channel after this.
         SHARED.with(|shared| shared.active = false);
-        if let Err(reason) = self.capture.stop_transfer()
-            && (channel.is_enabled() || channel.abort_in_progress())
-        {
-            panic!("mipi-csi stream DMA shutdown failed: {:?}", reason);
+        if !self.capture.stop_transfer() && (channel.is_enabled() || channel.abort_in_progress()) {
+            panic!("mipi-csi stream DMA shutdown failed");
         }
         MIPI_CSI_BRIDGE::regs().int_ena().reset();
+        for core in Cpu::all() {
+            interrupt::disable(core, Interrupt::CSI_BRIDGE);
+        }
         channel.set_interrupt_signal_enable(0);
         unregister_channel_handler(channel);
         self.capture.clear_transfer_status();
@@ -531,7 +532,7 @@ fn stream_bridge_interrupt_handler() {
             return;
         };
         // The bridge must stay enabled until the channel stopped.
-        if stop_dma_channel(channel).is_err() {
+        if !stop_dma_channel(channel) {
             shared.fault = true;
             return;
         }

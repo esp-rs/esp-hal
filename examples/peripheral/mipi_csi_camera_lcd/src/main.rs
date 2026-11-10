@@ -157,22 +157,17 @@ fn main() -> ! {
     // Snapshot. The sensor starts streaming once the capture is armed, so the
     // first frame is whole.
     let mut stream_on = Ok(());
-    let frame = capture.receive_with(raw[0], || stream_on = sc2336::set_stream(&mut i2c, true));
+    let result = capture.receive_with(raw[0], || stream_on = sc2336::set_stream(&mut i2c, true));
     let stream_off = sc2336::set_stream(&mut i2c, false);
-    println!("snapshot: capture={frame:?} stream_on={stream_on:?} stream_off={stream_off:?}");
-    let frame = frame.expect("snapshot capture failed");
-    assert_eq!(
-        frame.received_bytes, RAW_BYTES,
-        "snapshot has the wrong size"
-    );
+    println!("snapshot: capture={result:?} stream_on={stream_on:?} stream_off={stream_off:?}");
+    result.expect("snapshot capture failed");
 
     let (min, max) = raw[0]
         .iter()
         .fold((u8::MAX, 0), |(lo, hi), &v| (lo.min(v), hi.max(v)));
     let means = demosaic::channel_means(raw[0], WIDTH, HEIGHT, sc2336::BAYER_ORDER);
     println!(
-        "snapshot: {} bytes checksum32=0x{:08x} min={min} max={max} mean r={} g={} b={}",
-        frame.received_bytes,
+        "snapshot: {RAW_BYTES} bytes checksum32=0x{:08x} min={min} max={max} mean r={} g={} b={}",
         checksum32(raw[0]),
         means[0],
         means[1],

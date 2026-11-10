@@ -331,7 +331,7 @@ fn main() -> ! {
         without_dsi_progress += u32::from(lcd.frames_sent() == sent_before);
         sensor.set_stream(false).unwrap();
         let report = capture.completion_interrupt_report();
-        if matches!(&result, Ok(frame) if frame.received_bytes == FRAME_BYTES)
+        if result.is_ok()
             && sentinel_words(buffer0) == 0
             && (!interrupt || (report.fired && report.own_source))
         {

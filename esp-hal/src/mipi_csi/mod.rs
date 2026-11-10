@@ -102,14 +102,14 @@
 //! )?;
 //!
 //! let mut frame = [0u8; 1024 * 600];
-//! let _result = capture.receive(&mut frame)?;
+//! capture.receive(&mut frame)?;
 //! # {after_snippet}
 //! ```
 
 use core::{
     fmt,
     marker::PhantomData,
-    sync::atomic::{AtomicU8, AtomicU32, Ordering},
+    sync::atomic::{AtomicU8, Ordering},
 };
 
 use procmacros::BuilderLite;
@@ -138,10 +138,8 @@ use crate::{
         HandshakeSelect,
         LlPointerMasterSelect,
         MAX_BLOCK_TRANSFER_SIZE_UNITS,
-        asserted_interrupt_sources,
         channel_interrupt_available,
         enable_controller,
-        enabled_channels,
         register_channel_handler,
         unregister_channel_handler,
     },
@@ -198,24 +196,8 @@ const DMA_STATUS_CH_SRC_SUSPENDED: u32 = 1 << 28;
 const DMA_STATUS_CH_SUSPENDED: u32 = 1 << 29;
 const DMA_STATUS_CH_DISABLED: u32 = 1 << 30;
 const DMA_STATUS_CH_ABORTED: u32 = 1 << 31;
-const DMA_STATUS_ERROR_MASK: u32 = (1 << 5)
-    | (1 << 6)
-    | (1 << 7)
-    | (1 << 8)
-    | (1 << 9)
-    | (1 << 10)
-    | (1 << 11)
-    | (1 << 12)
-    | (1 << 13)
-    | (1 << 14)
-    | (1 << 16)
-    | (1 << 17)
-    | (1 << 18)
-    | (1 << 19)
-    | (1 << 20)
-    | (1 << 21)
-    | (1 << 25);
-const DMA_STATUS_CHANNEL_STOPPED_MASK: u32 = DMA_STATUS_CH_DISABLED | DMA_STATUS_CH_ABORTED;
+// The error bits of `CH_INTSTATUS0`: 5 to 14, 16 to 21 and 25.
+const DMA_STATUS_ERROR_MASK: u32 = 0x023F_7FE0;
 // The suspend/disable/abort bits only latch when enabled here. Shutdown needs
 // them to report which stop step the channel completed.
 const DMA_STATUS_ENABLE_MASK: u32 = DMA_STATUS_BLOCK_TRANSFER_DONE
@@ -263,7 +245,7 @@ const fn csi_dma_channel_config(axi: DmaAxiConfig) -> ChannelConfig {
 /// [`CaptureConfig::with_dma_axi_config`] replaces it. Flow control, handshake,
 /// addressing, transfer width and burst items are fixed by the driver.
 #[instability::unstable]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaAxiConfig {
     /// `CTL1.ARLEN` for reads from the CSI bridge FIFO, 1 to 16.
@@ -408,7 +390,7 @@ fn take_owned_csi_dma_channel<'d>(
 }
 
 /// MIPI CSI controller configuration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, BuilderLite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// Number of active D-PHY data lanes.
@@ -416,6 +398,15 @@ pub struct Config {
 
     /// Target lane bit rate in Mbps.
     lane_bit_rate_mbps: u16,
+}
+
+impl Config {
+    fn validate(&self) -> Result<(), ConfigError> {
+        if !(MIN_LANE_RATE_MBPS..=MAX_LANE_RATE_MBPS).contains(&self.lane_bit_rate_mbps) {
+            return Err(ConfigError::InvalidLaneBitRate);
+        }
+        Ok(())
+    }
 }
 
 impl Default for Config {
@@ -428,13 +419,23 @@ impl Default for Config {
 }
 
 /// Configuration error.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
     /// Lane bit rate is outside the 90–1500 Mbps range.
     InvalidLaneBitRate,
 }
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLaneBitRate => write!(f, "lane bit rate outside 90-1500 Mbps"),
+        }
+    }
+}
+
+impl core::error::Error for ConfigError {}
 
 /// Pixel format accepted by the CSI bridge capture path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -545,7 +546,7 @@ impl CaptureConfig {
 }
 
 /// Capture configuration error.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum CaptureConfigError {
@@ -591,38 +592,19 @@ impl fmt::Display for CaptureConfigError {
 impl core::error::Error for CaptureConfigError {}
 
 /// DW-GDMA channel status snapshot.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaStatus {
-    /// Raw `INTSTATUS0` bits.
-    pub raw_status: u32,
-    /// Channel enable bit sampled from `CHEN0`.
+    /// The channel reported the end of its block transfer.
+    pub transfer_done: bool,
+    /// The channel reported an error.
+    pub error: bool,
+    /// The channel was still enabled.
     pub channel_enabled: bool,
-    /// Completed transfer size from `STATUS0`, in transfer-width units.
-    pub completed_transfer_units: u32,
-    /// Remaining FIFO data from `STATUS1`, in transfer-width units.
-    pub fifo_remaining_units: u16,
-}
-
-impl DmaStatus {
-    /// Returns true if DMA transfer completion was reported.
-    pub const fn transfer_done(&self) -> bool {
-        (self.raw_status & (DMA_STATUS_BLOCK_TRANSFER_DONE | DMA_STATUS_DMA_TRANSFER_DONE)) != 0
-    }
-
-    /// Returns true if any DMA channel error bit is set.
-    pub const fn any_error(&self) -> bool {
-        (self.raw_status & DMA_STATUS_ERROR_MASK) != 0
-    }
-
-    /// Returns true if the channel reports disabled or aborted.
-    pub const fn channel_stopped(&self) -> bool {
-        (self.raw_status & DMA_STATUS_CHANNEL_STOPPED_MASK) != 0 || !self.channel_enabled
-    }
 }
 
 /// Status snapshot captured during receive completion or failure.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CaptureStatus {
     /// CSI host status bits.
@@ -640,29 +622,8 @@ impl CaptureStatus {
     }
 }
 
-/// Successful single-frame receive result.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CaptureFrame {
-    /// Number of bytes the DMA wrote, measured from its destination address.
-    ///
-    /// The CSI bridge is the DMA flow controller and ends the block (TRM
-    /// §7.5.5), so this differs from the configured frame size when the source
-    /// frame does not match the configured geometry. `receive` only
-    /// invalidates the cache for the configured frame size.
-    pub received_bytes: usize,
-}
-
-/// Failure reason when CSI capture shutdown cannot be completed cleanly.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum ShutdownFailureReason {
-    /// Timed out waiting for the DW-GDMA channel to complete an abort.
-    AbortTimedOut,
-}
-
 /// Blocking receive error.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ReceiveError {
@@ -681,26 +642,23 @@ pub enum ReceiveError {
     DmaError(CaptureStatus),
     /// CSI host/bridge reported a frame or protocol error.
     CsiError(CaptureStatus),
-    /// Capture ended, but DMA channel shutdown did not complete cleanly.
-    ShutdownFailed {
-        /// Shutdown failure reason.
-        reason: ShutdownFailureReason,
-        /// Status sampled before shutdown was requested.
-        status_before_shutdown: CaptureStatus,
-        /// Status sampled after shutdown failure.
-        status_after_shutdown: CaptureStatus,
+    /// The frame completed with a size other than the configured one.
+    ///
+    /// The CSI bridge is the DMA flow controller and ends the block (TRM
+    /// §7.5.5), so this happens when the source frame does not match the
+    /// configured geometry.
+    FrameSizeMismatch {
+        /// Number of bytes the DMA wrote.
+        received: usize,
     },
+    /// Capture ended, but the DMA channel abort did not complete. The channel
+    /// was no longer enabled, so the buffer is handed back. Holds the status
+    /// sampled before shutdown was requested.
+    ShutdownFailed(CaptureStatus),
     /// [`CsiCapture::receive_with_interrupt`] did not arm, because the capture
     /// channel already has a handler in the shared DW-GDMA interrupt
-    /// dispatcher. Nothing was started and the buffer was not accessed. The
-    /// fields describe the line at that point.
-    InterruptUnavailable {
-        /// Other VDMA channels with `CH_EN` set, one bit per channel.
-        enabled_channels: u32,
-        /// Other sources driving the DW-GDMA interrupt line: bit `n` for
-        /// channel `n`, bit 16 for the common register block.
-        asserted_sources: u32,
-    },
+    /// dispatcher. Nothing was started and the buffer was not accessed.
+    InterruptUnavailable,
 }
 
 impl fmt::Display for ReceiveError {
@@ -714,19 +672,16 @@ impl fmt::Display for ReceiveError {
             Self::Timeout(_) => write!(f, "timed out waiting for CSI frame"),
             Self::DmaError(_) => write!(f, "DMA channel reported an error during capture"),
             Self::CsiError(_) => write!(f, "CSI host/bridge reported an error during capture"),
-            Self::ShutdownFailed { reason, .. } => {
+            Self::FrameSizeMismatch { received } => {
                 write!(
                     f,
-                    "failed to stop CSI DMA channel safely after capture ({reason:?})"
+                    "frame of {received} bytes does not match the configured size"
                 )
             }
-            Self::InterruptUnavailable {
-                enabled_channels,
-                asserted_sources,
-            } => write!(
-                f,
-                "DW-GDMA interrupt unavailable for the capture channel (enabled channels 0x{enabled_channels:x}, asserted sources 0x{asserted_sources:x})"
-            ),
+            Self::ShutdownFailed(_) => write!(f, "CSI DMA channel abort did not complete"),
+            Self::InterruptUnavailable => {
+                write!(f, "DW-GDMA interrupt unavailable for the capture channel")
+            }
         }
     }
 }
@@ -734,7 +689,7 @@ impl fmt::Display for ReceiveError {
 impl core::error::Error for ReceiveError {}
 
 /// CSI host error interrupt summary status.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct HostErrorStatus {
     /// Any PHY fatal status.
@@ -755,8 +710,6 @@ pub struct HostErrorStatus {
     pub ecc_corrected: bool,
     /// Any PHY non-fatal status.
     pub phy_error: bool,
-    /// Raw `int_st_main` value for debugging.
-    pub raw_main_status: u32,
 }
 
 impl HostErrorStatus {
@@ -774,50 +727,36 @@ impl HostErrorStatus {
     }
 }
 
-/// CSI bridge event summary status.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// CSI bridge error events.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct BridgeEventStatus {
-    /// Configured `vadr_num` greater-than event.
-    pub vadr_num_gt: bool,
-    /// Configured `vadr_num` less-than event.
-    pub vadr_num_lt: bool,
-    /// Incomplete-frame discard event.
-    pub discard: bool,
-    /// Buffer overrun event.
-    pub csi_buf_overrun: bool,
-    /// Async FIFO overflow event.
-    pub csi_async_fifo_ovf: bool,
-    /// DMA configuration update-complete event.
-    pub dma_cfg_has_updated: bool,
-    /// Raw `int_raw` value for debugging.
-    pub raw_status: u32,
+    /// The frame had more lines than configured.
+    pub too_many_lines: bool,
+    /// The frame had fewer lines than configured.
+    pub too_few_lines: bool,
+    /// The bridge sent an incomplete frame.
+    pub incomplete_frame: bool,
+    /// The bridge buffer overran.
+    pub buffer_overrun: bool,
+    /// The bridge input FIFO overflowed.
+    pub fifo_overflow: bool,
 }
 
 impl BridgeEventStatus {
     /// Returns true when an event that fails a capture is set.
     pub const fn any_error(&self) -> bool {
-        self.vadr_num_gt
-            || self.vadr_num_lt
-            || self.discard
-            || self.csi_buf_overrun
-            || self.csi_async_fifo_ovf
-    }
-
-    /// Returns true when any bridge event/status bit is set.
-    pub const fn any_event(&self) -> bool {
-        self.vadr_num_gt
-            || self.vadr_num_lt
-            || self.discard
-            || self.csi_buf_overrun
-            || self.csi_async_fifo_ovf
-            || self.dma_cfg_has_updated
+        self.too_many_lines
+            || self.too_few_lines
+            || self.incomplete_frame
+            || self.buffer_overrun
+            || self.fifo_overflow
     }
 }
 
 /// What the completion interrupt of the last
 /// [`CsiCapture::receive_with_interrupt`] observed.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CompletionInterruptReport {
     /// The handler ran before the wait ended.
@@ -825,11 +764,6 @@ pub struct CompletionInterruptReport {
     /// The capture channel raised it. `false` with `fired` means another
     /// source drove the shared line, and the wait fell back to polling.
     pub own_source: bool,
-    /// Channel `INTSTATUS0` read by the handler.
-    pub channel_status: u32,
-    /// Microseconds from arming the interrupt, just before the channel is
-    /// enabled, to the handler.
-    pub latency_from_arm_us: Option<u32>,
 }
 
 /// MIPI CSI controller handle.
@@ -866,8 +800,8 @@ struct CaptureShutdown(DwGdmaChannel);
 
 impl Drop for CaptureShutdown {
     fn drop(&mut self) {
-        if let Err(reason) = stop_transfer(self.0) {
-            panic!("mipi-csi DMA shutdown failed in Drop: {:?}", reason);
+        if !stop_transfer(self.0) {
+            panic!("mipi-csi DMA shutdown failed in Drop");
         }
         clear_transfer_status(self.0);
         disable_isp_bypass();
@@ -884,10 +818,7 @@ impl<'d> MipiCsi<'d> {
     /// Powers the `VDD_MIPI_DPHY` rail, which the MIPI-DSI driver shares,
     /// if it is not powered yet. It stays on until neither driver uses it.
     pub fn new(csi: MIPI_CSI<'d>, config: Config) -> Result<Self, ConfigError> {
-        if !(MIN_LANE_RATE_MBPS..=MAX_LANE_RATE_MBPS).contains(&config.lane_bit_rate_mbps) {
-            return Err(ConfigError::InvalidLaneBitRate);
-        }
-
+        config.validate()?;
         let this = Self {
             _dphy_power: DphyPower::acquire(),
             _csi: csi,
@@ -903,6 +834,19 @@ impl<'d> MipiCsi<'d> {
         this.init_host(config);
 
         Ok(this)
+    }
+
+    /// Applies a new lane configuration, which resets the CSI host and the
+    /// D-PHY.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error and keeps the previous configuration if `config` is
+    /// invalid.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        config.validate()?;
+        self.init_host(*config);
+        Ok(())
     }
 
     /// Attaches one VDMA channel and prepares a blocking single-frame capture
@@ -1113,7 +1057,7 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
     /// timeout/error path. This prevents returning buffer ownership to safe
     /// Rust while DMA may still write into it. Also panics if the DMA
     /// destination address ended up past the end of `buffer`.
-    pub fn receive(&mut self, buffer: &mut [u8]) -> Result<CaptureFrame, ReceiveError> {
+    pub fn receive(&mut self, buffer: &mut [u8]) -> Result<(), ReceiveError> {
         self.receive_with(buffer, || {})
     }
 
@@ -1131,7 +1075,7 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
         &mut self,
         buffer: &mut [u8],
         start_source: impl FnOnce(),
-    ) -> Result<CaptureFrame, ReceiveError> {
+    ) -> Result<(), ReceiveError> {
         self.receive_impl(buffer, start_source, CompletionWait::Polling)
     }
 
@@ -1157,7 +1101,7 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
         &mut self,
         buffer: &mut [u8],
         start_source: impl FnOnce(),
-    ) -> Result<CaptureFrame, ReceiveError> {
+    ) -> Result<(), ReceiveError> {
         self.receive_impl(buffer, start_source, CompletionWait::Interrupt)
     }
 
@@ -1167,12 +1111,58 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
         self.completion_interrupt
     }
 
+    /// Applies a new capture configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error and keeps the previous configuration if `config` is
+    /// invalid.
+    pub fn apply_config(&mut self, config: &CaptureConfig) -> Result<(), CaptureConfigError> {
+        let config = config.validate()?;
+        self.dma_channel
+            .configure(csi_dma_channel_config(config.dma_axi));
+        self.csi.configure_bridge_capture(config);
+        enable_isp_bypass(config);
+        self.config = config;
+        Ok(())
+    }
+
+    /// Starts capturing continuously into `buffers`.
+    ///
+    /// The DMA channel and the bridge are armed on the first buffer before
+    /// this returns, so the source stream may already be running or be started
+    /// afterwards. The bridge waits for the next frame start, so the first
+    /// frame is whole even if the source is mid-frame.
+    ///
+    /// The buffers must be DMA-capable, as for [`Self::receive`], at least the
+    /// configured frame size, and must not overlap. They are `'static`
+    /// because the DMA writes them between calls.
+    ///
+    /// The stream binds its own handler to the
+    /// [`CSI_BRIDGE`](crate::peripherals::Interrupt::CSI_BRIDGE) interrupt on
+    /// the current core, to end a frame that the bridge discarded.
+    ///
+    /// # Errors
+    ///
+    /// Returns the capture and the buffers unchanged if a buffer is unsuitable
+    /// or the capture channel's interrupt is already in use.
+    #[allow(
+        clippy::result_large_err,
+        reason = "hands back the capture and the buffers on failure"
+    )]
+    pub fn into_stream(
+        self,
+        buffers: [&'static mut [u8]; STREAM_BUFFER_COUNT],
+    ) -> Result<CsiStream<'d, Dm>, IntoStreamError<'d, Dm>> {
+        CsiStream::new(self, buffers)
+    }
+
     fn receive_impl(
         &mut self,
         buffer: &mut [u8],
         start_source: impl FnOnce(),
         wait: CompletionWait,
-    ) -> Result<CaptureFrame, ReceiveError> {
+    ) -> Result<(), ReceiveError> {
         if buffer.len() < self.config.frame_bytes {
             return Err(ReceiveError::BufferTooSmall {
                 required: self.config.frame_bytes,
@@ -1207,82 +1197,50 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
             // registers. After a completion it ends on its first pass.
             self.wait_for_completion_interrupt(deadline);
         }
-        let outcome = loop {
+        let (status, result) = loop {
             let status = self.capture_status();
-            if status.dma_status.any_error() {
-                break ReceiveOutcome::DmaError(status);
-            }
-            if status.csi_error() {
-                break ReceiveOutcome::CsiError(status);
-            }
-            if status.dma_status.transfer_done() {
-                break ReceiveOutcome::Completed(status);
-            }
-            if Instant::now() > deadline {
-                break ReceiveOutcome::Timeout(status);
-            }
+            let result = if status.dma_status.error {
+                Err(ReceiveError::DmaError(status))
+            } else if status.csi_error() {
+                Err(ReceiveError::CsiError(status))
+            } else if status.dma_status.transfer_done {
+                Ok(())
+            } else if Instant::now() > deadline {
+                Err(ReceiveError::Timeout(status))
+            } else {
+                continue;
+            };
+            break (status, result);
         };
 
-        if let Err(reason) = self.stop_transfer() {
-            let status_before_shutdown = outcome.status();
-            let status_after_shutdown = self.capture_status();
-            let abort_in_progress_after_shutdown = self.dma_channel.abort_in_progress();
-            let dma_may_still_be_active = status_after_shutdown.dma_status.channel_enabled
-                || abort_in_progress_after_shutdown;
-
-            // Buffer ownership can only be returned to safe Rust when the channel is
-            // definitely quiesced. If shutdown did not complete and the channel might still be
-            // active, abort execution instead of returning a potentially writable buffer.
-            if dma_may_still_be_active {
-                let dma = self.dma_channel;
-                panic!(
-                    "mipi-csi DMA shutdown failed ({:?}) after {}, the channel may still be active: before={:?} after={:?} abort_in_progress={} dar=0x{:08x} bridge_fifo_words={}",
-                    reason,
-                    outcome.kind(),
-                    status_before_shutdown,
-                    status_after_shutdown,
-                    abort_in_progress_after_shutdown,
-                    dma.destination_address(),
-                    MIPI_CSI_BRIDGE::regs()
-                        .buf_flow_ctl()
-                        .read()
-                        .csi_buf_depth()
-                        .bits(),
-                );
-            }
-
-            self.check_destination_bounds(dst_start, buffer_len);
-
-            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-            dma_buffer.invalidate();
-
-            return Err(ReceiveError::ShutdownFailed {
-                reason,
-                status_before_shutdown,
-                status_after_shutdown,
-            });
+        let stopped = self.stop_transfer();
+        if !stopped && (self.dma_channel.is_enabled() || self.dma_channel.abort_in_progress()) {
+            // Returning the buffer to safe Rust while the DMA can still write
+            // it would be unsound.
+            panic!(
+                "mipi-csi DMA shutdown failed, the channel may still be active: {:?} then {:?}",
+                status,
+                self.capture_status()
+            );
         }
-
-        let received_bytes = self.check_destination_bounds(dst_start, buffer_len);
+        let received = self.check_destination_bounds(dst_start, buffer_len);
 
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         dma_buffer.invalidate();
 
-        match outcome {
-            ReceiveOutcome::Completed(_) => Ok(CaptureFrame { received_bytes }),
-            ReceiveOutcome::Timeout(status) => Err(ReceiveError::Timeout(status)),
-            ReceiveOutcome::DmaError(status) => Err(ReceiveError::DmaError(status)),
-            ReceiveOutcome::CsiError(status) => Err(ReceiveError::CsiError(status)),
+        if !stopped {
+            return Err(ReceiveError::ShutdownFailed(status));
         }
+        result?;
+        if received != self.config.frame_bytes {
+            return Err(ReceiveError::FrameSizeMismatch { received });
+        }
+        Ok(())
     }
 
     fn check_completion_interrupt_free(&self) -> Result<(), ReceiveError> {
         if !channel_interrupt_available(self.dma_channel) {
-            let own = 1 << self.dma_channel.channel_id();
-            return Err(ReceiveError::InterruptUnavailable {
-                enabled_channels: enabled_channels() & !own,
-                asserted_sources: asserted_interrupt_sources() & !own,
-            });
+            return Err(ReceiveError::InterruptUnavailable);
         }
         Ok(())
     }
@@ -1290,7 +1248,6 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
     /// Must run after the channel status was cleared and before the channel is
     /// enabled.
     fn arm_completion_interrupt(&self) {
-        COMPLETION_IRQ_ARMED_AT_US.store(now_us(), Ordering::Relaxed);
         COMPLETION_IRQ_STATE.store(COMPLETION_IRQ_ARMED, Ordering::Release);
         register_channel_handler(self.dma_channel, completion_interrupt_handler);
         self.dma_channel
@@ -1308,20 +1265,9 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
         unregister_channel_handler(self.dma_channel);
         // The handler can no longer run, so its results are final.
         let state = COMPLETION_IRQ_STATE.swap(COMPLETION_IRQ_IDLE, Ordering::AcqRel);
-        let fired = state != COMPLETION_IRQ_ARMED;
         self.completion_interrupt = CompletionInterruptReport {
-            fired,
+            fired: state != COMPLETION_IRQ_ARMED,
             own_source: state == COMPLETION_IRQ_OWN,
-            channel_status: if fired {
-                COMPLETION_IRQ_STATUS.load(Ordering::Relaxed)
-            } else {
-                0
-            },
-            latency_from_arm_us: fired.then(|| {
-                COMPLETION_IRQ_AT_US
-                    .load(Ordering::Relaxed)
-                    .wrapping_sub(COMPLETION_IRQ_ARMED_AT_US.load(Ordering::Relaxed))
-            }),
         };
     }
 
@@ -1361,7 +1307,7 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
         }
     }
 
-    fn stop_transfer(&mut self) -> Result<(), ShutdownFailureReason> {
+    fn stop_transfer(&mut self) -> bool {
         stop_transfer(self.dma_channel)
     }
 
@@ -1392,11 +1338,15 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
         CaptureStatus {
             host_errors: host_error_status(),
             bridge_events: bridge_event_status(),
-            dma_status: DmaStatus {
-                raw_status: self.dma_channel.interrupt_status(),
-                channel_enabled: self.dma_channel.is_enabled(),
-                completed_transfer_units: self.dma_channel.completed_transfer_units(),
-                fifo_remaining_units: self.dma_channel.fifo_remaining_units(),
+            dma_status: {
+                let status = self.dma_channel.interrupt_status();
+                DmaStatus {
+                    transfer_done: status
+                        & (DMA_STATUS_BLOCK_TRANSFER_DONE | DMA_STATUS_DMA_TRANSFER_DONE)
+                        != 0,
+                    error: status & DMA_STATUS_ERROR_MASK != 0,
+                    channel_enabled: self.dma_channel.is_enabled(),
+                }
             },
         }
     }
@@ -1414,15 +1364,8 @@ const COMPLETION_IRQ_OWN: u8 = 2;
 const COMPLETION_IRQ_FOREIGN: u8 = 3;
 
 static COMPLETION_IRQ_STATE: AtomicU8 = AtomicU8::new(COMPLETION_IRQ_IDLE);
-static COMPLETION_IRQ_STATUS: AtomicU32 = AtomicU32::new(0);
-static COMPLETION_IRQ_ARMED_AT_US: AtomicU32 = AtomicU32::new(0);
-static COMPLETION_IRQ_AT_US: AtomicU32 = AtomicU32::new(0);
 
-fn now_us() -> u32 {
-    Instant::now().duration_since_epoch().as_micros() as u32
-}
-
-/// Records the channel status, called by the shared DW-GDMA dispatcher only for
+/// Records which source raised the interrupt, called by the shared DW-GDMA dispatcher only for
 /// the capture channel.
 ///
 /// The status is left latched for the waiting thread, so the source is
@@ -1434,11 +1377,7 @@ fn completion_interrupt_handler(channel: DwGdmaChannel, _pending: u32) {
     if COMPLETION_IRQ_STATE.load(Ordering::Acquire) != COMPLETION_IRQ_ARMED {
         return;
     }
-    let status = channel.interrupt_status();
-
-    COMPLETION_IRQ_STATUS.store(status, Ordering::Relaxed);
-    COMPLETION_IRQ_AT_US.store(now_us(), Ordering::Relaxed);
-    let state = if status & DMA_COMPLETION_INTERRUPT_MASK != 0 {
+    let state = if channel.interrupt_status() & DMA_COMPLETION_INTERRUPT_MASK != 0 {
         COMPLETION_IRQ_OWN
     } else {
         COMPLETION_IRQ_FOREIGN
@@ -1458,37 +1397,10 @@ fn wait_until(timeout_ms: u64, mut condition: impl FnMut() -> bool) -> bool {
     condition()
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ReceiveOutcome {
-    Completed(CaptureStatus),
-    Timeout(CaptureStatus),
-    DmaError(CaptureStatus),
-    CsiError(CaptureStatus),
-}
-
-impl ReceiveOutcome {
-    const fn status(self) -> CaptureStatus {
-        match self {
-            Self::Completed(status)
-            | Self::Timeout(status)
-            | Self::DmaError(status)
-            | Self::CsiError(status) => status,
-        }
-    }
-
-    const fn kind(self) -> &'static str {
-        match self {
-            Self::Completed(_) => "completed",
-            Self::Timeout(_) => "timeout",
-            Self::DmaError(_) => "dma_error",
-            Self::CsiError(_) => "csi_error",
-        }
-    }
-}
-
 /// Stops the capture in the order of TRM §42.7.2: the DMA channel first,
 /// then the bridge.
-fn stop_transfer(channel: DwGdmaChannel) -> Result<(), ShutdownFailureReason> {
+/// Returns whether the channel stopped.
+fn stop_transfer(channel: DwGdmaChannel) -> bool {
     let result = stop_dma_channel(channel);
     MIPI_CSI_BRIDGE::regs()
         .csi_en()
@@ -1496,9 +1408,9 @@ fn stop_transfer(channel: DwGdmaChannel) -> Result<(), ShutdownFailureReason> {
     result
 }
 
-fn stop_dma_channel(channel: DwGdmaChannel) -> Result<(), ShutdownFailureReason> {
+fn stop_dma_channel(channel: DwGdmaChannel) -> bool {
     if !channel.is_enabled() {
-        return Ok(());
+        return true;
     }
 
     // TRM §7.5.7.2: the channel halts only after the source reads it has
@@ -1506,7 +1418,7 @@ fn stop_dma_channel(channel: DwGdmaChannel) -> Result<(), ShutdownFailureReason>
     // stay enabled until `CH_EN` reads back clear.
     channel.set_enabled(false);
     if wait_until(DMA_CHANNEL_DISABLE_TIMEOUT_MS, || !channel.is_enabled()) {
-        return Ok(());
+        return true;
     }
 
     // TRM §7.5.6: suspend halts the source the same way and reports
@@ -1516,13 +1428,9 @@ fn stop_dma_channel(channel: DwGdmaChannel) -> Result<(), ShutdownFailureReason>
         !channel.is_enabled() || channel.interrupt_status() & DMA_STATUS_CH_SUSPENDED != 0
     });
     channel.trigger_abort();
-    if wait_until(DMA_CHANNEL_ABORT_TIMEOUT_MS, || {
+    wait_until(DMA_CHANNEL_ABORT_TIMEOUT_MS, || {
         !channel.is_enabled() && !channel.abort_in_progress()
-    }) {
-        Ok(())
-    } else {
-        Err(ShutdownFailureReason::AbortTimedOut)
-    }
+    })
 }
 
 fn clear_transfer_status(channel: DwGdmaChannel) {
@@ -1633,20 +1541,17 @@ fn host_error_status() -> HostErrorStatus {
         data_id_error: host_int_main.st_status_int_data_id().bit_is_set(),
         ecc_corrected: host_int_main.st_status_int_ecc_corrected().bit_is_set(),
         phy_error: host_int_main.st_status_int_phy().bit_is_set(),
-        raw_main_status: host_int_main.bits(),
     }
 }
 
 fn bridge_event_status() -> BridgeEventStatus {
     let bridge_int = MIPI_CSI_BRIDGE::regs().int_raw().read();
     BridgeEventStatus {
-        vadr_num_gt: bridge_int.vadr_num_gt().bit_is_set(),
-        vadr_num_lt: bridge_int.vadr_num_lt().bit_is_set(),
-        discard: bridge_int.discard().bit_is_set(),
-        csi_buf_overrun: bridge_int.csi_buf_overrun().bit_is_set(),
-        csi_async_fifo_ovf: bridge_int.csi_async_fifo_ovf().bit_is_set(),
-        dma_cfg_has_updated: bridge_int.dma_cfg_has_updated().bit_is_set(),
-        raw_status: bridge_int.bits(),
+        too_few_lines: bridge_int.vadr_num_gt().bit_is_set(),
+        too_many_lines: bridge_int.vadr_num_lt().bit_is_set(),
+        incomplete_frame: bridge_int.discard().bit_is_set(),
+        buffer_overrun: bridge_int.csi_buf_overrun().bit_is_set(),
+        fifo_overflow: bridge_int.csi_async_fifo_ovf().bit_is_set(),
     }
 }
 
