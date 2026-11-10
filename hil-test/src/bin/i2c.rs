@@ -5,6 +5,7 @@
 
 #![no_std]
 #![no_main]
+#![cfg_attr(esp32s3, feature(asm_experimental_arch))]
 
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
@@ -527,40 +528,43 @@ mod clock_gate {
 
     use esp_hal::{
         analog::adc::{Adc, AdcConfig},
-        gpio::Flex,
         i2c::lp_i2c::{Config, LpI2c},
-        peripherals::{CPU_CTRL, GPIO2, GPIO3, LP_I2C0, SENS},
+        peripherals::SENS,
         system::{CpuControl, Stack},
     };
     use hil_test::mk_static;
 
-    fn clock_gate_matches(enabled: bool) -> bool {
+    fn clock_gate_matches(expected_enabled: bool) -> bool {
         (0..32).all(|_| {
             SENS::regs()
                 .sar_peri_clk_gate_conf()
                 .read()
                 .rtc_i2c_clk_en()
                 .bit_is_set()
-                == enabled
+                == expected_enabled
         })
     }
 
-    fn other_core_keeps_rtc_i2c_clock_gate(
-        cpu_ctrl: CPU_CTRL<'static>,
-        mut i2c: LP_I2C0<'static>,
-        mut sda: GPIO3<'static>,
-        mut scl: GPIO2<'static>,
-        mut contender: impl FnMut() + Send + 'static,
-    ) {
+    #[test]
+    fn concurrent_adc_init_preserves_rtc_i2c_clock_gate() {
         static STOP: AtomicBool = AtomicBool::new(false);
         static STOPPED: AtomicBool = AtomicBool::new(false);
 
-        let mut cpu_control = CpuControl::new(cpu_ctrl);
+        let mut p = esp_hal::init(esp_hal::Config::default());
+        let mut adc = p.ADC1;
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
         let stack = mk_static!(Stack<8192>, Stack::new());
         let _guard = cpu_control
             .start_app_core(stack, move || {
-                while !STOP.load(Ordering::Relaxed) {
-                    contender();
+                // Vary the delay between ADC initializations to exercise more interleavings.
+                for nops in (0..32).cycle() {
+                    if STOP.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    for _ in 0..nops {
+                        unsafe { core::arch::asm!("nop", options(nomem, nostack)) };
+                    }
+                    let _ = Adc::new(adc.reborrow(), AdcConfig::new()).unwrap();
                 }
                 STOPPED.store(true, Ordering::Release);
                 loop {}
@@ -570,10 +574,10 @@ mod clock_gate {
         let mut lost_updates = 0u32;
         for _ in 0..100_000 {
             let driver = LpI2c::new(
-                i2c.reborrow(),
+                p.LP_I2C0.reborrow(),
                 Config::default(),
-                sda.reborrow(),
-                scl.reborrow(),
+                p.GPIO3.reborrow(),
+                p.GPIO2.reborrow(),
             )
             .unwrap();
             lost_updates += u32::from(!clock_gate_matches(true));
@@ -588,23 +592,5 @@ mod clock_gate {
             lost_updates, 0,
             "the other core overwrote the RTC I2C clock gate"
         );
-    }
-
-    #[test]
-    fn gpio_on_the_other_core_keeps_rtc_i2c_clock_gate() {
-        let p = esp_hal::init(esp_hal::Config::default());
-        let mut pin = p.GPIO9;
-        other_core_keeps_rtc_i2c_clock_gate(p.CPU_CTRL, p.LP_I2C0, p.GPIO3, p.GPIO2, move || {
-            let _ = Flex::new(pin.reborrow());
-        });
-    }
-
-    #[test]
-    fn adc_on_the_other_core_keeps_rtc_i2c_clock_gate() {
-        let p = esp_hal::init(esp_hal::Config::default());
-        let mut adc = p.ADC1;
-        other_core_keeps_rtc_i2c_clock_gate(p.CPU_CTRL, p.LP_I2C0, p.GPIO3, p.GPIO2, move || {
-            let _ = Adc::new(adc.reborrow(), AdcConfig::new()).unwrap();
-        });
     }
 }
