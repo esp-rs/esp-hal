@@ -38,10 +38,21 @@ impl I2sInstance {
 
     pub(crate) fn configure_tx_clk_impl(
         self,
-        _clocks: &mut ClockTree,
+        clocks: &mut ClockTree,
         _old_config: Option<I2sClkConfig>,
         new_config: I2sClkConfig,
     ) {
+        // The divider can lose the fraction if the module clock is gated while the coefficients
+        // change.
+        let enabled = clocks.i2s_tx_clk_refcount[self as usize] > 0;
+        self.enable_tx_clk_impl(clocks, true);
+        self.set_tx_divider(new_config);
+        if !enabled {
+            self.enable_tx_clk_impl(clocks, false);
+        }
+    }
+
+    fn set_tx_divider(self, new_config: I2sClkConfig) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
 
         // The divider applies twice, unless each coefficient has a separate register write in
@@ -91,10 +102,21 @@ impl I2sInstance {
 
     pub(crate) fn configure_rx_clk_impl(
         self,
-        _clocks: &mut ClockTree,
+        clocks: &mut ClockTree,
         _old_config: Option<I2sClkConfig>,
         new_config: I2sClkConfig,
     ) {
+        // The divider can lose the fraction if the module clock is gated while the coefficients
+        // change.
+        let enabled = clocks.i2s_rx_clk_refcount[self as usize] > 0;
+        self.enable_rx_clk_impl(clocks, true);
+        self.set_rx_divider(new_config);
+        if !enabled {
+            self.enable_rx_clk_impl(clocks, false);
+        }
+    }
+
+    fn set_rx_divider(self, new_config: I2sClkConfig) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
 
         // The divider applies twice, unless each coefficient has a separate register write in

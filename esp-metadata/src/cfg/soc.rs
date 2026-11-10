@@ -930,7 +930,7 @@ impl SystemClocks {
                     if let Some(instance_count) = instance_count.as_ref() {
                         clock_tree_refcount_field_decls.push(quote! {
                             #cfg_attr
-                            #refcount_field: [u32; #instance_count]
+                            pub(crate) #refcount_field: [u32; #instance_count]
                         });
                         clock_tree_refcount_field_inits.push(quote! {
                             #cfg_attr
@@ -939,7 +939,7 @@ impl SystemClocks {
                     } else {
                         clock_tree_refcount_field_decls.push(quote! {
                             #cfg_attr
-                            #refcount_field: u32
+                            pub(crate) #refcount_field: u32
                         });
                         clock_tree_refcount_field_inits.push(quote! {
                             #cfg_attr
