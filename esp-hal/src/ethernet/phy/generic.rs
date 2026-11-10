@@ -35,6 +35,12 @@ use crate::{
 /// Interval between link polls in async mode.
 const LINK_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
+const LINK_STATE_DOWN: LinkState = LinkState {
+    up: false,
+    speed: Speed::_100M,
+    duplex: Duplex::Full,
+};
+
 /// Maximum iterations to wait for the PHY reset bit to self-clear.
 const RESET_POLL_LIMIT: u32 = 500_000; // us
 
@@ -80,12 +86,16 @@ fn ext_write<M: MdioBus>(mdio: &mut M, addr: u8, ext: u16, val: u16) {
 pub struct GenericPhy {
     /// `Some(addr)` for a fixed address; `None` until auto-discovery runs.
     addr: Option<u8>,
+    /// Link state from the last read in async mode.
+    link: LinkState,
+    /// Earliest time of the next read in async mode.
+    next_poll: Instant,
 }
 
 impl GenericPhy {
     /// Creates a new driver instance for the given MDIO bus address.
     pub const fn new(addr: u8) -> Self {
-        Self { addr: Some(addr) }
+        Self::with_addr(Some(addr))
     }
 
     /// Creates a new driver instance that discovers the PHY address automatically
@@ -93,7 +103,15 @@ impl GenericPhy {
     ///
     /// Returns [`PhyError::NotFound`] from `init` if no PHY responds.
     pub const fn new_auto() -> Self {
-        Self { addr: None }
+        Self::with_addr(None)
+    }
+
+    const fn with_addr(addr: Option<u8>) -> Self {
+        Self {
+            addr,
+            link: LINK_STATE_DOWN,
+            next_poll: Instant::EPOCH,
+        }
     }
 
     /// Scans all 32 Clause 22 addresses and returns the first one that holds a
@@ -222,18 +240,28 @@ impl Phy for GenericPhy {
     }
 
     fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, cx: Option<&mut Context<'_>>) -> LinkState {
-        const LINK_STATE_DOWN: LinkState = LinkState {
-            up: false,
-            speed: Speed::_100M,
-            duplex: Duplex::Full,
+        let Some(cx) = cx else {
+            return self.read_link(mdio);
         };
 
-        // No PHY interrupt is available, so schedule the next poll. Without the
-        // `embassy-time` feature this wakes immediately and busy-polls.
-        if let Some(cx) = cx {
-            wake_at(Instant::now() + LINK_POLL_INTERVAL, cx);
+        // The task may be polled for other reasons (other wakers, joined or
+        // selected futures), so only read the PHY once the interval has passed.
+        let now = Instant::now();
+        if now >= self.next_poll {
+            self.link = self.read_link(mdio);
+            self.next_poll = now + LINK_POLL_INTERVAL;
         }
 
+        // No PHY interrupt is available. Without the `embassy-time` feature
+        // this wakes immediately and busy-polls.
+        wake_at(self.next_poll, cx);
+        self.link
+    }
+}
+
+impl GenericPhy {
+    /// Reads the current link state from the PHY registers.
+    fn read_link<M: MdioBus>(&self, mdio: &mut M) -> LinkState {
         let Some(addr) = self.addr else {
             debug!("poll_link called before init");
             return LINK_STATE_DOWN;

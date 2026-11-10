@@ -19,7 +19,11 @@ pub(crate) fn wake_at(deadline: Instant, cx: &mut Context<'_>) {
             use core::future::Future;
 
             let now = Instant::now();
-            let remaining = if deadline > now { (deadline - now).as_micros() } else { 0 };
+            let remaining = if deadline > now {
+                (deadline - now).as_micros()
+            } else {
+                0
+            };
 
             let mut timer = embassy_time::Timer::after_micros(remaining);
             let _ = core::pin::Pin::new(&mut timer).poll(cx);
