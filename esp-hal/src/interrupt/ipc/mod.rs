@@ -61,6 +61,8 @@ use crate::{
 #[cfg_attr(riscv, path = "riscv.rs")]
 #[cfg_attr(xtensa, path = "xtensa.rs")]
 mod implem;
+#[allow(dead_code)]
+mod queue;
 
 pub(crate) use implem::install;
 use implem::raise;
