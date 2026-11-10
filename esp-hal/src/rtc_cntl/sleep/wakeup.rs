@@ -20,7 +20,9 @@ use crate::{
 
 /// Which sleep the chip is entering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SleepKind {
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum SleepKind {
     /// The digital domain keeps its state, and the sleep returns to the caller.
     Light,
     /// The chip resets when it wakes.
