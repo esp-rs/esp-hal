@@ -5,7 +5,7 @@
 //! as the live camera-to-LCD example, has to be followed by one that turns it off, or by a power
 //! cycle, before these tests run. The tests check the D-PHY rail, configuration errors, capture
 //! timeouts, the shutdown of an armed capture and stream, and a dropped `next_frame_async` future.
-//! Capture with a camera is covered by `examples/qa/src/bin/mipi-csi-sc2336-first-frame.rs`.
+//! Capture with a camera is covered by the `mipi-csi-*` QA tests in `examples/qa`.
 
 //% CHIP_FILTER: mipi_csi_driver_supported
 //% FEATURES: unstable

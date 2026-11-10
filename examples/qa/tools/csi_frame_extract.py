@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract a RAW8 frame exported by `mipi-csi-sc2336-first-frame` (`CSI_FRAME_EXPORT=1`).
+"""Extract a RAW8 frame exported by `mipi-csi-sc2336-capture` (`CSI_FRAME_EXPORT=1`).
 
 Reads a console log, checks the `@@SC2336FRAME` framing, every chunk CRC, the
 chunk order and the whole-frame CRC, and only then writes:
