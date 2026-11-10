@@ -1225,6 +1225,9 @@ driver_configs![
                 /// New CPU and bus clock dividers take effect only after a shared update signal.
                 #[serde(default)]
                 has_bus_clock_update: bool,
+                /// The hardware can lower APB_CLK while the APB bus is idle.
+                #[serde(default)]
+                has_apb_frequency_reduction: bool,
                 #[serde(default)]
                 cpu_mcause_mask: u32,
                 /// PMP address matching granularity, in bytes.

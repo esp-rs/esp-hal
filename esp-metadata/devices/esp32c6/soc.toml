@@ -31,6 +31,7 @@ cpu_csr_prv_mode = 0xC10
 cpu_mcause_mask = 0x1f
 
 has_swd_watchdog = true
+has_apb_frequency_reduction = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4088_0000 },
@@ -85,7 +86,7 @@ peripherals = [
     { name = "OTP_DEBUG" },
     { name = "PARL_IO", interrupts = { peri = "PARL_IO" }, clock_group = "PARL_IO" },
     { name = "PAU" },
-    { name = "PCNT", interrupts = { peri = "PCNT" } },
+    { name = "PCNT", interrupts = { peri = "PCNT" }, clock_group = "PCNT" },
     { name = "PCR" },
     { name = "PLIC_MX" },
     { name = "PLIC_UX", hidden = true },

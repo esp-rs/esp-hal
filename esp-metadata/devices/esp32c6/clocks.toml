@@ -30,9 +30,8 @@ system_clocks = { clock_tree = [
         { name = "HS", outputs = "AHB_HS_DIV" },
         { name = "LS", outputs = "AHB_LS_DIV" },
     ] },
-    { name = "APB_CLK", type = "generic", params = { divisor = "0, 1, 3" }, output = "AHB_CLK / (divisor + 1)" },
-    # configurable, but automatic - there's no point in making APB_DECREASE_DIV part of the model as consumers will always see APB_CLK
-    # { name = "APB_DECREASE_DIV", type = "generic", output = "APB_DIV / (divisor + 1)" },
+    # The hardware lowers APB_CLK while the APB bus is idle. Consumers stop the reduction.
+    { name = "APB_CLK", type = "generic", params = { divisor = "0, 1, 3" }, output = "AHB_CLK / (divisor + 1)", always_on = true, refcounted = true },
 
     { name = "MSPI_FAST_HS_CLK", type = "generic", params = { divisor = "3, 4, 5" }, output = "HP_ROOT_CLK / (divisor + 1)" },
     { name = "MSPI_FAST_LS_CLK", type = "generic", params = { divisor = "0, 1, 2" }, output = "HP_ROOT_CLK / (divisor + 1)" },
@@ -96,6 +95,10 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SDM", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
+    ] },
+    # The glitch filter counts APB_CLK cycles.
+    { group = "PCNT", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "APB_CLK" },
     ] },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", wake_locking = true, variants = [

@@ -328,7 +328,6 @@ fn configure_cpu_root_clk_impl(
 }
 
 // CPU_CLK divider
-fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn configure_cpu_clk_impl(
     _clocks: &mut ClockTree,
     _old_config: Option<CpuClkConfig>,
@@ -348,10 +347,6 @@ fn configure_cpu_clk_impl(
 
 // MEM_CLK
 
-fn enable_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
-}
-
 fn configure_mem_clk_impl(
     _clocks: &mut ClockTree,
     _old_config: Option<MemClkConfig>,
@@ -370,10 +365,6 @@ fn configure_mem_clk_impl(
 }
 
 // SYS_CLK
-
-fn enable_sys_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
-}
 
 fn configure_sys_clk_impl(
     _clocks: &mut ClockTree,
@@ -395,10 +386,6 @@ fn configure_sys_clk_impl(
 }
 
 // APB_CLK
-
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
-}
 
 fn configure_apb_clk_impl(
     _clocks: &mut ClockTree,
@@ -473,6 +460,14 @@ fn configure_lp_slow_clk_impl(
 }
 
 // Per-instance clock impl for TIMG
+
+impl PcntInstance {
+    // PCNT_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+}
 
 impl SdmInstance {
     // SDM_FUNCTION_CLOCK

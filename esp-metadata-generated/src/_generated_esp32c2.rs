@@ -451,6 +451,9 @@ macro_rules! property {
     ("soc.has_bus_clock_update") => {
         false
     };
+    ("soc.has_apb_frequency_reduction") => {
+        false
+    };
     ("soc.cpu_mcause_mask") => {
         31
     };

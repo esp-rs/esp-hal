@@ -517,6 +517,9 @@ macro_rules! property {
     ("soc.has_bus_clock_update") => {
         true
     };
+    ("soc.has_apb_frequency_reduction") => {
+        true
+    };
     ("soc.cpu_mcause_mask") => {
         31
     };
@@ -1075,10 +1078,6 @@ macro_rules! for_each_sw_interrupt {
 ///
 /// // CPU_CLK
 ///
-/// fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
 /// fn configure_cpu_clk_impl(
 ///     _clocks: &mut ClockTree,
 ///     _old_config: Option<CpuClkConfig>,
@@ -1088,10 +1087,6 @@ macro_rules! for_each_sw_interrupt {
 /// }
 ///
 /// // AHB_CLK
-///
-/// fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
 ///
 /// fn configure_ahb_clk_impl(
 ///     _clocks: &mut ClockTree,
@@ -1847,7 +1842,6 @@ macro_rules! define_clock_tree_types {
             pub(crate) pll_f120m_refcount: u32,
             pub(crate) pll_f160m_refcount: u32,
             pub(crate) hp_root_clk_refcount: u32,
-            pub(crate) cpu_clk_refcount: u32,
             pub(crate) apb_clk_refcount: u32,
             pub(crate) lp_fast_clk_refcount: u32,
             pub(crate) lp_slow_clk_refcount: u32,
@@ -2011,7 +2005,6 @@ macro_rules! define_clock_tree_types {
                 pll_f120m_refcount: 0,
                 pll_f160m_refcount: 0,
                 hp_root_clk_refcount: 0,
-                cpu_clk_refcount: 0,
                 apb_clk_refcount: 0,
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
@@ -2595,27 +2588,16 @@ macro_rules! define_clock_tree_types {
         pub fn configure_cpu_clk(clocks: &mut ClockTree, config: CpuClkConfig) {
             let old_config = clocks.cpu_clk.replace(config);
             refresh_cpu_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_hp_root_clk(clocks);
+            }
             configure_cpu_clk_impl(clocks, old_config, config);
         }
         pub fn cpu_clk_config(clocks: &mut ClockTree) -> Option<CpuClkConfig> {
             clocks.cpu_clk
         }
-        pub fn request_cpu_clk(clocks: &mut ClockTree) {
-            trace!("Requesting CPU_CLK");
-            if increment_reference_count(&mut clocks.cpu_clk_refcount) {
-                trace!("Enabling CPU_CLK");
-                request_hp_root_clk(clocks);
-                enable_cpu_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_cpu_clk(clocks: &mut ClockTree) {
-            trace!("Releasing CPU_CLK");
-            if decrement_reference_count(&mut clocks.cpu_clk_refcount) {
-                trace!("Disabling CPU_CLK");
-                enable_cpu_clk_impl(clocks, false);
-                release_hp_root_clk(clocks);
-            }
-        }
+        fn request_cpu_clk(_clocks: &mut ClockTree) {}
+        fn release_cpu_clk(_clocks: &mut ClockTree) {}
         pub fn cpu_clk_config_frequency(config: CpuClkConfig) -> u32 {
             (hp_root_clk_frequency() / (config.divisor() + 1))
         }
@@ -2628,21 +2610,16 @@ macro_rules! define_clock_tree_types {
         pub fn configure_ahb_clk(clocks: &mut ClockTree, config: AhbClkConfig) {
             let old_config = clocks.ahb_clk.replace(config);
             refresh_ahb_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_hp_root_clk(clocks);
+            }
             configure_ahb_clk_impl(clocks, old_config, config);
         }
         pub fn ahb_clk_config(clocks: &mut ClockTree) -> Option<AhbClkConfig> {
             clocks.ahb_clk
         }
-        pub fn request_ahb_clk(clocks: &mut ClockTree) {
-            trace!("Enabling AHB_CLK");
-            request_hp_root_clk(clocks);
-            enable_ahb_clk_impl(clocks, true);
-        }
-        pub fn release_ahb_clk(clocks: &mut ClockTree) {
-            trace!("Disabling AHB_CLK");
-            enable_ahb_clk_impl(clocks, false);
-            release_hp_root_clk(clocks);
-        }
+        fn request_ahb_clk(_clocks: &mut ClockTree) {}
+        fn release_ahb_clk(_clocks: &mut ClockTree) {}
         pub fn ahb_clk_config_frequency(config: AhbClkConfig) -> u32 {
             (hp_root_clk_frequency() / (config.divisor() + 1))
         }
@@ -2655,6 +2632,9 @@ macro_rules! define_clock_tree_types {
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             let old_config = clocks.apb_clk.replace(config);
             refresh_apb_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_ahb_clk(clocks);
+            }
             configure_apb_clk_impl(clocks, old_config, config);
         }
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
@@ -2663,17 +2643,13 @@ macro_rules! define_clock_tree_types {
         pub fn request_apb_clk(clocks: &mut ClockTree) {
             trace!("Requesting APB_CLK");
             if increment_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Enabling APB_CLK");
-                request_ahb_clk(clocks);
                 enable_apb_clk_impl(clocks, true);
             }
         }
         pub fn release_apb_clk(clocks: &mut ClockTree) {
             trace!("Releasing APB_CLK");
             if decrement_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Disabling APB_CLK");
                 enable_apb_clk_impl(clocks, false);
-                release_ahb_clk(clocks);
             }
         }
         pub fn apb_clk_config_frequency(config: ApbClkConfig) -> u32 {

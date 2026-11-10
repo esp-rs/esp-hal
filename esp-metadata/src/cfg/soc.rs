@@ -611,7 +611,17 @@ impl ClockTreeNodeInstance {
             cfg: self.node.rustc_cfg().map(str::to_string),
             request: Function {
                 _name: request_fn_name.to_string(),
-                implementation: if always_on {
+                implementation: if always_on && let Some(refcount_accessor) = &refcount_accessor {
+                    // The node holds its sources permanently, so only the consumer count changes.
+                    quote! {
+                        pub fn #request_fn_name(#(#receiver,)* clocks: &mut ClockTree) {
+                            trace!(#request_trace);
+                            if increment_reference_count(&mut #refcount_accessor) {
+                                #(#receiver.)* #enable_fn_impl_name(clocks, true);
+                            }
+                        }
+                    }
+                } else if always_on {
                     quote! {
                         fn #request_fn_name(#(#receiver,)* _clocks: &mut ClockTree) { }
                     }
@@ -646,7 +656,16 @@ impl ClockTreeNodeInstance {
             },
             release: Function {
                 _name: release_fn_name.to_string(),
-                implementation: if always_on {
+                implementation: if always_on && let Some(refcount_accessor) = &refcount_accessor {
+                    quote! {
+                        pub fn #release_fn_name(#(#receiver,)* clocks: &mut ClockTree) {
+                            trace!(#release_trace);
+                            if decrement_reference_count(&mut #refcount_accessor) {
+                                #(#receiver.)* #enable_fn_impl_name(clocks, false);
+                            }
+                        }
+                    }
+                } else if always_on {
                     quote! {
                         fn #release_fn_name(#(#receiver,)* _clocks: &mut ClockTree) { }
                     }
@@ -785,7 +804,9 @@ impl ClockTreeNodeInstance {
             },
 
             hal_functions: vec![
-                if !always_on && (refcount_accessor.is_some() || self.properties.has_enable()) {
+                if (!always_on || refcount_accessor.is_some())
+                    && (refcount_accessor.is_some() || self.properties.has_enable())
+                {
                     quote! {
                         fn #enable_fn_impl_name(#(#receiver,)* _clocks: &mut ClockTree, _en: bool) {
                             todo!()
@@ -1932,8 +1953,17 @@ impl DeviceClocks {
             // referred to by the drivers.
             let is_peripheral_node = !node.group_instance.is_empty();
 
-            node.properties.refcounted =
-                is_peripheral_node || !(node.always_on() || has_one_direct_dependent);
+            if node.node.refcounted() && !node.always_on() {
+                anyhow::bail!(
+                    "Clock node `{}` is `refcounted` but not `always_on`; \
+                     other nodes get a reference count when they need one.",
+                    node.name_str()
+                );
+            }
+
+            node.properties.refcounted = node.node.refcounted()
+                || is_peripheral_node
+                || !(node.always_on() || has_one_direct_dependent);
 
             // Always-on clock sources don't need enable functions.
             node.properties.has_enable =

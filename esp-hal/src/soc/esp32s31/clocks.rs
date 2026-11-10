@@ -556,10 +556,6 @@ pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
     crate::psram::implem::low_speed::exit();
 }
 
-fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here
-}
-
 fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, new: CpuClkConfig) {
     HP_SYS_CLKRST::regs()
         .cpu_freq_ctrl0()
@@ -578,10 +574,6 @@ fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, n
 
 // MEM_CLK
 
-fn enable_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here
-}
-
 fn configure_mem_clk_impl(_clocks: &mut ClockTree, _old: Option<MemClkConfig>, new: MemClkConfig) {
     HP_SYS_CLKRST::regs()
         .mem_freq_ctrl0()
@@ -590,10 +582,6 @@ fn configure_mem_clk_impl(_clocks: &mut ClockTree, _old: Option<MemClkConfig>, n
 }
 
 // SYS_CLK
-
-fn enable_sys_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here
-}
 
 fn configure_sys_clk_impl(_clocks: &mut ClockTree, _old: Option<SysClkConfig>, new: SysClkConfig) {
     HP_SYS_CLKRST::regs()
@@ -863,6 +851,14 @@ impl PsramInstance {
                 PsramFunctionClockConfig::Cpll => 2,
             })
         });
+    }
+}
+
+impl PcntInstance {
+    // PCNT_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
     }
 }
 

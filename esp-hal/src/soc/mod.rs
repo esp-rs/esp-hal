@@ -98,6 +98,24 @@ mod bus_clock_update {
 #[cfg(soc_has_bus_clock_update)]
 pub(crate) use bus_clock_update::{update_bus_clocks, with_single_bus_clock_update};
 
+/// Lets the hardware lower APB_CLK while the APB bus is idle and APB_CLK has no consumers.
+#[cfg(soc_has_apb_frequency_reduction)]
+pub(crate) fn update_apb_frequency_reduction(clocks: &crate::soc::clocks::ClockTree) {
+    // The value 0 disables the reduction.
+    let divider = if clocks.apb_clk_refcount == 0 {
+        cfg_select! {
+            apb_frequency_reduction_ahb_div_2 => 1,
+            apb_frequency_reduction_ahb_div_4 => 3,
+            _ => 0,
+        }
+    } else {
+        0
+    };
+    crate::peripherals::PCR::regs()
+        .apb_freq_conf()
+        .modify(|_, w| unsafe { w.apb_decrease_div_num().bits(divider) });
+}
+
 cfg_select! {
     all(feature = "unstable", ulp_riscv_driver_supported) => {
         pub use self::implementation::*;

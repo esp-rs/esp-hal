@@ -398,10 +398,6 @@ pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
 
 // CPU_CLK
 
-fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
-}
-
 fn configure_cpu_clk_impl(
     _clocks: &mut ClockTree,
     _old_config: Option<CpuClkConfig>,
@@ -415,10 +411,6 @@ fn configure_cpu_clk_impl(
 }
 
 // AHB_CLK
-
-fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
-}
 
 fn configure_ahb_clk_impl(
     _clocks: &mut ClockTree,
@@ -434,18 +426,19 @@ fn configure_ahb_clk_impl(
 
 // APB_CLK
 
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
+fn enable_apb_clk_impl(clocks: &mut ClockTree, _en: bool) {
+    crate::soc::update_apb_frequency_reduction(clocks);
 }
 
 fn configure_apb_clk_impl(
-    _clocks: &mut ClockTree,
+    clocks: &mut ClockTree,
     _old_config: Option<ApbClkConfig>,
     new_config: ApbClkConfig,
 ) {
     PCR::regs()
         .apb_freq_conf()
         .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
+    crate::soc::update_apb_frequency_reduction(clocks);
 }
 
 // XTAL_D2_CLK
@@ -630,6 +623,14 @@ impl AdcInstance {
                 AdcFunctionClockConfig::PllF80m => 2,
             })
         });
+    }
+}
+
+impl PcntInstance {
+    // PCNT_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
     }
 }
 

@@ -35,13 +35,14 @@ system_clocks = { clock_tree = [
         { name = "PLL_F240M", outputs = "PLL_F240M" },
     ] },
 
-    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_ROOT_CLK / (divisor + 1)" },
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_ROOT_CLK / (divisor + 1)", always_on = true },
     # MEM_CLK divider
-    { name = "MEM_CLK", type = "generic", params = { divisor = "0..2" }, output = "CPU_CLK / (divisor + 1)" },
+    { name = "MEM_CLK", type = "generic", params = { divisor = "0..2" }, output = "CPU_CLK / (divisor + 1)", always_on = true },
     # SYS_CLK divider
-    { name = "SYS_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)" },
+    { name = "SYS_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)", always_on = true },
     # APB is a core system bus and must not be released with a peripheral clock.
-    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "SYS_CLK / (divisor + 1)", always_on = true },
+    # The reference count tells if a consumer needs a constant APB_CLK frequency.
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "SYS_CLK / (divisor + 1)", always_on = true, refcounted = true },
 
     # LP clocks
     { name = "LP_FAST_CLK", type = "mux", variants = [
@@ -168,6 +169,10 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SDM", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
+    ] },
+    # The glitch filter counts APB_CLK cycles.
+    { group = "PCNT", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "APB_CLK" },
     ] },
     # HP_SYS_CLKRST.parlio_{rx,tx}_ctrl0.clk_src_sel, see SOC_PARLIO_CLKS. The driver selects
     # source 3, the clock from the pad.
