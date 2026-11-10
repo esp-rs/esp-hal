@@ -48,6 +48,8 @@
 //! # {after_snippet}
 //! ```
 
+use core::ptr::NonNull;
+
 #[cfg(feature = "rt")]
 use portable_atomic::{AtomicPtr, Ordering};
 
@@ -123,11 +125,22 @@ pub(crate) unsafe fn fail_stranded(core: Cpu) {
     unsafe { queue::fail_stranded(&STATE[core as usize].lists, core as u32) };
 }
 
-/// Queues a run of `request` on the CPU `core`. Returns the encoding of [`esp_hal_ipc_post`].
+/// Queues a run of `request` on the CPU `core`.
+///
+/// Returns `seq << 5` for a queued or joined run, 1 if `core` does not take IPC interrupts, and 2
+/// if `request` is busy.
+///
+/// # Safety
+///
+/// `request` stays valid as long as the runtime can reach it.
+// esp-hal copies without the `rt` feature call this function by name. The name, the argument
+// types, the encoding of the return value and the layout of `IpcRequest` must stay stable.
 #[cfg(feature = "rt")]
-fn post_in_runtime(core: u8, request: &IpcRequest, arg: usize) -> u32 {
+#[unsafe(export_name = "esp_hal_ipc_post")]
+unsafe extern "C" fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>, arg: usize) -> u32 {
     use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 
+    let request = unsafe { request.as_ref() };
     let core = match core {
         0 => Cpu::ProCpu,
         1 => Cpu::AppCpu,
@@ -154,23 +167,11 @@ fn post_in_runtime(core: u8, request: &IpcRequest, arg: usize) -> u32 {
     result
 }
 
-/// Queues a run of `request` on the CPU `core`.
-///
-/// Returns `seq << 5` for a queued or joined run, 1 if `core` does not take IPC interrupts, and 2
-/// if `request` is busy.
-// esp-hal copies without the `rt` feature call this function by name. The name, the argument
-// types, the encoding of the return value and the layout of `IpcRequest` must stay stable.
-#[cfg(feature = "rt")]
-#[unsafe(export_name = "esp_hal_ipc_post")]
-extern "C" fn esp_hal_ipc_post(core: u8, request: *const IpcRequest, arg: usize) -> u32 {
-    post_in_runtime(core, unsafe { &*request }, arg)
-}
-
 // A build can hold esp-hal copies without the `rt` feature. Those copies post through the symbol
 // of the copy with `rt`.
 #[cfg(not(feature = "rt"))]
 unsafe extern "C" {
-    fn esp_hal_ipc_post(core: u8, request: *const IpcRequest, arg: usize) -> u32;
+    fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>, arg: usize) -> u32;
 }
 
 /// Handle that posts requests to a CPU through the IPC interrupt.
@@ -208,10 +209,7 @@ impl Ipc {
         request: &'static IpcRequest,
         arg: usize,
     ) -> Result<Ticket, IpcError> {
-        let result = cfg_select! {
-            feature = "rt" => post_in_runtime(core as u8, request, arg),
-            _ => unsafe { esp_hal_ipc_post(core as u8, request, arg) },
-        };
+        let result = unsafe { esp_hal_ipc_post(core as u8, NonNull::from(request), arg) };
         match result & queue::POST_RESULT_MASK {
             queue::POST_OK => Ok(Ticket {
                 request,
