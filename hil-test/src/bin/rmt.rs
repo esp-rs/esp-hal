@@ -604,6 +604,47 @@ mod tests {
         );
     }
 
+    // 3 MHz needs a fractional SCLK divider: 80 MHz / (26 + 2/3) or 32 MHz / (10 + 2/3). An
+    // integral divider or swapped fraction fields are off by more than the tolerance.
+    #[cfg(not(any(esp32, esp32s2)))]
+    #[test]
+    fn rmt_fractional_sclk_divider(mut ctx: Context) {
+        use esp_hal::time::Instant;
+
+        const SCLK: Rate = Rate::from_mhz(3);
+        const CODES: u64 = 4;
+
+        let rmt = Rmt::new(ctx.rmt.reborrow(), SCLK).unwrap();
+        assert_eq!(rmt.frequency(), SCLK);
+
+        let code = PulseCode::new(
+            Level::High,
+            PulseCode::MAX_LEN,
+            Level::Low,
+            PulseCode::MAX_LEN,
+        );
+        let tx_data = [code, code, code, code, PulseCode::end_marker()];
+        let expected_us = CODES * 2 * PulseCode::MAX_LEN as u64 * 1_000_000 / SCLK.as_hz() as u64;
+
+        let config = TxChannelConfig::default().with_clk_divider(1);
+        let tx_channel = rmt
+            .channel0
+            .configure_tx(&config)
+            .unwrap()
+            .with_pin(ctx.pin.reborrow());
+
+        let start = Instant::now();
+        tx_channel.transmit(&tx_data).unwrap().wait().unwrap();
+        let elapsed_us = start.elapsed().as_micros();
+
+        assert!(
+            elapsed_us * 100 >= expected_us * 99 && elapsed_us * 100 <= expected_us * 101,
+            "unexpected tx duration: {} us (expected {} us)",
+            elapsed_us,
+            expected_us
+        );
+    }
+
     #[test]
     #[cfg(esp32c6)]
     fn rmt_frequency_is_not_apb_on_default_esp32c6(mut ctx: Context) {
