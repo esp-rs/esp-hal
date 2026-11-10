@@ -1,26 +1,82 @@
 //! Light sleep under load.
 //!
-//! The program runs light sleeps of random length for [`RUN_FOR`], then prints the counts and
-//! stops. The program checks that PSRAM keeps its data across each sleep and that each sleep
-//! returns. On a chip with two cores, core 1 uses PSRAM and writes flash at the same time.
+//! The program runs a list of phases. Before each phase after the first, the program resets the
+//! chip in software. The phase then starts from `esp_hal::init` at its own CPU clock, without the
+//! CPU retention of an earlier phase. Each phase runs for [`PHASE_FOR`]. A phase sets three things:
 //!
-//! The program prints the counts every 10 seconds. The program panics on the first bad word,
-//! failed flash write, or failed check.
+//! - How the program requests each sleep: `sleep_light` from the main loop, `sleep_light` from a
+//!   high-priority esp-rtos thread while a low-priority thread works, or the automatic light sleep
+//!   of esp-rtos. The main loop calls the driver without esp-rtos. The thread calls it through the
+//!   esp-rtos scheduler, with its timer queue and its critical sections. The idle hook of esp-rtos
+//!   sets the wakeup deadline from the timer queue. The automatic phases do not call `sleep_light`,
+//!   so the program checks the length of each wait instead. At least one light sleep must wake on
+//!   the timer in an automatic phase.
+//! - The CPU clock: the default or the maximum. Each sleep switches the root clock to XTAL and
+//!   back, and the two settings return to different PLL configurations.
+//! - CPU retention: off or on, on a chip that can power the CPU domain down. With CPU retention,
+//!   each sleep saves the CPU state, powers the CPU domain down, and restores the state after the
+//!   wake. The PLLs then start again. On a chip with two cores, the other core joins the sleep
+//!   through the rendezvous.
 //!
-//! Set [`CPU_POWER_DOWN`] to power the CPU domain down in each sleep.
+//! The phases without CPU retention run first, so that a sleep with CPU retention that never ends
+//! does not hang the test before they run.
 //!
-//! The flash writes erase the NVS partition of the default partition table, at offset `0x9000`.
+//! In each phase, each core runs these parts:
 //!
-//! Use a UART port, with USB Serial/JTAG disconnected. esp-println prefers USB Serial/JTAG, and a
-//! sleep breaks that connection.
+//! - Sleeps of random length check the timer wakeup and the time update after the wake. One sleep
+//!   in 16 is long, 0.5–3 s. A long sleep must end within [`TOLERANCE`] of its deadline, and the
+//!   timer must be the wakeup cause. Most sleeps last 1–10 ms. The program does not check their
+//!   length, because the entry and the exit take an unknown part of it.
+//! - One sleep in eight has a deadline 0–200 µs ahead, which falls before or near the end of the
+//!   sleep entry. The hardware then rejects the sleep or wakes the chip at once, and `sleep_light`
+//!   returns `Ended` in both cases. The program cannot check the length of such a sleep, so it
+//!   checks that the call returns and that the checks after it pass.
+//! - Before each sleep, the core writes a new pattern to 128 KiB of PSRAM, or 1 MiB on the
+//!   ESP32-P4. It checks the pattern after the wake. A wrong word shows a cache line that was not
+//!   written back before the sleep, or PSRAM that lost data across the sleep.
+//! - The rest of PSRAM keeps one pattern for the whole phase, and the core checks part of it after
+//!   each wake. A wrong word there shows that PSRAM, or its clock, did not survive a sleep.
+//! - Between sleeps, the core reads, checks, and writes back part of the kept PSRAM, so that cache
+//!   lines are dirty when a sleep starts.
+//! - About every 100 ms, a core that is not sleeping erases, writes, and reads back one flash
+//!   sector of the free space after the image. The sector must read back what was written. On a
+//!   chip with two cores, each flash operation first parks the other core, which masks its
+//!   interrupts and waits in RAM until the operation ends. A core that wakes while an operation
+//!   waits for it joins that park before its sleep call returns. So a sleep or a wait during a
+//!   flash cycle does not get an upper bound.
+//! - On a chip with two cores, a random core requests each sleep while the other core works. The
+//!   working core must return from the park, and with CPU retention from the rendezvous, with its
+//!   state intact. A core that makes no progress for [`STALL_REPORTS`] reports fails the phase.
+//!
+//! Each phase ends with `PASS <phase>` or `FAIL <phase>: <reason>`. When a check fails, the
+//! program prints the wrong value at once, on a line that starts with `core <n>:`. To repeat a
+//! phase, set [`SEED`] and [`FIRST_PHASE`] to the seed and the number that its `RUN` line printed.
+//!
+//! The progress of the run is kept in memory that a reset does not clear. When a phase hangs
+//! outside a sleep or panics, the RTC watchdog resets the chip. The next boot reports that phase as
+//! failed, with the reset reason, and runs the next phase. A reset does not clear all of the chip's
+//! state, so a phase after a failed phase can fail because of it. A power-on reset starts the run
+//! again at [`FIRST_PHASE`]. A sleep that never ends hangs the test, because the RTC watchdog is
+//! not active during a light sleep.
+//!
+//! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
 //% CHIP_FILTER: sleep_light_sleep && sleep_has_wakeup_source_timer
+//% FEATURES: esp-println/uart
 
 #![no_std]
 #![no_main]
 
+use core::{
+    fmt,
+    ptr::{addr_of, addr_of_mut},
+};
+
 use esp_backtrace as _;
 use esp_hal::{
+    Blocking,
+    clock::CpuClock,
+    flash::{Config as FlashConfig, Flash},
     main,
     rtc_cntl::{
         Rtc,
@@ -32,69 +88,288 @@ use esp_hal::{
     },
     system::Cpu,
     time::{Duration, Instant},
+    timer::timg::TimerGroup,
 };
-use esp_println::println;
+use esp_rtos::{CurrentThreadHandle, thread::ThreadSpawner};
+use portable_atomic::{AtomicBool, AtomicU32, Ordering};
+use qa_test::{Progress, ProgressWord, free_flash, report};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-/// Prints a line and waits for the UART to send the line. A light sleep loses unsent UART data.
-macro_rules! report {
+/// Prints the reason for a failure, and makes core 0 fail the phase.
+macro_rules! problem {
     ($($arg:tt)*) => {{
-        println!($($arg)*);
-        let end = Instant::now() + Duration::from_millis(20);
-        while Instant::now() < end {}
+        report!("  {}", format_args!($($arg)*));
+        FAILED.store(true, Ordering::Release);
     }};
 }
 
-/// Whether the loop powers the CPU domain down in each light sleep.
-///
-/// The retention memory cannot be removed after installation, so one run tests one setting.
-/// Change `false` to `true` to power the CPU domain down. A chip without CPU power-down ignores
-/// the setting.
-const CPU_POWER_DOWN: bool = cfg!(supports_cpu_power_down) && false;
+/// The duration of each phase.
+const PHASE_FOR: Duration = Duration::from_secs(10 * 60);
 
-/// The duration of the run. Each flash write erases a sector, so the run stops to limit flash wear.
-const RUN_FOR: Duration = Duration::from_secs(2 * 60 * 60);
+/// The seed of the random sequence, or `None` for a seed from the RNG. To repeat a failed phase,
+/// set the seed that its `RUN` line printed.
+const SEED: Option<u32> = None;
+
+/// The phase that a run starts at. To run a phase first, set the number that its `RUN` line
+/// printed.
+const FIRST_PHASE: usize = 0;
 
 /// The maximum duration of a loop step before the watchdog resets the chip.
 const WATCHDOG_TIMEOUT: Duration = Duration::from_secs(5);
 
 const REPORT_EVERY: Duration = Duration::from_secs(10);
 
+/// The number of reports in a row without progress after which a core fails the phase. The longest
+/// pause of a working core is one long sleep of the other core, 3 s at most.
+const STALL_REPORTS: u32 = 2;
+
 /// The minimum length of a long sleep.
 const LONG_SLEEP: Duration = Duration::from_millis(500);
 
-/// The number of PSRAM words that the loop writes before each sleep. 64 KiB is more than the cache.
-const CORE0_WORDS: usize = 16 * 1024;
+/// The bound on a long sleep that returned without a sleep. Such a call returns within about 2 ms,
+/// and a long sleep that sleeps lasts at least [`LONG_SLEEP`] less [`TOLERANCE`].
+const NO_SLEEP: Duration = Duration::from_millis(5);
 
-/// The number of words in one slice of the kept PSRAM. The loop checks one slice after each wake.
+/// The longest time by which a long sleep or a wait can end before or after its deadline.
+const TOLERANCE: Duration = Duration::from_millis(5);
+
+/// The number of PSRAM words that a core writes before each sleep. The words must be more than the
+/// cache can hold, so that some of them must be written back before the sleep. The ESP32-S3's data
+/// cache is at most 64 KiB, and the ESP32-P4's L2 cache is at most 512 KiB.
+const DIRTY_WORDS: usize = if cfg!(feature = "esp32p4") {
+    256 * 1024
+} else {
+    32 * 1024
+};
+
+/// The number of words in one slice of the kept PSRAM. A core checks one slice after each wake.
 const SLICE_WORDS: usize = 16 * 1024;
 
-/// The seed of the kept PSRAM pattern. Each slice adds the slice number to the seed. A slice that
-/// reads the data of a different slice fails the check.
+/// The number of kept words that one work pass reads and writes back.
+const WINDOW_WORDS: usize = 4 * 1024;
+
+/// The seed of the kept PSRAM pattern.
 const KEPT_SEED: u32 = 0x6C07_8965;
+
+/// The number of sleeps and waits between two checks of all of the kept PSRAM.
+const FULL_CHECK_EVERY: u32 = 500;
+
+/// The minimum time between two flash cycles. Each cycle erases a sector, so the period limits
+/// flash wear.
+const FLASH_PERIOD: Duration = Duration::from_millis(100);
+
+const SECTOR: u32 = 4096;
+
+const CORES: usize = if cfg!(multi_core) { 2 } else { 1 };
+
+/// How a phase requests the sleeps.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Caller {
+    Bare,
+    Thread,
+    Automatic,
+}
+
+#[derive(Clone, Copy)]
+struct Phase {
+    caller: Caller,
+    max_clock: bool,
+    retention: bool,
+}
+
+/// The number of phases, before [`Phase::runs`] removes the ones that do not apply to the chip.
+const PHASES: usize = 12;
+
+impl Phase {
+    fn get(index: usize) -> Self {
+        Self {
+            caller: [Caller::Bare, Caller::Thread, Caller::Automatic][index % 6 / 2],
+            max_clock: index % 2 == 1,
+            retention: index >= 6,
+        }
+    }
+
+    /// Returns whether the phase runs on this chip. A chip with its default CPU clock at the
+    /// maximum does not run the phases at the maximum CPU clock, which repeat the others. A chip
+    /// without CPU power-down does not run the phases with CPU retention.
+    fn runs(self) -> bool {
+        (!self.max_clock || CpuClock::default() != CpuClock::max())
+            && (!self.retention || cfg!(supports_cpu_power_down))
+    }
+
+    fn cpu_clock(self) -> CpuClock {
+        if self.max_clock {
+            CpuClock::max()
+        } else {
+            CpuClock::default()
+        }
+    }
+}
+
+impl fmt::Display for Phase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let caller = match self.caller {
+            Caller::Bare => "sleep_light from the main loop",
+            Caller::Thread => "sleep_light from an esp-rtos thread",
+            Caller::Automatic => "esp-rtos automatic light sleep",
+        };
+        write!(
+            f,
+            "{caller} at the {} CPU clock, {} CPU retention",
+            if self.max_clock { "maximum" } else { "default" },
+            if self.retention { "with" } else { "without" },
+        )
+    }
+}
+
+/// Returns the index of the first phase at or after `index` that runs on this chip.
+fn next_phase(index: usize) -> usize {
+    (index..PHASES)
+        .find(|&i| Phase::get(i).runs())
+        .unwrap_or(PHASES)
+}
+
+/// Returns the number of phases from [`FIRST_PHASE`] that run on this chip.
+fn phases_in_run() -> usize {
+    (FIRST_PHASE..PHASES)
+        .filter(|&i| Phase::get(i).runs())
+        .count()
+}
+
+static PROGRESS: ProgressWord = ProgressWord::new(0xB);
+
+/// Words of PSRAM that both cores read and write, through volatile accesses.
+#[derive(Clone, Copy)]
+struct Words {
+    start: *mut u32,
+    len: usize,
+}
+
+// SAFETY: every access is volatile, and the program gives each core its own words or writes the
+// same value from both cores.
+unsafe impl Send for Words {}
+unsafe impl Sync for Words {}
+
+impl Words {
+    const EMPTY: Self = Self {
+        start: core::ptr::null_mut(),
+        len: 0,
+    };
+
+    fn split_at(self, n: usize) -> (Self, Self) {
+        let n = n.min(self.len);
+        let rest = Self {
+            start: unsafe { self.start.add(n) },
+            len: self.len - n,
+        };
+        (
+            Self {
+                start: self.start,
+                len: n,
+            },
+            rest,
+        )
+    }
+
+    fn read(self, i: usize) -> u32 {
+        unsafe { self.start.add(i).read_volatile() }
+    }
+
+    fn write(self, i: usize, value: u32) {
+        unsafe { self.start.add(i).write_volatile(value) }
+    }
+}
+
+/// The PSRAM of the run: the words that each core writes before each sleep, and the kept words.
+struct Memory {
+    dirty: [Words; CORES],
+    kept: Words,
+}
+
+static mut MEMORY: Memory = Memory {
+    dirty: [Words::EMPTY; CORES],
+    kept: Words::EMPTY,
+};
+
+/// Returns the PSRAM of the run. `main` sets it before any other core or thread starts.
+fn memory() -> &'static Memory {
+    unsafe { &*addr_of!(MEMORY) }
+}
 
 fn pattern(index: usize, seed: u32) -> u32 {
     (index as u32).wrapping_mul(0x9E37_79B9) ^ seed
 }
 
-fn fill(words: &mut [u32], seed: u32) {
-    for (i, word) in words.iter_mut().enumerate() {
-        unsafe { core::ptr::write_volatile(word, pattern(i, seed)) };
+fn fill(words: Words, seed: u32) {
+    for i in 0..words.len {
+        words.write(i, pattern(i, seed));
     }
 }
 
-fn count_bad(words: &[u32], seed: u32) -> u32 {
-    let mut bad = 0;
-    for (i, word) in words.iter().enumerate() {
-        if unsafe { core::ptr::read_volatile(word) } != pattern(i, seed) {
-            bad += 1;
+/// The words that a check found wrong: their number, and the first of them.
+struct Bad {
+    count: u32,
+    /// The address of the first wrong word, the value read, and the value expected.
+    first: Option<(*const u32, u32, u32)>,
+}
+
+impl Bad {
+    const NONE: Self = Self {
+        count: 0,
+        first: None,
+    };
+
+    fn add(&mut self, words: Words, i: usize, read: u32, expected: u32) {
+        self.count += 1;
+        if self.first.is_none() {
+            self.first = Some((words.start.wrapping_add(i), read, expected));
+        }
+    }
+}
+
+impl fmt::Display for Bad {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let noun = if self.count == 1 { "word" } else { "words" };
+        write!(f, "{} bad {noun}", self.count)?;
+        if let Some((at, read, expected)) = self.first {
+            write!(
+                f,
+                ", the first at {at:p}: {read:#010x}, expected {expected:#010x}"
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// Checks the words in `range` against the pattern of `seed`.
+fn check_words(words: Words, range: core::ops::Range<usize>, seed: u32) -> Bad {
+    let mut bad = Bad::NONE;
+    for i in range {
+        let (read, expected) = (words.read(i), pattern(i, seed));
+        if read != expected {
+            bad.add(words, i, read, expected);
         }
     }
     bad
 }
 
-/// A xorshift generator. Each run uses the same sequence of sleep lengths.
+/// Checks the slice `n` of the kept PSRAM.
+fn check_kept_slice(core: usize, n: usize) {
+    let kept = memory().kept;
+    let start = n * SLICE_WORDS;
+    let end = kept.len.min(start + SLICE_WORDS);
+    let bad = check_words(kept, start..end, KEPT_SEED);
+    if bad.count != 0 {
+        problem!("core {core}: slice {n} of the kept PSRAM read {bad}");
+    }
+}
+
+fn kept_slices() -> usize {
+    memory().kept.len.div_ceil(SLICE_WORDS)
+}
+
+/// A xorshift generator.
 struct Rng(u32);
 
 impl Rng {
@@ -104,141 +379,515 @@ impl Rng {
         self.0 ^= self.0 << 5;
         self.0
     }
+
+    fn below(&mut self, n: u32) -> u32 {
+        self.next() % n
+    }
 }
 
-// The load that core 1 adds during the sleeps.
-//
-// Core 1 writes and checks a separate PSRAM region all the time. For every 16 sleeps, core 1 also
-// writes one flash sector. `sleep-checks` checks that core 1 can request a sleep.
-//
-// Core 1 writes flash with the default `AutoPark` strategy. Each write stalls core 0. Core 0 enters
-// the stall loop, which runs from RAM with interrupts masked. Core 1 starts the erase only after
-// core 0 is in the stall loop. Core 0 masks interrupts for all of `sleep_light`. So core 0 is
-// asleep or stalled, but never both, and the park never stops core 1 during an erase. The park
-// stops core 1 in the PSRAM pass, or while core 1 waits for core 0 to enter the stall loop:
-//
-// ```text
-// core 0  sets WRITE_FLASH   sleep_light: masks interrupts, parks core 1, sleeps, wakes,
-//                            unparks core 1, unmasks interrupts
-// core 1  PSRAM pass         sees the flag, posts the stall request, waits | parked | waits
-//
-// core 0  stall request: enters the stall loop ............... leaves it   checks, next sleep
-// core 1  erases, writes, reads back, verifies, releases core 0            PSRAM pass
-// ```
-//
-// The stall request is an interrupt. The stall request runs before core 0 masks interrupts, or
-// waits until core 0 unmasks interrupts:
-//
-// ```text
-// F  core 0 sets the flag        [S]  core 0 asleep, core 1 parked
-// I  the stall request lands     [W]  core 0 in the stall loop, core 1 writing
-//
-// F[S]....[S]....[S] I [W]....[S]....   core 0 awake: the write runs before the next sleep
-// F[S]....[S]....[S I S]....[W]..[S]    core 0 asleep: core 1 waits, parked, and writes after
-// ```
-//
-// Core 1 waits with interrupts masked. With CPU power-down, a sleep that starts during this wait
-// does not park core 1. The rendezvous gets no answer within 1 ms, and `sleep_light` returns
-// `Ended` without a sleep. The flash write then runs before the next sleep.
-#[cfg(multi_core)]
-mod core1 {
-    use core::sync::atomic::{AtomicU32, Ordering};
+/// The counts of the phase, over all cores.
+struct Counts {
+    sleeps: AtomicU32,
+    short: AtomicU32,
+    long: AtomicU32,
+    refused: AtomicU32,
+    /// The long sleeps that ended within their bounds.
+    long_slept: AtomicU32,
+    not_slept: AtomicU32,
+    waits: AtomicU32,
+    passes: AtomicU32,
+    flash_cycles: AtomicU32,
+    /// The work passes, sleeps, and waits of each core.
+    progress: [AtomicU32; CORES],
+    /// The longest time in microseconds by which a checked long sleep or wait ended before its
+    /// deadline.
+    longest_early_us: AtomicU32,
+    /// The longest time in microseconds by which a checked long sleep or wait ended after its
+    /// deadline, without a flash cycle during it.
+    longest_overrun_us: AtomicU32,
+    /// The same, for a long sleep or wait during a flash cycle.
+    longest_flash_overrun_us: AtomicU32,
+}
 
-    use esp_hal::{
-        flash::{Config, Flash},
-        peripherals::{CPU_CTRL, FLASH},
-        system::{CpuControl, Stack},
-        time::{Duration, Instant},
-    };
-    use esp_println::println;
+static COUNTS: Counts = Counts {
+    sleeps: AtomicU32::new(0),
+    short: AtomicU32::new(0),
+    long: AtomicU32::new(0),
+    long_slept: AtomicU32::new(0),
+    refused: AtomicU32::new(0),
+    not_slept: AtomicU32::new(0),
+    waits: AtomicU32::new(0),
+    passes: AtomicU32::new(0),
+    flash_cycles: AtomicU32::new(0),
+    progress: [const { AtomicU32::new(0) }; CORES],
+    longest_early_us: AtomicU32::new(0),
+    longest_overrun_us: AtomicU32::new(0),
+    longest_flash_overrun_us: AtomicU32::new(0),
+};
 
-    use super::{count_bad, fill};
+fn count(counter: &AtomicU32) -> u32 {
+    counter.fetch_add(1, Ordering::Relaxed) + 1
+}
 
-    /// The number of PSRAM words that core 1 writes and checks (512 KiB).
-    pub const WORDS: usize = 128 * 1024;
+/// Whether a check failed. Core 0 then fails the phase.
+static FAILED: AtomicBool = AtomicBool::new(false);
 
-    const FLASH_OFFSET: u32 = 0x9000;
-    const FLASH_SECTOR: u32 = 4096;
+/// Stops this core's work after a failure, until core 0 resets the chip.
+fn stop_if_failed() {
+    while FAILED.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+    }
+}
 
-    /// The number of sectors in the NVS partition. The writes rotate over these sectors to spread
-    /// the wear.
-    const FLASH_SECTORS: u32 = 6;
+/// The free space that the flash cycles use, and the buffers of a cycle.
+struct Scratch {
+    flash: Flash<'static, Blocking>,
+    first: u32,
+    sectors: u32,
+    start: u32,
+    cycle: u32,
+    next: Instant,
+    data: [u32; SECTOR as usize / 4],
+    read: [u32; SECTOR as usize / 4],
+}
 
-    /// Core 0 sets `WRITE_FLASH` to request one flash write. Core 1 clears `WRITE_FLASH` after the
-    /// write.
-    static WRITE_FLASH: AtomicU32 = AtomicU32::new(0);
+/// The core that runs a flash cycle holds this flag, so that only one core uses [`SCRATCH`] at a
+/// time.
+static FLASH_BUSY: AtomicBool = AtomicBool::new(false);
 
-    static BAD_WORDS: AtomicU32 = AtomicU32::new(0);
-    static PASSES: AtomicU32 = AtomicU32::new(0);
-    static FLASH_WRITES: AtomicU32 = AtomicU32::new(0);
-    static FLASH_FAILURES: AtomicU32 = AtomicU32::new(0);
+static mut SCRATCH: Option<Scratch> = None;
 
-    /// Starts core 1. Core 1 writes and checks `words`, and writes flash on request from core 0.
-    pub fn start(cpu_ctrl: CPU_CTRL<'static>, flash: FLASH<'static>, words: &'static mut [u32]) {
-        static mut STACK: Stack<8192> = Stack::new();
-        let flash = Flash::new(flash, Config::default()).unwrap();
-        let mut cpu_control = CpuControl::new(cpu_ctrl);
-        let guard = cpu_control
-            .start_app_core(unsafe { &mut *core::ptr::addr_of_mut!(STACK) }, move || {
-                run(flash, words)
-            })
-            .unwrap();
-        core::mem::forget(guard);
+/// The number of times that a flash cycle started or ended. The value is odd while a cycle erases,
+/// writes, or reads. A sleep or a wait during which a cycle ran does not get an upper bound,
+/// because a flash operation can delay its end.
+static FLASH_GEN: AtomicU32 = AtomicU32::new(0);
+
+/// Erases, writes, and verifies the next sector of the free space. A cycle runs when
+/// [`FLASH_PERIOD`] has passed since the last one and the other core is not in a cycle.
+fn flash_cycle(core: usize) {
+    if FLASH_BUSY.swap(true, Ordering::Acquire) {
+        return;
+    }
+    // SAFETY: `FLASH_BUSY` gives this core the only access.
+    if let Some(s) = unsafe { (*addr_of_mut!(SCRATCH)).as_mut() }
+        && Instant::now() >= s.next
+    {
+        s.next = Instant::now() + FLASH_PERIOD;
+        let sector = s.first + (s.start + s.cycle) % s.sectors * SECTOR;
+        let seed = s.cycle.wrapping_mul(0x9E37_79B9);
+        for (i, word) in s.data.iter_mut().enumerate() {
+            *word = seed ^ i as u32;
+        }
+        s.read.fill(0);
+        FLASH_GEN.fetch_add(1, Ordering::AcqRel);
+        // SAFETY: the sector is in the booted partition, after the image.
+        let written = unsafe {
+            s.flash.erase(sector, sector + SECTOR).is_ok() && s.flash.write(sector, &s.data).is_ok()
+        };
+        let verified = written && s.flash.read(sector, &mut s.read).is_ok() && s.read == s.data;
+        FLASH_GEN.fetch_add(1, Ordering::AcqRel);
+        if !verified {
+            problem!("core {core}: flash sector {sector:#x} did not read back what was written");
+        }
+        s.cycle += 1;
+        count(&COUNTS.flash_cycles);
+    }
+    FLASH_BUSY.store(false, Ordering::Release);
+}
+
+/// Formats and sorts, so that the core runs code from other parts of the image between passes.
+/// Code that the cache does not hold comes from flash, and fails at once when a sleep left the
+/// flash MMU or the flash clock wrong.
+#[inline(never)]
+fn other_code(salt: u32) {
+    struct Buf {
+        data: [u8; 64],
+        len: usize,
     }
 
-    fn run(mut flash: Flash<'static, esp_hal::Blocking>, words: &'static mut [u32]) -> ! {
-        let mut sector = [0u32; FLASH_SECTOR as usize / 4];
-        let mut seed = 1u32;
-        loop {
-            seed = seed.wrapping_add(1);
-            if WRITE_FLASH.load(Ordering::Acquire) != 0 {
-                fill(&mut sector, seed);
-                let offset = FLASH_OFFSET
-                    + FLASH_WRITES.load(Ordering::Relaxed) % FLASH_SECTORS * FLASH_SECTOR;
-                let ok = unsafe {
-                    flash.erase(offset, offset + FLASH_SECTOR).is_ok()
-                        && flash.write(offset, &sector).is_ok()
-                };
-                sector.fill(0);
-                let ok = ok && flash.read(offset, &mut sector).is_ok();
-                if !ok || count_bad(&sector, seed) != 0 {
-                    FLASH_FAILURES.fetch_add(1, Ordering::Relaxed);
-                }
-                FLASH_WRITES.fetch_add(1, Ordering::Relaxed);
-                WRITE_FLASH.store(0, Ordering::Release);
-            } else if !words.is_empty() {
-                fill(words, seed);
-                let bad = count_bad(words, seed);
-                BAD_WORDS.fetch_add(bad, Ordering::Relaxed);
-                PASSES.fetch_add(1, Ordering::Relaxed);
-            } else {
-                core::hint::spin_loop();
-            }
+    impl fmt::Write for Buf {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            let n = s.len().min(self.data.len() - self.len);
+            self.data[self.len..self.len + n].copy_from_slice(&s.as_bytes()[..n]);
+            self.len += n;
+            Ok(())
         }
     }
 
-    /// Requests one flash write from core 1.
-    pub fn request_flash_write() {
-        WRITE_FLASH.store(1, Ordering::Release);
+    let mut buf = Buf {
+        data: [0; 64],
+        len: 0,
+    };
+    let _ = fmt::Write::write_fmt(
+        &mut buf,
+        format_args!("{salt:08x} {} {:?}", salt.rotate_left(7), salt % 1000),
+    );
+    let mut a = [0u32; 32];
+    for (i, x) in a.iter_mut().enumerate() {
+        *x = salt.wrapping_mul(i as u32 + 1).rotate_right(i as u32);
+    }
+    a.sort_unstable();
+    core::hint::black_box((&buf.data, &a));
+}
+
+/// Runs a flash cycle when one is due, then reads, checks, and writes back a random window of the
+/// kept PSRAM. The write leaves the cache lines dirty.
+fn work_step(core: usize, rng: &mut Rng) {
+    flash_cycle(core);
+    let kept = memory().kept;
+    if kept.len > WINDOW_WORDS {
+        let offset = rng.below((kept.len - WINDOW_WORDS) as u32) as usize;
+        let mut bad = Bad::NONE;
+        for i in offset..offset + WINDOW_WORDS {
+            let (read, expected) = (kept.read(i), pattern(i, KEPT_SEED));
+            if read != expected {
+                bad.add(kept, i, read, expected);
+            }
+            kept.write(i, expected);
+        }
+        if bad.count != 0 {
+            problem!("core {core}: a work pass over the kept PSRAM read {bad}");
+        }
+    }
+    other_code(rng.next());
+    count(&COUNTS.passes);
+    count(&COUNTS.progress[core]);
+}
+
+/// The core that requests a sleep holds this flag. The wakeup deadline and the wakeup cause belong
+/// to one sleep at a time, so only one core requests a sleep at a time.
+static SLEEP_TURN: AtomicBool = AtomicBool::new(false);
+
+fn busy_wait(length: Duration) {
+    let end = Instant::now() + length;
+    while Instant::now() < end {}
+}
+
+/// Returns whether a flash cycle was running when the caller read `flash_gen` from
+/// [`FLASH_GEN`], or ran after that.
+fn flash_ran(flash_gen: u32) -> bool {
+    flash_gen % 2 == 1 || FLASH_GEN.load(Ordering::Acquire) != flash_gen
+}
+
+/// Returns whether a long sleep or a wait ended within its bounds, and records by how much it ended
+/// early or late. A sleep or wait of `length` that took `took` must not end more than [`TOLERANCE`]
+/// early. When no flash cycle ran during it, it must also not end more than [`TOLERANCE`] late.
+///
+/// The bounds are wider than the error that the report shows, because a fault in the timer wakeup
+/// or in the time update moves the end by much more.
+fn length_ok(took: Duration, length: Duration, flash_gen: u32) -> bool {
+    let during_flash = flash_ran(flash_gen);
+    let early = length.as_micros().saturating_sub(took.as_micros()) as u32;
+    COUNTS.longest_early_us.fetch_max(early, Ordering::Relaxed);
+    let overrun = took.as_micros().saturating_sub(length.as_micros()) as u32;
+    let longest = if during_flash {
+        &COUNTS.longest_flash_overrun_us
+    } else {
+        &COUNTS.longest_overrun_us
+    };
+    longest.fetch_max(overrun, Ordering::Relaxed);
+    took + TOLERANCE >= length && (during_flash || took <= length + TOLERANCE)
+}
+
+/// Requests one light sleep of random length, then checks the sleep and PSRAM. Returns at once when
+/// another core is requesting a sleep.
+fn sleep_round(core: usize, lpwr: &mut LowPower<'_>, rng: &mut Rng, retention: bool) {
+    if SLEEP_TURN.swap(true, Ordering::Acquire) {
+        return;
+    }
+    // A random delay varies where the other core is in its work when the sleep starts.
+    busy_wait(Duration::from_micros(u64::from(rng.below(1_001))));
+    let dirty = memory().dirty[core];
+    let seed = rng.next();
+    fill(dirty, seed);
+
+    // The sleep entry takes time for the cache write-back, the clock switches, and the park. A
+    // deadline during the entry makes the hardware reject the sleep or wake the chip at once. In
+    // both cases, `sleep_light` returns `Ended`, so the program cannot check the short sleeps. At
+    // 0.5 s, the entry and the exit take less than 1 %, and the deadline cannot fall inside the
+    // entry.
+    let random = rng.next();
+    let length = match random % 16 {
+        0 | 1 => {
+            count(&COUNTS.short);
+            Duration::from_micros(u64::from(random % 200))
+        }
+        2 => {
+            count(&COUNTS.long);
+            LONG_SLEEP + Duration::from_millis(u64::from(random % 2_500))
+        }
+        _ => Duration::from_micros(1_000 + u64::from(random % 9_000)),
+    };
+
+    let flash_gen = FLASH_GEN.load(Ordering::Acquire);
+    // The deadline and the measured length of the sleep must count from the same `Instant`.
+    // Otherwise a flash operation on the other core can stop this core between the two reads, for
+    // longer than `TOLERANCE`.
+    let before = Instant::now();
+    lpwr.set_wakeup_deadline(before + length);
+    let result = lpwr.sleep_light(RtcSleepConfig::default());
+    let slept = Instant::now() - before;
+    let n = count(&COUNTS.sleeps);
+    if result == LightSleep::Refused {
+        count(&COUNTS.refused);
     }
 
-    /// Panics if core 1 read a bad word or a flash write failed.
-    pub fn check(sleeps: u32) {
-        let bad = BAD_WORDS.load(Ordering::Relaxed);
-        let flash_failures = FLASH_FAILURES.load(Ordering::Relaxed);
-        if bad != 0 || flash_failures != 0 {
-            panic!(
-                "sleep {sleeps}: core 1 read {bad} bad words, and {flash_failures} flash writes failed"
+    if result == LightSleep::Ended && length >= LONG_SLEEP {
+        if cfg!(all(cpu_retention = "software", multi_core))
+            && (retention || core == 1)
+            && slept < NO_SLEEP
+        {
+            // On a chip with two cores and software CPU retention, each sleep of core 1, and each
+            // sleep of core 0 with CPU retention, waits for the other core in a rendezvous. A core
+            // in a critical section, such as one that waits for a flash write, does not answer
+            // within 1 ms, and `sleep_light` returns without a sleep. The count shows how often
+            // this occurs. If such sleeps outnumber the long sleeps that slept, the phase tested
+            // few sleeps, so it fails. `wakeup_cause` returns the cause of the previous sleep, so
+            // the program does not check the cause.
+            count(&COUNTS.not_slept);
+        } else if !wakeup_cause().contains(WakeupSource::Timer) {
+            problem!("core {core}: sleep {n} woke on {:?}", wakeup_cause());
+        } else if !length_ok(slept, length, flash_gen) {
+            problem!("core {core}: sleep {n} lasted {slept} of {length}");
+        } else {
+            count(&COUNTS.long_slept);
+        }
+    }
+    SLEEP_TURN.store(false, Ordering::Release);
+    count(&COUNTS.progress[core]);
+
+    let bad = check_words(dirty, 0..dirty.len, seed);
+    if bad.count != 0 {
+        problem!("core {core}: sleep {n}: the PSRAM written before the sleep read {bad}");
+    }
+    let slices = kept_slices();
+    if slices > 0 {
+        check_kept_slice(core, n as usize % slices);
+    }
+}
+
+/// Waits a random time in an esp-rtos thread, which lets the automatic light sleep run, then checks
+/// the wait and PSRAM. The waits start at 1 ms, the default minimum residency of the idle hook. In
+/// some waits the hook then waits for an interrupt instead of a sleep.
+fn wait_round(core: usize, rng: &mut Rng) {
+    let dirty = memory().dirty[core];
+    let seed = rng.next();
+    fill(dirty, seed);
+    let length = Duration::from_micros(1_000 + u64::from(rng.below(29_001)));
+    let flash_gen = FLASH_GEN.load(Ordering::Acquire);
+    let before = Instant::now();
+    CurrentThreadHandle::get().delay(length);
+    let waited = Instant::now() - before;
+    let n = count(&COUNTS.waits);
+    count(&COUNTS.progress[core]);
+    if !length_ok(waited, length, flash_gen) {
+        problem!("core {core}: wait {n} lasted {waited} of {length}");
+    }
+    let bad = check_words(dirty, 0..dirty.len, seed);
+    if bad.count != 0 {
+        problem!("core {core}: wait {n}: the PSRAM written before the wait read {bad}");
+    }
+    let slices = kept_slices();
+    if slices > 0 {
+        check_kept_slice(core, n as usize % slices);
+    }
+}
+
+/// The part of core 0 that controls the phase. It feeds the watchdog, prints the counts, checks all
+/// of the kept PSRAM, and ends the phase.
+struct Controller {
+    rtc: Rtc<'static>,
+    index: usize,
+    progress: Progress,
+    started: Instant,
+    next_report: Instant,
+    next_full_check: u32,
+    /// Each core's progress count at the last report, and the reports in a row that it did not
+    /// change.
+    quiet: [(u32, u32); CORES],
+}
+
+impl Controller {
+    fn poll(&mut self) {
+        self.rtc.rwdt.feed();
+        let done = COUNTS.sleeps.load(Ordering::Relaxed) + COUNTS.waits.load(Ordering::Relaxed);
+        if done >= self.next_full_check {
+            self.next_full_check = done + FULL_CHECK_EVERY;
+            for n in 0..kept_slices() {
+                self.rtc.rwdt.feed();
+                check_kept_slice(0, n);
+            }
+        }
+        if Instant::now() >= self.next_report {
+            self.next_report += REPORT_EVERY;
+            self.report();
+            self.check_progress();
+        }
+        if FAILED.load(Ordering::Acquire) || Instant::now() - self.started >= PHASE_FOR {
+            self.end();
+        }
+    }
+
+    fn report(&self) {
+        let c = &COUNTS;
+        report!(
+            "stress: {} s, sleeps {}, short {}, long {}, long slept {}, refused {}, not slept {}, waits {}, work passes {}, flash cycles {}",
+            (Instant::now() - self.started).as_secs(),
+            c.sleeps.load(Ordering::Relaxed),
+            c.short.load(Ordering::Relaxed),
+            c.long.load(Ordering::Relaxed),
+            c.long_slept.load(Ordering::Relaxed),
+            c.refused.load(Ordering::Relaxed),
+            c.not_slept.load(Ordering::Relaxed),
+            c.waits.load(Ordering::Relaxed),
+            c.passes.load(Ordering::Relaxed),
+            c.flash_cycles.load(Ordering::Relaxed),
+        );
+        if c.long_slept.load(Ordering::Relaxed) + c.waits.load(Ordering::Relaxed) > 0 {
+            report!(
+                "  bounds: at most {} µs early, longest overrun {} µs, during a flash cycle {} µs",
+                c.longest_early_us.load(Ordering::Relaxed),
+                c.longest_overrun_us.load(Ordering::Relaxed),
+                c.longest_flash_overrun_us.load(Ordering::Relaxed),
             );
         }
     }
 
-    pub fn report() {
+    /// Fails the phase when a core made no progress for [`STALL_REPORTS`] reports in a row.
+    fn check_progress(&mut self) {
+        for (core, (last, quiet)) in self.quiet.iter_mut().enumerate() {
+            let count = COUNTS.progress[core].load(Ordering::Relaxed);
+            *quiet = if count == *last { *quiet + 1 } else { 0 };
+            *last = count;
+            if *quiet == STALL_REPORTS {
+                problem!(
+                    "core {core}: no progress for {} s",
+                    REPORT_EVERY.as_secs() * u64::from(STALL_REPORTS)
+                );
+            }
+        }
+    }
+
+    /// Reports the phase, then resets the chip for the next phase, or reports the run and stops.
+    fn end(&mut self) -> ! {
+        self.report();
+        let phase = Phase::get(self.index);
+        let c = &COUNTS;
+        let made = |counter: &AtomicU32| counter.load(Ordering::Relaxed) > 0;
+        let missing = match phase.caller {
+            _ if !made(&c.flash_cycles) => Some("no flash cycle"),
+            Caller::Automatic if !made(&c.waits) => Some("no wait"),
+            Caller::Automatic if !wakeup_cause().contains(WakeupSource::Timer) => {
+                Some("no automatic light sleep")
+            }
+            Caller::Bare | Caller::Thread if !made(&c.sleeps) => Some("no sleep"),
+            Caller::Bare | Caller::Thread if !made(&c.long_slept) => {
+                Some("no long sleep ended within its bounds")
+            }
+            Caller::Bare | Caller::Thread
+                if c.not_slept.load(Ordering::Relaxed) > c.long_slept.load(Ordering::Relaxed) =>
+            {
+                Some("more long sleeps returned without a sleep than ended within their bounds")
+            }
+            _ => None,
+        };
+        if FAILED.load(Ordering::Acquire) {
+            report!("FAIL {phase}: see the core line above");
+        } else if let Some(missing) = missing {
+            report!("FAIL {phase}: {missing}");
+        } else {
+            report!("PASS {phase}");
+            self.progress.passed += 1;
+        }
+
+        self.progress.next = next_phase(self.index + 1);
+        if self.progress.next < PHASES {
+            self.progress.reset_requested = true;
+            PROGRESS.store(self.progress);
+            // The reset drops what the UART has not sent yet.
+            busy_wait(Duration::from_millis(100));
+            esp_hal::system::software_reset();
+        }
+        PROGRESS.store(self.progress);
         report!(
-            "stress: core 1 passes {}, flash writes {}",
-            PASSES.load(Ordering::Relaxed),
-            FLASH_WRITES.load(Ordering::Relaxed),
+            "light-sleep-stress: {} of {} phases passed",
+            self.progress.passed,
+            phases_in_run()
         );
+        self.rtc.rwdt.disable();
+        loop {
+            core::hint::spin_loop();
+        }
+    }
+}
+
+/// Requests sleeps from the main loop, and works between them.
+fn bare_loop(
+    core: usize,
+    mut lpwr: LowPower<'static>,
+    mut rng: Rng,
+    retention: bool,
+    mut controller: Option<Controller>,
+) -> ! {
+    loop {
+        match &mut controller {
+            Some(controller) => controller.poll(),
+            None => stop_if_failed(),
+        }
+        if rng.below(2) == 0 {
+            sleep_round(core, &mut lpwr, &mut rng, retention);
+        } else {
+            work_step(core, &mut rng);
+        }
+    }
+}
+
+/// Requests sleeps from this thread, at a high priority, while a low-priority thread on the same
+/// core works. The thread blocks for 1–3 ms after each sleep, so that the low-priority thread runs.
+fn thread_loop(
+    core: usize,
+    mut lpwr: LowPower<'static>,
+    mut rng: Rng,
+    retention: bool,
+    mut controller: Option<Controller>,
+) -> ! {
+    static WORKER_STACKS: [static_cell::ConstStaticCell<esp_rtos::thread::Stack<8192>>; CORES] =
+        [const { static_cell::ConstStaticCell::new(esp_rtos::thread::Stack::new()) }; CORES];
+
+    let mut worker_rng = Rng(rng.next() | 1);
+    CurrentThreadHandle::get().set_priority(2);
+    let worker = ThreadSpawner::from_static(WORKER_STACKS[core].take()).with_priority(1);
+    #[cfg(multi_core)]
+    let worker = worker.with_pinned_to(if core == 0 { Cpu::ProCpu } else { Cpu::AppCpu });
+    worker
+        .spawn(move || {
+            loop {
+                stop_if_failed();
+                work_step(core, &mut worker_rng);
+            }
+        })
+        .detach();
+
+    loop {
+        match &mut controller {
+            Some(controller) => controller.poll(),
+            None => stop_if_failed(),
+        }
+        sleep_round(core, &mut lpwr, &mut rng, retention);
+        CurrentThreadHandle::get()
+            .delay(Duration::from_micros(1_000 + u64::from(rng.below(2_001))));
+    }
+}
+
+/// Works, then waits, so that the automatic light sleep runs when every core waits.
+fn automatic_loop(core: usize, mut rng: Rng, mut controller: Option<Controller>) -> ! {
+    loop {
+        match &mut controller {
+            Some(controller) => controller.poll(),
+            None => stop_if_failed(),
+        }
+        work_step(core, &mut rng);
+        wait_round(core, &mut rng);
     }
 }
 
@@ -249,163 +898,177 @@ static CPU_RETENTION_MEMORY: esp_hal::rtc_cntl::CpuRetentionStorage =
 
 #[main]
 fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let reset = reset_reason(Cpu::ProCpu);
+    let loaded = PROGRESS.load(PHASES);
+    // When the program did not request the reset, the stored phase did not finish.
+    let hung = loaded
+        .filter(|stored| !stored.reset_requested)
+        .map(|stored| stored.next);
+    let mut progress = loaded.unwrap_or(Progress {
+        next: FIRST_PHASE,
+        passed: 0,
+        reset_requested: false,
+    });
+    if let Some(hung) = hung {
+        progress.next = hung + 1;
+    }
+    progress.next = next_phase(progress.next);
+    let index = progress.next;
+    let phase = Phase::get(index);
 
-    report!("light-sleep-stress: reset={:?}", reset_reason(Cpu::ProCpu));
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(phase.cpu_clock()));
+
+    report!(
+        "light-sleep-stress: reset={:?}, CPU clock {:?}",
+        reset,
+        phase.cpu_clock()
+    );
 
     let mut rtc = Rtc::new(peripherals.RTC_TIMER);
+
+    if let Some(hung) = hung {
+        report!("FAIL {}: reset {:?}", Phase::get(hung), reset);
+    }
+    if index == PHASES {
+        PROGRESS.store(progress);
+        report!(
+            "light-sleep-stress: {} of {} phases passed",
+            progress.passed,
+            phases_in_run()
+        );
+        rtc.rwdt.disable();
+        loop {
+            core::hint::spin_loop();
+        }
+    }
+    progress.reset_requested = false;
+    PROGRESS.store(progress);
+
     rtc.rwdt.set_timeout(RwdtStage::Stage0, WATCHDOG_TIMEOUT);
     rtc.rwdt.enable();
 
     #[cfg(psram_driver_supported)]
-    let psram_words: &'static mut [u32] = {
+    let psram = {
         let psram =
             esp_hal::psram::Psram::new(peripherals.PSRAM, esp_hal::psram::PsramConfig::default());
         let (start, size) = psram.raw_parts();
-        if size == 0 {
-            &mut []
-        } else {
-            unsafe { core::slice::from_raw_parts_mut(start.cast::<u32>(), size / 4) }
+        Words {
+            start: start.cast::<u32>(),
+            len: size / 4,
         }
     };
     #[cfg(not(psram_driver_supported))]
-    let psram_words: &'static mut [u32] = &mut [];
+    let psram = Words::EMPTY;
+    report!("PSRAM: {} KiB", psram.len / 256);
 
-    report!("PSRAM: {} KiB", psram_words.len() / 256);
-    // The loop writes `core0_words` before each sleep, and checks the words after the wake. The
-    // kept PSRAM keeps one pattern for the whole run. After each wake, the loop checks the next
-    // slice of the kept PSRAM. The loop reads all of PSRAM every few hundred sleeps.
-    let (core0_words, kept_words) = psram_words.split_at_mut(CORE0_WORDS.min(psram_words.len()));
-    #[cfg(multi_core)]
-    let (core1_words, kept_words) = kept_words.split_at_mut(core1::WORDS.min(kept_words.len()));
-    let kept_words: &'static [u32] = {
-        for (n, slice) in kept_words.chunks_mut(SLICE_WORDS).enumerate() {
+    let mut dirty = [Words::EMPTY; CORES];
+    let mut kept = psram;
+    for words in dirty.iter_mut() {
+        (*words, kept) = kept.split_at(DIRTY_WORDS);
+    }
+    unsafe { MEMORY = Memory { dirty, kept } };
+    for i in 0..kept.len {
+        if i % SLICE_WORDS == 0 {
             rtc.rwdt.feed();
-            fill(slice, KEPT_SEED.wrapping_add(n as u32));
         }
-        kept_words
+        kept.write(i, pattern(i, KEPT_SEED));
+    }
+
+    let seed = SEED.unwrap_or_else(|| esp_hal::rng::Rng::new().random() | 1);
+    let mut rng = Rng(seed);
+
+    let mut flash = Flash::new(peripherals.FLASH, FlashConfig::default()).unwrap();
+    let free = free_flash(&mut flash);
+    let (first, sectors) = (free.start, free.len() as u32 / SECTOR);
+    report!("flash: {sectors} free sectors from {first:#x}");
+    unsafe {
+        SCRATCH = Some(Scratch {
+            flash,
+            first,
+            sectors,
+            start: rng.below(sectors),
+            cycle: 0,
+            next: Instant::now(),
+            data: [0; SECTOR as usize / 4],
+            read: [0; SECTOR as usize / 4],
+        })
     };
-    let slices = kept_words.len().div_ceil(SLICE_WORDS);
-    report!(
-        "kept PSRAM: {} KiB in {slices} slices",
-        kept_words.len() / 256
-    );
 
+    report!("RUN phase {index}: {phase}, seed {seed:#010x}");
+    let now = Instant::now();
+    let controller = Controller {
+        rtc,
+        index,
+        progress,
+        started: now,
+        next_report: now + REPORT_EVERY,
+        next_full_check: FULL_CHECK_EVERY,
+        quiet: [(0, 0); CORES],
+    };
+    let retention = phase.retention;
+    #[cfg(multi_core)]
+    let core1_rng = Rng(rng.next() | 1);
+    #[cfg(multi_core)]
+    static mut CORE1_STACK: esp_hal::system::Stack<16384> = esp_hal::system::Stack::new();
+    #[cfg(multi_core)]
+    let core1_stack = unsafe { &mut *addr_of_mut!(CORE1_STACK) };
+
+    if phase.caller == Caller::Automatic {
+        #[cfg_attr(not(supports_cpu_power_down), expect(unused_mut))]
+        let mut sleep = esp_rtos::sleep::configure(peripherals.LPWR);
+        #[cfg(supports_cpu_power_down)]
+        if retention {
+            sleep
+                .enable_cpu_powerdown(CPU_RETENTION_MEMORY.take())
+                .unwrap();
+        }
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
+        #[cfg(multi_core)]
+        esp_rtos::start_second_core(peripherals.CPU_CTRL, core1_stack, move || {
+            automatic_loop(1, core1_rng, None)
+        });
+        automatic_loop(0, rng, Some(controller))
+    }
+
+    #[cfg_attr(not(supports_cpu_power_down), expect(unused_mut))]
     let mut lpwr = LowPower::new(peripherals.LPWR);
-
     #[cfg(supports_cpu_power_down)]
-    if CPU_POWER_DOWN {
+    if retention {
         lpwr.install_cpu_retention_memory(CPU_RETENTION_MEMORY.take())
             .unwrap();
     }
-
-    #[cfg(multi_core)]
-    core1::start(peripherals.CPU_CTRL, peripherals.FLASH, core1_words);
-
-    report!("stress: start");
-
-    let mut rng = Rng(0x2545_F491);
-    let mut sleeps = 0u32;
-    let mut short = 0u32;
-    let mut long = 0u32;
-    let mut refused = 0u32;
-    let mut not_slept = 0u32;
-    let mut next_report = Instant::now() + REPORT_EVERY;
-    let end = Instant::now() + RUN_FOR;
-    while Instant::now() < end {
-        rtc.rwdt.feed();
-
-        let seed = rng.next();
-        fill(core0_words, seed);
-
-        // Most sleeps last 1–10 ms. One in eight sleeps lasts less than 200 µs, so some wakeups
-        // come during the sleep entry. One in 16 sleeps lasts 0.5–3 s.
-        //
-        // The sleep entry takes time for the cache write-back, the clock switches, and the park. A
-        // deadline in that window makes the hardware reject the sleep or wake the chip at once. In
-        // both cases, `sleep_light` returns `Ended`, so the loop cannot check the short sleeps. The
-        // entry and the exit take an unknown part of a 1–10 ms sleep. At 0.5 s, the entry and the
-        // exit take less than one percent, and the deadline cannot fall inside the entry.
-        let random = rng.next();
-        let length = match random % 16 {
-            0 | 1 => {
-                short += 1;
-                Duration::from_micros(u64::from(random % 200))
-            }
-            2 => {
-                long += 1;
-                LONG_SLEEP + Duration::from_millis(u64::from(random % 2_500))
-            }
-            _ => Duration::from_micros(1_000 + u64::from(random % 9_000)),
-        };
-
+    if phase.caller == Caller::Thread {
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(timg0.timer0);
         #[cfg(multi_core)]
-        if sleeps % 16 == 0 {
-            core1::request_flash_write();
-        }
-
-        lpwr.set_wakeup_deadline(Instant::now() + length);
-        let before = rtc.time_since_power_up();
-        let result = lpwr.sleep_light(RtcSleepConfig::default());
-        let slept = rtc.time_since_power_up() - before;
-        if result == LightSleep::Refused {
-            refused += 1;
-        }
-        sleeps += 1;
-
-        // A sleep that returns at once passes every PSRAM check. So a long sleep must last at
-        // least 90 percent of its length, and the timer must wake the chip.
-        if result == LightSleep::Ended && length >= LONG_SLEEP {
-            if CPU_POWER_DOWN && slept < length / 10 {
-                // With CPU power-down on a two-core chip, core 1 can wait for a flash write with
-                // interrupts masked. The rendezvous then gets no answer within 1 ms, and
-                // `sleep_light` returns without a sleep. The count shows how often this occurs.
-                // `wakeup_cause` returns the cause of the previous sleep, so the loop does not
-                // check the cause.
-                not_slept += 1;
-            } else {
-                let cause = wakeup_cause();
-                if !cause.contains(WakeupSource::Timer) {
-                    panic!("sleep {sleeps}: the wakeup cause is {cause:?}");
-                }
-                if slept < length * 9 / 10 {
-                    panic!("sleep {sleeps}: slept {slept} of {length}");
-                }
-            }
-        }
-
-        let core0_bad = count_bad(core0_words, seed);
-        if core0_bad != 0 {
-            panic!("sleep {sleeps}: core 0 read {core0_bad} bad words");
-        }
-        if slices > 0 {
-            let n = sleeps as usize % slices;
-            let start = n * SLICE_WORDS;
-            let end = kept_words.len().min(start + SLICE_WORDS);
-            let kept_bad = count_bad(&kept_words[start..end], KEPT_SEED.wrapping_add(n as u32));
-            if kept_bad != 0 {
-                panic!("sleep {sleeps}: slice {n} of the kept PSRAM read {kept_bad} bad words");
-            }
-        }
-        #[cfg(multi_core)]
-        core1::check(sleeps);
-
-        if Instant::now() > next_report {
-            next_report += REPORT_EVERY;
-            report!(
-                "stress: sleeps {sleeps}, short {short}, long {long}, refused {refused}, not slept {not_slept}"
-            );
-            #[cfg(multi_core)]
-            core1::report();
-        }
+        esp_rtos::start_second_core(peripherals.CPU_CTRL, core1_stack, move || {
+            thread_loop(
+                1,
+                LowPower::new(unsafe { esp_hal::peripherals::LPWR::steal() }),
+                core1_rng,
+                retention,
+                None,
+            )
+        });
+        thread_loop(0, lpwr, rng, retention, Some(controller))
     }
 
-    report!(
-        "stress: done, sleeps {sleeps}, short {short}, long {long}, refused {refused}, not slept {not_slept}"
-    );
     #[cfg(multi_core)]
-    core1::report();
-    loop {
-        rtc.rwdt.feed();
+    {
+        let mut cpu_control = esp_hal::system::CpuControl::new(peripherals.CPU_CTRL);
+        let guard = cpu_control
+            .start_app_core(core1_stack, move || {
+                bare_loop(
+                    1,
+                    LowPower::new(unsafe { esp_hal::peripherals::LPWR::steal() }),
+                    core1_rng,
+                    retention,
+                    None,
+                )
+            })
+            .unwrap();
+        core::mem::forget(guard);
     }
+    bare_loop(0, lpwr, rng, retention, Some(controller))
 }

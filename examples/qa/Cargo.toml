@@ -60,6 +60,7 @@ trouble-host = { version = "0.8.0", features = [
 ] }
 log = "0.4"
 libm = "0.2"
+portable-atomic = { version = "1.11", default-features = false }
 
 [features]
 default = ["float-save-restore"]
