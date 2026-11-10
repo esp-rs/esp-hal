@@ -12,6 +12,7 @@ use crate::{
     DriverMode,
     asynch::AtomicWaker,
     dma::DmaBufError,
+    interrupt,
     mipi_csi::{
         CsiCapture,
         DMA_COMPLETION_INTERRUPT_MASK,
@@ -21,6 +22,7 @@ use crate::{
         bridge_event_status,
         flush_bridge_fifo,
         host_error_status,
+        stop_dma_channel,
     },
     mipi_dw_gdma::{
         BlockTransferConfig,
@@ -29,7 +31,7 @@ use crate::{
         register_channel_handler,
         unregister_channel_handler,
     },
-    peripherals::MIPI_CSI_BRIDGE,
+    peripherals::{Interrupt, MIPI_CSI_BRIDGE},
     time::{Duration, Instant},
 };
 
@@ -51,9 +53,10 @@ enum Slot {
     App,
 }
 
-/// State shared by the stream handle and the DMA interrupt handler.
+/// State shared by the stream handle and the DMA and bridge interrupt handlers.
 struct Shared {
     active: bool,
+    channel: Option<DwGdmaChannel>,
     slots: [Slot; STREAM_BUFFER_COUNT],
     addrs: [u32; STREAM_BUFFER_COUNT],
     lens: [u32; STREAM_BUFFER_COUNT],
@@ -73,6 +76,7 @@ struct Shared {
 impl Shared {
     const IDLE: Self = Self {
         active: false,
+        channel: None,
         slots: [Slot::Free; STREAM_BUFFER_COUNT],
         addrs: [0; STREAM_BUFFER_COUNT],
         lens: [0; STREAM_BUFFER_COUNT],
@@ -250,6 +254,10 @@ impl<'d, Dm: DriverMode> CsiCapture<'d, Dm> {
     /// configured frame size, and must not overlap. They are `'static`
     /// because the DMA writes them between calls.
     ///
+    /// The stream binds its own handler to the
+    /// [`CSI_BRIDGE`](crate::peripherals::Interrupt::CSI_BRIDGE) interrupt on
+    /// the current core, to end a frame that the bridge discarded.
+    ///
     /// # Errors
     ///
     /// Returns the capture and the buffers unchanged if a buffer is unsuitable
@@ -311,6 +319,7 @@ impl<'d, Dm: DriverMode> CsiStream<'d, Dm> {
             }
             *shared = Shared {
                 active: true,
+                channel: Some(channel),
                 addrs,
                 lens,
                 block: Some(block),
@@ -321,6 +330,7 @@ impl<'d, Dm: DriverMode> CsiStream<'d, Dm> {
             self.capture.clear_transfer_status();
             register_channel_handler(channel, stream_interrupt_handler);
             channel.set_interrupt_signal_enable(DMA_COMPLETION_INTERRUPT_MASK);
+            interrupt::bind_handler(Interrupt::CSI_BRIDGE, stream_bridge_interrupt_handler);
             shared.arm(channel, 0);
             enable_bridge(true);
             true
@@ -402,6 +412,7 @@ impl<'d, Dm: DriverMode> CsiStream<'d, Dm> {
         {
             panic!("mipi-csi stream DMA shutdown failed: {:?}", reason);
         }
+        MIPI_CSI_BRIDGE::regs().int_ena().reset();
         channel.set_interrupt_signal_enable(0);
         unregister_channel_handler(channel);
         self.capture.clear_transfer_status();
@@ -471,10 +482,11 @@ fn take_newest(
     Ok(ready)
 }
 
+/// Switches the bridge on or off, with its discard interrupt.
 fn enable_bridge(enable: bool) {
-    MIPI_CSI_BRIDGE::regs()
-        .csi_en()
-        .modify(|_, w| w.csi_brig_en().bit(enable));
+    let bridge = MIPI_CSI_BRIDGE::regs();
+    bridge.int_ena().write(|w| w.discard().bit(enable));
+    bridge.csi_en().modify(|_, w| w.csi_brig_en().bit(enable));
 }
 
 /// Rearms the bridge and the channel after a failed frame. The bridge is off,
@@ -498,6 +510,36 @@ fn resync(shared: &mut Shared, channel: DwGdmaChannel) {
 #[crate::ram]
 fn stream_interrupt_handler(channel: DwGdmaChannel, pending: u32) {
     update_on_interrupt(channel, pending);
+    STREAM_WAKER.wake();
+}
+
+/// Drops the frame of the slot in `Dma` after the bridge discarded data.
+///
+/// If the source stops in the middle of a frame, the bridge can stop
+/// requesting DMA bursts when the next frame starts. It then fills its FIFO and
+/// discards, and the channel never ends its block, so no DMA interrupt comes.
+#[crate::ram]
+#[crate::handler]
+fn stream_bridge_interrupt_handler() {
+    SHARED.with(|shared| {
+        // Releases the interrupt line. The next arm unmasks it again.
+        MIPI_CSI_BRIDGE::regs().int_ena().reset();
+        if !shared.active || shared.fault {
+            return;
+        }
+        let (Some(channel), Some(done)) = (shared.channel, shared.dma_slot()) else {
+            return;
+        };
+        // The bridge must stay enabled until the channel stopped.
+        if stop_dma_channel(channel).is_err() {
+            shared.fault = true;
+            return;
+        }
+        enable_bridge(false);
+        shared.slots[done] = Slot::Free;
+        shared.stats.errored += 1;
+        shared.paused = true;
+    });
     STREAM_WAKER.wake();
 }
 

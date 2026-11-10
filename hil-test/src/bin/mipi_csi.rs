@@ -89,7 +89,8 @@ mod tests {
 
     #[test]
     fn dphy_rail_follows_the_driver(mut p: Peripherals) {
-        // Without PSRAM init, the rail is still on from boot, so the start state is not checked.
+        // Without PSRAM init, the rail can still be on from boot or from an earlier test, so
+        // the start state is not checked.
         for _ in 0..2 {
             let csi = MipiCsi::new(p.MIPI_CSI.reborrow(), Config::default()).unwrap();
             assert!(dphy_rail_on());
@@ -100,12 +101,14 @@ mod tests {
 
     #[test]
     fn invalid_configurations_are_rejected(mut p: Peripherals) {
+        // The PMU keeps the rail state over the reset between tests.
+        let rail_before = dphy_rail_on();
         let lane_rate = MipiCsi::new(
             p.MIPI_CSI.reborrow(),
             Config::default().with_lane_bit_rate_mbps(50),
         );
         assert_eq!(lane_rate.err(), Some(ConfigError::InvalidLaneBitRate));
-        assert!(!dphy_rail_on());
+        assert_eq!(dphy_rail_on(), rail_before);
 
         let size = MipiCsi::new(p.MIPI_CSI.reborrow(), Config::default())
             .unwrap()

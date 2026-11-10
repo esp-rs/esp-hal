@@ -55,7 +55,9 @@
 //! its own. [`CsiStream::next_frame_async`] has no timeout; combine it with a timer to bound the
 //! wait. A frame with a DMA error, a CSI host or bridge error, or a size other than the configured
 //! one is an error for a single-frame capture. A stream drops such a frame and switches the bridge
-//! off and on again, which [`StreamStats`] counts.
+//! off and on again, which [`StreamStats`] counts. This includes a frame that the source stopped in
+//! the middle of: when the bridge then discards data, the stream stops the DMA channel and drops
+//! the frame.
 //!
 //! # Shutdown
 //!
@@ -72,9 +74,6 @@
 //! - A source that stops in the middle of a frame leaves the CSI host waiting for that frame's end,
 //!   so the host reports a frame boundary or packet error at the next frame start. A single-frame
 //!   capture armed right then fails; let the source run for one frame first.
-//! - If the source stops in the middle of a frame while a stream runs, the stream can stall with
-//!   the bridge FIFO full and no DMA interrupt. [`CsiStream::next_frame`] then times out until the
-//!   stream is stopped and started again.
 //! - The bridge FIFO flush on every capture start uses the bridge soft reset, whose effect on the
 //!   FIFO the TRM does not describe. It was checked on hardware.
 //!
@@ -1041,8 +1040,8 @@ impl<'d> MipiCsi<'d> {
             w.dma_force_rd_status().clear_bit();
             w.csi_dma_flow_controller().set_bit()
         });
-        // `int_ena` stays at its reset value of 0: the bridge has no interrupt
-        // line of its own here, and events are read from `int_raw`.
+        // `int_ena` stays at its reset value of 0: single captures read events
+        // from `int_raw`, and only a stream unmasks the discard event.
     }
 
     fn shutdown(&self) {
