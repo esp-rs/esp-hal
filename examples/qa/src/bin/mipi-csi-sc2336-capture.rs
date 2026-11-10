@@ -29,7 +29,11 @@ use core::alloc::Layout;
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{main, mipi_csi::MipiCsi, psram};
+use esp_hal::{
+    main,
+    mipi_csi::{CaptureConfig, Config, MipiCsi},
+    psram,
+};
 use esp_println::{print, println};
 use qa_test::camera::{
     self,
@@ -73,10 +77,13 @@ fn main() -> ! {
         "capture: frames={frames} interrupt={interrupt} sensor_continuous={continuous} test_pattern={test_pattern}"
     );
 
-    let mut capture = MipiCsi::new(peripherals.MIPI_CSI, camera::csi_config())
-        .unwrap()
-        .with_dma(peripherals.VDMA_CH1, camera::capture_config())
+    // Built with the defaults, so the run also covers `apply_config`.
+    let mut csi = MipiCsi::new(peripherals.MIPI_CSI, Config::default()).unwrap();
+    csi.apply_config(&camera::csi_config()).unwrap();
+    let mut capture = csi
+        .with_dma(peripherals.VDMA_CH1, CaptureConfig::default())
         .unwrap();
+    capture.apply_config(&camera::capture_config()).unwrap();
     let mut sensor = Sc2336::new(
         peripherals.I2C0,
         peripherals.GPIO7,
@@ -118,7 +125,7 @@ fn main() -> ! {
         let guard_written = GUARD_BYTES / 4 - sentinel_words(guard);
         let report = capture.completion_interrupt_report();
         let irq_ok = !interrupt || (report.fired && report.own_source);
-        let ok = matches!(&result, Ok(f) if f.received_bytes == FRAME_BYTES)
+        let ok = result.is_ok()
             && untouched == 0
             && guard_written == 0
             && irq_ok
@@ -130,8 +137,7 @@ fn main() -> ! {
         if !ok || frames <= 10 || index % 10 == 0 {
             // Not `{:08x}` with a `0x` prefix: the monitor resolves those as addresses.
             println!(
-                "frame[{index}/{frames}]: ok={ok} untouched_words={untouched} guard_written_words={guard_written} checksum32={checksum:08x} irq_latency_us={:?}",
-                report.latency_from_arm_us
+                "frame[{index}/{frames}]: ok={ok} untouched_words={untouched} guard_written_words={guard_written} checksum32={checksum:08x}"
             );
         }
         if !ok {

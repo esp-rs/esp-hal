@@ -3,9 +3,10 @@
 //! No frame arrives on the CSI lanes: either no camera is connected, or its sensor does not
 //! stream. A sensor keeps streaming over a reset of the chip, so a firmware that left it on, such
 //! as the live camera-to-LCD example, has to be followed by one that turns it off, or by a power
-//! cycle, before these tests run. The tests check the D-PHY rail, configuration errors, capture
-//! timeouts, the shutdown of an armed capture and stream, and a dropped `next_frame_async` future.
-//! Capture with a camera is covered by the `mipi-csi-*` QA tests in `examples/qa`.
+//! cycle, before these tests run. The tests check the D-PHY rail, configuration errors,
+//! `apply_config`, capture timeouts, the shutdown of an armed capture and stream, and a dropped
+//! `next_frame_async` future. Capture with a camera is covered by the `mipi-csi-*` QA tests in
+//! `examples/qa`.
 
 //% CHIP_FILTER: mipi_csi_driver_supported
 //% FEATURES: unstable
@@ -32,6 +33,7 @@ mod tests {
             Config,
             ConfigError,
             CsiCapture,
+            DataLanes,
             DmaAxiConfig,
             MipiCsi,
             ReceiveError,
@@ -132,6 +134,34 @@ mod tests {
             );
         assert_eq!(axi.err(), Some(CaptureConfigError::InvalidDmaAxiConfig));
         assert!(!dphy_rail_on());
+    }
+
+    #[test]
+    fn apply_config_replaces_the_configuration(p: Peripherals) {
+        let mut csi = MipiCsi::new(p.MIPI_CSI, Config::default()).unwrap();
+        let lane_rate = csi.apply_config(&Config::default().with_lane_bit_rate_mbps(50));
+        assert_eq!(lane_rate, Err(ConfigError::InvalidLaneBitRate));
+        csi.apply_config(&Config::default().with_num_data_lanes(DataLanes::_1))
+            .unwrap();
+
+        let mut capture = csi.with_dma(p.VDMA_CH1, CaptureConfig::default()).unwrap();
+        let size = capture.apply_config(&CaptureConfig::default().with_frame_width(0));
+        assert_eq!(size, Err(CaptureConfigError::InvalidFrameDimensions));
+        let mut buffer = Frame([SENTINEL; FRAME_BYTES]);
+        let result = capture.receive(&mut buffer.0);
+        assert!(matches!(result, Err(ReceiveError::BufferTooSmall { .. })));
+
+        capture
+            .apply_config(
+                &CaptureConfig::default()
+                    .with_frame_width(WIDTH)
+                    .with_frame_height(HEIGHT)
+                    .with_timeout(TIMEOUT),
+            )
+            .unwrap();
+        let result = capture.receive(&mut buffer.0);
+        assert!(matches!(result, Err(ReceiveError::Timeout(_))));
+        assert!(untouched(&buffer.0));
     }
 
     #[test]

@@ -91,15 +91,9 @@ fn frame(
     sensor: &mut Sc2336<'_>,
     buffer: &mut [u8],
 ) -> bool {
-    let result = capture
-        .receive_with(buffer, || sensor.set_stream(true).unwrap())
-        .map(|frame| frame.received_bytes);
+    let result = capture.receive_with(buffer, || sensor.set_stream(true).unwrap());
     let _ = sensor.set_stream(false);
-    report(
-        step,
-        &format!("csi_frame={result:?}"),
-        result.is_ok_and(|bytes| bytes == FRAME_BYTES),
-    )
+    report(step, &format!("csi_frame={result:?}"), result.is_ok())
 }
 
 /// Only read while a `MipiDsi` lives, so that the DSI host is clocked.

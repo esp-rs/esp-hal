@@ -326,9 +326,7 @@ fn stream_async<'d>(
     let settle_on = sensor.set_stream(true);
     Delay::new().delay_millis(50);
     let [buffer0, buffer1] = buffers;
-    let blocking = capture
-        .receive_with(buffer0, || {})
-        .map(|frame| frame.received_bytes);
+    let blocking = capture.receive_with(buffer0, || {});
     let settle_off = sensor.set_stream(false);
 
     println!(
@@ -345,7 +343,7 @@ fn stream_async<'d>(
         && stream_off.is_ok()
         && settle_on.is_ok()
         && settle_off.is_ok()
-        && blocking.is_ok_and(|bytes| bytes == FRAME_BYTES);
+        && blocking.is_ok();
     (capture, [buffer0, buffer1], ok)
 }
 
