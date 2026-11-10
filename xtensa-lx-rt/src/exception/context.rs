@@ -108,7 +108,7 @@ unsafe extern "Rust" {
     /// The exception assembly jumps here once registers have been spilled
     fn __exception(cause: ExceptionCause, save_frame: &mut Context);
     /// This symbol will be provided by the user via `#[exception]`
-    fn __user_exception(cause: ExceptionCause, save_frame: &mut Context);
+    pub(super) fn __user_exception(cause: ExceptionCause, save_frame: &mut Context);
     /// No attribute is supplied for this symbol as the double exception can
     /// hardly occur
     fn __double_exception(cause: ExceptionCause, save_frame: &mut Context);
@@ -127,12 +127,6 @@ unsafe extern "Rust" {
     fn __level_6_interrupt(save_frame: &mut Context);
     /// This symbol will be provided by the user via `#[interrupt(7)]`
     fn __level_7_interrupt(save_frame: &mut Context);
-}
-
-#[unsafe(no_mangle)]
-#[unsafe(link_section = ".rwtext")]
-unsafe extern "C" fn __default_exception(cause: ExceptionCause, save_frame: &mut Context) {
-    unsafe { __user_exception(cause, save_frame) }
 }
 
 #[unsafe(no_mangle)]

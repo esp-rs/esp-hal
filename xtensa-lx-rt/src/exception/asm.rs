@@ -1,6 +1,18 @@
 use core::arch::global_asm;
 
+use super::{Context, ExceptionCause, context::__user_exception};
 use crate::cfg_global_asm;
+
+// The `global_asm!` blocks below use instructions and special registers that
+// only exist with optional Xtensa features (e.g. `s32e`, LBEG). If this module
+// has no Rust function, rustc may emit it in a codegen unit without functions,
+// where LLVM parses the assembly for a generic CPU and rejects them.
+// See https://github.com/espressif/llvm-project/issues/144.
+#[unsafe(no_mangle)]
+#[unsafe(link_section = ".rwtext")]
+unsafe extern "C" fn __default_exception(cause: ExceptionCause, save_frame: &mut Context) {
+    unsafe { __user_exception(cause, save_frame) }
+}
 
 // We could cfg symbols away and reduce frame size depending on features enabled
 // i.e the frame size is a fixed size based on all the features right now
