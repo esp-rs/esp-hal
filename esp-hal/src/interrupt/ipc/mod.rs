@@ -14,14 +14,10 @@
 //! joins that run. [`IpcRequest`] lists the rules for the function.
 //!
 //! ## Configuration
-#![cfg_attr(
-    xtensa,
-    doc = " The HAL reserves `FROM_CPU_INTR0` and `FROM_CPU_INTR1` for this path."
-)]
-#![cfg_attr(
-    riscv,
-    doc = " Each CPU takes the call in its machine software interrupt. The path needs no peripheral interrupt."
-)]
+#![doc = cfg_select! {
+    xtensa => "The HAL reserves `FROM_CPU_INTR0` and `FROM_CPU_INTR1` for this path.",
+    riscv => "Each CPU takes the call in its machine software interrupt. The path needs no peripheral interrupt.",
+}]
 //! [`crate::init`] installs the handler on the PRO CPU. The start of the APP CPU installs the
 //! handler on that CPU.
 //!
@@ -50,128 +46,36 @@
 
 use core::ptr::NonNull;
 
-#[cfg(feature = "rt")]
-use portable_atomic::{AtomicPtr, Ordering};
-
-pub use self::queue::IpcRequest;
-#[cfg(feature = "rt")]
-use crate::interrupt::__rtos_implementation::ContextSwitchHandler;
+pub use self::request::IpcRequest;
 use crate::{peripherals::IPC, system::Cpu, time::Instant};
 
-#[cfg(feature = "rt")]
-#[cfg_attr(riscv, path = "riscv.rs")]
-#[cfg_attr(xtensa, path = "xtensa.rs")]
-mod implem;
-#[allow(dead_code)]
-mod queue;
+mod request;
 
-#[cfg(feature = "rt")]
-pub(crate) use implem::install;
-#[cfg(feature = "rt")]
-use implem::raise;
+cfg_select! {
+    feature = "rt" => {
+        #[cfg_attr(riscv, path = "riscv.rs")]
+        #[cfg_attr(xtensa, path = "xtensa.rs")]
+        mod implem;
+        mod queue;
+        mod runtime;
 
-#[cfg(all(feature = "rt", riscv))]
-pub(crate) use self::implem::install_app;
-
-/// The IPC state of one CPU.
-///
-/// Every CPU has its own handler, which reads the fields at constant addresses.
-#[cfg(feature = "rt")]
-#[repr(C)]
-struct CoreState {
-    /// The context-switch handler that the CPU runs, or null if the CPU has none pending.
-    ///
-    /// [`request_context_switch`] copies `context_switch_handler` here. A posted request alone
-    /// therefore does not make the CPU switch tasks.
-    pending_context_switch: AtomicPtr<()>,
-
-    /// The context-switch handler of the CPU, or null if no RTOS registered one.
-    ///
-    /// This field is set once, and holds the only handler that the CPU accepts.
-    context_switch_handler: AtomicPtr<()>,
-
-    /// The address of the register that clears the request of this CPU.
-    #[cfg(riscv)]
-    request: AtomicPtr<u32>,
-
-    /// The requests that [`Ipc::post`] queued for this CPU.
-    lists: queue::Lists,
-}
-
-#[cfg(feature = "rt")]
-impl CoreState {
-    const fn new() -> Self {
-        Self {
-            pending_context_switch: AtomicPtr::new(core::ptr::null_mut()),
-            context_switch_handler: AtomicPtr::new(core::ptr::null_mut()),
-            #[cfg(riscv)]
-            request: AtomicPtr::new(core::ptr::null_mut()),
-            lists: queue::Lists::new(),
+        pub(crate) use implem::install;
+        #[cfg(riscv)]
+        pub(crate) use implem::install_app;
+        use runtime::esp_hal_ipc_post;
+        pub(crate) use runtime::{
+            fail_stranded,
+            request_context_switch,
+            set_context_switch_handler,
+        };
+    }
+    _ => {
+        // A build can hold esp-hal copies without the `rt` feature. Those copies post through the
+        // symbol of the copy with `rt`.
+        unsafe extern "C" {
+            fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>, arg: usize) -> u32;
         }
     }
-}
-
-#[cfg(feature = "rt")]
-static STATE: [CoreState; Cpu::COUNT] = [const { CoreState::new() }; Cpu::COUNT];
-
-/// Completes each request that `core` did not run with [`IpcError::Offline`], and empties the
-/// lists of `core`.
-///
-/// # Safety
-///
-/// `core` does not run, and posts to `core` return [`IpcError::Offline`].
-#[cfg(feature = "rt")]
-pub(crate) unsafe fn fail_stranded(core: Cpu) {
-    unsafe { queue::fail_stranded(&STATE[core as usize].lists, core as u32) };
-}
-
-/// Queues a run of `request` on the CPU `core`.
-///
-/// Returns `seq << 5` for a queued or joined run, 1 if `core` does not take IPC interrupts, and 2
-/// if `request` is busy.
-///
-/// # Safety
-///
-/// `request` stays valid as long as the runtime can reach it.
-// esp-hal copies without the `rt` feature call this function by name. The name, the argument
-// types, the encoding of the return value and the layout of `IpcRequest` must stay stable.
-#[cfg(feature = "rt")]
-#[unsafe(export_name = "esp_hal_ipc_post")]
-unsafe extern "C" fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>, arg: usize) -> u32 {
-    use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
-
-    let request = unsafe { request.as_ref() };
-    let core = match core {
-        0 => Cpu::ProCpu,
-        1 => Cpu::AppCpu,
-        _ => return queue::POST_OFFLINE,
-    };
-
-    // A context switch must not stop the post between the push and the raise.
-    let token = unsafe { SingleCoreInterruptLock.enter() };
-    let result = if core == Cpu::AppCpu && !crate::system::multi_core::app_core_takes_ipc() {
-        queue::POST_OFFLINE
-    } else {
-        unsafe {
-            queue::post(
-                &STATE[core as usize].lists,
-                core as u32,
-                request,
-                arg,
-                || raise(core),
-            )
-        }
-    };
-    unsafe { SingleCoreInterruptLock.exit(token) };
-
-    result
-}
-
-// A build can hold esp-hal copies without the `rt` feature. Those copies post through the symbol
-// of the copy with `rt`.
-#[cfg(not(feature = "rt"))]
-unsafe extern "C" {
-    fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>, arg: usize) -> u32;
 }
 
 /// Handle that posts requests to a CPU through the IPC interrupt.
@@ -210,13 +114,13 @@ impl Ipc {
         arg: usize,
     ) -> Result<Ticket, IpcError> {
         let result = unsafe { esp_hal_ipc_post(core as u8, NonNull::from(request), arg) };
-        match result & queue::POST_RESULT_MASK {
-            queue::POST_OK => Ok(Ticket {
+        match result & request::POST_RESULT_MASK {
+            request::POST_OK => Ok(Ticket {
                 request,
                 core,
                 seq: result,
             }),
-            queue::POST_OFFLINE => Err(IpcError::Offline),
+            request::POST_OFFLINE => Err(IpcError::Offline),
             _ => Err(IpcError::Busy),
         }
     }
@@ -264,8 +168,8 @@ impl Ticket {
     ///
     /// This function never waits.
     pub fn poll(self) -> Option<Result<(), IpcError>> {
-        queue::poll(self.request, self.seq).map(|outcome| match outcome {
-            queue::DONE => Ok(()),
+        request::poll(self.request, self.seq).map(|outcome| match outcome {
+            request::DONE => Ok(()),
             _ => Err(IpcError::Offline),
         })
     }
@@ -290,7 +194,7 @@ impl defmt::Format for Ticket {
             f,
             "Ticket {{ core: {}, seq: {} }}",
             self.core,
-            self.seq >> queue::SEQ_SHIFT
+            self.seq >> request::SEQ_SHIFT
         )
     }
 }
@@ -325,64 +229,3 @@ impl core::fmt::Display for IpcError {
 }
 
 impl core::error::Error for IpcError {}
-
-/// Registers the context-switch handler of `core`.
-///
-/// A CPU accepts one context-switch handler. [`request_context_switch`] therefore takes no
-/// handler of its own, and never waits.
-///
-/// # Panics
-///
-/// Panics if `core` already has a context-switch handler.
-///
-/// # Safety
-///
-/// See [`__rtos_implementation::set_context_switch_handler`].
-///
-/// [`__rtos_implementation::set_context_switch_handler`]:
-///     super::__rtos_implementation::set_context_switch_handler
-#[cfg(feature = "rt")]
-pub(crate) unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitchHandler) {
-    unwrap!(
-        STATE[core as usize]
-            .context_switch_handler
-            .compare_exchange(
-                core::ptr::null_mut(),
-                handler as *mut (),
-                Ordering::Release,
-                Ordering::Relaxed,
-            ),
-        "A CPU accepts one context switch handler"
-    );
-}
-
-/// Asks `core` to run its context-switch handler.
-///
-/// The handler runs at [`Priority::min`][super::Priority::min], after the requests that
-/// [`Ipc::post`] queued. The call does not wait, not even for a pending request.
-///
-/// # Panics
-///
-/// In debug builds, panics if `core` has no context-switch handler, or if `core` is the APP CPU
-/// and that CPU is not running.
-#[cfg(feature = "rt")]
-#[inline]
-pub(crate) fn request_context_switch(core: Cpu) {
-    debug_assert!(
-        core != Cpu::AppCpu || crate::soc::cpu_control::is_running(Cpu::AppCpu),
-        "IPC target APP core is not running"
-    );
-
-    let state = &STATE[core as usize];
-
-    // A CPU accepts one context switch handler, so this needs no read-modify-write: the store
-    // is idempotent, and the IPC handler takes the handler before it runs it, which makes the
-    // handler run at least once after this store.
-    let handler = state.context_switch_handler.load(Ordering::Relaxed);
-    debug_assert!(!handler.is_null(), "The CPU has no context switch handler");
-    state
-        .pending_context_switch
-        .store(handler, Ordering::Release);
-
-    raise(core);
-}

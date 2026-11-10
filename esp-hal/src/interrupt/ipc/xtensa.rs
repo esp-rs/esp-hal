@@ -5,7 +5,7 @@
 
 use portable_atomic::Ordering;
 
-use super::STATE;
+use super::runtime::STATE;
 use crate::{
     interrupt::{Priority, software::SoftwareInterrupt},
     peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1, Interrupt},

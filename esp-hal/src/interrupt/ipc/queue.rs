@@ -4,91 +4,27 @@
 
 use core::ptr;
 
-use portable_atomic::{AtomicPtr, AtomicU32, AtomicUsize, Ordering};
+use portable_atomic::{AtomicPtr, Ordering};
+
+pub(crate) use super::request::*;
 
 /// A run is pending. Its sequence number is in the `seq` bits.
 pub(crate) const QUEUED: u32 = 1 << 0;
-/// Reserved. Always 0.
-#[allow(dead_code)]
-pub(crate) const CANCELLED: u32 = 1 << 1;
 /// `func` runs on the CPU in the `CORE` bit.
-pub(crate) const RUNNING: u32 = 1 << 2;
+pub(crate) const RUNNING: u32 = 1 << 1;
 /// The CPU of the pending or running run.
-pub(crate) const CORE: u32 = 1 << 3;
+pub(crate) const CORE: u32 = 1 << 2;
 /// `arg` holds the argument of the pending run.
-pub(crate) const ARMED: u32 = 1 << 4;
-/// The position of the sequence number in `word` and in `status`.
-pub(crate) const SEQ_SHIFT: u32 = 5;
+pub(crate) const ARMED: u32 = 1 << 3;
 
-/// The outcome bits of `status`.
-pub(crate) const OUTCOME_MASK: u32 = 0b11;
-/// The run ended.
-pub(crate) const DONE: u32 = 0;
 /// The target CPU stopped before the run.
 pub(crate) const OFFLINE: u32 = 1;
 
-/// The post queued a run, or joined a pending run.
-pub(crate) const POST_OK: u32 = 0;
-/// The target CPU does not take IPC interrupts.
-pub(crate) const POST_OFFLINE: u32 = 1;
 /// The request is pending with a different argument, or it belongs to the other CPU.
 pub(crate) const POST_BUSY: u32 = 2;
-/// The result bits of the return value of a post.
-pub(crate) const POST_RESULT_MASK: u32 = (1 << SEQ_SHIFT) - 1;
 
 /// The bits of the sequence number in `word` and in `status`.
 const SEQ_FIELD: u32 = !((1 << SEQ_SHIFT) - 1);
-
-/// A function that [`Ipc::post`][super::Ipc::post] runs on a CPU, and the state of its runs.
-///
-/// The IPC interrupt of the target CPU calls `func` at
-/// [`Priority::min`][crate::interrupt::Priority::min] with the argument of the post. A request must
-/// be `'static`, because the IPC can read and write it at any time after the first post. A request
-/// has at most one pending run. Two concurrent runs need two requests.
-///
-/// `func` must:
-///
-/// - return,
-/// - not use the floating-point registers,
-/// - not enable interrupts, and not lower the run level,
-/// - not wait for a run on its own CPU.
-///
-/// A caller can stop its wait before the run starts, so `func` can run late. `func` must then find
-/// its protocol state stale, and do nothing.
-// esp-hal copies without `rt` share this layout, the bit constants above and `seq_reached` with
-// the copy that has `rt`. Do not change them.
-#[repr(C)]
-#[derive(Debug)]
-pub struct IpcRequest {
-    next: AtomicPtr<IpcRequest>,
-    word: AtomicU32,
-    status: AtomicU32,
-    func: extern "C" fn(usize),
-    arg: AtomicUsize,
-}
-
-impl IpcRequest {
-    /// Creates a request that runs `func` with the argument of the post.
-    pub const fn new(func: extern "C" fn(usize)) -> Self {
-        Self {
-            next: AtomicPtr::new(ptr::null_mut()),
-            word: AtomicU32::new(0),
-            status: AtomicU32::new(0),
-            func,
-            arg: AtomicUsize::new(0),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn word(&self) -> &AtomicU32 {
-        &self.word
-    }
-
-    #[cfg(test)]
-    pub(crate) fn status(&self) -> &AtomicU32 {
-        &self.status
-    }
-}
 
 /// The request lists of one CPU.
 #[derive(Debug)]
@@ -109,15 +45,6 @@ impl Lists {
             current: AtomicPtr::new(ptr::null_mut()),
         }
     }
-}
-
-/// Returns `true` if the sequence number in the `seq` bits of `current` reached the one of
-/// `target`.
-///
-/// Sequence numbers have 27 bits and wrap. The bits of `target` below the `seq` bits are 0.
-#[inline(always)]
-pub(crate) fn seq_reached(current: u32, target: u32) -> bool {
-    current.wrapping_sub(target) as i32 >= 0
 }
 
 #[inline(always)]
@@ -369,11 +296,4 @@ fn fail(request: &IpcRequest, core: u32) {
     }
 
     complete(request, word & SEQ_FIELD, OFFLINE);
-}
-
-/// Returns the outcome of the run of `request` with the `seq` bits `seq`, or `None` if the run
-/// did not end.
-pub(crate) fn poll(request: &IpcRequest, seq: u32) -> Option<u32> {
-    let status = request.status.load(Ordering::Acquire);
-    seq_reached(status, seq).then_some(status & OUTCOME_MASK)
 }

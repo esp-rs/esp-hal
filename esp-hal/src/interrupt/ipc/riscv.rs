@@ -6,7 +6,7 @@
 use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use portable_atomic::Ordering;
 
-use super::{CoreState, STATE};
+use super::runtime::{CoreState, STATE};
 use crate::{
     interrupt::{CpuInterrupt, Priority},
     peripherals::{CLINT, CLINT_OTHER_CORE},

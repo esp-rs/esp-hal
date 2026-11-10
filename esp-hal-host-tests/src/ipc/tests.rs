@@ -52,11 +52,11 @@ fn drain(lists: &Lists, core: u32) {
 }
 
 fn flags(request: &IpcRequest) -> u32 {
-    request.word().load(Ordering::SeqCst) & (QUEUED | RUNNING | ARMED)
+    request.word.load(Ordering::SeqCst) & (QUEUED | RUNNING | ARMED)
 }
 
 fn status_seq(request: &IpcRequest) -> u32 {
-    request.status().load(Ordering::SeqCst) >> SEQ_SHIFT
+    request.status.load(Ordering::SeqCst) >> SEQ_SHIFT
 }
 
 fn to_ptr(request: &IpcRequest) -> *mut IpcRequest {
@@ -112,7 +112,7 @@ fn post_to_unarmed_request_is_busy() {
 
     // Another post is between its CAS and its store of `armed`.
     request
-        .word()
+        .word
         .store((1 << SEQ_SHIFT) | QUEUED, Ordering::SeqCst);
     assert_eq!(post(&lists, PRO, &request, 0), BUSY);
     assert!(lists.head.load(Ordering::SeqCst).is_null());
@@ -157,10 +157,10 @@ fn post_to_other_cpu_after_the_run_ended_takes_the_request() {
 
     // The PRO core stored the outcome of run 1, and did not clear `running` yet.
     REQUEST
-        .word()
+        .word
         .store((1 << SEQ_SHIFT) | RUNNING, Ordering::SeqCst);
     REQUEST
-        .status()
+        .status
         .store((1 << SEQ_SHIFT) | DONE, Ordering::SeqCst);
 
     assert_eq!(post(&LISTS[1], APP, &REQUEST, 0), Ok(2));
@@ -255,7 +255,7 @@ fn drain_runs_requests_in_post_order() {
     assert_eq!(*ORDER.lock().unwrap(), [0, 1, 2]);
     for request in &REQUESTS {
         assert_eq!(
-            request.status().load(Ordering::SeqCst),
+            request.status.load(Ordering::SeqCst),
             (1 << SEQ_SHIFT) | DONE
         );
         assert_eq!(flags(request), 0);
@@ -306,11 +306,9 @@ fn seq_reached_wraps() {
 fn post_wraps_seq() {
     let lists = Lists::new();
     let request = IpcRequest::new(nothing);
+    request.word.store(SEQ_MASK << SEQ_SHIFT, Ordering::SeqCst);
     request
-        .word()
-        .store(SEQ_MASK << SEQ_SHIFT, Ordering::SeqCst);
-    request
-        .status()
+        .status
         .store(SEQ_MASK << SEQ_SHIFT, Ordering::SeqCst);
 
     assert_eq!(post(&lists, PRO, &request, 0), Ok(0));
@@ -346,15 +344,15 @@ fn fail_stranded_fails_each_list() {
 
     for request in [&in_head, &in_drain, &in_both] {
         assert_eq!(
-            request.status().load(Ordering::SeqCst),
+            request.status.load(Ordering::SeqCst),
             (1 << SEQ_SHIFT) | OFFLINE
         );
         assert_eq!(poll(request, 1), Some(OFFLINE));
         assert_eq!(flags(request), 0);
     }
     assert_eq!(
-        in_both.word().load(Ordering::SeqCst),
-        in_drain.word().load(Ordering::SeqCst)
+        in_both.word.load(Ordering::SeqCst),
+        in_drain.word.load(Ordering::SeqCst)
     );
     assert!(lists.head.load(Ordering::SeqCst).is_null());
     assert!(lists.drain.load(Ordering::SeqCst).is_null());
@@ -374,7 +372,7 @@ fn fail_stranded_fails_the_running_request() {
 
     // `func` runs on the APP core, and a post to the APP core queued a new run.
     assert_eq!(post(&scratch, APP, &running, 0), Ok(1));
-    running.word().store(
+    running.word.store(
         (2 << SEQ_SHIFT) | CORE | QUEUED | ARMED | RUNNING,
         Ordering::SeqCst,
     );
@@ -395,10 +393,10 @@ fn fail_stranded_keeps_the_outcome_of_an_ended_run() {
 
     // The APP core stored the outcome of run 1, and stopped before it cleared `running`.
     request
-        .word()
+        .word
         .store((1 << SEQ_SHIFT) | CORE | RUNNING, Ordering::SeqCst);
     request
-        .status()
+        .status
         .store((1 << SEQ_SHIFT) | DONE, Ordering::SeqCst);
     lists.current.store(to_ptr(&request), Ordering::SeqCst);
 
