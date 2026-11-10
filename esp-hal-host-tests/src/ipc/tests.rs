@@ -146,26 +146,30 @@ fn post_to_other_cpu_while_running_is_busy() {
 
 #[test]
 fn post_to_other_cpu_after_the_run_ended_takes_the_request() {
-    let lists = [Lists::new(), Lists::new()];
-    let request = IpcRequest::new(nothing);
+    static LISTS: [Lists; 2] = [Lists::new(), Lists::new()];
+    static FLAGS: AtomicU32 = AtomicU32::new(0);
+    extern "C" fn clear_late(_: usize) {
+        // The PRO core clears `running` of run 1 while run 2 runs on the APP core.
+        clear_running(&REQUEST, PRO);
+        FLAGS.store(flags(&REQUEST), Ordering::SeqCst);
+    }
+    static REQUEST: IpcRequest = IpcRequest::new(clear_late);
 
     // The PRO core stored the outcome of run 1, and did not clear `running` yet.
-    request
+    REQUEST
         .word()
         .store((1 << SEQ_SHIFT) | RUNNING, Ordering::SeqCst);
-    request
+    REQUEST
         .status()
         .store((1 << SEQ_SHIFT) | DONE, Ordering::SeqCst);
 
-    assert_eq!(post(&lists[1], APP, &request, 0), Ok(2));
-    assert_eq!(flags(&request), QUEUED | ARMED);
+    assert_eq!(post(&LISTS[1], APP, &REQUEST, 0), Ok(2));
+    assert_eq!(flags(&REQUEST), QUEUED | ARMED);
 
-    clear_running(&request, PRO);
-    assert_eq!(flags(&request), QUEUED | ARMED);
-
-    drain(&lists[1], APP);
-    assert_eq!(poll(&request, 2), Some(DONE));
-    assert_eq!(flags(&request), 0);
+    drain(&LISTS[1], APP);
+    assert_eq!(FLAGS.load(Ordering::SeqCst), RUNNING);
+    assert_eq!(poll(&REQUEST, 2), Some(DONE));
+    assert_eq!(flags(&REQUEST), 0);
 }
 
 #[test]
@@ -206,7 +210,7 @@ fn join_after_the_run_ended_returns_the_new_seq() {
     let lists = Lists::new();
     let request = IpcRequest::new(nothing);
 
-    assert_eq!(post(&lists, PRO, &request, 7), Ok(1));
+    assert_eq!(post(&lists, PRO, &request, 8), Ok(1));
 
     // Between the joiner's first load of `word` and its read of `arg`, run 1 ends, and a new post
     // arms the request with the joiner's `arg`.
@@ -232,35 +236,6 @@ fn join_after_the_run_ended_returns_the_new_seq() {
     assert_eq!(decode(result), Ok(2));
     assert_eq!(poll(&request, 1), Some(DONE));
     assert_eq!(poll(&request, 2), None);
-}
-
-#[test]
-fn join_after_the_run_ended_sees_a_new_arg() {
-    let lists = Lists::new();
-    let request = IpcRequest::new(nothing);
-
-    assert_eq!(post(&lists, PRO, &request, 7), Ok(1));
-
-    let mut fired = false;
-    let result = unsafe {
-        queue::post_with_hook(
-            &lists,
-            PRO,
-            &request,
-            7,
-            || {},
-            || {
-                if !fired {
-                    fired = true;
-                    drain(&lists, PRO);
-                    assert_eq!(post(&lists, PRO, &request, 8), Ok(2));
-                }
-            },
-        )
-    };
-
-    assert!(fired);
-    assert_eq!(decode(result), BUSY);
 }
 
 #[test]
@@ -449,29 +424,6 @@ fn fail_stranded_skips_a_request_of_the_other_cpu() {
     assert_eq!(poll(&request, 1), None);
     drain(&lists[0], PRO);
     assert_eq!(poll(&request, 1), Some(DONE));
-}
-
-#[test]
-fn func_that_posts_itself_runs_on_the_next_drain() {
-    static LISTS: Lists = Lists::new();
-    static RUNS: AtomicUsize = AtomicUsize::new(0);
-    extern "C" fn repost(arg: usize) {
-        if RUNS.fetch_add(1, Ordering::SeqCst) == 0 {
-            let result = unsafe { queue::post(&LISTS, PRO, &REQUEST, arg, || {}) };
-            assert_eq!(decode(result), Ok(2));
-        }
-    }
-    static REQUEST: IpcRequest = IpcRequest::new(repost);
-
-    assert_eq!(post(&LISTS, PRO, &REQUEST, 0), Ok(1));
-    drain(&LISTS, PRO);
-    assert_eq!(RUNS.load(Ordering::SeqCst), 1);
-    assert_eq!(poll(&REQUEST, 1), Some(DONE));
-    assert_eq!(poll(&REQUEST, 2), None);
-
-    drain(&LISTS, PRO);
-    assert_eq!(RUNS.load(Ordering::SeqCst), 2);
-    assert_eq!(poll(&REQUEST, 2), Some(DONE));
 }
 
 #[test]

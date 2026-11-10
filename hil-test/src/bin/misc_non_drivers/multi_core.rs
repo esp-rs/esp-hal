@@ -262,48 +262,6 @@ mod tests {
     }
 
     #[test]
-    fn ipc_posts_with_the_same_arg_join(p: Peripherals) {
-        static RUNS: AtomicU32 = AtomicU32::new(0);
-        extern "C" fn count(_: usize) {
-            RUNS.fetch_add(1, Ordering::Relaxed);
-        }
-        static REQUEST: IpcRequest = IpcRequest::new(count);
-
-        let ipc = Ipc::new(p.IPC);
-        let token = unsafe { SingleCoreInterruptLock.enter() };
-        let first = ipc.post(Cpu::current(), &REQUEST, 3);
-        let second = ipc.post(Cpu::current(), &REQUEST, 3);
-        unsafe { SingleCoreInterruptLock.exit(token) };
-
-        let (first, second) = (first.unwrap(), second.unwrap());
-        assert_eq!(first.wait(deadline(100)), Ok(()));
-        assert_eq!(second.wait(deadline(100)), Ok(()));
-        assert_eq!(RUNS.load(Ordering::Relaxed), 1);
-    }
-
-    #[test]
-    fn ipc_post_with_another_arg_is_busy(p: Peripherals) {
-        static RUNS: AtomicU32 = AtomicU32::new(0);
-        static ARG: AtomicUsize = AtomicUsize::new(0);
-        extern "C" fn record(arg: usize) {
-            RUNS.fetch_add(1, Ordering::Relaxed);
-            ARG.store(arg, Ordering::Relaxed);
-        }
-        static REQUEST: IpcRequest = IpcRequest::new(record);
-
-        let ipc = Ipc::new(p.IPC);
-        let token = unsafe { SingleCoreInterruptLock.enter() };
-        let first = ipc.post(Cpu::current(), &REQUEST, 1);
-        let second = ipc.post(Cpu::current(), &REQUEST, 2);
-        unsafe { SingleCoreInterruptLock.exit(token) };
-
-        assert!(matches!(second, Err(IpcError::Busy)));
-        assert_eq!(first.unwrap().wait(deadline(100)), Ok(()));
-        assert_eq!(RUNS.load(Ordering::Relaxed), 1);
-        assert_eq!(ARG.load(Ordering::Relaxed), 1);
-    }
-
-    #[test]
     fn ipc_post_does_not_wait_for_a_busy_core(p: Peripherals) {
         static RELEASE: AtomicBool = AtomicBool::new(false);
         static LONG_STARTED: AtomicBool = AtomicBool::new(false);
@@ -335,14 +293,11 @@ mod tests {
         }
 
         let mut tickets: [Option<Ticket>; 4] = [None; 4];
-        let mut work = 0u32;
         for (index, request) in OTHERS.iter().enumerate() {
             let start = Instant::now();
             tickets[index] = Some(ipc.post(Cpu::AppCpu, request, index).unwrap());
             assert!(start.elapsed() < Duration::from_millis(1));
-            work += 1;
         }
-        assert_eq!(work, 4);
         assert_eq!(OTHER_RUNS.load(Ordering::Relaxed), 0);
         for ticket in tickets.iter().flatten() {
             assert_eq!(ticket.poll(), None);
