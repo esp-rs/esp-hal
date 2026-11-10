@@ -19,7 +19,7 @@ page_size = 0x10000
 entry_num = 1024
 
 [device.flash]
-support_status = "partial"
+support_status = { status = "partial", issue = 6757 }
 
 [device.rom]
 has_crc_le  = true
@@ -155,7 +155,7 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 context_switch_source = "ipc"
 
 [device.timergroup]
-support_status = "partial"
+support_status = { status = "partial", issue = 6779 }
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_timer1 = true
 timg_has_divcnt_rst = true
@@ -163,21 +163,22 @@ rc_fast_calibration = { divider = 50, min_rev = 0 }
 wdt_has_conf_update = true
 
 [device.gpio]
-support_status = "supported"
+support_status = { status = "supported", issue = 6758 }
 # {include gpio.toml}
 
 [device.dedicated_gpio]
 version = "riscv_v2"
-support_status = "partial"
+support_status = { status = "partial", issue = 6753 }
 channels = [
     ["CPU_GPIO_0", "CPU_GPIO_1",  "CPU_GPIO_2",  "CPU_GPIO_3",  "CPU_GPIO_4",  "CPU_GPIO_5",  "CPU_GPIO_6",  "CPU_GPIO_7" ],
     ["CPU_GPIO_8", "CPU_GPIO_9",  "CPU_GPIO_10", "CPU_GPIO_11", "CPU_GPIO_12", "CPU_GPIO_13", "CPU_GPIO_14", "CPU_GPIO_15"],
 ]
 
 [device.io_mux]
+support_status = { status = "partial", issue = 6758 }
 
 [device.uart]
-support_status = "supported"
+support_status = { status = "supported", issue = 6782 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
@@ -190,7 +191,7 @@ peripheral_controls_mem_clk = true
 has_sclk_enable = true
 
 [device.i2c_master]
-support_status = "supported"
+support_status = { status = "supported", issue = 6760 }
 version = 4
 instances = [
     { name = "i2c0", sys_instance = "I2c0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
@@ -216,6 +217,7 @@ version = "lp_i2c"
 fifo_size = 16
 
 [device.systimer]
+support_status = { status = "partial", issue = 6777 }
 
 [device.lp_timer]
 
@@ -231,7 +233,7 @@ apb_cycle_wait_num = 16 # TODO
 is_lp_sys = false
 
 [device.sleep]
-support_status = "partial"
+support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 deep_sleep = true
 ext1_version = 3
@@ -255,12 +257,13 @@ cpu_retention_frame = "s31"
 supports_top_power_down = true
 
 [device.usb_otg_hs]
+support_status = { status = "partial", issue = 6786 }
 fifo_depth_words = 896
 
 [device.spi_master]
 version = 3
 fifo_size = 64
-support_status = "supported"
+support_status = { status = "supported", issue = 6776 }
 has_octal = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
@@ -303,7 +306,7 @@ instances = [
 ]
 
 [device.dma]
-support_status = "partial"
+support_status = { status = "partial", issue = 6754 }
 gdma_version = 3
 separate_in_out_interrupts = true
 # TODO: add LP_GDMA engine
@@ -373,7 +376,7 @@ has_memory_clock_gate = true
 supports_enhanced_security = true
 
 [device.aes]
-support_status = "partial"
+support_status = { status = "partial", issue = 6748 }
 has_split_text_registers = true
 endianness_configurable = false
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128", "GCM"]
@@ -389,7 +392,7 @@ size_increment = 32
 memory_size_bytes = 512
 
 [device.sha]
-support_status = { status = "partial", issue = 5973 }
+support_status = { status = "partial", issue = 6775 }
 algo = {
     sha1 = 0,
     sha224 = 1,
@@ -410,17 +413,17 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.adc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6747 }
 instances = [
     { name = "adc1" },
     { name = "adc2" },
 ]
 
 [device.usb_serial_jtag]
-support_status = "partial"
+support_status = { status = "partial", issue = 6787 }
 
 [device.camera]
-support_status = "partial"
+support_status = { status = "partial", issue = 6751 }
 
 # Peripherals the chip has, that no driver reaches yet.
 [device.avc]
@@ -430,7 +433,7 @@ support_status = "not_supported"
 [device.dac]
 support_status = "not_supported"
 [device.ethernet]
-support_status = "partial"
+support_status = { status = "partial", issue = 6755 }
 mii_via_gpio_matrix = true
 dma_burst_len = 16
 dma_alignment = 8
@@ -442,7 +445,7 @@ support_status = "not_supported"
 [device.i2c_slave]
 support_status = "not_supported"
 [device.i2s]
-support_status = "partial"
+support_status = { status = "partial", issue = 6762 }
 version = 3
 clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 8
@@ -479,11 +482,13 @@ instances = [
     },
 ]
 [device.ieee802154]
+support_status = { status = "partial", issue = 6763 }
 [device.key_manager]
 support_status = "not_supported"
 [device.mcpwm]
 support_status = "not_supported"
 [device.pcnt]
+support_status = { status = "partial", issue = 6771 }
 instances = {
     PCNT = {
         sys_instance = "Pcnt",
@@ -507,7 +512,7 @@ instances = {
     },
 }
 [device.rgb_display]
-support_status = "partial"
+support_status = { status = "partial", issue = 6744 }
 output_lines = 24
 
 [device.sdm]
@@ -515,13 +520,14 @@ support_status = "partial"
 channel_count = 8
 
 [device.temp_sensor]
+support_status = { status = "partial", issue = 6778 }
 register_block = "lp_tsens"
 [device.touch]
 support_status = "not_supported"
 [device.canfd]
 support_status = "not_supported"
 [device.uhci]
-support_status = "partial"
+support_status = { status = "partial", issue = 6783 }
 combined_uart_selector_field = true
 [device.ulp_riscv]
 support_status = "not_supported"
@@ -540,13 +546,13 @@ has_rx_wrap = true
 has_rx_demodulation = true
 
 [device.parl_io]
-support_status = "partial"
+support_status = { status = "partial", issue = 6770 }
 version = 2
 max_data_width = 16
 has_tx_cs = true
 
 [device.sdmmc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6774 }
 delay_phase_num = 8 # FIXME: placeholder
 has_iomux = true
 has_gpio_matrix = false
@@ -573,7 +579,7 @@ slot_config = [
 
 ## Radio
 [device.wifi]
-support_status = "partial"
+support_status = { status = "partial", issue = 6788 }
 mac_version = 3
 has_wifi6 = true
 csi_supported = true
@@ -581,7 +587,7 @@ has_nan = true
 has_ftm = true
 
 [device.bt]
-support_status = "partial"
+support_status = { status = "partial", issue = 6750 }
 # IDF `porting_btdm` (nested config + `esp_*` VHCI), not the ESP32/C3/S3 OSI table
 controller = "btdm2"
 
@@ -599,13 +605,13 @@ support_status = "not_supported"
 ram_size = 20 # FIXME: placeholder
 
 [device.psram]
-support_status = "partial"
+support_status = { status = "partial", issue = 6773 }
 extmem_origin = 0x5000_0000
 octal_spi = true
 has_timing_tuning = true
 
 [device.pixel_accelerator]
-support_status = "partial"
+support_status = { status = "partial", issue = 6772 }
 
 [device.asrc]
 support_status = "not_supported"

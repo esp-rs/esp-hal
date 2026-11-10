@@ -293,6 +293,6 @@ output_signals = [
 ]
 
 [device.lp_io]
-support_status = "partial"
+support_status = { status = "partial", issue = 6767 }
 version = "v4"
 
