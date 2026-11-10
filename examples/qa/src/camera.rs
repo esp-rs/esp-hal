@@ -290,7 +290,7 @@ impl<'d> Sc2336<'d> {
         sensor
     }
 
-    pub fn read(&mut self, reg: u16) -> Result<u8, Error> {
+    fn read(&mut self, reg: u16) -> Result<u8, Error> {
         let mut value = [0];
         self.i2c
             .write_read(ADDRESS, &reg.to_be_bytes(), &mut value)?;
