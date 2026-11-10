@@ -3,13 +3,20 @@
 //!
 //! ## Overview
 //!
-//! [`Ipc`] posts a function to a CPU, then raises that CPU's IPC interrupt. The interrupt
-//! handler runs the posted function at [`Priority::min`][super::Priority::min].
+//! [`Ipc::post`] queues a run of an [`IpcRequest`] on a CPU, then raises that CPU's IPC
+//! interrupt. The interrupt handler calls the function of each queued request at
+//! [`Priority::min`][super::Priority::min], in post order.
+//!
+//! A post never waits. It returns a [`Ticket`], and [`Ticket::wait`] waits for the run with a
+//! deadline. A busy CPU does not block the poster.
+//!
+//! A request has at most one pending run. A post of a pending request with the same argument
+//! joins that run. Two concurrent runs need two requests.
 //!
 //! The same interrupt also carries a context switch. A CPU asks the other CPU to switch tasks
 //! through this interrupt. The context-switch handler of the RTOS that owns scheduling runs
-//! after the posted function, and chooses the context that the interrupt returns to. A posted
-//! function and a context switch do not wait for each other. A posted function alone does not
+//! after the posted requests, and chooses the context that the interrupt returns to. A posted
+//! request and a context switch do not wait for each other. A posted request alone does not
 //! make a CPU switch tasks.
 //!
 //! ## Configuration
@@ -29,9 +36,9 @@
 //! [`Ipc::new`] creates a handle from the `IPC` peripheral singleton, and [`Ipc::post`] posts an
 //! [`IpcRequest`] to a CPU.
 //!
-//! The posted function runs in an interrupt handler. The handler saves the registers that the
-//! calling convention lets the callee clobber, except the floating-point registers. The posted
-//! function must not use those registers, and must be callable with the cache disabled.
+//! The function of a request runs in an interrupt handler. The handler saves the registers that
+//! the calling convention lets the callee clobber, except the floating-point registers.
+//! [`IpcRequest`] lists the rules for the function.
 //!
 //! ## Examples
 //!
@@ -181,7 +188,7 @@ unsafe extern "C" {
     fn esp_hal_ipc_post(core: u8, request: *const IpcRequest, arg: usize) -> u32;
 }
 
-/// Handle that posts a function to a CPU through the IPC interrupt.
+/// Handle that posts requests to a CPU through the IPC interrupt.
 ///
 /// Copies of this handle share one state table.
 #[derive(Clone, Copy, Debug)]
@@ -198,7 +205,18 @@ impl Ipc {
         Self
     }
 
-    /// Queues a run of `request` on `core` with the argument `arg`, and returns at once.
+    /// Queues a run of `request` on `core` with the argument `arg`, and returns a [`Ticket`] that
+    /// can be used to wait for the run.
+    ///
+    /// This function never waits. If `request` is pending on `core` with the same `arg`, the post
+    /// joins that run. If `request` runs on `core`, the post queues a new run, which starts after
+    /// the current run returns.
+    ///
+    /// # Errors
+    ///
+    /// - [`IpcError::Offline`] when `core` does not take IPC interrupts.
+    /// - [`IpcError::Busy`] when `request` is pending with a different argument, when another CPU
+    ///   posts it at the same moment, or when it runs on the other CPU.
     pub fn post(
         self,
         core: Cpu,
@@ -221,7 +239,7 @@ impl Ipc {
     }
 }
 
-/// A run that [`Ipc::post`] queued.
+/// A run that [`Ipc::post`] queued or joined.
 ///
 /// If a later run of the request ended, the ticket gives the outcome of that later run.
 #[derive(Clone, Copy, Debug)]
@@ -300,6 +318,15 @@ impl defmt::Format for Ticket {
 #[non_exhaustive]
 pub enum IpcError {
     /// The CPU does not take IPC interrupts.
+    ///
+    /// The APP core does not take IPC interrupts before [`CpuControl`] starts it. A run that was
+    /// queued on the APP core when [`CpuControl`] starts the APP core again also ends with this
+    /// error. A stop through [`AppCoreGuard`] or the return of the APP closure does not give this
+    /// error: a post to the stopped APP core queues a run, and its wait returns
+    /// [`IpcError::Timeout`].
+    ///
+    /// [`CpuControl`]: crate::system::CpuControl
+    /// [`AppCoreGuard`]: crate::system::AppCoreGuard
     Offline,
     /// The request is pending with a different argument, another CPU posts it at this moment, or
     /// it runs on the other CPU.

@@ -41,7 +41,7 @@
     doc = "
 ## Inter-Processor Call (IPC)
 
-The [`ipc`] module posts a function to a CPU, and raises the IPC interrupt of that CPU.
+The [`ipc`] module queues requests on a CPU, and raises the IPC interrupt of that CPU.
 "
 )]
 #![cfg_attr(

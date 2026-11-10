@@ -159,8 +159,8 @@ impl MultiCoreStrategy {
     /// # Safety
     ///
     /// The other core must not fetch instructions or data from flash during any
-    /// operation, including reads. Flash-backed caches are unavailable while
-    /// an operation runs.
+    /// operation, including reads. This also applies to the IPC requests that run on
+    /// that core. Flash-backed caches are unavailable while an operation runs.
     #[instability::unstable]
     pub const unsafe fn ignore() -> Self {
         Self::Ignore(IgnoreMarker { _private: () })

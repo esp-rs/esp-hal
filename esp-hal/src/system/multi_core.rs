@@ -82,6 +82,18 @@ pub(crate) static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::pt
 /// ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the APP core is parked during
 /// such an operation, the next cache operation on the PRO core waits forever. Make sure that the
 /// APP core does no DMA or cache operation before you drop this guard.
+///
+/// The parked APP core does not run [IPC requests][crate::interrupt::ipc::IpcRequest]:
+///
+/// - A post to the parked APP core queues a run, and its wait returns
+///   [`IpcError::Timeout`][crate::interrupt::ipc::IpcError::Timeout]. The next start of the APP
+///   core ends that run with [`IpcError::Offline`][crate::interrupt::ipc::IpcError::Offline].
+/// - If the APP core stops while it posts a request, each later post of that request returns
+///   [`IpcError::Busy`][crate::interrupt::ipc::IpcError::Busy].
+/// - If the APP core stops while its IPC handler takes the queued requests, each later post of
+///   those requests joins a run that never happens.
+///
+/// A new start of the APP core does not repair the requests of the last two cases.
 #[must_use = "Dropping this guard will park the APP core"]
 #[instability::unstable]
 pub struct AppCoreGuard<'a> {
@@ -168,6 +180,9 @@ impl<'d> CpuControl<'d> {
     /// such an operation, the next cache operation on the other core waits forever. Make sure that
     /// the parked core does no DMA or cache operation when you call this function.
     ///
+    /// The parked core runs no [IPC requests][crate::interrupt::ipc::IpcRequest]. Posts to it
+    /// queue their runs, and the runs happen after [`Self::unpark_core`].
+    ///
     /// # Safety
     ///
     /// The caller must ensure that the core being parked is not the core which is
@@ -206,7 +221,8 @@ impl<'d> CpuControl<'d> {
     /// The second core starts running the closure `entry`. The core enables interrupts before
     /// `entry` runs. If the closure exits, the core is parked.
     ///
-    /// Dropping the returned guard will park the core.
+    /// Dropping the returned guard will park the core. [`AppCoreGuard`] describes how a parked
+    /// APP core affects IPC requests.
     #[instability::unstable]
     pub fn start_app_core<'a, const SIZE: usize, F>(
         &mut self,
@@ -237,7 +253,8 @@ impl<'d> CpuControl<'d> {
     /// The second core starts running the closure `entry`. The core enables interrupts before
     /// `entry` runs. If the closure exits, the core is parked.
     ///
-    /// Dropping the returned guard will park the core.
+    /// Dropping the returned guard will park the core. [`AppCoreGuard`] describes how a parked
+    /// APP core affects IPC requests.
     #[instability::unstable]
     pub fn start_app_core_with_stack_guard_offset<'a, const SIZE: usize, F>(
         &mut self,
