@@ -118,6 +118,17 @@ impl CoreState {
 #[cfg(feature = "rt")]
 static STATE: [CoreState; Cpu::COUNT] = [const { CoreState::new() }; Cpu::COUNT];
 
+/// Completes each request that `core` did not run with [`IpcError::Offline`], and empties the
+/// lists of `core`.
+///
+/// # Safety
+///
+/// `core` does not run, and posts to `core` return [`IpcError::Offline`].
+#[cfg(feature = "rt")]
+pub(crate) unsafe fn fail_stranded(core: Cpu) {
+    unsafe { queue::fail_stranded(&STATE[core as usize].lists, core as u32) };
+}
+
 /// Queues a run of `request` on the CPU `core`. Returns the encoding of [`esp_hal_ipc_post`].
 #[cfg(feature = "rt")]
 fn post_in_runtime(core: u8, request: &IpcRequest, arg: usize) -> u32 {

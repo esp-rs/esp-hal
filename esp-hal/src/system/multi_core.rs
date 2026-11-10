@@ -528,6 +528,9 @@ cfg_select! {
         #[unsafe(export_name = "esp_hal_app_core_starting")]
         fn app_core_starting() {
             APP_CORE_TAKES_IPC.store(false, Ordering::Release);
+            // Posts to the APP core return `Offline` after the store, so no post adds a request
+            // to the APP core while this call fails the requests that the APP core did not run.
+            unsafe { crate::interrupt::ipc::fail_stranded(Cpu::AppCpu) };
         }
 
         /// Lets the APP core take IPC interrupts. The APP core calls this function after it
