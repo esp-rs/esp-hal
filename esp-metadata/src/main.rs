@@ -126,7 +126,7 @@ fn warn_partial_support_without_issue() {
     }
 
     log::warn!(
-        "{} partially supported drivers do not link to a tracking issue. Set \
+        "{} partially supported driver cells do not link to a tracking issue. Set \
          `support_status = {{ status = \"partial\", issue = <number> }}` in their \
          `[device.<driver>]` table. Run with `RUST_LOG=debug` to list them.",
         unlinked.len()
