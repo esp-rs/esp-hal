@@ -104,20 +104,17 @@ mod tests {
 
     #[test]
     fn ipc_post_runs_on_the_other_core(p: Peripherals) {
-        static ARG: AtomicUsize = AtomicUsize::new(0);
         static CORE: AtomicUsize = AtomicUsize::new(usize::MAX);
-        extern "C" fn record(arg: usize) {
-            ARG.store(arg, Ordering::Relaxed);
+        extern "C" fn record() {
             CORE.store(Cpu::current() as usize, Ordering::Release);
         }
         static REQUEST: IpcRequest = IpcRequest::new(record);
 
         let _guard = start_ipc_app_core(p.CPU_CTRL);
 
-        let ticket = Ipc::new(p.IPC).post(Cpu::AppCpu, &REQUEST, 42).unwrap();
+        let ticket = Ipc::new(p.IPC).post(Cpu::AppCpu, &REQUEST).unwrap();
         assert_eq!(ticket.wait(deadline(100)), Ok(()));
         assert_eq!(CORE.load(Ordering::Acquire), Cpu::AppCpu as usize);
-        assert_eq!(ARG.load(Ordering::Relaxed), 42);
     }
 
     #[test]
@@ -130,7 +127,7 @@ mod tests {
         const RESULT_WRONG_LEVEL: usize = 2;
         const RESULT_ERROR: usize = 3;
 
-        extern "C" fn count(_: usize) {
+        extern "C" fn count() {
             RUNS.fetch_add(1, Ordering::Relaxed);
         }
         static REQUEST: IpcRequest = IpcRequest::new(count);
@@ -143,7 +140,7 @@ mod tests {
                 RESULT_WRONG_LEVEL
             } else {
                 match ipc()
-                    .post(Cpu::AppCpu, &REQUEST, 0)
+                    .post(Cpu::AppCpu, &REQUEST)
                     .and_then(|ticket| ticket.wait(deadline(100)))
                 {
                     Ok(()) => RESULT_OK,
@@ -175,12 +172,12 @@ mod tests {
     #[test]
     fn ipc_self_post_runs_before_wait_returns(p: Peripherals) {
         static RUNS: AtomicU32 = AtomicU32::new(0);
-        extern "C" fn count(_: usize) {
+        extern "C" fn count() {
             RUNS.fetch_add(1, Ordering::Relaxed);
         }
         static REQUEST: IpcRequest = IpcRequest::new(count);
 
-        let ticket = Ipc::new(p.IPC).post(Cpu::current(), &REQUEST, 7).unwrap();
+        let ticket = Ipc::new(p.IPC).post(Cpu::current(), &REQUEST).unwrap();
         assert_eq!(ticket.wait(deadline(100)), Ok(()));
         assert_eq!(RUNS.load(Ordering::Relaxed), 1);
     }
@@ -188,13 +185,13 @@ mod tests {
     #[test]
     fn ipc_masked_self_wait_would_deadlock(p: Peripherals) {
         static RUNS: AtomicU32 = AtomicU32::new(0);
-        extern "C" fn count(_: usize) {
+        extern "C" fn count() {
             RUNS.fetch_add(1, Ordering::Relaxed);
         }
         static REQUEST: IpcRequest = IpcRequest::new(count);
 
         let token = unsafe { SingleCoreInterruptLock.enter() };
-        let ticket = Ipc::new(p.IPC).post(Cpu::current(), &REQUEST, 0).unwrap();
+        let ticket = Ipc::new(p.IPC).post(Cpu::current(), &REQUEST).unwrap();
         let masked_result = ticket.wait(deadline(10));
         let masked_runs = RUNS.load(Ordering::Relaxed);
         unsafe { SingleCoreInterruptLock.exit(token) };
@@ -211,14 +208,14 @@ mod tests {
         static INNER_RUNS_IN_OUTER: AtomicU32 = AtomicU32::new(u32::MAX);
         static OUTER_GOT_WOULD_DEADLOCK: AtomicBool = AtomicBool::new(false);
 
-        extern "C" fn inner(_: usize) {
+        extern "C" fn inner() {
             INNER_RUNS.fetch_add(1, Ordering::Relaxed);
         }
         static INNER: IpcRequest = IpcRequest::new(inner);
 
-        extern "C" fn outer(_: usize) {
+        extern "C" fn outer() {
             let result = ipc()
-                .post(Cpu::current(), &INNER, 0)
+                .post(Cpu::current(), &INNER)
                 .map(|ticket| ticket.wait(deadline(10)));
             OUTER_GOT_WOULD_DEADLOCK.store(
                 result == Ok(Err(IpcError::WouldDeadlock)),
@@ -228,7 +225,7 @@ mod tests {
         }
         static OUTER: IpcRequest = IpcRequest::new(outer);
 
-        let ticket = Ipc::new(p.IPC).post(Cpu::current(), &OUTER, 0).unwrap();
+        let ticket = Ipc::new(p.IPC).post(Cpu::current(), &OUTER).unwrap();
         assert_eq!(ticket.wait(deadline(100)), Ok(()));
         assert!(OUTER_GOT_WOULD_DEADLOCK.load(Ordering::Relaxed));
         assert_eq!(INNER_RUNS_IN_OUTER.load(Ordering::Relaxed), 0);
@@ -243,7 +240,7 @@ mod tests {
     #[test]
     fn ipc_masked_target_times_out(p: Peripherals) {
         static RUNS: AtomicU32 = AtomicU32::new(0);
-        extern "C" fn count(_: usize) {
+        extern "C" fn count() {
             RUNS.fetch_add(1, Ordering::Relaxed);
         }
         static REQUEST: IpcRequest = IpcRequest::new(count);
@@ -252,7 +249,7 @@ mod tests {
         MASK_APP_CORE.store(true, Ordering::Release);
         while !APP_CORE_MASKED.load(Ordering::Acquire) {}
 
-        let ticket = Ipc::new(p.IPC).post(Cpu::AppCpu, &REQUEST, 0).unwrap();
+        let ticket = Ipc::new(p.IPC).post(Cpu::AppCpu, &REQUEST).unwrap();
         assert_eq!(ticket.wait(deadline(10)), Err(IpcError::Timeout));
         assert_eq!(RUNS.load(Ordering::Relaxed), 0);
 
@@ -267,13 +264,13 @@ mod tests {
         static LONG_STARTED: AtomicBool = AtomicBool::new(false);
         static OTHER_RUNS: AtomicU32 = AtomicU32::new(0);
 
-        extern "C" fn long(_: usize) {
+        extern "C" fn long() {
             LONG_STARTED.store(true, Ordering::Release);
             while !RELEASE.load(Ordering::Acquire) {}
         }
         static LONG: IpcRequest = IpcRequest::new(long);
 
-        extern "C" fn other(_: usize) {
+        extern "C" fn other() {
             OTHER_RUNS.fetch_add(1, Ordering::Relaxed);
         }
         static OTHERS: [IpcRequest; 4] = [
@@ -286,7 +283,7 @@ mod tests {
         let _guard = start_ipc_app_core(p.CPU_CTRL);
         let ipc = Ipc::new(p.IPC);
 
-        let long_ticket = ipc.post(Cpu::AppCpu, &LONG, 0).unwrap();
+        let long_ticket = ipc.post(Cpu::AppCpu, &LONG).unwrap();
         let end = deadline(100);
         while !LONG_STARTED.load(Ordering::Acquire) {
             assert!(Instant::now() < end);
@@ -295,7 +292,7 @@ mod tests {
         let mut tickets: [Option<Ticket>; 4] = [None; 4];
         for (index, request) in OTHERS.iter().enumerate() {
             let start = Instant::now();
-            tickets[index] = Some(ipc.post(Cpu::AppCpu, request, index).unwrap());
+            tickets[index] = Some(ipc.post(Cpu::AppCpu, request).unwrap());
             assert!(start.elapsed() < Duration::from_millis(1));
         }
         assert_eq!(OTHER_RUNS.load(Ordering::Relaxed), 0);

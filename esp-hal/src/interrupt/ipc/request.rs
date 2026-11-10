@@ -6,7 +6,7 @@
 
 use core::ptr;
 
-use portable_atomic::{AtomicPtr, AtomicU32, AtomicUsize, Ordering};
+use portable_atomic::{AtomicPtr, AtomicU32, Ordering};
 
 /// The position of the sequence number in `status` and in the result of a post.
 pub(crate) const SEQ_SHIFT: u32 = 5;
@@ -26,9 +26,9 @@ pub(crate) const POST_RESULT_MASK: u32 = (1 << SEQ_SHIFT) - 1;
 /// A function that [`Ipc::post`][super::Ipc::post] runs on a CPU, and the state of its runs.
 ///
 /// The IPC interrupt of the target CPU calls `func` at
-/// [`Priority::min`][crate::interrupt::Priority::min] with the argument of the post. A request must
-/// be `'static`, because the IPC can read and write it at any time after the first post. A request
-/// has at most one pending run. Two concurrent runs need two requests.
+/// [`Priority::min`][crate::interrupt::Priority::min]. A request must be `'static`, because the IPC
+/// can read and write it at any time after the first post. A request has at most one pending run.
+/// Two concurrent runs need two requests.
 ///
 /// `func` must:
 ///
@@ -47,19 +47,17 @@ pub struct IpcRequest {
     /// request that no post took holds 0.
     pub(super) word: AtomicU32,
     pub(super) status: AtomicU32,
-    pub(super) func: extern "C" fn(usize),
-    pub(super) arg: AtomicUsize,
+    pub(super) func: extern "C" fn(),
 }
 
 impl IpcRequest {
-    /// Creates a request that runs `func` with the argument of the post.
-    pub const fn new(func: extern "C" fn(usize)) -> Self {
+    /// Creates a request that runs `func`.
+    pub const fn new(func: extern "C" fn()) -> Self {
         Self {
             next: AtomicPtr::new(ptr::null_mut()),
             word: AtomicU32::new(0),
             status: AtomicU32::new(0),
             func,
-            arg: AtomicUsize::new(0),
         }
     }
 }

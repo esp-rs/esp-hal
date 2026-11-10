@@ -10,8 +10,8 @@
 //! A post never waits. It returns a [`Ticket`], and [`Ticket::wait`] waits for the run with a
 //! deadline. A busy CPU does not block the poster.
 //!
-//! A request has at most one pending run. A post of a pending request with the same argument
-//! joins that run. [`IpcRequest`] lists the rules for the function.
+//! A request has at most one pending run. A post of a pending request joins that run.
+//! [`IpcRequest`] lists the rules for the function.
 //!
 //! ## Configuration
 #![doc = cfg_select! {
@@ -32,14 +32,14 @@
 //!     system::Cpu,
 //! };
 //!
-//! extern "C" fn on_cpu(arg: usize) {
+//! extern "C" fn on_cpu() {
 //!     // Runs on the selected CPU at minimum interrupt priority.
 //! }
 //!
 //! static ON_CPU: IpcRequest = IpcRequest::new(on_cpu);
 //!
 //! let ipc = Ipc::new(peripherals.IPC);
-//! let ticket = ipc.post(Cpu::ProCpu, &ON_CPU, 42)?;
+//! let ticket = ipc.post(Cpu::ProCpu, &ON_CPU)?;
 //! ticket.wait(Instant::now() + Duration::from_millis(10))?;
 //! # {after_snippet}
 //! ```
@@ -73,7 +73,7 @@ cfg_select! {
         // A build can hold esp-hal copies without the `rt` feature. Those copies post through the
         // symbol of the copy with `rt`.
         unsafe extern "C" {
-            fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>, arg: usize) -> u32;
+            fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>) -> u32;
         }
     }
 }
@@ -95,25 +95,19 @@ impl Ipc {
         Self
     }
 
-    /// Queues a run of `request` on `core` with the argument `arg`, and returns a [`Ticket`] that
-    /// can be used to wait for the run.
+    /// Queues a run of `request` on `core`, and returns a [`Ticket`] that can be used to wait for
+    /// the run.
     ///
-    /// This function never waits. If `request` is pending on `core` with the same `arg`, the post
-    /// joins that run. If `request` runs on `core`, the post queues a new run, which starts after
-    /// the current run returns.
+    /// This function never waits. If `request` is pending on `core`, the post joins that run. If
+    /// `request` runs on `core`, the post queues a new run, which starts after the current run
+    /// returns.
     ///
     /// # Errors
     ///
     /// - [`IpcError::Offline`] when `core` does not take IPC interrupts.
-    /// - [`IpcError::Busy`] when `request` is pending with a different argument, when another CPU
-    ///   posts it at the same moment, or when it runs on the other CPU.
-    pub fn post(
-        self,
-        core: Cpu,
-        request: &'static IpcRequest,
-        arg: usize,
-    ) -> Result<Ticket, IpcError> {
-        let result = unsafe { esp_hal_ipc_post(core as u8, NonNull::from(request), arg) };
+    /// - [`IpcError::Busy`] when `request` is pending on a CPU other than `core`, or runs on it.
+    pub fn post(self, core: Cpu, request: &'static IpcRequest) -> Result<Ticket, IpcError> {
+        let result = unsafe { esp_hal_ipc_post(core as u8, NonNull::from(request)) };
         match result & request::POST_RESULT_MASK {
             request::POST_OK => Ok(Ticket {
                 request,
@@ -208,8 +202,7 @@ pub enum IpcError {
     ///
     /// [`CpuControl`]: crate::system::CpuControl
     Offline,
-    /// The request is pending with a different argument, another CPU posts it at this moment, or
-    /// it runs on the other CPU.
+    /// The request is pending on a CPU other than the target CPU, or runs on it.
     Busy,
     /// The deadline passed before the run ended.
     Timeout,

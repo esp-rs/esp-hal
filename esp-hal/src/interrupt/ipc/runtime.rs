@@ -66,11 +66,7 @@ pub(crate) unsafe fn fail_stranded(core: Cpu) {
 // esp-hal copies without the `rt` feature call this function by name. The name, the argument
 // types, the encoding of the return value and the layout of `IpcRequest` must stay stable.
 #[unsafe(export_name = "esp_hal_ipc_post")]
-pub(super) unsafe extern "C" fn esp_hal_ipc_post(
-    core: u8,
-    request: NonNull<IpcRequest>,
-    arg: usize,
-) -> u32 {
+pub(super) unsafe extern "C" fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>) -> u32 {
     use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 
     let request = unsafe { request.as_ref() };
@@ -86,13 +82,9 @@ pub(super) unsafe extern "C" fn esp_hal_ipc_post(
         queue::POST_OFFLINE
     } else {
         unsafe {
-            queue::post(
-                &STATE[core as usize].lists,
-                core as u32,
-                request,
-                arg,
-                || raise(core),
-            )
+            queue::post(&STATE[core as usize].lists, core as u32, request, || {
+                raise(core)
+            })
         }
     };
     unsafe { SingleCoreInterruptLock.exit(token) };

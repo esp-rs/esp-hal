@@ -14,13 +14,11 @@ pub(crate) const QUEUED: u32 = 1 << 0;
 pub(crate) const RUNNING: u32 = 1 << 1;
 /// The CPU of the pending or running run.
 pub(crate) const CORE: u32 = 1 << 2;
-/// `arg` holds the argument of the pending run.
-pub(crate) const ARMED: u32 = 1 << 3;
 
 /// The target CPU stopped before the run.
 pub(crate) const OFFLINE: u32 = 1;
 
-/// The request is pending with a different argument, or it belongs to the other CPU.
+/// The request belongs to the other CPU.
 pub(crate) const POST_BUSY: u32 = 2;
 
 /// The bits of the sequence number in `word` and in `status`.
@@ -65,25 +63,7 @@ pub(crate) unsafe fn post(
     lists: &Lists,
     core: u32,
     request: &IpcRequest,
-    arg: usize,
     raise: impl FnOnce(),
-) -> u32 {
-    unsafe { post_with_hook(lists, core, request, arg, raise, || {}) }
-}
-
-/// [`post`], with a hook that runs between the first load of `word` and the read of `arg` in a
-/// join.
-///
-/// # Safety
-///
-/// See [`post`].
-pub(crate) unsafe fn post_with_hook(
-    lists: &Lists,
-    core: u32,
-    request: &IpcRequest,
-    arg: usize,
-    raise: impl FnOnce(),
-    mut before_join_read: impl FnMut(),
 ) -> u32 {
     let core = core_bit(core);
     let mut word = request.word.load(Ordering::Acquire);
@@ -109,31 +89,13 @@ pub(crate) unsafe fn post_with_hook(
                 continue;
             }
 
-            request.arg.store(arg, Ordering::Release);
-            request.word.fetch_or(ARMED, Ordering::Release);
             unsafe { push(lists, request) };
             raise();
 
             return seq;
         }
 
-        // Without `armed`, `arg` can hold the argument of an earlier run.
-        if !same_core || word & ARMED == 0 {
-            return POST_BUSY;
-        }
-
-        before_join_read();
-        let pending = request.arg.load(Ordering::Acquire);
-
-        // Load `word` again after the read of `arg`. The run can end, and a new post can store a
-        // new `arg`, between the first load and the read.
-        let again = request.word.load(Ordering::Acquire);
-        if again != word {
-            word = again;
-            continue;
-        }
-
-        return if pending == arg {
+        return if same_core {
             word & SEQ_FIELD
         } else {
             POST_BUSY
@@ -180,10 +142,8 @@ pub(crate) unsafe fn drain(lists: &Lists, core: u32) {
             return;
         };
 
-        // Read `next` and `arg` before clearing `queued`. A post can take the request again
-        // after that.
+        // Read `next` before clearing `queued`. A post can take the request again after that.
         let next = request.next.load(Ordering::Relaxed);
-        let arg = request.arg.load(Ordering::Acquire);
 
         // `fail_stranded` must find the request in `current` or in `drain` at each moment.
         lists.current.store(ptr, Ordering::Release);
@@ -191,7 +151,7 @@ pub(crate) unsafe fn drain(lists: &Lists, core: u32) {
 
         let mut word = request.word.load(Ordering::Acquire);
         let seq = loop {
-            let running = (word & !(QUEUED | ARMED)) | RUNNING;
+            let running = (word & !QUEUED) | RUNNING;
             match request.word.compare_exchange_weak(
                 word,
                 running,
@@ -203,7 +163,7 @@ pub(crate) unsafe fn drain(lists: &Lists, core: u32) {
             }
         };
 
-        (request.func)(arg);
+        (request.func)();
 
         complete(request, seq, DONE);
         clear_running(request, core);
@@ -286,7 +246,7 @@ fn fail(request: &IpcRequest, core: u32) {
 
         match request.word.compare_exchange_weak(
             word,
-            word & !(QUEUED | ARMED | RUNNING),
+            word & !(QUEUED | RUNNING),
             Ordering::AcqRel,
             Ordering::Acquire,
         ) {

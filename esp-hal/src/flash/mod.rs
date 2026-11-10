@@ -942,11 +942,11 @@ mod ipc_stall {
     /// Stalls `core` in [`stall`], and returns `false` if `core` does not take IPC interrupts.
     pub(super) fn enter(core: Cpu) -> bool {
         let ipc = Ipc::new(unsafe { IPC::steal() });
-        match ipc.post(core, &STALL[core as usize], 0) {
+        match ipc.post(core, &STALL[core as usize]) {
             Ok(_) => {}
             Err(IpcError::Offline) => return false,
             Err(error) => {
-                // Each request has one target, and each post uses the same argument.
+                // Each request has one target.
                 debug_assert!(false, "Posting the flash stall failed: {:?}", error);
                 return false;
             }
@@ -966,7 +966,7 @@ mod ipc_stall {
     }
 
     #[ram(unstable(cache_suspend_safe))]
-    extern "C" fn stall(_: usize) {
+    extern "C" fn stall() {
         {
             // The mask is taken before `Phase::Ack`. The guards drop after the cache is on again.
             let token = unsafe { SingleCoreInterruptLock.enter() };
