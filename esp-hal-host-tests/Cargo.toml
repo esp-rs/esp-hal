@@ -1,9 +1,9 @@
 [package]
-name         = "esp-hal-ipc-host-tests"
+name         = "esp-hal-host-tests"
 version      = "0.0.0"
 edition      = "2024"
 rust-version = "1.95.0"
-description  = "Host tests of the IPC request queue of esp-hal"
+description  = "Host tests of esp-hal code that does not need hardware"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 publish      = false

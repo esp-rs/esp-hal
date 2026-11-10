@@ -11,13 +11,7 @@
 //! deadline. A busy CPU does not block the poster.
 //!
 //! A request has at most one pending run. A post of a pending request with the same argument
-//! joins that run. Two concurrent runs need two requests.
-//!
-//! The same interrupt also carries a context switch. A CPU asks the other CPU to switch tasks
-//! through this interrupt. The context-switch handler of the RTOS that owns scheduling runs
-//! after the posted requests, and chooses the context that the interrupt returns to. A posted
-//! request and a context switch do not wait for each other. A posted request alone does not
-//! make a CPU switch tasks.
+//! joins that run. [`IpcRequest`] lists the rules for the function.
 //!
 //! ## Configuration
 #![cfg_attr(
@@ -30,15 +24,6 @@
 )]
 //! [`crate::init`] installs the handler on the PRO CPU. The start of the APP CPU installs the
 //! handler on that CPU.
-//!
-//! ## Usage
-//!
-//! [`Ipc::new`] creates a handle from the `IPC` peripheral singleton, and [`Ipc::post`] posts an
-//! [`IpcRequest`] to a CPU.
-//!
-//! The function of a request runs in an interrupt handler. The handler saves the registers that
-//! the calling convention lets the callee clobber, except the floating-point registers.
-//! [`IpcRequest`] lists the rules for the function.
 //!
 //! ## Examples
 //!
@@ -317,16 +302,9 @@ impl defmt::Format for Ticket {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum IpcError {
-    /// The CPU does not take IPC interrupts.
-    ///
-    /// The APP core does not take IPC interrupts before [`CpuControl`] starts it. A run that was
-    /// queued on the APP core when [`CpuControl`] starts the APP core again also ends with this
-    /// error. A stop through [`AppCoreGuard`] or the return of the APP closure does not give this
-    /// error: a post to the stopped APP core queues a run, and its wait returns
-    /// [`IpcError::Timeout`].
+    /// The CPU does not take IPC interrupts, or [`CpuControl`] started it again before the run.
     ///
     /// [`CpuControl`]: crate::system::CpuControl
-    /// [`AppCoreGuard`]: crate::system::AppCoreGuard
     Offline,
     /// The request is pending with a different argument, another CPU posts it at this moment, or
     /// it runs on the other CPU.

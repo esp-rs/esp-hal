@@ -1,9 +1,5 @@
-//! Host tests of the IPC request queue of esp-hal.
+//! Host tests of esp-hal code that does not need hardware.
 
 #![cfg(test)]
 
-#[path = "../../esp-hal/src/interrupt/ipc/queue.rs"]
-#[allow(dead_code)]
-mod queue;
-
-mod tests;
+mod ipc;

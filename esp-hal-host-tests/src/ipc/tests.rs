@@ -7,7 +7,7 @@ use std::{
     thread,
 };
 
-use crate::queue::{self, *};
+use super::queue::{self, *};
 
 const PRO: u32 = 0;
 const APP: u32 = 1;
