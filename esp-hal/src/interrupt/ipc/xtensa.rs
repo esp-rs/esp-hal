@@ -3,6 +3,7 @@
 //! The CPUs have no interrupt that reaches the other CPU. Each CPU therefore takes the call in
 //! a `FROM_CPU` interrupt of its own.
 
+use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use portable_atomic::Ordering;
 
 use super::runtime::STATE;
@@ -69,8 +70,12 @@ fn ipc_handler(context: &mut TrapFrame) {
 
     let state = &STATE[core as usize];
 
-    // The posted requests return here, so they run first.
+    // The posted requests return here, so they run first. An interrupt handler at a higher
+    // priority can stop this CPU. The stop must not occur in the drain outside `func`, so no
+    // interrupt handler can run during the drain.
+    let token = unsafe { SingleCoreInterruptLock.enter() };
     unsafe { super::queue::drain(&state.lists, core as u32) };
+    unsafe { SingleCoreInterruptLock.exit(token) };
 
     if state.deferral.load(Ordering::Relaxed) != 0 {
         return;

@@ -122,7 +122,8 @@ unsafe fn push(lists: &Lists, request: &IpcRequest) {
 ///
 /// # Safety
 ///
-/// Only the CPU `core`, which owns `lists`, calls this function, from its IPC interrupt.
+/// Only the CPU `core`, which owns `lists`, calls this function, from its IPC interrupt, with
+/// masked interrupts. The CPU `core` stops only inside `func`.
 // The IPC handler runs from RAM, and the flash can be off while the handler runs.
 #[inline(always)]
 pub(crate) unsafe fn drain(lists: &Lists, core: u32) {
@@ -145,7 +146,7 @@ pub(crate) unsafe fn drain(lists: &Lists, core: u32) {
         // Read `next` before clearing `queued`. A post can take the request again after that.
         let next = request.next.load(Ordering::Relaxed);
 
-        // `fail_stranded` must find the request in `current` or in `drain` at each moment.
+        // `fail_stranded` reads `current` and `drain` after a stop inside `func`.
         lists.current.store(ptr, Ordering::Release);
         lists.drain.store(next, Ordering::Release);
 
@@ -171,22 +172,12 @@ pub(crate) unsafe fn drain(lists: &Lists, core: u32) {
     }
 }
 
-/// Stores the outcome of the run of `request` with the `seq` bits `seq`, unless a later run
-/// already ended.
+/// Stores the outcome of the run of `request` with the `seq` bits `seq`.
+///
+/// Only the CPU that the run belongs to calls this function, before it gives up the request.
 #[inline(always)]
 fn complete(request: &IpcRequest, seq: u32, outcome: u32) {
-    let mut status = request.status.load(Ordering::Acquire);
-    while !seq_reached(status, seq) {
-        match request.status.compare_exchange_weak(
-            status,
-            seq | outcome,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            Ok(_) => return,
-            Err(actual) => status = actual,
-        }
-    }
+    request.status.store(seq | outcome, Ordering::Release);
 }
 
 /// Clears the `running` bit of `request`, if the request still belongs to the CPU `core`.
@@ -214,7 +205,8 @@ pub(crate) fn clear_running(request: &IpcRequest, core: u32) {
 ///
 /// # Safety
 ///
-/// The CPU `core` owns `lists`, and does not run. No post adds to `lists` during the call.
+/// The CPU `core` owns `lists`, and stopped inside `func` or outside [`drain`]. No post adds to
+/// `lists` during the call.
 pub(crate) unsafe fn fail_stranded(lists: &Lists, core: u32) {
     let core = core_bit(core);
     for list in [&lists.drain, &lists.head] {
@@ -236,24 +228,20 @@ pub(crate) unsafe fn fail_stranded(lists: &Lists, core: u32) {
 }
 
 fn fail(request: &IpcRequest, core: u32) {
-    let mut word = request.word.load(Ordering::Acquire);
-    loop {
-        // A request can be in `current` and in `drain`. After the first fail, it can belong to
-        // the other CPU.
-        if word & CORE != core || word & (QUEUED | RUNNING) == 0 {
-            return;
-        }
-
-        match request.word.compare_exchange_weak(
-            word,
-            word & !(QUEUED | RUNNING),
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            Ok(_) => break,
-            Err(actual) => word = actual,
-        }
+    let word = request.word.load(Ordering::Acquire);
+    // A request that posted itself during `func` is in `current` and in `head`. After the first
+    // fail, it can belong to the other CPU.
+    if word & CORE != core || word & (QUEUED | RUNNING) == 0 {
+        return;
     }
 
+    // A post to the other CPU can take a running request after the store of `status`. The
+    // exchange then fails, and the request belongs to that post.
     complete(request, word & SEQ_FIELD, OFFLINE);
+    _ = request.word.compare_exchange(
+        word,
+        word & !(QUEUED | RUNNING),
+        Ordering::AcqRel,
+        Ordering::Relaxed,
+    );
 }

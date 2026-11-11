@@ -50,6 +50,10 @@ esp32h4 = [
     "esp-hal/esp32h4",
 ]
 
+[profile.dev.package.esp-hal]
+# Parking a core needs esp-hal at opt-level 2 or 3
+opt-level = 2
+
 [profile.release]
 debug            = true
 debug-assertions = true

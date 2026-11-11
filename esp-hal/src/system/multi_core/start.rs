@@ -1,19 +1,20 @@
 //! Starts the APP core.
 //!
-//! A build can hold esp-hal versions without the `rt` feature. Those versions start the APP core
-//! through [`start_app_core`] by symbol name. The name and the signature must stay stable.
+//! A build can hold esp-hal versions without the `rt` feature. Those versions call
+//! [`start_app_core`] and [`app_core_running`] by symbol name. The names and the signatures must
+//! stay stable.
 
 use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 
 use crate::{soc::cpu_control::internal_park_core, system::Cpu};
 
-static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
+pub(super) static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
 static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 static APP_CORE_ENTRY: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 
 /// Starts the APP core with the stack that ends at `stack_top`. The APP core calls `entry`, and
-/// parks itself when `entry` returns.
+/// stops when `entry` returns. The start ends all parks of the APP core.
 ///
 /// Returns `false`, and does not start the APP core, if the APP core runs.
 ///
@@ -27,7 +28,7 @@ pub(super) unsafe fn start_app_core(
     stack_guard: *mut u32,
     entry: unsafe fn(),
 ) -> bool {
-    if !crate::debugger::debugger_connected() && crate::soc::cpu_control::is_running(Cpu::AppCpu) {
+    if app_core_running() {
         return false;
     }
 
@@ -51,14 +52,16 @@ pub(super) unsafe fn start_app_core(
     true
 }
 
-/// Marks the APP core as not running code of this program before the APP core starts.
+/// Marks the APP core as not running code of this program, and resets its park state, before the
+/// APP core starts.
 fn app_core_starting() {
-    APP_CORE_TAKES_IPC.store(false, Ordering::Release);
+    APP_CORE_TAKES_IPC.store(false, Ordering::SeqCst);
     // Posts to the APP core return `Offline` after the store, so no post adds a request
     // to the APP core while this call fails the requests that the APP core did not run.
     unsafe { crate::interrupt::ipc::fail_stranded(Cpu::AppCpu) };
     // The APP core can stop while a `SchedulerSuspendGuard` is alive on the APP core.
     crate::interrupt::ipc::reset_context_switch_deferral(Cpu::AppCpu);
+    super::park::reset_app_core();
 }
 
 /// Lets the APP core take IPC interrupts. The APP core calls this function after it
@@ -70,10 +73,17 @@ fn app_core_started() {
     APP_CORE_TAKES_IPC.store(true, Ordering::Release);
 }
 
-/// Returns `true` if [`super::CpuControl`] started the APP core in this boot. That core takes IPC
-/// interrupts unless it masks them.
+/// Returns `true` if [`super::CpuControl`] started the APP core in this boot, and the core has not
+/// stopped since. That core takes IPC interrupts unless it masks them.
 pub(crate) fn app_core_takes_ipc() -> bool {
-    APP_CORE_TAKES_IPC.load(Ordering::Acquire)
+    // A post orders this load after its count in `APP_POSTS`.
+    APP_CORE_TAKES_IPC.load(Ordering::SeqCst)
+}
+
+/// Returns whether the APP core runs code of this program.
+#[unsafe(export_name = "esp_hal_app_core_running")]
+pub(super) fn app_core_running() -> bool {
+    app_core_takes_ipc() && crate::soc::cpu_control::is_running(Cpu::AppCpu)
 }
 
 /// Runs the entry of the APP core.
@@ -85,10 +95,8 @@ unsafe fn start_core1_run() -> ! {
     unsafe {
         let entry = core::mem::transmute::<*mut (), unsafe fn()>(entry);
         entry();
-        loop {
-            internal_park_core(Cpu::current(), true);
-        }
     }
+    super::park::stop_current_core()
 }
 
 #[cfg(soc_cpu_pma_needs_core1_setup)]
