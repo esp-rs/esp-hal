@@ -286,8 +286,7 @@ impl MultiCoreStrategy {
         #[cfg(multi_core)]
         esp_hal::if_unstable_hal! {
             let cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
-            let _parked = (self == MultiCoreStrategy::AutoPark)
-                .then(|| Cpu::other().map(|other| cpu_ctrl.park_core(other)).next());
+            let _parked = (self == MultiCoreStrategy::AutoPark).then(|| cpu_ctrl.park_other_core());
 
             // A parked core does not run.
             if self != MultiCoreStrategy::Ignore && Cpu::other().any(is_running) {

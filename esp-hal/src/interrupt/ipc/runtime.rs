@@ -62,7 +62,9 @@ pub(super) static STATE: [CoreState; Cpu::COUNT] = [const { CoreState::new() }; 
 pub(crate) unsafe fn fail_stranded(core: Cpu) {
     // A post that read `true` from `app_core_takes_ipc` can push until it leaves `APP_POSTS`.
     if core == Cpu::AppCpu {
-        while APP_POSTS.load(Ordering::Acquire) != 0 {
+        // This load and the load in `esp_hal_ipc_post` must be `SeqCst`. Otherwise each side can
+        // miss the store of the other side.
+        while APP_POSTS.load(Ordering::SeqCst) != 0 {
             core::hint::spin_loop();
         }
     }

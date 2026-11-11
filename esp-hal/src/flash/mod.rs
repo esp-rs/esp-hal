@@ -848,9 +848,7 @@ impl ParkGuard {
                         }
                         None
                     }
-                    // The wait for the park does not mask interrupts.
-                    MultiCoreStrategy::AutoPark => Cpu::other()
-                        .find_map(|other| multi_core::park_masked(other).map(|mask| (other, mask))),
+                    MultiCoreStrategy::AutoPark => multi_core::park_other_masked(),
                     MultiCoreStrategy::Ignore(_) => None,
                 };
                 let (parked, mask) = match parked {

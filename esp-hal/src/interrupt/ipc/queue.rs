@@ -228,20 +228,27 @@ pub(crate) unsafe fn fail_stranded(lists: &Lists, core: u32) {
 }
 
 fn fail(request: &IpcRequest, core: u32) {
-    let word = request.word.load(Ordering::Acquire);
-    // A request that posted itself during `func` is in `current` and in `head`. After the first
-    // fail, it can belong to the other CPU.
-    if word & CORE != core || word & (QUEUED | RUNNING) == 0 {
-        return;
-    }
+    let mut word = request.word.load(Ordering::Acquire);
+    let seq = loop {
+        // A request that posted itself during `func` is in `current` and in `head`. After the
+        // first fail, it can belong to the other CPU.
+        if word & CORE != core || word & (QUEUED | RUNNING) == 0 {
+            return;
+        }
 
-    // A post to the other CPU can take a running request after the store of `status`. The
-    // exchange then fails, and the request belongs to that post.
-    complete(request, word & SEQ_FIELD, OFFLINE);
-    _ = request.word.compare_exchange(
-        word,
-        word & !(QUEUED | RUNNING),
-        Ordering::AcqRel,
-        Ordering::Relaxed,
-    );
+        // A post to the other CPU takes a pending request after the store of `status`. The
+        // request must thus be running at that store, as in `drain`.
+        match request.word.compare_exchange_weak(
+            word,
+            (word & !QUEUED) | RUNNING,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            Ok(_) => break word & SEQ_FIELD,
+            Err(actual) => word = actual,
+        }
+    };
+
+    complete(request, seq, OFFLINE);
+    clear_running(request, core);
 }

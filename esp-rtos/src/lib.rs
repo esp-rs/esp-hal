@@ -445,6 +445,9 @@ pub fn start_with_idle_hook(timer: impl TimerSource, idle_hook: IdleFn) {
 /// You can return from the second core's main thread function. This will cause the scheduler to
 /// enter the idle state, but the second core will continue to run interrupt handlers and other
 /// tasks.
+///
+/// The second core can park while the other core suspends the caches. See [Optimization
+/// level](esp_hal#optimization-level) for the build requirement.
 #[cfg(multi_core)]
 pub fn start_second_core<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
@@ -535,6 +538,9 @@ fn suspend_main_task() {
 /// You can return from the second core's main thread function. This will cause the scheduler to
 /// enter the idle state, but the second core will continue to run interrupt handlers and other
 /// tasks.
+///
+/// The second core can park while the other core suspends the caches. See [Optimization
+/// level](esp_hal#optimization-level) for the build requirement.
 #[cfg(multi_core)]
 pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
@@ -595,6 +601,9 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
 /// You can return from the second core's main thread function. This will cause the scheduler to
 /// enter the idle state, but the second core will continue to run interrupt handlers and other
 /// tasks.
+///
+/// The second core can park while the other core suspends the caches. See [Optimization
+/// level](esp_hal#optimization-level) for the build requirement.
 ///
 /// ## Restrictions
 ///

@@ -13,6 +13,14 @@ use esp_sync::{
 
 use crate::{peripherals::CPU_CTRL, system::Cpu};
 
+/// The park symbols use this value for "the other core" and for "no core".
+const NO_CORE: u8 = u8::MAX;
+
+fn cpu_from_u8(core: u8) -> Cpu {
+    debug_assert!((core as usize) < Cpu::COUNT);
+    if core == 0 { Cpu::ProCpu } else { Cpu::AppCpu }
+}
+
 // Runtime contract, keep stable.
 cfg_select! {
     feature = "rt" => {
@@ -22,15 +30,15 @@ cfg_select! {
         pub(crate) use park::unpark;
         use park::{park_request, park_stall, stop_app_core};
         pub(crate) use start::app_core_takes_ipc;
-        use start::{APP_CORE_TAKES_IPC, app_core_running, start_app_core};
+        use start::{APP_CORE_STOPPING, APP_CORE_TAKES_IPC, app_core_running, start_app_core};
 
         use crate::interrupt::ipc::{defer_context_switch, resume_context_switch};
     }
     _ => {
         // The esp-hal copy with the `rt` feature defines these functions in `park` and `start`.
         unsafe extern "C" {
-            fn esp_hal_park_request(core: u8) -> bool;
-            fn esp_hal_park_stall(core: u8);
+            fn esp_hal_park_request(core: u8, generation: &mut u32) -> u8;
+            fn esp_hal_park_stall(core: u8, generation: u32) -> bool;
             fn esp_hal_unpark_core(core: u8);
             fn esp_hal_stop_app_core();
         }
@@ -51,13 +59,17 @@ cfg_select! {
         }
 
         #[inline(always)]
-        fn park_request(core: Cpu) -> bool {
-            unsafe { esp_hal_park_request(core as u8) }
+        fn park_request(core: Option<Cpu>) -> Option<(Cpu, u32)> {
+            let mut generation = 0;
+            let parked = unsafe {
+                esp_hal_park_request(core.map_or(NO_CORE, |core| core as u8), &mut generation)
+            };
+            (parked != NO_CORE).then(|| (cpu_from_u8(parked), generation))
         }
 
         #[inline(always)]
-        fn park_stall(core: Cpu) {
-            unsafe { esp_hal_park_stall(core as u8) }
+        fn park_stall(core: Cpu, generation: u32) -> bool {
+            unsafe { esp_hal_park_stall(core as u8, generation) }
         }
 
         #[inline(always)]
@@ -97,13 +109,26 @@ pub(crate) fn park(core: Cpu) -> bool {
 /// Panics if `core` is the current core.
 #[crate::ram]
 pub(crate) fn park_masked(core: Cpu) -> Option<RestoreState> {
-    if !park_request(core) {
-        return None;
+    park_target_masked(Some(core)).map(|(_, token)| token)
+}
+
+/// Parks the other core as [`park_masked`] does, and returns the parked core with the mask.
+#[crate::ram]
+pub(crate) fn park_other_masked() -> Option<(Cpu, RestoreState)> {
+    park_target_masked(None)
+}
+
+#[inline(always)]
+fn park_target_masked(core: Option<Cpu>) -> Option<(Cpu, RestoreState)> {
+    loop {
+        let (parked, generation) = park_request(core)?;
+        // The mask belongs to this copy of esp-hal, so it never crosses the park symbols.
+        let token = unsafe { SingleCoreInterruptLock.enter() };
+        if park_stall(parked, generation) {
+            return Some((parked, token));
+        }
+        unsafe { SingleCoreInterruptLock.exit(token) };
     }
-    // The mask belongs to this copy of esp-hal, so it never crosses the park symbols.
-    let token = unsafe { SingleCoreInterruptLock.enter() };
-    park_stall(core);
-    Some(token)
 }
 
 /// Returns whether `core` runs code of this program. Only such a core takes park requests.
@@ -215,7 +240,7 @@ pub struct ParkGuard<'a> {
 }
 
 impl ParkGuard<'_> {
-    /// Keeps the core parked for good.
+    /// Drops the guard without unparking the core.
     ///
     /// [`CpuControl::start_app_core`] can start a parked APP core again. No function can start a
     /// parked PRO core again.
@@ -345,8 +370,9 @@ impl<'d> CpuControl<'d> {
     /// the tick of a scheduler. [IPC requests][crate::interrupt::ipc::IpcRequest] to the parked
     /// core run after the park ends.
     ///
-    /// The call waits until `core` parks. The wait does not mask interrupts, so code at a higher
-    /// run level can run, and can park `core` too. If `core` never takes the IPC interrupt, the
+    /// The call waits until `core` parks. The wait does not mask interrupts, so interrupt
+    /// handlers can run, and can park `core` too. The current core defers its context switches
+    /// during the wait. If `core` never takes the IPC interrupt, the
     /// call waits forever. For example, `core` can keep its interrupts masked, or wait for a lock
     /// in an interrupt handler. Do not hold a lock that `core` can wait for in an interrupt handler
     /// or with masked interrupts, for example a critical section or a mutex.
@@ -359,11 +385,27 @@ impl<'d> CpuControl<'d> {
     ///
     /// # Panics
     ///
-    /// Panics if `core` is the current core.
+    /// Panics if `core` is the current core. A thread that an RTOS can move between cores can run
+    /// on `core` at the call.
     #[instability::unstable]
     pub fn park_core(&self, core: Cpu) -> ParkGuard<'_> {
         ParkGuard {
             core: park(core).then_some(core),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Parks the other core until the returned guard drops, as [`Self::park_core`] does.
+    ///
+    /// The call chooses the other core while the current thread cannot move to it. A thread that an
+    /// RTOS can move between cores can thus call this function.
+    #[instability::unstable]
+    pub fn park_other_core(&self) -> ParkGuard<'_> {
+        ParkGuard {
+            core: park_other_masked().map(|(core, token)| {
+                unsafe { SingleCoreInterruptLock.exit(token) };
+                core
+            }),
             phantom: PhantomData,
         }
     }

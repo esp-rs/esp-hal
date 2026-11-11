@@ -9,6 +9,8 @@ use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use crate::{soc::cpu_control::internal_park_core, system::Cpu};
 
 pub(super) static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
+/// The APP core stops itself. The core runs until it stalls itself.
+pub(super) static APP_CORE_STOPPING: AtomicBool = AtomicBool::new(false);
 static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 static APP_CORE_ENTRY: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
@@ -56,6 +58,7 @@ pub(super) unsafe fn start_app_core(
 /// APP core starts.
 fn app_core_starting() {
     APP_CORE_TAKES_IPC.store(false, Ordering::SeqCst);
+    APP_CORE_STOPPING.store(false, Ordering::SeqCst);
     // Posts to the APP core return `Offline` after the store, so no post adds a request
     // to the APP core while this call fails the requests that the APP core did not run.
     unsafe { crate::interrupt::ipc::fail_stranded(Cpu::AppCpu) };
@@ -83,7 +86,9 @@ pub(crate) fn app_core_takes_ipc() -> bool {
 /// Returns whether the APP core runs code of this program.
 #[unsafe(export_name = "esp_hal_app_core_running")]
 pub(super) fn app_core_running() -> bool {
-    app_core_takes_ipc() && crate::soc::cpu_control::is_running(Cpu::AppCpu)
+    // A stopping APP core takes no IPC interrupts, but runs until it stalls itself.
+    (app_core_takes_ipc() || APP_CORE_STOPPING.load(Ordering::SeqCst))
+        && crate::soc::cpu_control::is_running(Cpu::AppCpu)
 }
 
 /// Runs the entry of the APP core.
