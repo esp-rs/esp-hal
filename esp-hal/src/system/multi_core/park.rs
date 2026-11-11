@@ -10,7 +10,13 @@
 //!
 //! The claim covers the changes of the park state. A core never waits for the other core while it
 //! holds the claim. The requesting core waits without the claim, and does not mask its interrupts.
-//! Code at a higher run level can thus run, and can also park the same core.
+//! Interrupt handlers can thus run, and can also park the same core. The requesting core also
+//! runs the IPC requests that the target core posts, so the target core can wait for them.
+//!
+//! The requesting core defers its context switches from the choice of the target core until the
+//! target core parks. The requesting thread thus cannot move to the target core. There, the IPC
+//! handler would park the core under the requesting thread, and the thread would never release
+//! the park.
 //!
 //! A core answers the park request of the other core before it takes the claim. A core thus asks
 //! for a park only if the other core does not ask the core to park. Two cores never park each
@@ -27,9 +33,18 @@ use esp_sync::{
     RestoreState,
     raw::{RawLock, SingleCoreInterruptLock},
 };
-use portable_atomic::{AtomicU8, AtomicUsize, Ordering};
+use portable_atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering};
 
-use super::{APP_CORE_TAKES_IPC, park, takes_ipc};
+use super::{
+    APP_CORE_STOPPING,
+    APP_CORE_TAKES_IPC,
+    NO_CORE,
+    SchedulerSuspendGuard,
+    cpu_from_u8,
+    is_running,
+    park,
+    takes_ipc,
+};
 use crate::{
     interrupt::ipc::{self, Ipc, IpcRequest},
     peripherals::IPC,
@@ -67,60 +82,89 @@ const NO_CLAIM: u8 = u8::MAX;
 /// Two cores that park each other at the same time stall each other. The claim prevents that case.
 static CLAIM: AtomicU8 = AtomicU8::new(NO_CLAIM);
 
-/// Counts a park of `core`, and waits until `core` is in [`serve`]. [`park_stall`] then stalls
-/// `core`.
+/// The number of starts of the APP core.
 ///
-/// Returns `false` as [`park`] does. The wait does not mask interrupts.
+/// An interrupt handler can stop and start the APP core while a park of the APP core waits. That
+/// park then belongs to the earlier run.
+static GENERATION: AtomicU32 = AtomicU32::new(0);
+
+/// Counts a park of `core`, or of the other core if `core` is `None`, and waits until that core is
+/// in [`serve`]. [`park_stall`] then stalls the core.
+///
+/// Returns the core and its [`GENERATION`], or `None` where [`park`] returns `false`. If the call
+/// returns a core, the current core defers its context switches until [`park_stall`] returns.
 ///
 /// # Panics
 ///
 /// Panics if `core` is the current core.
 #[ram]
-pub(crate) fn park_request(core: Cpu) -> bool {
-    assert_ne!(core, Cpu::current(), "A core cannot park itself");
+pub(crate) fn park_request(core: Option<Cpu>) -> Option<(Cpu, u32)> {
+    let suspend = SchedulerSuspendGuard::new();
+    let current = Cpu::current();
+    let core = core.unwrap_or(match current {
+        Cpu::ProCpu => Cpu::AppCpu,
+        Cpu::AppCpu => Cpu::ProCpu,
+    });
+    assert_ne!(core, current, "A core cannot park itself");
 
     let phase = &PHASE[core as usize];
     let count = &COUNT[core as usize];
-    loop {
-        let _claim = Claim::take();
-        if count.load(Ordering::Relaxed) == 0 {
-            if !takes_ipc(core) {
-                return false;
+    'park: loop {
+        let claim = Claim::take();
+        if !takes_ipc(core) {
+            drop(claim);
+            // A stopping core runs until it stalls itself.
+            while is_running(core) {
+                core::hint::spin_loop();
             }
+            return None;
+        }
+        if count.load(Ordering::Relaxed) == 0 {
             // After an unpark, `core` must leave `serve` before the next request.
             if phase.load(Ordering::Acquire) != Phase::Idle as u8 {
                 continue;
             }
             phase.store(Phase::Requested as u8, Ordering::Release);
+            let result = Ipc::new(unsafe { IPC::steal() }).post(core, &SERVE[core as usize]);
+            // Only the other core posts `SERVE[core]`. The claim checked that `core` takes IPC
+            // interrupts, and a stop of `core` needs the claim.
+            debug_assert!(result.is_ok(), "Posting the park request failed");
         }
         count.fetch_add(1, Ordering::Relaxed);
-        break;
-    }
+        let generation = GENERATION.load(Ordering::Relaxed);
+        drop(claim);
 
-    // Each caller that holds a park waits, because a context switch can stop a different caller
-    // before its stall.
-    if phase.load(Ordering::Acquire) != Phase::Parked as u8 {
-        let ipc = Ipc::new(unsafe { IPC::steal() });
-        let result = ipc.post(core, &SERVE[core as usize]);
-        // Only the other core posts `SERVE[core]`. The claim above checked that `core` takes IPC
-        // interrupts.
-        debug_assert!(result.is_ok(), "Posting the park request failed");
+        while phase.load(Ordering::Acquire) != Phase::Parked as u8 {
+            if GENERATION.load(Ordering::Acquire) != generation {
+                continue 'park;
+            }
+            core::hint::spin_loop();
+        }
+        // A context switch before the stall leaves `core` in `serve` until this thread runs again.
+        core::mem::forget(suspend);
+        return Some((core, generation));
     }
-    while phase.load(Ordering::Acquire) != Phase::Parked as u8 {
-        core::hint::spin_loop();
-    }
-    true
 }
 
-/// Stalls `core` after [`park_request`] returned `true`.
+/// Stalls `core` after [`park_request`] returned it with `generation`, and ends the deferral of
+/// the context switches.
+///
+/// Returns `false`, and does not stall `core`, if `core` stopped or started again since
+/// [`park_request`] returned.
 ///
 /// The caller masks the interrupts of the current core before the call. A caller that keeps the
-/// mask until [`unpark`] runs no interrupt handler while `core` is parked.
+/// mask until [`unpark`] runs no interrupt handler and no context switch while `core` is parked.
 #[ram]
-pub(crate) fn park_stall(core: Cpu) {
-    // `core` waits in a RAM loop with masked interrupts. The stall stops `core` in that loop.
-    let _claim = Claim::take();
-    unsafe { internal_park_core(core, true) };
+pub(crate) fn park_stall(core: Cpu, generation: u32) -> bool {
+    let claim = Claim::take();
+    let stall = takes_ipc(core) && GENERATION.load(Ordering::Relaxed) == generation;
+    if stall {
+        // `core` waits in a RAM loop with masked interrupts. The stall stops `core` in that loop.
+        unsafe { internal_park_core(core, true) };
+    }
+    drop(claim);
+    unsafe { ipc::resume_context_switch() };
+    stall
 }
 
 /// Releases a park that [`park`] took. `core` runs again if no other park holds `core`.
@@ -141,36 +185,40 @@ pub(crate) fn unpark(core: Cpu) {
     }
 }
 
-/// Parks the APP core for good.
+/// Parks the APP core until [`super::CpuControl`] starts it again.
 ///
 /// The parks that hold the APP core keep working. The APP core stays parked after the last park
-/// ends. [`super::CpuControl`] can start the APP core again.
+/// ends.
 #[ram]
 pub(crate) fn stop_app_core() {
+    let _suspend = SchedulerSuspendGuard::new();
     if Cpu::current() == Cpu::AppCpu {
         stop_current_core();
     }
 
     // A park that never ends keeps the core stalled after the other parks end.
     if park(Cpu::AppCpu) {
+        let claim = Claim::take();
         APP_CORE_TAKES_IPC.store(false, Ordering::SeqCst);
+        drop(claim);
         // Posts to the APP core return `Offline` after the store.
         unsafe { ipc::fail_stranded(Cpu::AppCpu) };
     }
 }
 
-/// Stalls the current core, which must be the APP core, for good.
+/// Stalls the current core, which must be the APP core, until [`super::CpuControl`] starts it
+/// again.
 #[ram]
 pub(crate) fn stop_current_core() -> ! {
-    debug_assert_eq!(Cpu::current(), Cpu::AppCpu);
-
     // The interrupts stay masked after the claim ends. The APP core runs no code of this program
     // again.
     let _mask = unsafe { SingleCoreInterruptLock.enter() };
+    debug_assert_eq!(Cpu::current(), Cpu::AppCpu);
 
     // The claim orders the stop against a park from the PRO core. That park ends before the stop,
-    // or sees that the APP core runs no code of this program.
+    // or waits until the stall below takes effect.
     let claim = Claim::take();
+    APP_CORE_STOPPING.store(true, Ordering::SeqCst);
     APP_CORE_TAKES_IPC.store(false, Ordering::SeqCst);
     drop(claim);
     // Posts to the APP core return `Offline` after the store.
@@ -183,6 +231,8 @@ pub(crate) fn stop_current_core() -> ! {
 
 /// Resets the park state of the APP core before the APP core starts.
 pub(crate) fn reset_app_core() {
+    let _claim = Claim::take();
+    GENERATION.fetch_add(1, Ordering::Release);
     COUNT[Cpu::AppCpu as usize].store(0, Ordering::Relaxed);
     PHASE[Cpu::AppCpu as usize].store(Phase::Idle as u8, Ordering::Relaxed);
 }
@@ -234,9 +284,10 @@ struct Claim(RestoreState);
 impl Claim {
     #[inline(always)]
     fn take() -> Self {
-        let current = Cpu::current();
         loop {
             let token = unsafe { SingleCoreInterruptLock.enter() };
+            // The thread can move to the other core while the interrupts are on.
+            let current = Cpu::current();
             match CLAIM.compare_exchange(
                 NO_CLAIM,
                 current as u8,
@@ -274,21 +325,22 @@ impl Drop for Claim {
 // esp-hal copies without the `rt` feature call these functions by name. The names, the argument
 // types and their meaning must stay stable.
 
-fn cpu_from_u8(core: u8) -> Cpu {
-    debug_assert!((core as usize) < Cpu::COUNT);
-    if core == 0 { Cpu::ProCpu } else { Cpu::AppCpu }
-}
-
 #[ram]
 #[unsafe(export_name = "esp_hal_park_request")]
-extern "C" fn export_park_request(core: u8) -> bool {
-    park_request(cpu_from_u8(core))
+extern "C" fn export_park_request(core: u8, generation: &mut u32) -> u8 {
+    match park_request((core != NO_CORE).then(|| cpu_from_u8(core))) {
+        Some((core, parked_generation)) => {
+            *generation = parked_generation;
+            core as u8
+        }
+        None => NO_CORE,
+    }
 }
 
 #[ram]
 #[unsafe(export_name = "esp_hal_park_stall")]
-extern "C" fn export_park_stall(core: u8) {
-    park_stall(cpu_from_u8(core))
+extern "C" fn export_park_stall(core: u8, generation: u32) -> bool {
+    park_stall(cpu_from_u8(core), generation)
 }
 
 #[ram]

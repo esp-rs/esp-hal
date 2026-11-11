@@ -456,6 +456,117 @@ mod tests {
     }
 
     #[test]
+    fn a_stopped_app_core_failed_its_requests(p: Peripherals) {
+        const COUNT: usize = 64;
+        extern "C" fn nothing() {}
+        static REQUESTS: [IpcRequest; COUNT] = [const { IpcRequest::new(nothing) }; COUNT];
+        static MASKED: AtomicBool = AtomicBool::new(false);
+        static POSTED: AtomicBool = AtomicBool::new(false);
+
+        let ipc = Ipc::new(p.IPC);
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        // The closure returns with masked interrupts, so the posts stay queued until the stop.
+        let _guard = cpu_control
+            .start_app_core(app_core_stack(), || {
+                let _token = unsafe { SingleCoreInterruptLock.enter() };
+                MASKED.store(true, Ordering::Release);
+                while !POSTED.load(Ordering::Acquire) {}
+            })
+            .unwrap();
+        while !MASKED.load(Ordering::Acquire) {}
+
+        let tickets = REQUESTS
+            .each_ref()
+            .map(|request| ipc.post(Cpu::AppCpu, request).unwrap());
+        POSTED.store(true, Ordering::Release);
+        while is_running(Cpu::AppCpu) {}
+
+        let pending = tickets
+            .into_iter()
+            .filter(|ticket| ticket.poll().is_none())
+            .count();
+        hil_test::assert_eq!(pending, 0);
+    }
+
+    #[test]
+    fn a_park_ends_when_an_interrupt_handler_restarts_the_app_core(p: Peripherals) {
+        use core::cell::RefCell;
+
+        use esp_hal::{
+            Blocking,
+            flash::{Config, Flash},
+            timer::{OneShotTimer, timg::TimerGroup},
+        };
+
+        struct Restart {
+            timer: OneShotTimer<'static, Blocking>,
+            cpu_control: CpuControl<'static>,
+            guard: AppCoreGuard<'static>,
+            stack: &'static mut Stack<4096>,
+        }
+
+        static RESTART: critical_section::Mutex<RefCell<Option<Restart>>> =
+            critical_section::Mutex::new(RefCell::new(None));
+        static MASKED: AtomicBool = AtomicBool::new(false);
+        static RELEASE: AtomicBool = AtomicBool::new(false);
+        static RESTARTED: AtomicBool = AtomicBool::new(false);
+
+        extern "C" fn restart() {
+            let Some(mut state) = critical_section::with(|cs| RESTART.borrow_ref_mut(cs).take())
+            else {
+                return;
+            };
+            state.timer.clear_interrupt();
+            RELEASE.store(true, Ordering::Release);
+            drop(state.guard);
+            let guard = state
+                .cpu_control
+                .start_app_core(state.stack, || loop {})
+                .unwrap();
+            core::mem::forget(guard);
+            RESTARTED.store(true, Ordering::Release);
+        }
+
+        // Thread mode parks the APP core through the flash driver, which borrows no `CpuControl`.
+        // The interrupt handler owns the only `CpuControl`.
+        let mut flash = Flash::new(p.FLASH, Config::default()).unwrap();
+        let mut timer = OneShotTimer::new(TimerGroup::new(p.TIMG0).timer0);
+        timer.set_interrupt_handler(InterruptHandler::new(restart, Priority::Priority2));
+
+        // The APP core takes the park request only after the interrupt handler on the PRO core
+        // stopped and restarted the APP core.
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let guard = cpu_control
+            .start_app_core(app_core_stack(), || {
+                let token = unsafe { SingleCoreInterruptLock.enter() };
+                MASKED.store(true, Ordering::Release);
+                while !RELEASE.load(Ordering::Acquire) {}
+                unsafe { SingleCoreInterruptLock.exit(token) };
+                loop {}
+            })
+            .unwrap();
+        while !MASKED.load(Ordering::Acquire) {}
+
+        critical_section::with(|cs| {
+            let mut state = RESTART.borrow_ref_mut(cs);
+            let state = state.insert(Restart {
+                timer,
+                cpu_control,
+                guard,
+                stack: unsafe { &mut *(&raw mut IPC_APP_CORE_STACK) },
+            });
+            // The flash read below starts to wait for the park in this time.
+            state.timer.schedule(Duration::from_millis(10)).unwrap();
+            state.timer.listen();
+        });
+
+        let mut word = [0u32; 1];
+        flash.read(0, &mut word).unwrap();
+        hil_test::assert!(RESTARTED.load(Ordering::Acquire));
+        hil_test::assert!(is_running(Cpu::AppCpu));
+    }
+
+    #[test]
     fn a_second_start_fails_while_the_app_core_runs(p: Peripherals) {
         let mut cpu_control = CpuControl::new(p.CPU_CTRL);
         let _guard = cpu_control
