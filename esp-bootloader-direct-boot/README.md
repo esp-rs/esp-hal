@@ -1,4 +1,4 @@
-# esp-bootloader-direct-boot
+# esp-bootloader-direct-boot (EXPERIMENTAL - NOT RECOMMENDED FOR ANY USE OTHER THAN TESTING)
 
 [![Crates.io](https://img.shields.io/crates/v/esp-bootloader-direct-boot?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-bootloader-direct-boot)
 [![docs.rs](https://img.shields.io/docsrs/esp-bootloader-direct-boot?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-bootloader-direct-boot/latest/)
