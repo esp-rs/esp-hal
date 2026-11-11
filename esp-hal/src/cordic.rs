@@ -60,43 +60,25 @@ pub struct Config {
     precision: Precision,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-struct ClockRequest {
-    source: ClockSource,
-    target_frequency: Option<Rate>,
-    source_hz: u32,
-}
-
-impl ClockRequest {
-    fn new(config: &Config) -> Self {
-        let source = config.clock_source;
-        let target_frequency = config.frequency;
-        Self {
-            source,
-            target_frequency,
-            source_hz: target_frequency.map_or(0, |_| {
-                CordicInstance::function_clock_source_frequency(source)
-            }),
-        }
-    }
-
-    fn resolve(&self) -> Result<CordicFunctionClockConfig, ConfigError> {
-        let Some(target_frequency) = self.target_frequency else {
-            return Ok(CordicFunctionClockConfig::new(self.source, 1, 0, 1));
+impl Config {
+    fn clock_config(&self) -> Result<CordicFunctionClockConfig, ConfigError> {
+        let source = self.clock_source;
+        let Some(target_frequency) = self.frequency else {
+            return Ok(CordicFunctionClockConfig::new(source, 1, 0, 1));
         };
+        let source_hz = CordicInstance::function_clock_source_frequency(source);
         let target_hz = target_frequency.as_hz();
-        if target_hz == 0 || target_hz > self.source_hz {
+        if target_hz == 0 || target_hz > source_hz {
             return Err(ConfigError::UnreachableClockRate);
         }
         let (_, max_divider) = property!("clock_tree.cordic.function_clock.divider");
         let (_, max_denominator) = property!("clock_tree.cordic.function_clock.denominator");
-        let divider = FractionalDivider::new(self.source_hz, target_hz, max_denominator);
+        let divider = FractionalDivider::new(source_hz, target_hz, max_denominator);
         if divider.integer > max_divider {
             return Err(ConfigError::UnreachableClockRate);
         }
         Ok(CordicFunctionClockConfig::new(
-            self.source,
+            source,
             divider.integer,
             divider.numerator,
             divider.denominator.max(1),
@@ -162,7 +144,6 @@ pub struct Cordic<'d, Dm: DriverMode = Blocking> {
     peripheral: CORDIC<'d>,
     _clock_guard: CordicClockGuard,
     _guard: GenericPeripheralGuard<{ Peripheral::Cordic as u8 }>,
-    clock_request: ClockRequest,
     precision: Precision,
     _mode: PhantomData<Dm>,
 }
@@ -278,14 +259,12 @@ impl<'d> Cordic<'d, Blocking> {
     ///
     /// [`ConfigError::UnreachableClockRate`] when the requested clock rate is unsupported.
     pub fn new(peripheral: CORDIC<'d>, config: Config) -> Result<Self, ConfigError> {
-        let clock_request = ClockRequest::new(&config);
         // Keep the calculation clock running during the peripheral reset.
-        let clock_guard = CordicClockGuard::new(clock_request.resolve()?);
+        let clock_guard = CordicClockGuard::new(config.clock_config()?);
         Ok(Self {
             peripheral,
             _clock_guard: clock_guard,
             _guard: GenericPeripheralGuard::new(),
-            clock_request,
             precision: config.precision,
             _mode: PhantomData,
         })
@@ -298,17 +277,13 @@ impl<'d> Cordic<'d, Blocking> {
     /// [`ConfigError::UnreachableClockRate`] when the requested clock rate is unsupported.
     /// The current configuration is retained in that case.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let clock_request = ClockRequest::new(config);
-        if self.clock_request != clock_request {
-            let clock_config = clock_request.resolve()?;
-            ClockTree::with(|clocks| {
-                let instance = CordicInstance::Cordic;
-                if instance.function_clock_config(clocks) != Some(clock_config) {
-                    instance.configure_function_clock(clocks, clock_config);
-                }
-            });
-            self.clock_request = clock_request;
-        }
+        let clock_config = config.clock_config()?;
+        ClockTree::with(|clocks| {
+            let instance = CordicInstance::Cordic;
+            if instance.function_clock_config(clocks) != Some(clock_config) {
+                instance.configure_function_clock(clocks, clock_config);
+            }
+        });
         self.precision = config.precision;
         Ok(())
     }
