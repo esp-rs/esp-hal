@@ -23,14 +23,11 @@
 mod fmt;
 pub(crate) mod reg_access;
 
-use core::{
-    marker::PhantomData,
-    sync::atomic::{AtomicPtr, Ordering},
-};
+use core::marker::PhantomData;
 
+use esp_hal::system::Cpu;
 #[cfg(esp32)]
 use esp_hal::time::{Duration, Instant};
-use esp_hal::{interrupt::RunLevel, system::Cpu};
 use esp_sync::{NonReentrantMutex, RawMutex};
 
 /// Tracks the number of references to the PHY clock.
@@ -369,85 +366,18 @@ fn is_reset_from_deepsleep() -> bool {
     reason == CORE_DEEP_SLEEP
 }
 
-/// Scheduler mutex that threads wait on while another thread uses the PHY.
-#[doc(hidden)]
-// Public for esp-radio, which owns the scheduler that implements the mutex.
-#[derive(Debug)]
-pub struct PhyMutex {
-    /// Blocks the calling thread until it owns the mutex. The owner may lock it again.
-    pub lock: fn(),
-    /// Releases [PhyMutex::lock].
-    pub unlock: fn(),
-}
+/// Global PHY initialization state
+static PHY_STATE: NonReentrantMutex<PhyState> = NonReentrantMutex::new(PhyState::new());
 
-static PHY_MUTEX: AtomicPtr<PhyMutex> = AtomicPtr::new(core::ptr::null_mut());
-
-/// Install the mutex that threads wait on for the PHY.
-///
-/// Until then, nothing waits. Another context that uses the PHY while it calibrates panics instead.
-#[doc(hidden)]
-// Public for esp-radio, which installs the mutex once the scheduler runs.
-pub fn set_phy_mutex(mutex: &'static PhyMutex) {
-    PHY_MUTEX.store(core::ptr::from_ref(mutex).cast_mut(), Ordering::Release);
-}
-
-/// Whether this context can wait for [PHY_MUTEX]: a thread with interrupts enabled.
-fn can_wait() -> bool {
-    // Xtensa critical sections raise the run level, RISC-V ones clear `mstatus.MIE` (bit 3).
-    RunLevel::current().is_thread()
-        && cfg_select! {
-            riscv => {{
-                let mstatus: u32;
-                unsafe { core::arch::asm!("csrr {0}, mstatus", out(reg) mstatus) };
-                mstatus & (1 << 3) != 0
-            }}
-            _ => true,
-        }
-}
-
-/// Holds [PHY_MUTEX] until dropped, if this context can wait for it.
-struct PhyMutexGuard(Option<&'static PhyMutex>);
-
-impl PhyMutexGuard {
-    fn new() -> Self {
-        // SAFETY: `set_phy_mutex` only stores `'static` references.
-        let mutex = unsafe { PHY_MUTEX.load(Ordering::Acquire).as_ref() }.filter(|_| can_wait());
-        if let Some(mutex) = mutex {
-            (mutex.lock)();
-        }
-        Self(mutex)
-    }
-}
-
-impl Drop for PhyMutexGuard {
-    fn drop(&mut self) {
-        if let Some(mutex) = self.0 {
-            (mutex.unlock)();
-        }
-    }
-}
-
-/// Run `f` with [PHY_MUTEX], [PHY_STATE] and [ESP_PHY_LOCK] held, and interrupts masked.
+/// Run `f` with the PHY state locked.
 ///
 /// # Panics
 ///
 /// See [enable_phy].
-#[doc(hidden)]
-// Public for esp-radio. Calibration borrows modem clocks and restores them afterwards, so esp-radio
-// changes modem clocks under this lock.
-pub fn with_phy_lock<R>(f: impl FnOnce() -> R) -> R {
-    with_phy_state(|_| ESP_PHY_LOCK.lock(f))
-}
-
-/// Global PHY initialization state
-static PHY_STATE: NonReentrantMutex<PhyState> = NonReentrantMutex::new(PhyState::new());
-
-/// Run `f` with [PHY_MUTEX] held and the PHY state locked.
 fn with_phy_state<R>(f: impl FnOnce(&mut PhyState) -> R) -> R {
-    let _mutex = PhyMutexGuard::new();
     PHY_STATE.with(|phy_state| {
         if phy_state.calibrating {
-            panic!("The PHY was used while it calibrates, by a context that cannot wait for it");
+            panic!("The PHY was used while it calibrates");
         }
         f(phy_state)
     })
@@ -485,19 +415,17 @@ impl Drop for PhyInitGuard<'_> {
 /// will involve a full RF calibration, unless you loaded previously backed up calibration
 /// data with [set_phy_calibration_data].
 ///
-/// The first initialization since power-up calibrates the PHY with interrupts enabled. Other
-/// threads that use the PHY meanwhile wait for it, once `esp-radio` has initialized. Wake-up and
-/// shutdown mask interrupts.
+/// The first initialization since power-up calibrates the PHY with interrupts enabled. Nothing
+/// else may use the PHY until the calibration finishes. Wake-up and shutdown mask interrupts.
 ///
 /// # Panics
 ///
-/// Panics if called from an interrupt handler or with interrupts masked while the PHY calibrates.
+/// Panics if another context uses the PHY while it calibrates.
 pub fn enable_phy<'d>() -> PhyInitGuard<'d> {
     // In esp-idf, this is done after calculating the MAC time delta, but it shouldn't make
     // much of a difference.
     let _phy_clock_guard = enable_phy_clock();
 
-    let _mutex = PhyMutexGuard::new();
     if with_phy_state(PhyState::increase_ref_count) {
         let calibration_result = phy_clocks::with_calibration_clocks(PhyState::calibrate);
         PHY_STATE.with(|phy_state| {
@@ -644,12 +572,8 @@ pub fn backup_phy_calibration_data(
 ///
 /// This can be used to know if any previously persisted calibration data is outdated/invalid and
 /// needs to get updated.
-///
-/// # Panics
-///
-/// See [enable_phy].
 pub fn last_calibration_result() -> Option<CalibrationResult> {
-    with_phy_state(|phy_state| {
+    PHY_STATE.with(|phy_state| {
         if phy_state.calibrated {
             Some(
                 if phy_state.calibration_result == sys::include::ESP_CAL_DATA_CHECK_FAIL as i32 {
