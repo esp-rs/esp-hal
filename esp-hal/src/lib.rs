@@ -159,9 +159,9 @@ fn main() -> ! {
 #![doc = ""]
 //! ## Optimization level
 //!
-//! Some operations suspend the caches. The code that runs while the caches are suspended must not
-//! call code in flash. The documentation of each operation with this requirement links to this
-//! section.
+//! Some operations suspend the caches or change the MSPI clocks. The code that runs in that time
+//! must not call code in flash. The documentation of each operation with this requirement links to
+//! this section.
 //!
 //! To use these operations, build esp-hal at `opt-level` 2 or 3 in each profile. At other levels,
 //! the link can fail with `prohibited cross reference from '.rwtext.checked'` and the
