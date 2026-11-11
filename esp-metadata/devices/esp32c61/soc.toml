@@ -37,8 +37,8 @@ has_swd_watchdog = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
-    # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c61/bootloader.ld#L32
-    { name = "dram2_uninit", start = 0x4083_EA70, end = 0x4084_EA70 },
+    # bootloader_iram_loader_seg_start up to SOC_ROM_STACK_START: https://github.com/espressif/esp-idf/blob/v6.1/components/bootloader/subproject/main/ld/esp32c61/bootloader.memory.ld.in
+    { name = "dram2_uninit", start = 0x4083_E670, end = 0x4084_E670 },
     { name = "irom", start = 0x4200_0000, end = 0x4400_0000 },
     { name = "drom", start = 0x4200_0000, end = 0x4400_0000 },
 ] }
