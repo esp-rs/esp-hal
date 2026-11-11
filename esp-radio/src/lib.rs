@@ -181,7 +181,7 @@ use esp_hal as hal;
 #[instability::unstable]
 pub use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi", all(feature = "ble", modem_retention = "backup_dma")))]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
 pub(crate) mod sys {
@@ -239,9 +239,20 @@ mod asynch;
 mod compat;
 #[cfg(any(esp32h4, esp32s31))]
 mod compiler_rt_abi;
+#[cfg(any(
+    all(feature = "ble", any(bt_controller = "btdm", bt_controller = "btdm2")),
+    all(feature = "wifi", feature = "unstable", modem_retention = "backup_dma"),
+))]
+mod counting_lock;
 #[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "btdm2")))]
 mod drop_guard;
 mod interrupt_dispatch;
+#[cfg(all(
+    modem_retention = "backup_dma",
+    feature = "unstable",
+    any(feature = "ble", feature = "wifi"),
+))]
+mod modem_power;
 mod radio_clocks;
 mod refcount;
 mod time;
