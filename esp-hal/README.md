@@ -141,7 +141,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | JPEG Codec                   | ❌     |
 | H.264 encoder                | ❌     |
 | Audio Sample Rate Converter  | ❌     |
-| CORDIC accelerator           | ❌     |
+| CORDIC accelerator           | 🚧     |
 | Voice Activity Detection     | ❌     |
 
 ### [Analog](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#analog)

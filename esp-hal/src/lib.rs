@@ -396,6 +396,8 @@ unstable_driver! {
     pub mod assist_debug;
     #[cfg(canfd_driver_supported)]
     pub mod canfd;
+    #[cfg(cordic_driver_supported)]
+    pub mod cordic;
     pub mod delay;
     #[cfg(ecc_driver_supported)]
     pub mod ecc;

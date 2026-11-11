@@ -188,6 +188,17 @@ system_clocks = { clock_tree = [
         { name = "TX_CLOCK", preset = "CLK" },
       ],
     },
+    # The function clock owns the calculation gate. The peripheral clock owns the bus and reset.
+    { group = "CORDIC", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "(source * denominator) / (divider * denominator + numerator)", params = {
+            source = [
+                { name = "XTAL", outputs = "XTAL_CLK" },
+                { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+                { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
+            ],
+            divider = "1 ..= 256", numerator = "0 ..= 254", denominator = "1 ..= 255",
+        } },
+    ] },
     # Function clocks live in HP_SYS_CLKRST. The divider register stores N - 1.
     { group = "LCD_CAM", clocks = [
         { name = "LCD_CLOCK", type = "generic", wake_locking = true, output = "(sclk * div_a) / (div_num * div_a + div_b)", params = { sclk = [
@@ -271,6 +282,9 @@ peripheral_clocks = { templates = [
     { name = "Ecc", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Sha", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Rsa", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
+    { name = "Cordic", template_params = {
+        rst_en = ".apb_rst_en().bit(reset).sys_rst_en().bit(reset).core_rst_en().bit(reset)",
+    } },
     # Timers
     { name = "Systimer", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}" }, keep_enabled = true },
     { name = "Timg0", template_params = { peripheral = "timergrp0", clk_en = "{{apb_clk}}" }, keep_enabled = true },
