@@ -466,15 +466,27 @@ mod tests {
                     (ClockSource::RcFast, 5_000_000, false),
                 ]
             }}
-            // Half an SCL cycle takes at least 13 cycles of the 80 MHz APB clock.
+            // Half an SCL cycle takes at least 13 cycles of the 80 MHz APB clock, and the
+            // SCL low period has to fit in its 14-bit field.
             i2c_master_version = "1" => [
+                (ClockSource::Apb, 2_441, false),
+                (ClockSource::Apb, 2_442, true),
+                // The setup and hold times are clamped to their 10-bit fields.
+                (ClockSource::Apb, 39_062, true),
                 (ClockSource::Apb, 3_076_923, true),
                 (ClockSource::Apb, 3_076_924, false),
             ],
             // Half an SCL cycle takes at least 3 clock cycles: 80 MHz APB, 1 MHz REF_TICK.
+            // The SCL low period has to fit in its 14-bit field.
             _ => [
+                (ClockSource::Apb, 2_441, false),
+                (ClockSource::Apb, 2_442, true),
+                (ClockSource::Apb, 39_062, true),
                 (ClockSource::Apb, 13_333_333, true),
                 (ClockSource::Apb, 13_333_334, false),
+                (ClockSource::RefTick, 30, false),
+                (ClockSource::RefTick, 31, true),
+                (ClockSource::RefTick, 488, true),
                 (ClockSource::RefTick, 166_666, true),
                 (ClockSource::RefTick, 166_667, false),
             ],
