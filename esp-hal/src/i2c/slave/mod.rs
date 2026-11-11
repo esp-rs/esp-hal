@@ -780,7 +780,11 @@ impl Driver<'_> {
     }
 
     fn release_stretch(&self) {
+        use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
+
         let regs = self.regs();
+        // A preemption between the stretch release and the timeout restart stops timeout detection.
+        let token = unsafe { SingleCoreInterruptLock.enter() };
         // Restart timeout counting when the master regains control of SCL.
         regs.to().modify(|_, w| w.time_out_en().clear_bit());
         self.update_registers();
@@ -794,6 +798,7 @@ impl Driver<'_> {
             .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
         regs.to().modify(|_, w| w.time_out_en().set_bit());
         self.update_registers();
+        unsafe { SingleCoreInterruptLock.exit(token) };
     }
 
     fn recover(&self) {
@@ -867,11 +872,11 @@ impl Driver<'_> {
                         || (previous_bytes > 0 && (next_write_byte || !addressed)))));
 
         // A following request's timeout must not discard a completed write.
-        if let Some(error) = error {
-            if error != Error::Timeout || !write_ended {
-                self.recover();
-                return Some(Err(error));
-            }
+        if let Some(error) = error
+            && (error != Error::Timeout || !write_ended)
+        {
+            self.recover();
+            return Some(Err(error));
         }
 
         if wait_for_ack {
@@ -947,11 +952,11 @@ impl Driver<'_> {
         let ints = regs.int_raw().read();
 
         // A later timeout must not replace a completed read.
-        if let Some(error) = error {
-            if error != Error::Timeout || ints.nack().bit_is_clear() {
-                self.recover();
-                return Some(Err(error));
-            }
+        if let Some(error) = error
+            && (error != Error::Timeout || ints.nack().bit_is_clear())
+        {
+            self.recover();
+            return Some(Err(error));
         }
 
         if ints.nack().bit_is_set()
