@@ -2805,11 +2805,13 @@ impl Default for ControllerConfig {
 
 impl ControllerConfig {
     fn validate(&self) {
-        if self.rx_ba_win as u16 >= self.dynamic_rx_buf_num {
-            warn!("RX BA window size should be less than the number of dynamic RX buffers.");
+        if self.rx_ba_win as u16 > self.dynamic_rx_buf_num {
+            warn!("RX BA window size should not be larger than the number of dynamic RX buffers.");
         }
-        if self.rx_ba_win as u16 >= 2 * (self.static_rx_buf_num as u16) {
-            warn!("RX BA window size should be less than twice the number of static RX buffers.");
+        if self.rx_ba_win as u16 > 2 * (self.static_rx_buf_num as u16) {
+            warn!(
+                "RX BA window size should not be larger than twice the number of static RX buffers."
+            );
         }
         let tx_buf_num = if crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE == 0 {
             self.static_tx_buf_num as usize
