@@ -116,7 +116,7 @@ pub(crate) fn set_station_state(state: WifiStationState) {
 /// Wi-Fi state that only code under [`locked`] accesses.
 pub(crate) struct State {
     #[cfg(wifi_tx_retry)]
-    pub(super) pending_tx: Option<alloc::boxed::Box<super::tx_retry::PendingTxFrame>>,
+    pub(super) pending_tx: super::tx_retry::PendingTxFrame,
 }
 
 struct StateCell(UnsafeCell<State>);
@@ -128,7 +128,7 @@ static LOCK: LazyLock<SemaphoreHandle> =
     LazyLock::new(|| SemaphoreHandle::new(SemaphoreKind::Mutex));
 static STATE: StateCell = StateCell(UnsafeCell::new(State {
     #[cfg(wifi_tx_retry)]
-    pending_tx: None,
+    pending_tx: super::tx_retry::PendingTxFrame::new(),
 }));
 
 #[inline(never)]

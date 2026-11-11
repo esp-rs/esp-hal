@@ -1384,10 +1384,7 @@ fn release_inflight_slot() {
 
 #[cfg(wifi_tx_retry)]
 mod tx_retry {
-    use alloc::{
-        alloc::{Layout, alloc_zeroed},
-        boxed::Box,
-    };
+    use alloc::boxed::Box;
 
     use portable_atomic::AtomicBool;
 
@@ -1397,26 +1394,28 @@ mod tx_retry {
     pub(super) struct PendingTxFrame {
         mode: InterfaceType,
         len: usize,
-        data: [u8; MTU],
+        data: Option<Box<[u8; MTU]>>,
+    }
+
+    impl PendingTxFrame {
+        pub(super) const fn new() -> Self {
+            Self {
+                mode: InterfaceType::Station,
+                len: 0,
+                data: None,
+            }
+        }
     }
 
     pub(super) fn init() -> Result<(), WifiError> {
         state::locked(|state| {
-            let slot = &mut state.pending_tx;
+            let slot = &mut state.pending_tx.data;
             if slot.is_none() {
-                const { core::assert!(core::mem::size_of::<PendingTxFrame>() > 0) };
-                // SAFETY: `PendingTxFrame` is non-zero-sized because `MTU > 0`.
-                let ptr = unsafe { alloc_zeroed(Layout::new::<PendingTxFrame>()) }
-                    .cast::<PendingTxFrame>();
-                if ptr.is_null() {
-                    return Err(WifiError::OutOfMemory);
-                }
-                // SAFETY: `ptr` is valid, aligned, and `len` and `data` are valid when zeroed.
-                let boxed = unsafe {
-                    (&raw mut (*ptr).mode).write(InterfaceType::Station);
-                    Box::from_raw(ptr)
-                };
-                *slot = Some(boxed);
+                let mut buf = Vec::new();
+                buf.try_reserve_exact(MTU)
+                    .map_err(|_| WifiError::OutOfMemory)?;
+                buf.resize(MTU, 0);
+                *slot = buf.try_into().ok();
             }
             Ok(())
         })
@@ -1430,18 +1429,14 @@ mod tx_retry {
     /// Sends a frame. If the driver has no free memory, keeps the frame in `pending`.
     ///
     /// The caller must hold the `state::locked` lock.
-    pub(super) fn send_frame(
-        pending: &mut Option<Box<PendingTxFrame>>,
-        mode: InterfaceType,
-        data: &mut [u8],
-    ) {
+    pub(super) fn send_frame(pending: &mut PendingTxFrame, mode: InterfaceType, data: &mut [u8]) {
         if send_data_locked(mode, data) {
             return;
         }
 
         if !PENDING.load(Ordering::Relaxed)
-            && let Some(pending) = pending.as_deref_mut()
-            && let Some(dst) = pending.data.get_mut(..data.len())
+            && let Some(buf) = pending.data.as_deref_mut()
+            && let Some(dst) = buf.get_mut(..data.len())
         {
             pending.mode = mode;
             pending.len = data.len();
@@ -1472,13 +1467,14 @@ mod tx_retry {
                 return true;
             }
 
-            let Some(frame) = state.pending_tx.as_deref_mut() else {
+            let frame = &mut state.pending_tx;
+            let Some(buf) = frame.data.as_deref_mut() else {
                 PENDING.store(false, Ordering::Relaxed);
                 return true;
             };
 
             WIFI_TX_INFLIGHT.fetch_add(1, Ordering::SeqCst);
-            if send_data_locked(frame.mode, &mut frame.data[..frame.len.min(MTU)]) {
+            if send_data_locked(frame.mode, &mut buf[..frame.len.min(MTU)]) {
                 PENDING.store(false, Ordering::Relaxed);
                 true
             } else {
@@ -1489,9 +1485,9 @@ mod tx_retry {
     }
 
     /// The caller must hold the `state::locked` lock.
-    pub(super) fn deinit(pending: &mut Option<Box<PendingTxFrame>>) {
+    pub(super) fn deinit(pending: &mut PendingTxFrame) {
         PENDING.store(false, Ordering::Relaxed);
-        *pending = None;
+        pending.data = None;
     }
 }
 
