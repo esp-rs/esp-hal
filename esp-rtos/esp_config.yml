@@ -2,7 +2,8 @@ crate: esp-rtos
 
 options:
   - name: tick_rate_hz
-    description: "Tick rate of the task scheduler in Hertz"
+    description: "Time slice rate in Hertz. Tasks sharing the same priority take turns, each running for 1/tick_rate_hz seconds.
+      There is no periodic tick: slicing only happens while another task of equal priority is ready"
     default:
       - value: 100
     constraints:
