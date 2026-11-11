@@ -88,7 +88,7 @@ pub(crate) fn disable_core1() {
     supports_cpu_power_down,
     feature = "rt"
 ))]
-#[crate::ram(unstable(cache_suspend_safe))]
+#[crate::ram(unstable(checked))]
 pub(crate) fn restart_core1_after_wake() {
     if Cpu::current() != Cpu::ProCpu {
         return;

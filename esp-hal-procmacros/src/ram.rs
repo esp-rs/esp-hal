@@ -9,7 +9,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let mut rtc_fast = false;
     let mut rtc_slow = false;
-    let mut cache_suspend_safe = false;
+    let mut checked = false;
     let mut dram2_uninit = false;
     let mut dcache_reclaimed = false;
     let mut persistent = false;
@@ -40,7 +40,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                             let arg = match ident {
                                 i if i == "rtc_fast" => &mut rtc_fast,
                                 i if i == "rtc_slow" => &mut rtc_slow,
-                                i if i == "cache_suspend_safe" => &mut cache_suspend_safe,
+                                i if i == "checked" => &mut checked,
                                 i if i == "persistent" => &mut persistent,
                                 i if i == "dcache_reclaimed" => &mut dcache_reclaimed,
                                 i if i == "zeroed" => &mut zeroed,
@@ -162,7 +162,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let options = [
         (rtc_fast, "rtc_fast"),
         (rtc_slow, "rtc_slow"),
-        (cache_suspend_safe, "cache_suspend_safe"),
+        (checked, "checked"),
         (dram2_uninit, "reclaimed"),
         (dcache_reclaimed, "dcache_reclaimed"),
         (uncached, "uncached"),
@@ -178,7 +178,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         (true, []) => Ok(".rwtext.ram"),
         (true, ["rtc_fast"]) => Ok(".rtc_fast.text.ram"),
         (true, ["rtc_slow"]) => Ok(".rtc_slow.text.ram"),
-        (true, ["cache_suspend_safe"]) => Ok(".rwtext.cache_suspend_safe"),
+        (true, ["checked"]) => Ok(".rwtext.checked"),
 
         (false, []) => Ok(".data"),
         (false, ["reclaimed"]) => Ok(".dram2_uninit"),
@@ -356,7 +356,31 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_suspend_safe_text() {
+    fn test_checked_text() {
+        let result = ram(
+            quote::quote! {
+                unstable(checked)
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ::core::concat!(".rwtext.checked.", ::core::module_path!(), ".", "foo"))]
+                #[inline (never)]
+                fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_cache_suspend_safe_is_unknown() {
         let result = ram(
             quote::quote! {
                 unstable(cache_suspend_safe)
@@ -371,19 +395,17 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ::core::concat!(".rwtext.cache_suspend_safe.", ::core::module_path!(), ".", "foo"))]
-                #[inline (never)]
-                fn foo () { }
+                ::core::compile_error!{ "Unknown unstable argument `cache_suspend_safe`" }
             }
             .to_string()
         );
     }
 
     #[test]
-    fn test_cache_suspend_safe_naked() {
+    fn test_checked_naked() {
         let result = ram(
             quote::quote! {
-                unstable(cache_suspend_safe)
+                unstable(checked)
             }
             .into(),
             quote::quote! {
@@ -396,7 +418,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                #[unsafe (link_section = ::core::concat!(".rwtext.cache_suspend_safe.", ::core::module_path!(), ".", "foo"))]
+                #[unsafe (link_section = ::core::concat!(".rwtext.checked.", ::core::module_path!(), ".", "foo"))]
                 #[unsafe(naked)]
                 extern "C" fn foo () { }
             }
@@ -405,10 +427,10 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_suspend_safe_static() {
+    fn test_checked_static() {
         let result = ram(
             quote::quote! {
-                unstable(cache_suspend_safe)
+                unstable(checked)
             }
             .into(),
             quote::quote! {

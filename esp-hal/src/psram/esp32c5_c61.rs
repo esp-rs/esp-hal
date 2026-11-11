@@ -90,6 +90,7 @@ mod chip {
         }
     }
 
+    #[inline(always)]
     pub(super) fn core_clock_for_mode(_speed_mode: MspiTimingSpeedMode) -> u32 {
         // in all cases (low and high speed) we use an MSPI clock of 80 MHz on this target
         80
@@ -187,6 +188,11 @@ use chip::{core_clock_for_mode, enable_cache_buses, mspi_timing_ll_set_core_cloc
 pub use tuning::MspiTimingTuningParam;
 
 /// PSRAM configuration
+///
+/// [`Psram::new`](super::Psram::new) runs the PSRAM start-up, which changes the MSPI clocks. An
+/// interrupt handler in flash must not run in that time, so `Psram::new` must be called before any
+/// interrupt is enabled. See [Optimization level](crate#optimization-level) for the build
+/// requirement.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PsramConfig {
@@ -209,7 +215,56 @@ pub struct PsramConfig {
 /// Initializes PSRAM to be used for data.
 #[procmacros::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
-    quad::psram_init(config);
+    // The register setters keep only the bits of each field, so a value out of range must fail
+    // here, before the MSPI timing changes. The start-up writes the values only when the PSRAM
+    // frequency needs timing tuning.
+    #[cfg(psram_has_timing_tuning)]
+    if config.ram_frequency.need_timing_tuning() {
+        for param in [config.flash_tuning, config.ram_tuning] {
+            assert!(param.spi_din_mode <= 7);
+            assert!(param.spi_din_num <= 3);
+        }
+    }
+
+    // The flash and PSRAM frequency while the start-up changes the timing.
+    const LOW_SPEED_MHZ: u32 = 20;
+
+    // The division and its assertion have panic paths in flash, so the clock register values are
+    // calculated before the start-up changes the MSPI clocks.
+    let low_speed = clock_reg(
+        LOW_SPEED_MHZ,
+        MspiTimingSpeedMode::MspiTimingSpeedModeLowPerf,
+    );
+    let flash = clock_reg(
+        config.flash_frequency.mhz(),
+        MspiTimingSpeedMode::MspiTimingSpeedModeNormalPerf,
+    );
+    let psram = clock_reg(
+        config.ram_frequency.mhz(),
+        MspiTimingSpeedMode::MspiTimingSpeedModeNormalPerf,
+    );
+    match quad::psram_init(config, low_speed, flash, psram) {
+        quad::ChipId::NotRead => {}
+        quad::ChipId::Unknown(id) => {
+            warn!(
+                "Unknown PSRAM chip ID: {:x}. PSRAM chip not found or not supported. Check if ESP_HAL_CONFIG_PSRAM_MODE is configured correctly.",
+                id
+            );
+            return true;
+        }
+        quad::ChipId::Known { id, density, size } => {
+            info!("Detected PSRAM chip id = {:x}", id);
+            info!("Detected PSRAM chip density = {}", density);
+            info!("PSRAM size is {}", size);
+        }
+    }
+
+    info!(
+        "PSRAM clock {} MHz, flash clock {} MHz",
+        config.ram_frequency.mhz(),
+        config.flash_frequency.mhz()
+    );
+
     true
 }
 
@@ -370,16 +425,19 @@ mod ctrlr_ll {
     }
 }
 
-#[ram]
-fn mspi_timing_config_set_flash_clock(flash_freq_mhz: u32, speed_mode: quad::MspiTimingSpeedMode) {
-    let core_clock_mhz = core_clock_for_mode(speed_mode);
-    // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
-    mspi_timing_ll_set_core_clock(core_clock_mhz);
-
-    let freqdiv: u32 = core_clock_mhz / flash_freq_mhz;
-    debug!("flash freqdiv: {}", freqdiv);
+/// Returns the clock register value that divides the MSPI core clock of `speed_mode` to
+/// `freq_mhz`.
+fn clock_reg(freq_mhz: u32, speed_mode: MspiTimingSpeedMode) -> u32 {
+    let freqdiv: u32 = core_clock_for_mode(speed_mode) / freq_mhz;
     assert!(freqdiv > 0);
-    let reg_val: u32 = mspi_timing_ll_calculate_clock_reg(freqdiv);
+    mspi_timing_ll_calculate_clock_reg(freqdiv)
+}
+
+#[ram(unstable(checked))]
+fn mspi_timing_config_set_flash_clock(reg_val: u32, speed_mode: MspiTimingSpeedMode) {
+    // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
+    mspi_timing_ll_set_core_clock(core_clock_for_mode(speed_mode));
+
     mspi_timing_ll_set_flash_clock(0, reg_val);
     mspi_timing_ll_set_flash_clock(1, reg_val);
 }
@@ -408,18 +466,12 @@ fn mspi_timing_ll_set_flash_clock(mspi_id: u32, clock_conf: u32) {
     }
 }
 
-#[ram]
-fn mspi_timing_config_set_psram_clock(psram_freq_mhz: u32, speed_mode: quad::MspiTimingSpeedMode) {
+#[ram(unstable(checked))]
+fn mspi_timing_config_set_psram_clock(reg_val: u32, speed_mode: MspiTimingSpeedMode) {
     // bool control_both_mspi = true
-    let core_clock_mhz = core_clock_for_mode(speed_mode);
-
     // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
-    mspi_timing_ll_set_core_clock(core_clock_mhz);
+    mspi_timing_ll_set_core_clock(core_clock_for_mode(speed_mode));
 
-    let freqdiv: u32 = core_clock_mhz / psram_freq_mhz;
-    debug!("psram freqdiv: {}", freqdiv);
-    assert!(freqdiv > 0);
-    let reg_val: u32 = mspi_timing_ll_calculate_clock_reg(freqdiv);
     mspi_timing_ll_set_psram_clock(reg_val);
 }
 
@@ -462,7 +514,7 @@ mod tuning {
     #[inline(always)]
     pub(crate) fn mspi_timing_ll_set_flash_din_mode(mspi_id: u8, din_mode: u8) {
         assert!(mspi_id == 0);
-        assert!(din_mode <= 7);
+        // `din_mode` must be at most 7. `init_psram` validates it before the MSPI timing changes.
 
         SPI0::regs().din_mode().modify(|_, w| {
             unsafe {
@@ -489,7 +541,7 @@ mod tuning {
     #[inline(always)]
     pub(crate) fn mspi_timing_ll_set_flash_din_num(mspi_id: u8, din_num: u8) {
         assert!(mspi_id == 0);
-        assert!(din_num <= 3);
+        // `din_num` must be at most 3. `init_psram` validates it before the MSPI timing changes.
 
         SPI0::regs().din_num().modify(|_, w| {
             unsafe {
@@ -538,7 +590,7 @@ mod tuning {
     #[inline(always)]
     pub(crate) fn mspi_timing_ll_set_psram_din_mode(mspi_id: u8, din_mode: u8) {
         assert!(mspi_id == 0);
-        assert!(din_mode <= 7);
+        // `din_mode` must be at most 7. `init_psram` validates it before the MSPI timing changes.
 
         SPI0::regs().smem_din_mode().modify(|_, w| {
             unsafe {
@@ -565,7 +617,7 @@ mod tuning {
     #[inline(always)]
     pub(crate) fn mspi_timing_ll_set_psram_din_num(mspi_id: u8, din_num: u8) {
         assert!(mspi_id == 0);
-        assert!(din_num <= 3);
+        // `din_num` must be at most 3. `init_psram` validates it before the MSPI timing changes.
 
         SPI0::regs().smem_din_num().modify(|_, w| {
             unsafe {
@@ -602,47 +654,5 @@ mod tuning {
         SPI0::regs()
             .timing_cali()
             .modify(|_, w| w.update().set_bit());
-    }
-
-    /// Returns the MSPI flash dummy info.
-    #[inline(always)]
-    pub(crate) fn mspi_timing_ll_get_flash_dummy(mspi_id: u8) -> (u8, u8) {
-        assert!(mspi_id <= 1);
-
-        if mspi_id == 0 {
-            let usr_dummy = SPI0::regs().user1().read().usr_dummy_cyclelen().bits();
-            let extra_dummy = SPI0::regs()
-                .timing_cali()
-                .read()
-                .extra_dummy_cyclelen()
-                .bits();
-            (usr_dummy, extra_dummy)
-        } else {
-            let usr_dummy = SPI1::regs().user1().read().usr_dummy_cyclelen().bits();
-            let extra_dummy = SPI1::regs()
-                .timing_cali()
-                .read()
-                .extra_dummy_cyclelen()
-                .bits();
-            (usr_dummy, extra_dummy)
-        }
-    }
-
-    /// Returns the MSPI PSRAM dummy info.
-    #[inline(always)]
-    pub(crate) fn mspi_timing_ll_get_psram_dummy(mspi_id: u8) -> (u8, u8) {
-        assert!(mspi_id == 0);
-
-        let usr_dummy = SPI0::regs()
-            .cache_sctrl()
-            .read()
-            .sram_rdummy_cyclelen()
-            .bits();
-        let extra_dummy = SPI0::regs()
-            .smem_timing_cali()
-            .read()
-            .smem_extra_dummy_cyclelen()
-            .bits();
-        (usr_dummy, extra_dummy)
     }
 }
