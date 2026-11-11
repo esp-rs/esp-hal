@@ -8,7 +8,7 @@
 #![no_main]
 
 use embassy_executor::Spawner;
-use embassy_futures::join::join;
+use embassy_futures::{join::join, select::select};
 use embassy_time::{Duration, Timer};
 use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
 use esp_radio::ble::controller::BleConnector;
@@ -65,15 +65,13 @@ async fn main(_spawner: Spawner) {
     run_peripheral(controller).await;
 }
 
-async fn run_peripheral<C>(controller: C)
-where
-    C: Controller,
-{
+async fn run_peripheral(controller: ExternalController<BleConnector<'static>, 1>) {
     let address = Address::random(PERIPHERAL_ADDRESS);
 
     let mut resources: HostResources<DefaultPacketPool, 1, 2> = HostResources::new();
     let stack = trouble_host::new(controller, &mut resources)
         .set_random_address(address)
+        .register_l2cap_spsm(hil_test::ble::L2CAP_PSM)
         .build();
     let mut peripheral = stack.peripheral();
     let runner = stack.runner();
@@ -88,7 +86,11 @@ where
         loop {
             match advertise(&mut peripheral, &server).await {
                 Ok(conn) => {
-                    gatt_events_task(&server, &conn).await;
+                    select(
+                        gatt_events_task(&server, &conn),
+                        send_l2cap_data(&stack, conn.raw()),
+                    )
+                    .await;
                 }
                 Err(_) => Timer::after(Duration::from_millis(100)).await,
             }
@@ -155,4 +157,38 @@ async fn gatt_events_task<P: PacketPool>(server: &Server<'_>, conn: &GattConnect
             _ => {}
         }
     }
+}
+
+/// Sends `L2CAP_BYTES` on the first L2CAP channel the central opens.
+async fn send_l2cap_data(
+    stack: &Stack<'_, ExternalController<BleConnector<'static>, 1>, DefaultPacketPool>,
+    conn: &Connection<'_, DefaultPacketPool>,
+) {
+    let Ok(mut channel) = L2capChannel::listen(stack, conn)
+        .accept(&Default::default())
+        .await
+    else {
+        return core::future::pending().await;
+    };
+    // 2120 µs is the maximum LE packet time.
+    if conn
+        .update_data_length(stack, hil_test::ble::DATA_LENGTH, 2120)
+        .await
+        .is_ok()
+    {
+        let mut sent = 0;
+        while sent < hil_test::ble::L2CAP_BYTES {
+            let mut sdu = [0; 240];
+            let len = sdu.len().min(hil_test::ble::L2CAP_BYTES - sent);
+            for (i, byte) in sdu[..len].iter_mut().enumerate() {
+                *byte = hil_test::ble::l2cap_byte(sent + i);
+            }
+            if channel.send(stack, &sdu[..len]).await.is_err() {
+                break;
+            }
+            sent += len;
+        }
+    }
+    // Keep the channel open until disconnect, so the central receives everything.
+    core::future::pending().await
 }
