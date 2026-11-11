@@ -122,21 +122,7 @@ SECTIONS {
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
 
     INCLUDE "esp_hal_rwtext.x"
-
-    *( .wifi0iram  .wifi0iram.*)
-    *( .wifirxiram  .wifirxiram.*)
-    *( .wifislprxiram  .wifislprxiram.*)
-    *( .wifislpiram  .wifislpiram.*)
-    *( .phyiram  .phyiram.*)
-    *( .iram1  .iram1.*)
-    *( .wifiextrairam.* )
-    *( .coexiram.* )
-    *( .high_perf_code_iram* )
-    *( .coexsleepiram* )
-    *( .wifiorslpiram* )
-    *( .isr_iram* )
-    *( .conn_iram* )
-    *( .sleep_iram* )
+    INCLUDE "esp_hal_rwtext_radio.x"
     . = ALIGN(4);
     _rwtext_end = .;
   } > RWTEXT
@@ -267,23 +253,7 @@ SECTIONS {
      flash at plus its flash offset. */
   .text IROM_BASE + ALIGN(LOADADDR(.rtc_slow.data) + SIZEOF(.rtc_slow.data), 16) : AT(ALIGN(LOADADDR(.rtc_slow.data) + SIZEOF(.rtc_slow.data), 16))
   {
-    /* The Espressif blobs (esp-wifi-sys / esp-phy / BT) are GCC-compiled and emit per-function
-       `.literal.<f>` paired with `.text.<f>` within each object file. Pulling each archive in as a
-       single block keeps every function's literal pool within L32R reach of its own code. */
-    *libpp.a:(.literal .text .literal.* .text.*)
-    *libnet80211.a:(.literal .text .literal.* .text.*)
-    *libwpa_supplicant.a:(.literal .text .literal.* .text.*)
-    *libmesh.a:(.literal .text .literal.* .text.*)
-    *libsmartconfig.a:(.literal .text .literal.* .text.*)
-    *libphy.a:(.literal .text .literal.* .text.*)
-    *libcoexist.a:(.literal .text .literal.* .text.*)
-    *libcore.a:(.literal .text .literal.* .text.*)
-    *libregulatory.a:(.literal .text .literal.* .text.*)
-    *libespnow.a:(.literal .text .literal.* .text.*)
-    *libwapi.a:(.literal .text .literal.* .text.*)
-    *libprintf.a:(.literal .text .literal.* .text.*)
-    *libbtdm_app.a:(.literal .text .literal.* .text.*)
-    *libbtbb.a:(.literal .text .literal.* .text.*)
+    INCLUDE "esp_hal_text_radio.x"
 
     /* Bare `.literal` holds the `global_asm!` literal pools of the boot code; keep their
        consumers right behind it. */

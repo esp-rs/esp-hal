@@ -8,6 +8,7 @@ SECTIONS {
     KEEP(*(.init));
     KEEP(*(.init.rust));
     KEEP(*(.text.abort));
+    INCLUDE "esp_hal_text_radio.x"
     *(.literal .text .literal.* .text.*)
     . = ALIGN(4);
   } > ROTEXT

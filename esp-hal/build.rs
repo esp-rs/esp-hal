@@ -190,6 +190,9 @@ fn copy_dir_all(
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> Result<(), Box<dyn Error>> {
+    // The per-file directives miss files added to the directory.
+    println!("cargo:rerun-if-changed={}", src.as_ref().display());
+
     fs::create_dir_all(&dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;

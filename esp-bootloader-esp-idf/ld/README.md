@@ -27,11 +27,15 @@ name with them:
 - `esp_hal_rwtext.x` / `esp_hal_rwdata.x`: input sections that esp-hal's configuration places in
   RAM. They contain input section descriptions only.
 - `esp_hal_rwtext_sections.x`: output sections in `RWTEXT` that esp-hal defines.
+- `esp_hal_rwtext_radio.x` / `esp_hal_text_radio.x`: input sections of the Espressif radio blobs
+  that go in RAM and in flash. They contain input section descriptions only.
 
 A bootloader support crate provides `linkall.x`, which must:
 
 - `INCLUDE "esp_hal_config.x"` before `MEMORY`, `INCLUDE "hal-defaults.x"`, and include
-  `esp_hal_rwtext.x` inside `.rwtext` and `esp_hal_rwdata.x` inside `.data`.
+  `esp_hal_rwtext.x` inside `.rwtext` and `esp_hal_rwdata.x` inside `.data`. Include
+  `esp_hal_rwtext_radio.x` in an output section in `RWTEXT` before `_rwtext_end`, and
+  `esp_hal_text_radio.x` inside `.text` before its catch-all.
 - Include `esp_hal_rwtext_sections.x` inside `SECTIONS`, after `_rwtext_start` and in front of the
   output section that holds `*(.rwtext.*)`. Derive sizes and addresses from `_rwtext_len` and from
   the crate's own sections, not from a sum of section sizes, so that new esp-hal sections need no

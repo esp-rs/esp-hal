@@ -11,6 +11,9 @@ extern "C" fn __esp_bootloader_init() {
     #[cfg(esp32h4)]
     enable_bbpll_clocks();
 
+    #[cfg(esp32p4)]
+    switch_to_dcdc();
+
     unlock_flash();
 }
 
@@ -78,6 +81,96 @@ fn enable_bbpll_clocks() {
         w.hp_active_xpd_bbpll().set_bit();
         w.hp_active_xpd_bbpll_i2c().set_bit()
     });
+}
+
+/// The ROM leaves the HP domain on its LDO at the uncalibrated reset voltage. esp-hal leaves the
+/// eFuse-calibrated regulator voltages and turning on the DCDC converter to the bootloader, and
+/// runs the CPU at up to 400 MHz on top of them.
+///
+/// See <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32p4/rtc_clk_init.c#L58-L88>.
+/// See <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32p4/pmu_param.c#L332-L373>.
+#[cfg(esp32p4)]
+#[inline(always)]
+fn switch_to_dcdc() {
+    use esp_hal::{
+        efuse::{self, ChipRevision},
+        peripherals::{LP_SYS, PMU},
+    };
+
+    const HP_CALI_ACTIVE_DBIAS_DEFAULT: u8 = 24;
+    const LP_CALI_ACTIVE_DBIAS_DEFAULT: u8 = 29;
+    const HP_CALI_ACTIVE_DCM_VSET_DEFAULT: u8 = 27;
+    const DCDC_STARTUP_TIME_US: u32 = 1000;
+
+    // ESP-IDF reads the voltage calibration only from block version 0.2 on, and not on 1.0.
+    let (blk_major, blk_minor) = efuse::block_version();
+    let calibrated = (blk_major, blk_minor) >= (0, 2) && (blk_major, blk_minor) != (1, 0);
+    let (hp_cali, lp_cali) = if calibrated {
+        (
+            efuse::read_field_le::<u8>(efuse::ACTIVE_HP_DBIAS),
+            efuse::read_field_le::<u8>(efuse::ACTIVE_LP_DBIAS),
+        )
+    } else {
+        (0, 0)
+    };
+    let hp_dbias = match hp_cali {
+        0 => HP_CALI_ACTIVE_DBIAS_DEFAULT,
+        cali => (cali + 16).min(31),
+    };
+    // The LP calibration is 4 steps lower than the DCDC voltage.
+    let lp_dbias = match lp_cali {
+        0 => LP_CALI_ACTIVE_DBIAS_DEFAULT,
+        cali => (cali + 16 + 4).min(31),
+    };
+    let fb_res_workaround = efuse::chip_revision() >= ChipRevision::from_combined(301);
+
+    let pmu = PMU::regs();
+    pmu.hp_active_hp_regulator0().modify(|_, w| unsafe {
+        w.hp_active_hp_regulator_xpd().set_bit();
+        w.hp_active_hp_regulator_dbias().bits(hp_dbias)
+    });
+    // The LP_ACTIVE mode registers are the `hp_sleep_lp_*` group.
+    pmu.hp_sleep_lp_regulator0()
+        .modify(|_, w| unsafe { w.hp_sleep_lp_regulator_dbias().bits(lp_dbias) });
+
+    let dcm_vset = pmu
+        .hp_active_hp_regulator0()
+        .read()
+        .hp_dbias_vol()
+        .bits()
+        .max(HP_CALI_ACTIVE_DCM_VSET_DEFAULT);
+
+    if fb_res_workaround {
+        pmu.dcm_ctrl()
+            .modify(|_, w| w.dcdc_fb_res_force_pd().set_bit());
+    }
+    pmu.dcm_ctrl().modify(|_, w| {
+        w.dcdc_done_force().clear_bit();
+        w.dcdc_on_req().set_bit()
+    });
+    pmu.power_dcdc_switch().modify(|_, w| {
+        w.force_dcdc_switch_pu().clear_bit();
+        w.force_dcdc_switch_pd().clear_bit()
+    });
+    pmu.hp_active_bias()
+        .modify(|_, w| unsafe { w.hp_active_dcm_vset().bits(dcm_vset) });
+    // Hands the regulator voltage over to the PMU.
+    pmu.hp_active_hp_regulator0()
+        .modify(|_, w| w.dig_regulator0_dbias_sel().set_bit());
+    esp_rom_sys::rom::ets_delay_us(DCDC_STARTUP_TIME_US);
+
+    if fb_res_workaround {
+        // Bit 4 clear selects the digital feedback resistor instead of the analog one.
+        LP_SYS::regs()
+            .sys_ctrl()
+            .modify(|_, w| unsafe { w.lp_fib_sel().bits(0xEF) });
+        pmu.dcm_ctrl()
+            .modify(|_, w| w.dcdc_fb_res_force_pd().clear_bit());
+        esp_rom_sys::rom::ets_delay_us(10);
+    }
+
+    pmu.hp_active_hp_regulator0()
+        .modify(|_, w| w.hp_active_hp_regulator_xpd().clear_bit());
 }
 
 /// esp-hal's flash driver writes without clearing the write protection bits of the flash chip.
