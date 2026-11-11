@@ -1,5 +1,9 @@
 use super::*;
-use crate::{rtc_cntl::WakeLock, soc::clocks::ClockTree};
+use crate::{
+    asynch::{wait_until, wake_at},
+    rtc_cntl::WakeLock,
+    soc::clocks::ClockTree,
+};
 
 #[cfg_attr(i2c_master_version = "1", path = "v1.rs")]
 #[cfg_attr(i2c_master_version = "2", path = "v2.rs")]
@@ -112,8 +116,10 @@ impl core::future::Future for I2cFuture<'_> {
 
         let result = self.poll_completion();
 
-        if result.is_pending() && self.deadline.is_some() {
-            ctx.waker().wake_by_ref();
+        if result.is_pending()
+            && let Some(deadline) = self.deadline
+        {
+            wake_at(deadline, ctx);
         }
 
         result
@@ -559,14 +565,9 @@ impl Driver<'_> {
 
     async fn clear_bus(&self) {
         let clear_bus = ClearBusFuture::new(*self, true);
-        let start = Instant::now();
+        let deadline = Instant::now() + CLEAR_BUS_TIMEOUT_MS;
 
-        embassy_futures::select::select(clear_bus, async {
-            while start.elapsed() < CLEAR_BUS_TIMEOUT_MS {
-                embassy_futures::yield_now().await;
-            }
-        })
-        .await;
+        embassy_futures::select::select(clear_bus, wait_until(deadline)).await;
     }
 
     pub(super) fn force_scl_low(&self, low: bool) {

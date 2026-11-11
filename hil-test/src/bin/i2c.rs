@@ -2,6 +2,8 @@
 
 //% CHIP_FILTER: i2c_master_driver_supported
 //% FEATURES: unstable embassy
+//% FEATURES(busy_poll):
+//% FEATURES(embassy_time): esp-hal/embassy-time-05
 
 #![no_std]
 #![no_main]
