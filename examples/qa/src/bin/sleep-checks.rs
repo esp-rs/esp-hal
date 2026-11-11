@@ -69,8 +69,8 @@ const SLEEP_LENGTH: Duration = Duration::from_millis(20);
 /// The number of PSRAM words that use one seed.
 const SLICE_WORDS: usize = 16 * 1024;
 
-/// The seed of the PSRAM pattern. Each slice adds the slice number to the seed. A read that returns
-/// the data of a different slice fails the check.
+/// The seed of the PSRAM pattern. Each check puts its number in the high bits, and each slice adds
+/// its number. A read that returns the data of a different check or slice fails the check.
 const PSRAM_SEED: u32 = 0x6C07_8965;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -163,6 +163,9 @@ struct Board<'d> {
     rtc: Rtc<'d>,
     lpwr: LowPower<'d>,
     psram: &'static mut [u32],
+    /// The seed of the current check's PSRAM pattern. PSRAM must hold other data before the fill,
+    /// or a sleep that loses the writes still leaves the expected pattern.
+    seed: u32,
     #[cfg(supports_cpu_power_down)]
     retention_installed: bool,
     #[cfg(multi_core)]
@@ -180,7 +183,7 @@ fn fill_psram(board: &mut Board<'_>) {
         board.rtc.rwdt.feed();
         for (i, word) in slice.iter_mut().enumerate() {
             unsafe {
-                core::ptr::write_volatile(word, pattern(i, PSRAM_SEED.wrapping_add(n as u32)))
+                core::ptr::write_volatile(word, pattern(i, board.seed.wrapping_add(n as u32)))
             };
         }
     }
@@ -190,7 +193,7 @@ fn check_psram(board: &mut Board<'_>) -> Result<(), &'static str> {
     let mut failed = false;
     for (n, slice) in board.psram.chunks(SLICE_WORDS).enumerate() {
         board.rtc.rwdt.feed();
-        let seed = PSRAM_SEED.wrapping_add(n as u32);
+        let seed = board.seed.wrapping_add(n as u32);
         let bad = slice
             .iter()
             .enumerate()
@@ -407,6 +410,7 @@ fn main() -> ! {
         rtc,
         lpwr: LowPower::new(peripherals.LPWR),
         psram,
+        seed: PSRAM_SEED,
         #[cfg(supports_cpu_power_down)]
         retention_installed: false,
         #[cfg(multi_core)]
@@ -426,6 +430,8 @@ fn main() -> ! {
 
         PROGRESS.store(progress);
         board.rtc.rwdt.feed();
+        // The slice number takes the low bits.
+        board.seed = PSRAM_SEED ^ ((progress.next as u32 + 1) << 20);
         report!("RUN {}", check.name);
         match (check.run)(&mut board) {
             Ok(()) => {
