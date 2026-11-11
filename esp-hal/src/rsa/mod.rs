@@ -33,7 +33,12 @@ use crate::{
     pac,
     peripherals::RSA,
     rtc_cntl::WakeLock,
-    system::{CryptoClockGuard, GenericPeripheralGuard, Peripheral as PeripheralEnable},
+    system::{
+        CryptoClockGuard,
+        GenericPeripheralGuard,
+        Peripheral as PeripheralEnable,
+        PeripheralClockControl,
+    },
     trm_markdown_link,
     work_queue::{self, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
@@ -41,6 +46,8 @@ use crate::{
 /// RSA peripheral driver.
 pub struct Rsa<'d, Dm: DriverMode> {
     rsa: RSA<'d>,
+    // RSA configuration registers cannot be read reliably while an operation is in progress.
+    config: Config,
     phantom: PhantomData<Dm>,
     _guard: RsaGuard,
 }
@@ -163,15 +170,16 @@ impl<'d> Rsa<'d, Blocking> {
     ///
     /// Optionally an interrupt handler can be bound.
     pub fn new(rsa: RSA<'d>, config: Config) -> Result<Self, ConfigError> {
-        let mut this = Self {
+        let this = Self {
             rsa,
+            config,
             phantom: PhantomData,
             _guard: RsaGuard::new(),
         };
 
         while !this.ready() {}
 
-        this.apply_config(&config)?;
+        this.write_config(&this.config);
         Ok(this)
     }
 
@@ -182,6 +190,7 @@ impl<'d> Rsa<'d, Blocking> {
 
         Rsa {
             rsa: self.rsa,
+            config: self.config,
             phantom: PhantomData,
             _guard: self._guard,
         }
@@ -215,6 +224,24 @@ impl crate::interrupt::InterruptConfigurable for Rsa<'_, Blocking> {
 }
 
 impl<'d> Rsa<'d, Async> {
+    fn abort(&mut self) {
+        let mut reset = || {
+            PeripheralClockControl::reset(PeripheralEnable::Rsa);
+            while !self.ready() {}
+            self.clear_interrupt();
+        };
+
+        cfg_select! {
+            rsa_version = "1" => SIGNALED.with(|signaled| {
+                // Serialize reset with the interrupt handler's completion register access.
+                reset();
+                *signaled = false;
+            }),
+            _ => reset(),
+        }
+        self.write_config(&self.config);
+    }
+
     /// Reconfigures the RSA driver to operate in [`Blocking`] mode.
     pub fn into_blocking(self) -> Rsa<'d, Blocking> {
         self.internal_enable_disable_interrupt(false);
@@ -222,6 +249,7 @@ impl<'d> Rsa<'d, Async> {
 
         Rsa {
             rsa: self.rsa,
+            config: self.config,
             phantom: PhantomData,
             _guard: self._guard,
         }
@@ -372,11 +400,12 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
     /// For more information on the options, refer to the
     #[doc = trm_markdown_link!("rsa")]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.config = *config;
         self.write_config(config);
         Ok(())
     }
 
-    fn write_config(&mut self, _config: &Config) {
+    fn write_config(&self, _config: &Config) {
         #[cfg(not(rsa_version = "1"))]
         {
             self.regs()
@@ -386,16 +415,6 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
                 .search_enable()
                 .write(|w| w.search_enable().bit(_config.search_acceleration));
         }
-    }
-
-    /// Returns whether the search functionality is enabled in the RSA hardware.
-    #[cfg(not(rsa_version = "1"))]
-    fn is_search_enabled(&mut self) -> bool {
-        self.regs()
-            .search_enable()
-            .read()
-            .search_enable()
-            .bit_is_set()
     }
 
     /// Sets the search position in the RSA hardware.
@@ -490,7 +509,7 @@ where
         self.rsa.write_mprime(self.m_prime);
 
         #[cfg(not(rsa_version = "1"))]
-        if self.rsa.is_search_enabled() {
+        if self.rsa.config.search_acceleration {
             self.rsa
                 .write_search_position(Self::find_search_pos(self.exponent));
         }
@@ -670,20 +689,24 @@ static WAKER: AtomicWaker = AtomicWaker::new();
 #[cfg(rsa_version = "1")]
 static SIGNALED: NonReentrantMutex<bool> = NonReentrantMutex::new(false);
 
-/// `Future` that waits for the RSA operation to complete.
+/// An in-flight RSA operation.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct RsaFuture<'a, 'd> {
-    driver: &'a Rsa<'d, Async>,
+    driver: &'a mut Rsa<'d, Async>,
+    finished: bool,
     _wake_lock: WakeLock,
 }
 
 impl<'a, 'd> RsaFuture<'a, 'd> {
-    fn new(driver: &'a Rsa<'d, Async>) -> Self {
+    fn start(driver: &'a mut Rsa<'d, Async>, start: impl FnOnce(&Rsa<'d, Async>)) -> Self {
+        let wake_lock = WakeLock::new();
         driver.internal_enable_disable_interrupt(true);
+        start(driver);
 
         Self {
             driver,
-            _wake_lock: WakeLock::new(),
+            finished: false,
+            _wake_lock: wake_lock,
         }
     }
 
@@ -698,6 +721,11 @@ impl<'a, 'd> RsaFuture<'a, 'd> {
 impl Drop for RsaFuture<'_, '_> {
     fn drop(&mut self) {
         self.driver.internal_enable_disable_interrupt(false);
+        if self.finished {
+            self.driver.clear_interrupt();
+        } else {
+            self.driver.abort();
+        }
     }
 }
 
@@ -705,11 +733,12 @@ impl core::future::Future for RsaFuture<'_, '_> {
     type Output = ();
 
     fn poll(
-        self: core::pin::Pin<&mut Self>,
+        mut self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> core::task::Poll<Self::Output> {
         WAKER.register(cx.waker());
         if self.is_done() {
+            self.finished = true;
             Poll::Ready(())
         } else {
             Poll::Pending
@@ -722,6 +751,11 @@ where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Asynchronously performs an RSA modular exponentiation operation.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Dropping a pending future aborts the operation and leaves `outbuf` unchanged.
+    /// You can retry the operation.
     pub async fn exponentiation(
         &mut self,
         base: &T::InputType,
@@ -729,9 +763,7 @@ where
         outbuf: &mut T::InputType,
     ) {
         self.set_up_exponentiation(base, r);
-        let fut = RsaFuture::new(self.rsa);
-        self.rsa.start_modexp();
-        fut.await;
+        RsaFuture::start(self.rsa, Rsa::start_modexp).await;
         self.rsa.read_out(outbuf);
     }
 }
@@ -741,6 +773,11 @@ where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Asynchronously performs an RSA modular multiplication operation.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Dropping a pending future aborts the operation and leaves `outbuf` unchanged.
+    /// You can retry the operation.
     pub async fn modular_multiplication(
         &mut self,
         operand_b: &T::InputType,
@@ -749,17 +786,13 @@ where
         self.set_up_modular_multiplication();
         cfg_select! {
             rsa_version = "1" => {
-                let fut = RsaFuture::new(self.rsa);
-                self.rsa.start_multi();
-                fut.await;
+                RsaFuture::start(self.rsa, Rsa::start_multi).await;
                 self.rsa.write_operand_a(operand_b);
             }
             _ => self.rsa.write_operand_b(operand_b),
         }
 
-        let fut = RsaFuture::new(self.rsa);
-        self.rsa.start_modmulti();
-        fut.await;
+        RsaFuture::start(self.rsa, Rsa::start_modmulti).await;
         self.rsa.read_out(outbuf);
     }
 }
@@ -769,6 +802,11 @@ where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Asynchronously performs an RSA multiplication operation.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Dropping a pending future aborts the operation and leaves `outbuf` unchanged.
+    /// You can retry the operation.
     pub async fn multiplication<const O: usize>(
         &mut self,
         operand_b: &T::InputType,
@@ -777,9 +815,7 @@ where
         T: Multi<OutputType = [u32; O]>,
     {
         self.set_up_multiplication(operand_b);
-        let fut = RsaFuture::new(self.rsa);
-        self.rsa.start_multi();
-        fut.await;
+        RsaFuture::start(self.rsa, Rsa::start_multi).await;
         self.rsa.read_out(outbuf);
     }
 }
@@ -925,6 +961,7 @@ impl<'d> RsaBackend<'d> {
             RsaBackendState::Idle => {
                 let driver = Rsa {
                     rsa: unsafe { self.peri.clone_unchecked() },
+                    config: Config::default(),
                     phantom: PhantomData,
                     _guard: RsaGuard::new(),
                 };
