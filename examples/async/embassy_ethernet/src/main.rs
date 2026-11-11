@@ -45,7 +45,7 @@ use embassy_net::{
     dns::DnsSocket,
     tcp::client::{TcpClient, TcpClientState},
 };
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, Timer, with_timeout};
 use esp_alloc as _;
 use esp_backtrace as _;
 cfg_select! {
@@ -214,28 +214,35 @@ async fn main(spawner: Spawner) {
     let dns_client = DnsSocket::new(stack);
 
     loop {
+        stack.wait_link_up().await;
+        stack.wait_config_up().await;
+
         Timer::after(Duration::from_millis(1000)).await;
 
-        let mut client = HttpClient::new(&tcp_client, &dns_client);
-        let mut rx_buf = [0u8; 4096];
+        let result = with_timeout(Duration::from_secs(10), async {
+            let mut client = HttpClient::new(&tcp_client, &dns_client);
+            let mut rx_buf = [0u8; 4096];
 
-        let builder = client
-            .request(Method::GET, "http://httpbin.org/get?hello=Hello+esp-hal")
-            .await
-            .unwrap();
+            let mut builder = client
+                .request(Method::GET, "http://httpbin.org/get?hello=Hello+esp-hal")
+                .await?
+                .headers(&[("Host", "httpbin.org"), ("Connection", "close")]);
 
-        let mut builder = builder.headers(&[("Host", "httpbin.org"), ("Connection", "close")]);
-
-        let response = builder.send(&mut rx_buf).await.unwrap();
-
-        match response.body().read_to_end().await {
-            Ok(data) => {
-                if let Ok(st) = core::str::from_utf8(data) {
-                    println!("Body: {}", st);
-                }
+            let response = builder.send(&mut rx_buf).await?;
+            let data = response.body().read_to_end().await?;
+            if let Ok(st) = core::str::from_utf8(data) {
+                println!("Body: {}", st);
             }
-            Err(e) => println!("Body error: {:?}", e),
+            Ok::<_, reqwless::Error>(())
+        })
+        .await;
+
+        match result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => println!("HTTP error: {:?}", e),
+            Err(_) => println!("HTTP request timed out"),
         }
+
         Timer::after(Duration::from_millis(3000)).await;
     }
 }
