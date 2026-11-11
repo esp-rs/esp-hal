@@ -3,9 +3,10 @@
 //! A CPU reaches its own CLINT through one alias, and the CLINT of the other CPU through
 //! another alias. The machine software interrupt therefore carries the call in both directions.
 
+use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use portable_atomic::Ordering;
 
-use super::{CoreState, STATE};
+use super::runtime::{CoreState, STATE};
 use crate::{
     interrupt::{CpuInterrupt, Priority},
     peripherals::{CLINT, CLINT_OTHER_CORE},
@@ -16,6 +17,9 @@ use crate::{
 const CLINT_INTERRUPT: CpuInterrupt = CpuInterrupt::Interrupt3;
 
 pub(super) fn raise(core: Cpu) {
+    // An unpinned task can move to the other CPU between the read of the current CPU and the
+    // write to the CLINT alias.
+    let token = unsafe { SingleCoreInterruptLock.enter() };
     if core == Cpu::current() {
         CLINT::regs()
     } else {
@@ -23,6 +27,7 @@ pub(super) fn raise(core: Cpu) {
     }
     .msip()
     .write(|w| w.msip().set_bit());
+    unsafe { SingleCoreInterruptLock.exit(token) };
 }
 
 /// Installs the IPC interrupt handler of the PRO CPU.
@@ -62,7 +67,7 @@ fn install_core(core: Cpu) {
 
 /// Handles the IPC interrupt of one CPU.
 ///
-/// The handler clears the request, runs the posted function, then jumps to the context-switch
+/// The handler clears the request, runs the posted requests, then jumps to the context-switch
 /// handler. It borrows `ra`, `t0`, and `t1` only. `t0` goes to `mscratch`. That CSR is free,
 /// because the hardware clears `mstatus.MIE` on trap entry, and nothing here enables
 /// interrupts again.
@@ -87,10 +92,10 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         lw   t0, {request}(t1)
         sw   zero, 0(t0)
 
-        # The callback returns here, so it runs first. A CPU rarely has one, so the callback
-        # runs out of line: a taken branch costs two cycles, and the context switch that the
+        # The posted requests return here, so they run first. A CPU rarely has one, so they
+        # run out of line: a taken branch costs two cycles, and the context switch that the
         # scheduler asks for on every yield must not pay them.
-        lw   t0, {callback}(t1)
+        lw   t0, {head}(t1)
         bnez t0, 3f
 
     1:
@@ -108,9 +113,9 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         mret
 
     3:
-        # `callback_handler` takes the callback from `t1`, and may clobber `ra`, `t0` and `t1`.
+        # `drain_handler` takes the state from `t1`, and may clobber `ra`, `t0` and `t1`.
         sw   ra, 4(sp)
-        la   t0, {callback_handler}
+        la   t0, {drain_handler}
         jalr ra, 0(t0)
         lw   ra, 4(sp)
         la   t1, {state} + {base}
@@ -118,14 +123,14 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         ",
         state = sym STATE,
         base = const CORE * size_of::<CoreState>(),
-        callback = const core::mem::offset_of!(CoreState, callback),
+        head = const core::mem::offset_of!(CoreState, lists.head),
         pending_context_switch = const core::mem::offset_of!(CoreState, pending_context_switch),
         request = const core::mem::offset_of!(CoreState, request),
-        callback_handler = sym callback_handler,
+        drain_handler = sym drain_handler,
     )
 }
 
-/// Runs the posted function of one CPU, then returns to [`ipc_handler`].
+/// Runs the posted requests of one CPU, then returns to [`ipc_handler`].
 ///
 /// `t1` holds the address of the `CoreState` of the CPU. This function saves the registers
 /// that the RISC-V calling convention lets the callee clobber, except `ra`, `t0`, and `t1`,
@@ -137,7 +142,7 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
 )]
 #[cfg_attr(interrupt_controller = "clic", unsafe(link_section = ".rwtext"))]
 #[unsafe(naked)]
-unsafe extern "C" fn callback_handler() {
+unsafe extern "C" fn drain_handler() {
     core::arch::naked_asm!(
         "
         addi sp, sp, -64
@@ -156,8 +161,8 @@ unsafe extern "C" fn callback_handler() {
         sw   a6, 48(sp)
         sw   a7, 52(sp)
 
-        lw   t0, {callback}(t1)
-        sw   zero, {callback}(t1)
+        mv   a0, t1
+        la   t0, {drain}
         jalr ra, 0(t0)
 
         lw   ra, 0(sp)
@@ -177,6 +182,18 @@ unsafe extern "C" fn callback_handler() {
         addi sp, sp, 64
         ret
         ",
-        callback = const core::mem::offset_of!(CoreState, callback),
+        drain = sym drain_current_core,
     )
+}
+
+/// Runs the queued requests of the current CPU.
+///
+/// `func` of a request runs with `mstatus.MIE` clear, and the interrupted `t0` in `mscratch`.
+#[cfg_attr(
+    not(interrupt_controller = "clic"),
+    unsafe(link_section = ".trap.rust")
+)]
+#[cfg_attr(interrupt_controller = "clic", unsafe(link_section = ".rwtext"))]
+extern "C" fn drain_current_core(state: &CoreState) {
+    unsafe { super::queue::drain(&state.lists, crate::system::raw_core() as u32) };
 }

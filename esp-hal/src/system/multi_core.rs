@@ -82,6 +82,9 @@ pub(crate) static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::pt
 /// ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the APP core is parked during
 /// such an operation, the next cache operation on the PRO core waits forever. Make sure that the
 /// APP core does no DMA or cache operation before you drop this guard.
+///
+/// The parked APP core runs no [IPC requests][crate::interrupt::ipc::IpcRequest]. A request that
+/// the APP core posted or took at the park can stay busy.
 #[must_use = "Dropping this guard will park the APP core"]
 #[instability::unstable]
 pub struct AppCoreGuard<'a> {
@@ -167,6 +170,8 @@ impl<'d> CpuControl<'d> {
     /// ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the core is parked during
     /// such an operation, the next cache operation on the other core waits forever. Make sure that
     /// the parked core does no DMA or cache operation when you call this function.
+    ///
+    /// IPC requests to the parked core run after [`Self::unpark_core`].
     ///
     /// # Safety
     ///
@@ -528,6 +533,9 @@ cfg_select! {
         #[unsafe(export_name = "esp_hal_app_core_starting")]
         fn app_core_starting() {
             APP_CORE_TAKES_IPC.store(false, Ordering::Release);
+            // Posts to the APP core return `Offline` after the store, so no post adds a request
+            // to the APP core while this call fails the requests that the APP core did not run.
+            unsafe { crate::interrupt::ipc::fail_stranded(Cpu::AppCpu) };
         }
 
         /// Lets the APP core take IPC interrupts. The APP core calls this function after it

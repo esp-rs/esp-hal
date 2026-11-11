@@ -23,7 +23,7 @@ use super::{
     save_pre_critical,
 };
 use crate::{
-    interrupt::ipc::Ipc,
+    interrupt::ipc::{Ipc, IpcRequest},
     peripherals::{IPC, LPWR},
     rtc_cntl::sleep::{LowPower, RtcSleepConfig, SleepKind},
     soc::cpu_control,
@@ -131,9 +131,7 @@ pub(crate) fn engage() -> bool {
     // An APP CPU that asked for a sleep waits for it with interrupts disabled, and reads the phase
     // itself. It could not take the doorbell anyway.
     if !app_cpu_waits {
-        // Only this function posts to the APP CPU, so the post merges with a pending doorbell
-        // instead of waiting for it.
-        Ipc::new(unsafe { IPC::steal() }).call_function(Cpu::AppCpu, helper_entry);
+        let _ = Ipc::new(unsafe { IPC::steal() }).post(Cpu::AppCpu, &HELPER);
     }
 
     let deadline = raw_time::raw_counter() + raw_time::us_to_ticks(ANSWER_TIMEOUT_US);
@@ -197,8 +195,7 @@ pub(crate) fn sleep_from_app_cpu(config: RtcSleepConfig) {
                     // configuration.
                     unsafe { (*SLEEP_CONFIG.0.get()).write(config) };
                     if swap_phase(Phase::Idle, Phase::Wanted) {
-                        // Only this function posts to the PRO CPU, so the post never waits.
-                        Ipc::new(unsafe { IPC::steal() }).call_function(Cpu::ProCpu, kick_entry);
+                        let _ = Ipc::new(unsafe { IPC::steal() }).post(Cpu::ProCpu, &KICK);
                         deadline = Some(
                             raw_time::raw_counter() + raw_time::us_to_ticks(ANSWER_TIMEOUT_US),
                         );
@@ -225,9 +222,15 @@ pub(crate) fn sleep_from_app_cpu(config: RtcSleepConfig) {
     }
 }
 
+/// Asks the PRO CPU to run [`kick_entry`].
+static KICK: IpcRequest = IpcRequest::new(kick_entry);
+
+/// Asks the APP CPU to run [`helper_entry`].
+static HELPER: IpcRequest = IpcRequest::new(helper_entry);
+
 /// Takes the request of the APP CPU, and requests the sleep for it.
 #[crate::ram]
-fn kick_entry() {
+extern "C" fn kick_entry() {
     // The answer of `can_sleep` holds for the whole sleep, so nothing may give this core work
     // between the two.
     let irq_token = unsafe { SingleCoreInterruptLock.enter() };
@@ -249,7 +252,7 @@ fn kick_entry() {
 
 /// Takes the doorbell of the PRO CPU.
 #[crate::ram]
-fn helper_entry() {
+extern "C" fn helper_entry() {
     // The answer of `can_sleep` holds for the whole sleep, so nothing may give this core work
     // between the two.
     let irq_token = unsafe { SingleCoreInterruptLock.enter() };

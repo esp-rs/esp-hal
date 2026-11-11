@@ -159,8 +159,8 @@ impl MultiCoreStrategy {
     /// # Safety
     ///
     /// The other core must not fetch instructions or data from flash during any
-    /// operation, including reads. Flash-backed caches are unavailable while
-    /// an operation runs.
+    /// operation, including reads. This also applies to the IPC requests that run on
+    /// that core. Flash-backed caches are unavailable while an operation runs.
     #[instability::unstable]
     pub const unsafe fn ignore() -> Self {
         Self::Ignore(IgnoreMarker { _private: () })
@@ -864,10 +864,10 @@ impl ParkGuard {
                             }
                             // A core that `CpuControl` did not start has no IPC handler. It can
                             // run ROM code, which a CPU-control stall does not break.
-                            if other == crate::system::Cpu::ProCpu
-                                || crate::system::multi_core::app_core_takes_ipc()
+                            if (other == crate::system::Cpu::ProCpu
+                                || crate::system::multi_core::app_core_takes_ipc())
+                                && ipc_stall::enter(other)
                             {
-                                ipc_stall::enter(other);
                                 release = Release::Ipc;
                             } else {
                                 let mut cpu_ctrl = crate::system::CpuControl::new(unsafe {
@@ -915,7 +915,12 @@ mod ipc_stall {
     use portable_atomic::{AtomicU8, Ordering};
     use procmacros::ram;
 
-    use crate::private::DropGuard;
+    use crate::{
+        interrupt::ipc::{Ipc, IpcError, IpcRequest},
+        peripherals::IPC,
+        private::DropGuard,
+        system::Cpu,
+    };
 
     // `stall` runs with the caches suspended. An `atomic_enum` load can panic, and the panic code
     // is in flash, so the phase is a plain `u8`.
@@ -932,11 +937,25 @@ mod ipc_stall {
 
     static PHASE: AtomicU8 = AtomicU8::new(Phase::Idle as u8);
 
-    pub(super) fn enter(core: crate::system::Cpu) {
-        crate::interrupt::ipc::Ipc.call_function(core, stall);
+    static STALL: [IpcRequest; Cpu::COUNT] = [const { IpcRequest::new(stall) }; Cpu::COUNT];
+
+    /// Stalls `core` in [`stall`], and returns `false` if `core` does not take IPC interrupts.
+    pub(super) fn enter(core: Cpu) -> bool {
+        let ipc = Ipc::new(unsafe { IPC::steal() });
+        match ipc.post(core, &STALL[core as usize]) {
+            Ok(_) => {}
+            Err(IpcError::Offline) => return false,
+            Err(error) => {
+                // Each request has one target.
+                debug_assert!(false, "Posting the flash stall failed: {:?}", error);
+                return false;
+            }
+        }
+
         while PHASE.load(Ordering::Acquire) != Phase::Ack as u8 {
             core::hint::spin_loop();
         }
+        true
     }
 
     pub(super) fn leave() {
@@ -947,7 +966,7 @@ mod ipc_stall {
     }
 
     #[ram(unstable(cache_suspend_safe))]
-    fn stall() {
+    extern "C" fn stall() {
         {
             // The mask is taken before `Phase::Ack`. The guards drop after the cache is on again.
             let token = unsafe { SingleCoreInterruptLock.enter() };
