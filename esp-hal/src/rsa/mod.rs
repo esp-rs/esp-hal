@@ -447,17 +447,21 @@ pub mod operand_sizes {
 /// Support for the RSA peripheral's modular exponentiation feature that could be
 /// used to find the `(base ^ exponent) mod modulus`.
 ///
-/// Each operand is a little endian byte array of the same size.
+/// Operands are equal-length arrays of `u32` words, least significant word first.
 pub struct RsaModularExponentiation<'a, 'd, T: RsaMode, Dm: DriverMode> {
     rsa: &'a mut Rsa<'d, Dm>,
-    phantom: PhantomData<T>,
+    exponent: &'a T::InputType,
+    modulus: &'a T::InputType,
+    m_prime: u32,
 }
 
 impl<'a, 'd, T: RsaMode, Dm: DriverMode, const N: usize> RsaModularExponentiation<'a, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    /// Creates an instance of `RsaModularExponentiation`.
+    /// Creates a new modular exponentiation operation.
+    ///
+    /// Borrows `exponent` and `modulus` for as long as this object is in use.
     ///
     /// `m_prime` could be calculated using `-(modular multiplicative inverse of
     /// modulus) mod 2^32`.
@@ -466,27 +470,31 @@ where
     #[doc = trm_markdown_link!("rsa")]
     pub fn new(
         rsa: &'a mut Rsa<'d, Dm>,
-        exponent: &T::InputType,
-        modulus: &T::InputType,
+        exponent: &'a T::InputType,
+        modulus: &'a T::InputType,
         m_prime: u32,
     ) -> Self {
-        Self::write_mode(rsa);
-        rsa.write_operand_b(exponent);
-        rsa.write_modulus(modulus);
-        rsa.write_mprime(m_prime);
-
-        #[cfg(not(rsa_version = "1"))]
-        if rsa.is_search_enabled() {
-            rsa.write_search_position(Self::find_search_pos(exponent));
-        }
-
         Self {
             rsa,
-            phantom: PhantomData,
+            exponent,
+            modulus,
+            m_prime,
         }
     }
 
     fn set_up_exponentiation(&mut self, base: &T::InputType, r: &T::InputType) {
+        self.rsa
+            .write_modexp_mode(N as u32 / WORDS_PER_INCREMENT - 1);
+        self.rsa.write_operand_b(self.exponent);
+        self.rsa.write_modulus(self.modulus);
+        self.rsa.write_mprime(self.m_prime);
+
+        #[cfg(not(rsa_version = "1"))]
+        if self.rsa.is_search_enabled() {
+            self.rsa
+                .write_search_position(Self::find_search_pos(self.exponent));
+        }
+
         self.rsa.write_operand_a(base);
         self.rsa.write_r(r);
     }
@@ -521,24 +529,22 @@ where
         }
         0
     }
-
-    /// Sets the modular exponentiation mode for the RSA hardware.
-    fn write_mode(rsa: &mut Rsa<'d, Dm>) {
-        rsa.write_modexp_mode(N as u32 / WORDS_PER_INCREMENT - 1);
-    }
 }
 
 /// Support for the RSA peripheral's modular multiplication feature that could be
 /// used to find the `(operand a * operand b) mod modulus`.
 ///
-/// Each operand is a little endian byte array of the same size.
+/// Operands are equal-length arrays of `u32` words, least significant word first.
 pub struct RsaModularMultiplication<'a, 'd, T, Dm>
 where
     T: RsaMode,
     Dm: DriverMode,
 {
     rsa: &'a mut Rsa<'d, Dm>,
-    phantom: PhantomData<T>,
+    operand_a: &'a T::InputType,
+    modulus: &'a T::InputType,
+    r: &'a T::InputType,
+    m_prime: u32,
 }
 
 impl<'a, 'd, T, Dm, const N: usize> RsaModularMultiplication<'a, 'd, T, Dm>
@@ -546,7 +552,9 @@ where
     T: RsaMode<InputType = [u32; N]>,
     Dm: DriverMode,
 {
-    /// Creates an instance of `RsaModularMultiplication`.
+    /// Creates a new modular multiplication operation.
+    ///
+    /// Borrows `operand_a`, `modulus`, and `r` for as long as this object is in use.
     ///
     /// - `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
     /// - `m_prime` can be calculated using `-(modular multiplicative inverse of modulus) mod 2^32`.
@@ -555,22 +563,27 @@ where
     #[doc = trm_markdown_link!("rsa")]
     pub fn new(
         rsa: &'a mut Rsa<'d, Dm>,
-        operand_a: &T::InputType,
-        modulus: &T::InputType,
-        r: &T::InputType,
+        operand_a: &'a T::InputType,
+        modulus: &'a T::InputType,
+        r: &'a T::InputType,
         m_prime: u32,
     ) -> Self {
-        rsa.write_multi_mode(N as u32 / WORDS_PER_INCREMENT - 1, true);
-
-        rsa.write_mprime(m_prime);
-        rsa.write_modulus(modulus);
-        rsa.write_operand_a(operand_a);
-        rsa.write_r(r);
-
         Self {
             rsa,
-            phantom: PhantomData,
+            operand_a,
+            modulus,
+            r,
+            m_prime,
         }
+    }
+
+    fn set_up_modular_multiplication(&mut self) {
+        self.rsa
+            .write_multi_mode(N as u32 / WORDS_PER_INCREMENT - 1, true);
+        self.rsa.write_mprime(self.m_prime);
+        self.rsa.write_modulus(self.modulus);
+        self.rsa.write_operand_a(self.operand_a);
+        self.rsa.write_r(self.r);
     }
 
     /// Starts the modular multiplication operation.
@@ -578,7 +591,15 @@ where
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
     pub fn start_modular_multiplication(&mut self, operand_b: &T::InputType) {
-        self.set_up_modular_multiplication(operand_b);
+        self.set_up_modular_multiplication();
+        cfg_select! {
+            rsa_version = "1" => {
+                self.rsa.start_multi();
+                self.rsa.wait_for_idle();
+                self.rsa.write_operand_a(operand_b);
+            }
+            _ => self.rsa.write_operand_b(operand_b),
+        }
         self.rsa.start_modmulti();
     }
 
@@ -590,30 +611,19 @@ where
     pub fn read_results(&mut self, outbuf: &mut T::InputType) {
         self.rsa.read_results(outbuf);
     }
-
-    fn set_up_modular_multiplication(&mut self, operand_b: &T::InputType) {
-        if cfg!(rsa_version = "1") {
-            self.rsa.start_multi();
-            self.rsa.wait_for_idle();
-
-            self.rsa.write_operand_a(operand_b);
-        } else {
-            self.rsa.write_operand_b(operand_b);
-        }
-    }
 }
 
 /// Support for the RSA peripheral's large number multiplication feature that could
 /// be used to find the `operand a * operand b`.
 ///
-/// Each operand is a little endian byte array of the same size.
+/// Operands are equal-length arrays of `u32` words, least significant word first.
 pub struct RsaMultiplication<'a, 'd, T, Dm>
 where
     T: RsaMode + Multi,
     Dm: DriverMode,
 {
     rsa: &'a mut Rsa<'d, Dm>,
-    phantom: PhantomData<T>,
+    operand_a: &'a T::InputType,
 }
 
 impl<'a, 'd, T, Dm, const N: usize> RsaMultiplication<'a, 'd, T, Dm>
@@ -622,16 +632,11 @@ where
     T: Multi,
     Dm: DriverMode,
 {
-    /// Creates an instance of `RsaMultiplication`.
-    pub fn new(rsa: &'a mut Rsa<'d, Dm>, operand_a: &T::InputType) -> Self {
-        // Non-modular multiplication result is twice as wide as its operands.
-        rsa.write_multi_mode(2 * N as u32 / WORDS_PER_INCREMENT - 1, false);
-        rsa.write_operand_a(operand_a);
-
-        Self {
-            rsa,
-            phantom: PhantomData,
-        }
+    /// Creates a new multiplication operation.
+    ///
+    /// Borrows `operand_a` for as long as this object is in use.
+    pub fn new(rsa: &'a mut Rsa<'d, Dm>, operand_a: &'a T::InputType) -> Self {
+        Self { rsa, operand_a }
     }
 
     /// Starts the multiplication operation.
@@ -653,6 +658,10 @@ where
     }
 
     fn set_up_multiplication(&mut self, operand_b: &T::InputType) {
+        // Non-modular multiplication result is twice as wide as its operands.
+        self.rsa
+            .write_multi_mode(2 * N as u32 / WORDS_PER_INCREMENT - 1, false);
+        self.rsa.write_operand_a(self.operand_a);
         self.rsa.write_multi_operand_b(operand_b);
     }
 }
@@ -737,14 +746,15 @@ where
         operand_b: &T::InputType,
         outbuf: &mut T::InputType,
     ) {
-        if cfg!(rsa_version = "1") {
-            let fut = RsaFuture::new(self.rsa);
-            self.rsa.start_multi();
-            fut.await;
-
-            self.rsa.write_operand_a(operand_b);
-        } else {
-            self.set_up_modular_multiplication(operand_b);
+        self.set_up_modular_multiplication();
+        cfg_select! {
+            rsa_version = "1" => {
+                let fut = RsaFuture::new(self.rsa);
+                self.rsa.start_multi();
+                fut.await;
+                self.rsa.write_operand_a(operand_b);
+            }
+            _ => self.rsa.write_operand_b(operand_b),
         }
 
         let fut = RsaFuture::new(self.rsa);

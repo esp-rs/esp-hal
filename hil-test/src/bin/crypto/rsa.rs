@@ -268,6 +268,11 @@ mod tests {
         );
         let r = compute_r(&BIGNUM_3);
         mod_exp
+            .exponentiation(U512::ONE.as_words(), r.as_words(), &mut outbuf)
+            .await;
+        hil_test::assert_eq!(*U512::ONE.as_words(), outbuf);
+
+        mod_exp
             .exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf)
             .await;
         hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
