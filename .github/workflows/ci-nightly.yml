@@ -98,8 +98,6 @@ jobs:
       TEMPLATE_SWEEP: >-
         --all-combinations
         --exclude-group module
-        --exclude-category editor
-        --exclude-category optional
         --exclude-category toolchain
         --cross-group base-template
     strategy:

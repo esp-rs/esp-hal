@@ -488,8 +488,6 @@ jobs:
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       TEMPLATE_SWEEP: >-
-        --exclude-category editor
-        --exclude-category optional
         --exclude-category toolchain
         --cross-group base-template
     steps:

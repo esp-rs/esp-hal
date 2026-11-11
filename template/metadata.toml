@@ -32,17 +32,5 @@ emit = [
   { path = ".cargo/config.toml.in",         as = ".cargo/config.toml" },
   { path = ".gitignore.in",                 as = ".gitignore" },
 
-  { path = ".github/workflows/rust_ci.yml", when = 'option("ci")' },
-  { path = ".helix/languages.toml",         when = 'option("helix")' },
-  { path = ".nvim.lua",                     when = 'group_selected("neovim")' },
-  { path = ".vscode/extensions.json",       when = 'option("vscode")' },
-  { path = ".vscode/launch.json",           when = 'option("vscode")' },
-  { path = ".vscode/settings.json",         when = 'option("vscode")' },
-  { path = ".vscode/tasks.json",            when = 'option("vscode")' },
-  { path = ".zed/settings.json",            when = 'option("zed")' },
-  { path = "CODING_AGENT_GUIDANCE.md",      when = 'group_selected("coding-agent-guidance")', as = "{{ coding_agent_guidance_file }}" },
-  { path = "Embed.toml",                    when = 'option("cargo-embed")' },
-  { path = "diagram.json",                  when = 'option("wokwi")' },
   { path = "tests/hello_test.rs",           when = 'option("embedded-test")' },
-  { path = "wokwi.toml",                    when = 'option("wokwi")' },
 ]
