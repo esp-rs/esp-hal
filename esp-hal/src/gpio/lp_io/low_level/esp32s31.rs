@@ -2,6 +2,7 @@
 use crate::gpio::lp_io::{LpInputSignal, LpOutputSignal};
 use crate::{
     gpio::{GPIO_LOCK, LpPin, lp_io::LpFunction},
+    pac::lp_io_mux::gpio::W,
     peripherals::{LP_GPIO, LP_IO_MUX, LP_PERI, LP_SYS},
 };
 
@@ -77,16 +78,43 @@ pub(crate) fn set_config(lp: u8, input_enable: bool, mux: bool, func: LpFunction
         });
     });
 
-    LP_IO_MUX::regs().gpio(lp as usize).modify(|_, w| unsafe {
-        w.slp_sel().bit(false);
-        w.fun_ie().bit(input_enable);
-        w.mcu_sel().bits(func as u8)
+    LP_IO_MUX::regs().gpio(lp as usize).modify(|_, w| {
+        configure_iomux(w, input_enable, func);
+        w
     });
+}
+
+fn configure_iomux(w: &mut W, input_enable: bool, func: LpFunction) {
+    w.slp_sel().clear_bit();
+    w.fun_ie().bit(input_enable);
+    unsafe { w.mcu_sel().bits(func as u8) };
 }
 
 pub(crate) fn init_pin(lp: u8, input_enable: bool) -> u8 {
     set_config(lp, input_enable, true, LpFunction::LP_GPIO);
     lp
+}
+
+#[cfg(all(dac_version = "2", feature = "unstable"))]
+pub(crate) fn init_analog(lp: u8) {
+    enable_io_clock();
+    output_enable(lp, false);
+    // Disconnect peripheral output and output-enable signals from the pad.
+    LP_GPIO::regs().func_out_sel_cfg(lp as usize).reset();
+    LP_IO_MUX::regs().gpio(lp as usize).modify(|_, w| {
+        configure_iomux(w, false, LpFunction::LP_GPIO);
+        w.fun_wpu().clear_bit();
+        w.fun_wpd().clear_bit()
+    });
+
+    // Release the hold with the LP pad configuration ready.
+    let mask = 1u8 << lp;
+    GPIO_LOCK.lock(|| {
+        LP_SYS::regs().padctrl().modify(|r, w| unsafe {
+            w.pad_mux_sel().bits(r.pad_mux_sel().bits() | mask);
+            w.pad_hold().bits(r.pad_hold().bits() & !mask)
+        });
+    });
 }
 
 pub(crate) fn output_enable(lp: u8, enable: bool) {

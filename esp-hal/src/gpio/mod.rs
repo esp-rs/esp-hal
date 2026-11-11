@@ -534,11 +534,7 @@ for_each_analog_function! {
         #[instability::unstable]
         impl $crate::gpio::AnalogPin for crate::peripherals::$gpio<'_> {
             fn set_analog(&self, _: private::Internal) {
-                unsafe { AnyPin::steal(self.number()) }.init_gpio();
-                io_mux_reg(self.number()).modify(|_, w| {
-                    w.fun_wpu().clear_bit();
-                    w.fun_wpd().clear_bit()
-                });
+                lp_io::low_level::init_analog(self.lp_number());
             }
         }
     };
