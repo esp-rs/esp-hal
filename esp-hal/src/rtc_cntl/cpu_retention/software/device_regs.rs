@@ -20,7 +20,7 @@ impl DeviceRegion {
 /// Reads every region into `frame`, in the order of `regions`.
 ///
 /// Stops at the end of `frame` if the regions hold more words.
-#[ram(unstable(cache_suspend_safe))]
+#[ram(unstable(checked))]
 pub(crate) fn save(regions: &[DeviceRegion], frame: &mut [u32]) {
     // Do not use slice iterators. With debug assertions, they check the pointer arithmetic, and
     // the panic path is in flash.
@@ -45,7 +45,7 @@ pub(crate) fn save(regions: &[DeviceRegion], frame: &mut [u32]) {
 /// Writes `frame` back to every region, in the order of `regions`.
 ///
 /// Stops at the end of `frame` if the regions hold more words.
-#[ram(unstable(cache_suspend_safe))]
+#[ram(unstable(checked))]
 pub(crate) fn restore(regions: &[DeviceRegion], frame: &[u32]) {
     // Do not use slice iterators. See `save`.
     let mut slot = 0;

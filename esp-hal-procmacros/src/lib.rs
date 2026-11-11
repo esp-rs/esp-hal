@@ -73,10 +73,11 @@ mod unified_main;
 ///
 /// - `rtc_fast`: Use RTC fast RAM.
 /// - `rtc_slow`: Use RTC slow RAM. **Note**: not available on all targets.
-/// - `cache_suspend_safe`: Place a function in the RAM section for code that runs while the caches
-///   are suspended. The link fails if the function refers to code or constants in flash, or to RAM
-///   code without `cache_suspend_safe`. GNU ld, the default linker for the ESP32, ESP32-S2 and
-///   ESP32-S3, checks only references to global symbols, for example `#[no_mangle]` functions.
+/// - `checked`: Place a function in the RAM section for code that runs while flash cannot be read,
+///   for example while the caches are suspended. The link fails if the function refers to code or
+///   constants in flash, or to RAM code without `checked`. GNU ld, the default linker for the
+///   ESP32, ESP32-S2, and ESP32-S3, finds only references to global symbols, for example
+///   `#[no_mangle]` functions.
 /// - `persistent`: Persist the contents of the `static` across resets. See [the section
 ///   below](#persistent) for details.
 /// - `zeroed`: Initialize the memory of the `static` to zero. The initializer expression will be
@@ -86,7 +87,7 @@ mod unified_main;
 ///   memory. Only available on ESP32-P4.
 ///
 /// Using both `rtc_fast` and `rtc_slow`, or `persistent` and `zeroed`, together is an error.
-/// `cache_suspend_safe` on a `static`, or with `rtc_fast` or `rtc_slow`, is also an error.
+/// `checked` on a `static`, or with `rtc_fast` or `rtc_slow`, is also an error.
 ///
 /// ## `persistent`
 ///

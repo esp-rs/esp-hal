@@ -810,7 +810,7 @@ impl Flash<'_, Blocking> {
 ///
 /// On ESP32, `flush` flushes every cache line before the caches resume. An invalidate by
 /// address is not available on ESP32.
-#[ram(unstable(cache_suspend_safe))]
+#[ram(unstable(checked))]
 fn with_caches_suspended<R>(
     #[cfg_attr(not(esp32), expect(unused_variables))] flush: bool,
     f: impl FnOnce() -> Result<R, rom::RomError>,
@@ -965,7 +965,7 @@ mod ipc_stall {
         }
     }
 
-    #[ram(unstable(cache_suspend_safe))]
+    #[ram(unstable(checked))]
     extern "C" fn stall() {
         {
             // The mask is taken before `Phase::Ack`. The guards drop after the cache is on again.

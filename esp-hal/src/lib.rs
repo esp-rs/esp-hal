@@ -164,7 +164,7 @@ fn main() -> ! {
 //! section.
 //!
 //! To use these operations, build esp-hal at `opt-level` 2 or 3 in each profile. At other levels,
-//! the link can fail with `prohibited cross reference from '.rwtext.cache_suspend_safe'` and the
+//! the link can fail with `prohibited cross reference from '.rwtext.checked'` and the
 //! name of a helper function. GNU ld, the default linker for the ESP32, ESP32-S2 and ESP32-S3,
 //! finds only some of these calls. The link can then pass, and the chip locks up at run time. The
 //! `Cargo.toml` of the application can set the level for esp-hal only:

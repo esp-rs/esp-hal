@@ -530,7 +530,7 @@ mod esp32_cache {
     use crate::{flash::cache::CacheGuard, pac::mmu_table::ENTRY};
 
     /// Map `page_paddr` into `entry` and make the new mapping visible.
-    #[ram(unstable(cache_suspend_safe))]
+    #[ram(unstable(checked))]
     pub(super) fn map_entry(entry: &ENTRY, page_paddr: u32) {
         let cache = CacheGuard::suspend();
         table::write_entry(entry, page_paddr);
@@ -538,7 +538,7 @@ mod esp32_cache {
     }
 
     /// Drop the lines of a temporary mapping and invalidate its entry, if we own it.
-    #[ram(unstable(cache_suspend_safe))]
+    #[ram(unstable(checked))]
     pub(super) fn unmap_entry(owned_entry: Option<&ENTRY>) {
         let cache = CacheGuard::suspend();
         if let Some(entry) = owned_entry {
@@ -548,7 +548,7 @@ mod esp32_cache {
     }
 
     /// Drop every cached line.
-    #[ram(unstable(cache_suspend_safe))]
+    #[ram(unstable(checked))]
     pub(super) fn flush_caches() {
         let cache = CacheGuard::suspend();
         cache.flush_while_off();

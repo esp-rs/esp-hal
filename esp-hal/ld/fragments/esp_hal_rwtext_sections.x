@@ -2,11 +2,11 @@
    in front of the output section that holds `*(.rwtext.*)`, so these sections get their input
    sections first. */
 
-/* Code that runs while the caches are suspended. `esp_hal_checks.x` forbids references from this
+/* Code that runs while flash cannot be read. `esp_hal_checks.x` forbids references from this
    section to flash and to `.rwtext`. */
-.rwtext.cache_suspend_safe : ALIGN(4)
+.rwtext.checked : ALIGN(4)
 {
-  *(.rwtext.cache_suspend_safe.*)
+  *(.rwtext.checked.*)
   /* unconditionally add patched SPI-flash ROM functions (from esp-rom-sys) - the linker is still happy if there are none */
   *:esp_rom_spiflash.*(.literal .text .literal.* .text.*)
   . = ALIGN(4);
