@@ -5,8 +5,8 @@
 # failed is named in that report, and its growth over that range is not checked
 # again. Commits whose sizes are already stored in the Espressif App Metrics
 # service are fetched via its API instead of being rebuilt. Reports to the job
-# summary, uploads newly measured `HEAD` metrics to S3 from a Brno self-hosted
-# runner, and on scheduled runs opens or comments on the regression issue.
+# summary, uploads newly measured `HEAD` metrics to S3, and on scheduled runs
+# opens or comments on the regression issue.
 #
 # `binary-size.yml` measures a single pull request the same way (`/test-size`).
 
@@ -173,7 +173,7 @@ jobs:
   upload-metrics:
     needs: [prepare, report]
     if: github.repository_owner == 'esp-rs' && needs.report.outputs.has_metrics == 'true'
-    runs-on: macos-m1-self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
@@ -182,6 +182,8 @@ jobs:
       - uses: ./.github/actions/upload-metrics
         with:
           commit-sha: ${{ needs.prepare.outputs.head }}
-          s3-server: ${{ secrets.ESP_METRICS_S3_SERVER }}
+          s3-server: ${{ vars.ESP_METRICS_S3_SERVER }}
           s3-access-key: ${{ secrets.ESP_METRICS_S3_ACCESS_KEY }}
           s3-secret-key: ${{ secrets.ESP_METRICS_S3_SECRET_KEY }}
+          long-term-bucket: ${{ vars.ESP_METRICS_S3_LONG_TERM_BUCKET }}
+          short-term-bucket: ${{ vars.ESP_METRICS_S3_SHORT_TERM_BUCKET }}
