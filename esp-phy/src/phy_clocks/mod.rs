@@ -20,12 +20,12 @@ pub(crate) fn enable_phy(enable: bool) {
 ///
 /// Without them, `phy_wakeup_init` on the ESP32-C61 stalls on every register access for about
 /// 11 ms. The previous state of the clocks is restored afterwards, because Wi-Fi and BLE own some
-/// of them.
+/// of them. The radios do not change them meanwhile: wake-up runs with the PHY state locked, and
+/// `esp-radio` calibrates before it brings up a radio.
 ///
-/// `esp-radio` changes modem clocks through `with_phy_lock`, which waits for or panics on a running
-/// calibration, so the restore does not undo those changes. Each read-modify-write takes
-/// [crate::ESP_PHY_LOCK], because other code writes these registers without `with_phy_lock`.
-#[cfg(any(esp32c5, esp32c6, esp32c61, esp32s31))]
+/// The calibration runs with interrupts enabled, and esp-hal also writes these registers, so each
+/// read-modify-write takes [crate::ESP_PHY_LOCK].
+#[cfg(soc_has_modem_syscon)]
 pub(crate) fn with_calibration_clocks<R>(f: impl FnOnce() -> R) -> R {
     use phy_clocks_ll::{CALIBRATION_CLK_CONF_MASK, CALIBRATION_CLK_CONF1_MASK};
 
@@ -57,7 +57,7 @@ pub(crate) fn with_calibration_clocks<R>(f: impl FnOnce() -> R) -> R {
 }
 
 /// Runs `f`. On this chip, other code already keeps the clocks running that the PHY accesses.
-#[cfg(not(any(esp32c5, esp32c6, esp32c61, esp32s31)))]
+#[cfg(not(soc_has_modem_syscon))]
 pub(crate) fn with_calibration_clocks<R>(f: impl FnOnce() -> R) -> R {
     f()
 }
