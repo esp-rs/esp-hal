@@ -22,8 +22,9 @@ options:
 
   - name: wifi_tx_retry
     description: "Keep one TX frame that the Wi-Fi driver refuses for lack of heap memory, and send
-      the frame again. The network stack waits until the frame is sent. This uses `wifi_mtu` bytes
-      of static RAM. When disabled, a refused frame is dropped, and TCP must send the data again."
+      the frame again. The network stack waits until the frame is sent. While Wi-Fi is initialized,
+      this reserves `wifi_mtu` bytes on the heap. When disabled, a refused frame is dropped, and TCP
+      must send the data again."
     default:
       - value: true
 
