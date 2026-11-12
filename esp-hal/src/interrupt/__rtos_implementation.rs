@@ -111,6 +111,48 @@ pub fn request_context_switch(core: Cpu) {
     }
 }
 
+// esp-hal copies without the `rt` feature call the two functions below by name. The names and
+// signatures must stay stable.
+
+/// Defers the context switches of the current CPU, so that the current thread stays on the CPU.
+///
+/// Interrupt handlers and IPC requests still run. The deferral lasts until each call has a
+/// matching call to [`resume_context_switch`].
+#[cfg(multi_core)]
+#[crate::ram]
+#[unsafe(export_name = "esp_hal_defer_context_switch")]
+pub fn defer_context_switch() {
+    super::ipc::defer_context_switch();
+}
+
+/// Ends one deferral of the current CPU. The end of the last deferral requests the deferred
+/// context switch.
+///
+/// # Safety
+///
+/// The call must match an earlier call to [`defer_context_switch`] on the current CPU.
+#[cfg(multi_core)]
+#[crate::ram]
+#[unsafe(export_name = "esp_hal_resume_context_switch")]
+pub unsafe fn resume_context_switch() {
+    unsafe { super::ipc::resume_context_switch() };
+}
+
+/// Masks the `Software0` context switch of the current CPU, and returns whether the context switch
+/// was enabled.
+#[cfg(all(context_switch_source = "software0", multi_core))]
+#[inline(always)]
+pub(crate) fn mask_local_context_switch() -> bool {
+    local::mask()
+}
+
+/// Unmasks the `Software0` context switch of the current CPU. A pending context switch then runs.
+#[cfg(all(context_switch_source = "software0", multi_core))]
+#[inline(always)]
+pub(crate) fn unmask_local_context_switch() {
+    local::unmask();
+}
+
 /// The `Software0` context-switch path.
 #[cfg(context_switch_source = "software0")]
 mod local {
@@ -132,6 +174,19 @@ mod local {
     #[inline]
     pub(super) fn trigger() {
         unsafe { xtensa_lx::interrupt::set(SW_INTERRUPT) };
+    }
+
+    /// The request stays pending while the interrupt is masked.
+    #[cfg(multi_core)]
+    #[inline(always)]
+    pub(super) fn mask() -> bool {
+        xtensa_lx::interrupt::disable_mask(SW_INTERRUPT) & SW_INTERRUPT != 0
+    }
+
+    #[cfg(multi_core)]
+    #[inline(always)]
+    pub(super) fn unmask() {
+        unsafe { xtensa_lx::interrupt::enable_mask(SW_INTERRUPT) };
     }
 
     /// The vectored dispatcher clears the request before it calls this handler.

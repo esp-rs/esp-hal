@@ -99,6 +99,10 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         bnez t0, 3f
 
     1:
+        # A deferred context switch stays in `pending_context_switch`.
+        lw   t0, {deferral}(t1)
+        bnez t0, 4f
+
         lw   t0, {pending_context_switch}(t1)
         sw   zero, {pending_context_switch}(t1)
 
@@ -120,10 +124,16 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
         lw   ra, 4(sp)
         la   t1, {state} + {base}
         j    1b
+
+    4:
+        lw   t1, 0(sp)
+        addi sp, sp, 16
+        j    2b
         ",
         state = sym STATE,
         base = const CORE * size_of::<CoreState>(),
         head = const core::mem::offset_of!(CoreState, lists.head),
+        deferral = const core::mem::offset_of!(CoreState, deferral),
         pending_context_switch = const core::mem::offset_of!(CoreState, pending_context_switch),
         request = const core::mem::offset_of!(CoreState, request),
         drain_handler = sym drain_handler,

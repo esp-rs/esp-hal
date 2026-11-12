@@ -97,6 +97,42 @@ impl Drop for AppCoreGuard<'_> {
     }
 }
 
+/// Suspends the scheduler of the current core until the guard drops.
+///
+/// The current core defers its context switches while a guard is alive. The current thread thus
+/// keeps the current core, and cannot move to the other core. Interrupt handlers and
+/// [IPC requests][crate::interrupt::ipc::IpcRequest] still run. The deferred context switch runs
+/// when the last guard drops.
+///
+/// The scheduler of the other core continues to run. Do not keep a guard for a long time,
+/// because other threads cannot run on the current core.
+#[must_use = "The scheduler continues when the guard drops"]
+#[instability::unstable]
+pub struct SchedulerSuspendGuard {
+    // The guard must drop on the core that made the guard.
+    _not_send: PhantomData<*const ()>,
+}
+
+impl SchedulerSuspendGuard {
+    /// Creates a new guard, and suspends the scheduler of the current core.
+    #[instability::unstable]
+    #[inline(always)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        defer_context_switch();
+        Self {
+            _not_send: PhantomData,
+        }
+    }
+}
+
+impl Drop for SchedulerSuspendGuard {
+    #[inline(always)]
+    fn drop(&mut self) {
+        unsafe { resume_context_switch() };
+    }
+}
+
 /// Represents errors that can occur while working with the core.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -527,6 +563,8 @@ cfg_select! {
     feature = "rt" => {
         use core::sync::atomic::AtomicBool;
 
+        use crate::interrupt::ipc::{defer_context_switch, resume_context_switch};
+
         static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
 
         /// Marks the APP core as not running code of this program before the APP core starts.
@@ -536,6 +574,8 @@ cfg_select! {
             // Posts to the APP core return `Offline` after the store, so no post adds a request
             // to the APP core while this call fails the requests that the APP core did not run.
             unsafe { crate::interrupt::ipc::fail_stranded(Cpu::AppCpu) };
+            // The APP core can stop while a `SchedulerSuspendGuard` is alive on the APP core.
+            crate::interrupt::ipc::reset_context_switch_deferral(Cpu::AppCpu);
         }
 
         /// Lets the APP core take IPC interrupts. The APP core calls this function after it
@@ -563,6 +603,10 @@ cfg_select! {
             safe fn app_core_started();
             #[link_name = "esp_hal_app_core_takes_ipc"]
             pub(crate) safe fn app_core_takes_ipc() -> bool;
+            #[link_name = "esp_hal_defer_context_switch"]
+            safe fn defer_context_switch();
+            #[link_name = "esp_hal_resume_context_switch"]
+            fn resume_context_switch();
         }
     }
 }
