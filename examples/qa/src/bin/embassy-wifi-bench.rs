@@ -12,6 +12,10 @@
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
 //% CHIP_FILTER: wifi_driver_supported
+//% ENV: CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS=false
+//% ENV: ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
+// With the allocator in flash, TLSF is slower than LLFF on chips with a small instruction cache.
+//% ENV-IF(esp32c2 || esp32c3): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV-IF(esp32s2): ESP_HAL_CONFIG_INSTRUCTION_CACHE_SIZE=16KB
 //% ENV-IF(esp32s2): ESP_HAL_CONFIG_INSTRUCTION_CACHE_LINE_SIZE=16B
 
