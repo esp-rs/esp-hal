@@ -224,6 +224,7 @@ impl PowerSleepConfig {
         self.hp_sys
             .dig_power
             .set_modem_top_pd_en(pd_flags.pd_modem());
+        // The CNNT domain may lose power only together with the TOP domain.
         self.hp_sys.dig_power.set_hp_cnnt_pd_en(pd_flags.pd_top());
         self.hp_sys.dig_power.set_hp_cpu_pd_en(pd_flags.pd_cpu());
         self.hp_sys.dig_power.set_modem_pwr_pd_en(pd_flags.pd_mem());

@@ -237,6 +237,9 @@ impl<const WORDS: usize> StaticNode<WORDS> {
 }
 
 /// The first node: a wait that the REGDMA skips, with a `next` pointer for each entry.
+///
+/// Its words are the statistics word, the head, a `next` pointer for each entry, then the address,
+/// the value and the mask of the wait.
 static HEAD: StaticNode<{ 2 + ENTRIES + 3 }> = StaticNode(UnsafeCell::new({
     let mut words = [0; 2 + ENTRIES + 3];
     words[1] = SKIPPED_WAIT | HEAD_BRANCH;
@@ -447,7 +450,7 @@ pub fn set_modem_power_down(enabled: bool) {
         if enabled {
             // The `next` pointers of the head stay 0 until the first join.
             join(registry);
-            init_pau();
+            init_regdma();
         } else {
             set_backup(false);
         }
@@ -493,7 +496,7 @@ cfg_select! {
 }
 
 /// Enables the REGDMA, and gives it the head of the list.
-fn init_pau() {
+fn init_regdma() {
     cfg_select! {
         esp32s31 => {
             crate::peripherals::HP_SYS_CLKRST::regs()
@@ -512,6 +515,7 @@ fn init_pau() {
     #[cfg(esp32h2)]
     {
         const MODEM_CLK_CODE: u8 = 3;
+        const CLK_SEL_XTAL: u8 = 0;
         const RESTORE_ENTRY_0: u8 = 0;
         const BACKUP_ENTRY_0: u8 = 1 << 2;
 
@@ -520,7 +524,7 @@ fn init_pau() {
             w.hp_sleep2active_backup_modem_clk_code()
                 .bits(MODEM_CLK_CODE)
                 .hp_sleep2active_backup_clk_sel()
-                .bits(0)
+                .bits(CLK_SEL_XTAL)
                 .hp_sleep2active_backup_mode()
                 .bits(RESTORE_ENTRY_0)
         });
@@ -528,7 +532,7 @@ fn init_pau() {
             w.hp_active2sleep_backup_modem_clk_code()
                 .bits(MODEM_CLK_CODE)
                 .hp_active2sleep_backup_clk_sel()
-                .bits(0)
+                .bits(CLK_SEL_XTAL)
                 .hp_active2sleep_backup_mode()
                 .bits(BACKUP_ENTRY_0)
         });
@@ -605,9 +609,9 @@ fn init_pau() {
     }
 }
 
-/// Runs the extra entry, which copies the attached modules of [`EXTRA_ENTRY`] to memory
-/// (`backup`), or back. Blocks until the REGDMA finishes. Does nothing while
-/// [`set_modem_power_down`] is off.
+/// Runs the nodes of [`EXTRA_ENTRY`] in the attached modules. With `backup`, they copy the
+/// registers to memory, otherwise back from memory. Blocks until the REGDMA finishes. Does nothing
+/// while [`set_modem_power_down`] is off.
 ///
 /// Call this while the PLL runs.
 #[cfg(regdma_bt_needs_pll)]

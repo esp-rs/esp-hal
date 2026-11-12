@@ -12,7 +12,7 @@ use esp_hal::rtc_cntl::regdma::{self, LinkConfig, LinkMemory, Module, SLEEP_ENTR
 
 use crate::compat::malloc::InternalMemory;
 
-const fn syscon(id: u16, address: u32, length: u16) -> LinkConfig {
+const fn registers(id: u16, address: u32, length: u16) -> LinkConfig {
     LinkConfig::continuous(id, address, address, length, SLEEP_ENTRY)
 }
 
@@ -20,22 +20,22 @@ const fn syscon(id: u16, address: u32, length: u16) -> LinkConfig {
 // See `sleep_clock.c` of each chip in
 // <https://github.com/espressif/esp-idf/tree/4d80c1b29ae/components/esp_hw_support/lowpower/port>.
 const CLOCK_MODEM: &[LinkConfig] = cfg_select! {
-    esp32c6 => &[syscon(0x0200, 0x600a_9800, 9)],
-    any(esp32c5, esp32c61) => &[syscon(0x0200, 0x600a_9c00, 10)],
+    esp32c6 => &[registers(0x0200, 0x600a_9800, 9)],
+    any(esp32c5, esp32c61) => &[registers(0x0200, 0x600a_9c00, 10)],
     esp32h2 => &[
-        syscon(0x0200, 0x600a_5400, 7),
-        syscon(0x0300, 0x600a_d000, 7),
+        registers(0x0200, 0x600a_5400, 7),
+        registers(0x0300, 0x600a_d000, 7),
     ],
     esp32h4 => &[
-        syscon(0x0200, 0x600c_9c00, 10),
-        syscon(0x0300, 0x600c_f000, 12),
+        registers(0x0200, 0x600c_9c00, 10),
+        registers(0x0300, 0x600c_f000, 12),
     ],
     esp32s31 => &[
         // The PMU may not ungate the PLL in time for the restore. A dummy write to the date
         // register first keeps the next nodes from a bus timeout.
         LinkConfig::write(0x0200, 0x2010_9c30, 0x0fff_ffff, 0x0fff_ffff, SLEEP_ENTRY),
-        syscon(0x0201, 0x2010_9c00, 10),
-        syscon(0x0300, 0x2010_f000, 21),
+        registers(0x0201, 0x2010_9c00, 10),
+        registers(0x0300, 0x2010_f000, 21),
     ],
 };
 
@@ -43,24 +43,24 @@ const CLOCK_MODEM: &[LinkConfig] = cfg_select! {
 // See `phy_init_data.c` of each chip in
 // <https://github.com/espressif/esp-idf/tree/4d80c1b29ae/components/esp_phy>.
 const PHY_FE: &[LinkConfig] = cfg_select! {
-    esp32c6 => &[syscon(0xff00, 0x600a_0000, 58)],
+    esp32c6 => &[registers(0xff00, 0x600a_0000, 58)],
     esp32c61 => &[
-        syscon(0xff00, 0x600a_0000, 21),
-        syscon(0xff01, 0x600a_0400, 34),
-        syscon(0xff02, 0x600a_0800, 56),
-        syscon(0xff03, 0x600a_0c00, 21),
+        registers(0xff00, 0x600a_0000, 21),
+        registers(0xff01, 0x600a_0400, 34),
+        registers(0xff02, 0x600a_0800, 56),
+        registers(0xff03, 0x600a_0c00, 21),
     ],
     esp32c5 => &[
-        syscon(0xff00, 0x600a_0000, 21),
-        syscon(0xff01, 0x600a_0400, 35),
-        syscon(0xff02, 0x600a_0800, 56),
-        syscon(0xff03, 0x600a_0c00, 22),
+        registers(0xff00, 0x600a_0000, 21),
+        registers(0xff01, 0x600a_0400, 35),
+        registers(0xff02, 0x600a_0800, 56),
+        registers(0xff03, 0x600a_0c00, 22),
     ],
     esp32s31 => &[
-        syscon(0xff00, 0x2010_0000, 22),
-        syscon(0xff01, 0x2010_0400, 35),
-        syscon(0xff02, 0x2010_0800, 57),
-        syscon(0xff03, 0x2010_0c00, 22),
+        registers(0xff00, 0x2010_0000, 22),
+        registers(0xff01, 0x2010_0400, 35),
+        registers(0xff02, 0x2010_0800, 57),
+        registers(0xff03, 0x2010_0c00, 22),
     ],
     // ESP-IDF retains no front end on the ESP32-H2. The ESP32-H4 restores its front end in the
     // PHY entry of the REGDMA, which nothing runs yet.

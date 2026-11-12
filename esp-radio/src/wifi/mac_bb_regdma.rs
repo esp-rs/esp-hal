@@ -14,7 +14,7 @@ use esp_hal::rtc_cntl::{
 };
 use portable_atomic::{AtomicBool, Ordering};
 
-use super::WifiError;
+use super::{WifiError, esp_wifi_result};
 use crate::{
     modem_power::{self, Radio},
     sys::{c_types::c_void, include::esp_err_t},
@@ -147,12 +147,12 @@ pub(super) fn init() -> Result<(), WifiError> {
     Ok(())
 }
 
-/// Stops the power-down.
+/// Stops the power-down, if stopping Wi-Fi did not stop it already.
 ///
 /// Call this before `esp_wifi_deinit_internal`.
 pub(super) fn stop_power_down() -> Result<(), WifiError> {
     if regdma::is_attached(Module::WifiMac) {
-        unsafe { mac_sleep_retention_detach() };
+        esp_wifi_result!(unsafe { mac_sleep_retention_detach() })?;
     }
     Ok(())
 }

@@ -123,6 +123,10 @@ unstable_module! {
     // only include sleep where it's been implemented
     #[cfg(sleep_driver_supported)]
     pub mod sleep;
+    // Public for esp-radio, which builds the REGDMA nodes of the radios.
+    #[cfg(modem_retention = "regdma")]
+    #[doc(hidden)]
+    pub mod regdma;
 }
 
 cfg_select! {
@@ -136,11 +140,6 @@ cfg_select! {
     }
     _ => {}
 }
-
-// Public for esp-radio, which builds the REGDMA nodes of the radios.
-#[cfg(modem_retention = "regdma")]
-#[doc(hidden)]
-pub mod regdma;
 
 cfg_select! {
     supports_cpu_power_down => {
