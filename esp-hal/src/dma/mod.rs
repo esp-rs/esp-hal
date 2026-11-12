@@ -65,6 +65,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
+    clock::CpuFrequencyLock,
     dma::aligned::DmaAlignedMut,
     interrupt::InterruptHandler,
     system::{Cpu, PeripheralGuard},
@@ -978,6 +979,7 @@ where
     pub(crate) rx_impl: CH,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
+    cpu_frequency_lock: Option<CpuFrequencyLock>,
 }
 
 impl<CH> ChannelRx<Blocking, CH>
@@ -1004,6 +1006,7 @@ where
             rx_impl,
             _phantom: PhantomData,
             _guard,
+            cpu_frequency_lock: None,
         }
     }
 
@@ -1017,6 +1020,7 @@ where
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
+            cpu_frequency_lock: self.cpu_frequency_lock,
         }
     }
 
@@ -1047,6 +1051,7 @@ where
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
+            cpu_frequency_lock: self.cpu_frequency_lock,
         }
     }
 }
@@ -1122,6 +1127,8 @@ where
     }
 
     pub(crate) fn start_transfer(&mut self) -> Result<(), DmaError> {
+        self.cpu_frequency_lock
+            .get_or_insert_with(CpuFrequencyLock::new);
         self.rx_impl.start();
 
         if self
@@ -1135,7 +1142,13 @@ where
     }
 
     pub(crate) fn stop_transfer(&mut self) {
-        self.rx_impl.stop()
+        self.rx_impl.stop();
+        self.end_transfer();
+    }
+
+    /// Releases the CPU frequency lock of a transfer that ended without [`Self::stop_transfer`].
+    pub(crate) fn end_transfer(&mut self) {
+        self.cpu_frequency_lock = None;
     }
 
     #[cfg(dma_supports_mem2mem)]
@@ -1202,6 +1215,7 @@ where
     pub(crate) tx_impl: CH,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
+    cpu_frequency_lock: Option<CpuFrequencyLock>,
 }
 
 impl<CH> ChannelTx<Blocking, CH>
@@ -1222,6 +1236,7 @@ where
             tx_impl,
             _phantom: PhantomData,
             _guard,
+            cpu_frequency_lock: None,
         }
     }
 
@@ -1235,6 +1250,7 @@ where
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
+            cpu_frequency_lock: self.cpu_frequency_lock,
         }
     }
 
@@ -1265,6 +1281,7 @@ where
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
+            cpu_frequency_lock: self.cpu_frequency_lock,
         }
     }
 }
@@ -1343,6 +1360,8 @@ where
     }
 
     pub(crate) fn start_transfer(&mut self) -> Result<(), DmaError> {
+        self.cpu_frequency_lock
+            .get_or_insert_with(CpuFrequencyLock::new);
         self.tx_impl.start();
         while self.tx_impl.is_fifo_empty() && self.pending_out_interrupts().is_empty() {}
 
@@ -1357,7 +1376,13 @@ where
     }
 
     pub(crate) fn stop_transfer(&mut self) {
-        self.tx_impl.stop()
+        self.tx_impl.stop();
+        self.end_transfer();
+    }
+
+    /// Releases the CPU frequency lock of a transfer that ended without [`Self::stop_transfer`].
+    pub(crate) fn end_transfer(&mut self) {
+        self.cpu_frequency_lock = None;
     }
 
     pub(crate) fn listen_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {

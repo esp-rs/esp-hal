@@ -343,6 +343,9 @@ macro_rules! property {
     ("bt.controller") => {
         "npl"
     };
+    ("bt.requires_fast_cpu") => {
+        true
+    };
     ("wifi.has_wifi6") => {
         true
     };
@@ -362,6 +365,12 @@ macro_rules! property {
         false
     };
     ("wifi.has_ftm") => {
+        true
+    };
+    ("wifi.requires_fast_cpu") => {
+        true
+    };
+    ("ieee802154.requires_fast_cpu") => {
         true
     };
     ("phy.combo_module") => {
@@ -511,6 +520,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.idle_frequency_scaling") => {
+        true
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
@@ -597,6 +609,9 @@ macro_rules! property {
     };
     ("soc.has_swd_watchdog") => {
         true
+    };
+    ("soc.has_bus_clock_update") => {
+        false
     };
     ("soc.cpu_mcause_mask") => {
         31

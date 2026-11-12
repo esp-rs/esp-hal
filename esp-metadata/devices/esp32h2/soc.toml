@@ -31,6 +31,7 @@ cpu_csr_prv_mode = 0xC10
 cpu_mcause_mask = 0x1f
 
 has_swd_watchdog = true
+has_bus_clock_update = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
@@ -337,6 +338,7 @@ max_data_width = 8
 [device.sleep]
 support_status = { status = "partial", issue = 6743 }
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 # esp32h2 has no separate per-pin path: `pin_wakeup_version` stays unset because the per-pin
 # registers *are* the ext1 registers.
@@ -430,9 +432,11 @@ support_status = "not_supported"
 [device.bt]
 support_status = { status = "partial", issue = 6750 }
 controller = "npl"
+requires_fast_cpu = true
 
 [device.ieee802154]
 support_status = { status = "partial", issue = 6763 }
+requires_fast_cpu = true
 
 [device.phy]
 

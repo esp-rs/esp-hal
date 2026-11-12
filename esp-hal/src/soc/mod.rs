@@ -30,6 +30,74 @@ pub(crate) mod cache;
 #[cfg(soc_has_xtal32k_pads)]
 pub(crate) mod xtal32k;
 
+#[cfg(soc_has_bus_clock_update)]
+mod bus_clock_update {
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    static DEFERRED: AtomicBool = AtomicBool::new(false);
+
+    /// Applies the new CPU root clock and the new CPU and bus clock dividers.
+    ///
+    /// Inside [`with_single_bus_clock_update`], this function does nothing. The bus can stop if
+    /// the new combination is not valid.
+    pub(crate) fn update_bus_clocks() {
+        if DEFERRED.load(Ordering::Relaxed) {
+            return;
+        }
+
+        cfg_select! {
+            soc_has_hp_sys_clkrst => {
+                use crate::peripherals::HP_SYS_CLKRST;
+
+                HP_SYS_CLKRST::regs()
+                    .root_clk_ctrl0()
+                    .modify(|_, w| w.soc_clk_div_update().set_bit());
+                while HP_SYS_CLKRST::regs()
+                    .root_clk_ctrl0()
+                    .read()
+                    .soc_clk_div_update()
+                    .bit_is_set()
+                {
+                    core::hint::spin_loop();
+                }
+            }
+            _ => {
+                use crate::peripherals::PCR;
+
+                PCR::regs()
+                    .bus_clk_update()
+                    .write(|w| w.bus_clock_update().set_bit());
+                while PCR::regs()
+                    .bus_clk_update()
+                    .read()
+                    .bus_clock_update()
+                    .bit_is_set()
+                {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+
+        // `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+        esp_rom_sys::rom::ets_update_cpu_frequency_rom(
+            super::clocks::cpu_clk_frequency() / 1_000_000,
+        );
+    }
+
+    /// Runs `f`, then applies all clock changes of `f` with one bus clock update.
+    ///
+    /// Separate updates can apply an intermediate combination that overclocks a bus.
+    pub(crate) fn with_single_bus_clock_update(f: impl FnOnce()) {
+        DEFERRED.store(true, Ordering::Relaxed);
+        f();
+        DEFERRED.store(false, Ordering::Relaxed);
+        update_bus_clocks();
+    }
+}
+
+#[cfg(soc_has_bus_clock_update)]
+pub(crate) use bus_clock_update::{update_bus_clocks, with_single_bus_clock_update};
+
 cfg_select! {
     all(feature = "unstable", ulp_riscv_driver_supported) => {
         pub use self::implementation::*;

@@ -2885,6 +2885,10 @@ impl Drop for WifiRefGuard {
                     warn!("Failed to cleanly deinit wifi: {:?}", e);
                 }
 
+                esp_hal::if_unstable_hal! {
+                    sleep::clear_sleep_lock();
+                }
+
                 #[cfg(rng_trng_supported)]
                 esp_hal::if_unstable_hal! {
                     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {

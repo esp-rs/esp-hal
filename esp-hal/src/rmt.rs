@@ -217,6 +217,7 @@ use crate::{
     Async,
     Blocking,
     asynch::AtomicWaker,
+    clock::CpuFrequencyLock,
     gpio::{
         self,
         InputConfig,
@@ -1402,21 +1403,30 @@ where
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct TxGuard {
     raw: Option<DynChannelAccess<Tx>>,
+    // The CPU refills the channel RAM. At a low CPU frequency, the refill can be too late.
+    _cpu_frequency_lock: Option<CpuFrequencyLock>,
 }
 
 impl TxGuard {
     fn new(raw: DynChannelAccess<Tx>) -> Self {
-        Self { raw: Some(raw) }
+        Self {
+            raw: Some(raw),
+            _cpu_frequency_lock: Some(CpuFrequencyLock::new()),
+        }
     }
 
     fn new_empty() -> Self {
-        Self { raw: None }
+        Self {
+            raw: None,
+            _cpu_frequency_lock: None,
+        }
     }
 
     /// Indicates that the transaction has completed (or was never started) and does not require
     /// explicit stopping on drop.
     fn set_completed(&mut self) {
         self.raw = None;
+        self._cpu_frequency_lock = None;
     }
 
     fn is_active(&self) -> bool {
@@ -1445,21 +1455,30 @@ impl Drop for TxGuard {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct RxGuard {
     raw: Option<DynChannelAccess<Rx>>,
+    // The CPU empties the channel RAM. At a low CPU frequency, the read can be too late.
+    _cpu_frequency_lock: Option<CpuFrequencyLock>,
 }
 
 impl RxGuard {
     fn new(raw: DynChannelAccess<Rx>) -> Self {
-        Self { raw: Some(raw) }
+        Self {
+            raw: Some(raw),
+            _cpu_frequency_lock: Some(CpuFrequencyLock::new()),
+        }
     }
 
     fn new_empty() -> Self {
-        Self { raw: None }
+        Self {
+            raw: None,
+            _cpu_frequency_lock: None,
+        }
     }
 
     /// Indicates that the transaction has completed (or was never started) and does not require
     /// explicit stopping on drop.
     fn set_completed(&mut self) {
         self.raw = None;
+        self._cpu_frequency_lock = None;
     }
 }
 

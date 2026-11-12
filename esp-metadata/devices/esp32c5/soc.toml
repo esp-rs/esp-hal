@@ -34,6 +34,7 @@ cpu_pmp_granularity = 128
 cpu_powers_down_cache = true
 
 has_swd_watchdog = true
+has_bus_clock_update = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4086_0000 },
@@ -388,6 +389,7 @@ is_lp_sys = true
 [device.wifi]
 support_status = { status = "partial", issue = 6788 }
 mac_version = 3
+requires_fast_cpu = true
 has_5g = true
 csi_supported = true
 has_wifi6 = true
@@ -397,9 +399,11 @@ has_ftm = true
 [device.bt]
 support_status = { status = "partial", issue = 6750 }
 controller = "npl"
+requires_fast_cpu = true
 
 [device.ieee802154]
 support_status = { status = "partial", issue = 6763 }
+requires_fast_cpu = true
 
 [device.phy]
 support_status = "partial"
@@ -442,6 +446,7 @@ support_status = { status = "not_supported", issue = 5154 }
 [device.sleep]
 support_status = { status = "partial", issue = 6743 }
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 ext1_version = 2
 pin_wakeup_version = 3

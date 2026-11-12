@@ -342,6 +342,7 @@ is_lp_sys = true
 [device.sleep]
 support_status = { status = "partial", issue = 6743 }
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 ext1_version = 2
 pin_wakeup_version = 3
@@ -445,15 +446,18 @@ support_status = { status = "partial", issue = 6784 }
 support_status = { status = "partial", issue = 6788 }
 has_wifi6 = true
 mac_version = 2
+requires_fast_cpu = true
 csi_supported = true
 has_ftm = true
 
 [device.bt]
 support_status = { status = "partial", issue = 6750 }
 controller = "npl"
+requires_fast_cpu = true
 
 [device.ieee802154]
 support_status = { status = "partial", issue = 6763 }
+requires_fast_cpu = true
 
 [device.phy]
 combo_module = true

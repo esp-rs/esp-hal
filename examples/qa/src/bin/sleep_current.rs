@@ -17,6 +17,13 @@
 //! PSRAM. Each light-sleep case writes a pattern to all of PSRAM before the sleep, and
 //! checks the pattern after the wake. The program then writes and checks the inverted
 //! pattern. The program panics if a pattern does not read back.
+//!
+//! On a chip that supports idle frequency scaling, each WAITI/WFI case also runs while a
+//! `CpuFrequencyLock` is held, so the currents with and without scaling can be compared. Set
+//! `ESP_HAL_CONFIG_IDLE_FREQUENCY_SCALING=true` to enable the scaling. The timer interrupt handler
+//! measures the CPU clock, and the program panics if the handler sees a slow clock. On a chip that
+//! switches PSRAM to a low speed during idle, each active case writes a pattern to all of PSRAM
+//! before the hold, and checks the pattern after the hold.
 
 //% FEATURES: esp-println/uart
 //% CHIP_FILTER: sleep_driver_supported && sleep_deep_sleep
@@ -46,6 +53,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[cfg(multi_core)]
 use core::ptr::addr_of_mut;
+#[cfg(sleep_idle_frequency_scaling)]
+use core::sync::atomic::{AtomicU32, Ordering};
 
 #[cfg(multi_core)]
 use esp_hal::{interrupt::Priority, peripherals::Interrupt};
@@ -120,6 +129,7 @@ enum Case {
         max_clock: bool,
         two_cores: bool,
         waiti: bool,
+        freq_lock: bool,
     },
     LightSleep {
         two_cores: bool,
@@ -134,45 +144,81 @@ const CASES: &[Case] = &[
         max_clock: false,
         two_cores: false,
         waiti: false,
+        freq_lock: false,
     },
     Case::Active {
         max_clock: false,
         two_cores: false,
         waiti: true,
+        freq_lock: false,
+    },
+    #[cfg(sleep_idle_frequency_scaling)]
+    Case::Active {
+        max_clock: false,
+        two_cores: false,
+        waiti: true,
+        freq_lock: true,
     },
     #[cfg(multi_core)]
     Case::Active {
         max_clock: false,
         two_cores: true,
         waiti: false,
+        freq_lock: false,
     },
     #[cfg(multi_core)]
     Case::Active {
         max_clock: false,
         two_cores: true,
         waiti: true,
+        freq_lock: false,
+    },
+    #[cfg(all(sleep_idle_frequency_scaling, multi_core))]
+    Case::Active {
+        max_clock: false,
+        two_cores: true,
+        waiti: true,
+        freq_lock: true,
     },
     Case::Active {
         max_clock: true,
         two_cores: false,
         waiti: false,
+        freq_lock: false,
     },
     Case::Active {
         max_clock: true,
         two_cores: false,
         waiti: true,
+        freq_lock: false,
+    },
+    #[cfg(sleep_idle_frequency_scaling)]
+    Case::Active {
+        max_clock: true,
+        two_cores: false,
+        waiti: true,
+        freq_lock: true,
     },
     #[cfg(multi_core)]
     Case::Active {
         max_clock: true,
         two_cores: true,
         waiti: false,
+        freq_lock: false,
     },
     #[cfg(multi_core)]
     Case::Active {
         max_clock: true,
         two_cores: true,
         waiti: true,
+        freq_lock: false,
+    },
+    #[cfg(all(sleep_idle_frequency_scaling, multi_core))]
+    Case::Active {
+        max_clock: true,
+        two_cores: true,
+        waiti: true,
+        freq_lock: true,
     },
     Case::LightSleep {
         two_cores: false,
@@ -235,14 +281,20 @@ fn print_case(index: usize, case: Case) {
             max_clock,
             two_cores,
             waiti,
+            freq_lock,
         } => {
             println!(
-                "=== [{}/{}] active CPU={} cores={} idle={} ({} s) ===",
+                "=== [{}/{}] active CPU={} cores={} idle={}{} ({} s) ===",
                 index + 1,
                 CASES.len(),
                 if max_clock { "max" } else { "default" },
                 if two_cores { 2 } else { 1 },
                 if waiti { "WAITI/WFI" } else { "busy" },
+                if freq_lock {
+                    " CpuFrequencyLock held"
+                } else {
+                    ""
+                },
                 HOLD.as_secs(),
             );
         }
@@ -287,6 +339,22 @@ fn app_waiti() -> bool {
     unsafe { core::ptr::read_volatile(&raw const APP_WAITI) }
 }
 
+/// The lowest CPU clock in MHz that the timer interrupt handler measured in the current case.
+#[cfg(sleep_idle_frequency_scaling)]
+static HANDLER_MIN_MHZ: AtomicU32 = AtomicU32::new(u32::MAX);
+
+#[cfg(sleep_idle_frequency_scaling)]
+fn cpu_cycles() -> u32 {
+    let cycles: u32;
+    cfg_select! {
+        any(feature = "esp32c6", feature = "esp32h2") => unsafe {
+            core::arch::asm!("csrr {0}, 0x7e2", out(reg) cycles)
+        },
+        _ => unsafe { core::arch::asm!("csrr {0}, mcycle", out(reg) cycles) },
+    }
+    cycles
+}
+
 #[esp_hal::handler]
 fn timer_handler() {
     unsafe {
@@ -294,6 +362,27 @@ fn timer_handler() {
             timer.clear_interrupt();
         }
     }
+
+    #[cfg(sleep_idle_frequency_scaling)]
+    {
+        let start_cycles = cpu_cycles();
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_micros(50) {}
+        let mhz = cpu_cycles().wrapping_sub(start_cycles) / start.elapsed().as_micros() as u32;
+        HANDLER_MIN_MHZ.fetch_min(mhz, Ordering::Relaxed);
+    }
+}
+
+/// Panics if the timer interrupt handler measured a CPU clock below 90% of the configured clock.
+#[cfg(sleep_idle_frequency_scaling)]
+fn check_handler_clock() {
+    let full_mhz = esp_hal::clock::cpu_clock().as_mhz();
+    let min_mhz = HANDLER_MIN_MHZ.swap(u32::MAX, Ordering::Relaxed);
+    assert!(
+        min_mhz >= full_mhz * 9 / 10,
+        "handler CPU clock {min_mhz} MHz of {full_mhz} MHz"
+    );
+    println!("lowest handler CPU clock: {min_mhz} MHz of {full_mhz} MHz");
 }
 
 #[cfg(multi_core)]
@@ -309,7 +398,8 @@ fn app_core_entry() -> ! {
     }
 }
 
-fn hold_active(waiti: bool) {
+fn hold_active(waiti: bool, freq_lock: bool) {
+    let _lock = freq_lock.then(esp_hal::clock::CpuFrequencyLock::new);
     let end = Instant::now() + HOLD;
     if waiti {
         while Instant::now() < end {
@@ -440,7 +530,10 @@ fn main() -> ! {
 
         match case {
             Case::Active {
-                two_cores, waiti, ..
+                two_cores,
+                waiti,
+                freq_lock,
+                ..
             } => {
                 #[cfg(multi_core)]
                 {
@@ -455,7 +548,19 @@ fn main() -> ! {
                 #[cfg(not(multi_core))]
                 let _ = two_cores;
 
-                hold_active(waiti);
+                #[cfg(psram_idle_low_speed_switch)]
+                fill_psram(psram_words, 0);
+                #[cfg(sleep_idle_frequency_scaling)]
+                HANDLER_MIN_MHZ.store(u32::MAX, Ordering::Relaxed);
+
+                hold_active(waiti, freq_lock);
+
+                #[cfg(sleep_idle_frequency_scaling)]
+                check_handler_clock();
+                #[cfg(psram_idle_low_speed_switch)]
+                if !psram_words.is_empty() {
+                    check_psram("after the hold", psram_words, 0);
+                }
             }
             Case::LightSleep {
                 two_cores,

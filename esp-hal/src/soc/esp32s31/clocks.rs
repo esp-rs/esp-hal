@@ -8,13 +8,9 @@
     reason = "Clock-tree types come from generated macro code"
 )]
 
-use core::sync::atomic::{AtomicBool, Ordering};
-
-use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
-
 use crate::{
     peripherals::{HP_ALIVE_SYS, HP_SYS, HP_SYS_CLKRST, LP_AON_CLK_RST, MODEM_LPCON, PMU},
-    soc::{regi2c, xtal32k},
+    soc::{regi2c, update_bus_clocks, with_single_bus_clock_update, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -132,38 +128,8 @@ impl ClockConfig {
             ));
         }
 
-        // CPU_ROOT_CLK and the CPU, memory, AHB, and APB dividers share one
-        // update signal. Write the complete configuration before latching it;
-        // applying each change separately can temporarily overclock the buses.
-        BUS_CLOCK_UPDATE_DEFERRED.store(true, Ordering::Relaxed);
-        self.apply(clocks);
-        BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
-
-        update_bus_clocks();
+        with_single_bus_clock_update(|| self.apply(clocks));
     }
-}
-
-static BUS_CLOCK_UPDATE_DEFERRED: AtomicBool = AtomicBool::new(false);
-
-fn update_bus_clocks() {
-    if BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
-        return;
-    }
-
-    HP_SYS_CLKRST::regs()
-        .root_clk_ctrl0()
-        .modify(|_, w| w.soc_clk_div_update().set_bit());
-    while HP_SYS_CLKRST::regs()
-        .root_clk_ctrl0()
-        .read()
-        .soc_clk_div_update()
-        .bit_is_set()
-    {
-        core::hint::spin_loop();
-    }
-
-    // `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
-    ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
 // BBPLL_CLK
@@ -542,6 +508,52 @@ fn configure_cpu_root_clk_impl(
         })
     });
     update_bus_clocks();
+}
+
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+//
+// All dividers are 1 while the CPU clock comes from XTAL_CLK, so that MEM_CLK, SYS_CLK and APB_CLK
+// stay at the XTAL_CLK frequency. One bus clock update applies the root clock and all dividers.
+// See <https://github.com/espressif/esp-idf/blob/4d80c1b29aeabc8e735ffc6e1be9bb23e95d1d5d/components/esp_hw_support/port/esp32s31/rtc_clk.c#L163-L182>.
+
+/// Switches the CPU clock to XTAL_CLK if it comes from a PLL, with configured dividers that
+/// [`restore_cpu_clock`] can restore. Returns whether the clock changed.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if !matches!(
+        clocks.cpu_root_clk(),
+        Some(CpuRootClkConfig::Cpll | CpuRootClkConfig::PllF240m)
+    ) || clocks.cpu_clk().is_none()
+        || clocks.mem_clk().is_none()
+        || clocks.sys_clk().is_none()
+        || clocks.apb_clk().is_none()
+    {
+        return false;
+    }
+    // PSRAM slows down before the CPU clock, and speeds up after it.
+    crate::psram::implem::low_speed::enter();
+    with_single_bus_clock_update(|| {
+        configure_cpu_root_clk_impl(clocks, None, CpuRootClkConfig::Xtal);
+        configure_cpu_clk_impl(clocks, None, CpuClkConfig::new(0));
+        configure_mem_clk_impl(clocks, None, MemClkConfig::new(0));
+        configure_sys_clk_impl(clocks, None, SysClkConfig::new(0));
+        configure_apb_clk_impl(clocks, None, ApbClkConfig::new(0));
+    });
+    true
+}
+
+/// Restores the CPU clock and the dividers that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    with_single_bus_clock_update(|| {
+        configure_apb_clk_impl(clocks, None, unwrap!(clocks.apb_clk()));
+        configure_sys_clk_impl(clocks, None, unwrap!(clocks.sys_clk()));
+        configure_cpu_clk_impl(clocks, None, unwrap!(clocks.cpu_clk()));
+        configure_mem_clk_impl(clocks, None, unwrap!(clocks.mem_clk()));
+        configure_cpu_root_clk_impl(clocks, None, unwrap!(clocks.cpu_root_clk()));
+    });
+    crate::psram::implem::low_speed::exit();
 }
 
 fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
