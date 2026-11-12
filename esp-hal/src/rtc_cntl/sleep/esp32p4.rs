@@ -2,7 +2,7 @@
 
 use core::{
     ops::Not,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 
 use crate::{
@@ -33,6 +33,7 @@ use crate::{
 
 static USJ_CLOCK_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
 static USJ_PAD_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
+static USJ_CONF0: AtomicU32 = AtomicU32::new(0);
 
 fn usj_module_is_enabled() -> bool {
     let clkrst = HP_SYS_CLKRST::regs();
@@ -93,6 +94,15 @@ fn usj_pad_backup_and_disable() {
         usj_reset_register();
         false
     };
+    // Clearing `usb_pad_enable` alone keeps the D+ pull-up, so the host never sees a
+    // disconnect and USJ stops responding after the sleep.
+    let conf0 = USB_DEVICE::regs().conf0();
+    USJ_CONF0.store(conf0.read().bits(), Ordering::Relaxed);
+    conf0.modify(|_, w| {
+        w.pad_pull_override().set_bit();
+        w.dp_pullup().clear_bit();
+        w.dm_pullup().clear_bit()
+    });
     usj_set_pad_enable(false);
     usj_enable_bus_clock(false);
 
@@ -103,6 +113,9 @@ fn usj_pad_backup_and_disable() {
 /// Restores the USJ pad on wake. esp-idf `sleep_console_usj_pad_restore`.
 fn usj_pad_restore() {
     usj_enable_bus_clock(true);
+    USB_DEVICE::regs()
+        .conf0()
+        .write(|w| unsafe { w.bits(USJ_CONF0.load(Ordering::Relaxed)) });
     usj_set_pad_enable(USJ_PAD_WAS_ENABLED.load(Ordering::Relaxed));
     if !USJ_CLOCK_WAS_ENABLED.load(Ordering::Relaxed) {
         usj_enable_bus_clock(false);
