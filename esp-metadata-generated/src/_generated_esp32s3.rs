@@ -490,6 +490,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         true
     };
+    ("sleep.usb_serial_jtag_in_light_sleep") => {
+        false
+    };
     ("sleep.cpu_retention_mem_size") => {
         8800
     };

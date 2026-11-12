@@ -109,6 +109,83 @@ pub(crate) fn request_sleep() -> bool {
     super::wait_for_sleep_result()
 }
 
+#[cfg(sleep_usb_serial_jtag_in_light_sleep)]
+pub(super) mod usb_serial_jtag {
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    use crate::peripherals::USB_DEVICE;
+
+    /// Whether the current light sleep keeps USB Serial/JTAG running.
+    static KEPT_IN_SLEEP: AtomicBool = AtomicBool::new(false);
+
+    /// Returns whether USB Serial/JTAG is clocked and out of reset.
+    pub(in crate::rtc_cntl::sleep) fn module_is_enabled() -> bool {
+        cfg_select! {
+            esp32p4 => {
+                crate::peripherals::HP_SYS_CLKRST::regs()
+                    .soc_clk_ctrl2()
+                    .read()
+                    .usb_device_apb_clk_en()
+                    .bit_is_set()
+                    && crate::peripherals::LP_AON_CLKRST::regs()
+                        .lp_aonclkrst_hp_usb_clkrst_ctrl1()
+                        .read()
+                        .lp_aonclkrst_rst_en_usb_device()
+                        .bit_is_clear()
+            }
+            _ => {
+                let conf = crate::peripherals::PCR::regs().usb_device_conf().read();
+                conf.usb_device_clk_en().bit_is_set() && conf.usb_device_rst_en().bit_is_clear()
+            }
+        }
+    }
+
+    /// Returns whether the USB PHY gets its clock.
+    fn phy_clock_is_enabled() -> bool {
+        cfg_select! {
+            esp32p4 => crate::peripherals::LP_AON_CLKRST::regs()
+                .lp_aonclkrst_hp_usb_clkrst_ctrl0()
+                .read()
+                .lp_aonclkrst_usb_device_48m_clk_en()
+                .bit_is_set(),
+            _ => true,
+        }
+    }
+
+    /// Returns whether a USB host sent a start-of-frame packet since the previous call.
+    ///
+    /// A connected host that has not suspended the bus sends one every millisecond. The caller
+    /// makes sure that USB Serial/JTAG is clocked and out of reset.
+    fn host_sent_sof() -> bool {
+        let regs = USB_DEVICE::regs();
+        let sof = regs.int_raw().read().sof().bit_is_set();
+        regs.int_clr().write(|w| w.sof().clear_bit_by_one());
+        sof
+    }
+
+    /// Decides whether the coming sleep keeps USB Serial/JTAG running, and returns the decision.
+    ///
+    /// A light sleep keeps it running while it is in use and a USB host is connected.
+    pub(in crate::rtc_cntl::sleep) fn decide_for_sleep(deep: bool) -> bool {
+        let keep = !deep
+            && module_is_enabled()
+            && phy_clock_is_enabled()
+            && USB_DEVICE::regs()
+                .conf0()
+                .read()
+                .usb_pad_enable()
+                .bit_is_set()
+            && host_sent_sof();
+        KEPT_IN_SLEEP.store(keep, Ordering::Relaxed);
+        keep
+    }
+
+    /// Whether the current sleep keeps USB Serial/JTAG running.
+    pub(in crate::rtc_cntl::sleep) fn kept_in_sleep() -> bool {
+        KEPT_IN_SLEEP.load(Ordering::Relaxed)
+    }
+}
+
 /// Waits until the eFuse controller has reloaded the eFuse memory after the sleep request.
 ///
 /// An eFuse read before this point can return stale data.

@@ -25,30 +25,14 @@ use crate::{
 // In light sleep the HP peripheral domain stays powered, so the USJ PHY keeps
 // driving its pads (including the D+ pull-up) while the peripheral is clock
 // gated. The host therefore keeps the device enumerated but unresponsive, and
-// the link does not recover after wake. Mirroring esp-idf `sleep_console.c`,
+// the link does not recover after wake. Unless the sleep keeps USJ running,
 // disable the USJ pad (releasing the pull-up so the host sees a clean
-// disconnect) on light-sleep entry and restore it on wake. ESP32-P4 does not
-// support keeping USJ alive across light sleep, so this is unconditional.
+// disconnect) on light-sleep entry and restore it on wake.
 // ----------------------------------------------------------------------------
 
 static USJ_CLOCK_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
 static USJ_PAD_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
 static USJ_CONF0: AtomicU32 = AtomicU32::new(0);
-
-fn usj_module_is_enabled() -> bool {
-    let clkrst = HP_SYS_CLKRST::regs();
-    let aon = LP_AON_CLKRST::regs();
-    clkrst
-        .soc_clk_ctrl2()
-        .read()
-        .usb_device_apb_clk_en()
-        .bit_is_set()
-        && aon
-            .lp_aonclkrst_hp_usb_clkrst_ctrl1()
-            .read()
-            .lp_aonclkrst_rst_en_usb_device()
-            .bit_is_clear()
-}
 
 fn usj_enable_bus_clock(enable: bool) {
     HP_SYS_CLKRST::regs()
@@ -85,7 +69,7 @@ fn usj_pad_is_enabled() -> bool {
 /// Backup and disable the USJ pad on light-sleep entry. esp-idf
 /// `sleep_console_usj_pad_backup_and_disable`.
 fn usj_pad_backup_and_disable() {
-    let clock_enabled = usj_module_is_enabled();
+    let clock_enabled = super::pmu_common::usb_serial_jtag::module_is_enabled();
     let pad_enabled = if clock_enabled {
         usj_pad_is_enabled()
     } else {
@@ -377,6 +361,9 @@ impl AnalogSleepConfig {
             this.hp_sys.bias.set_bias_sleep(false);
             this.hp_sys.bias.set_dbg_atten(0);
             this.hp_sys.regulator0.set_dbias(HP_CALI_ACTIVE_DBIAS);
+            // USB Serial/JTAG kept running in light sleep stops working at the DCDC sleep
+            // voltage.
+            this.hp_sys.bias.set_dcm_vset(HP_CALI_ACTIVE_DCM_VSET);
 
             this.lp_sys_sleep.bias.set_pd_cur(false);
             this.lp_sys_sleep.bias.set_bias_sleep(false);
@@ -840,6 +827,8 @@ impl PowerDownFlags {
 // Default DCDC voltage parameter during sleep (Kconfig
 // CONFIG_ESP_SLEEP_DCM_VSET_VAL_IN_SLEEP default).
 const DCM_VSET_IN_SLEEP: u8 = 14;
+// Active DCDC voltage parameter, about 1.25 V (esp-idf HP_CALI_ACTIVE_DCM_VSET_DEFAULT).
+const HP_CALI_ACTIVE_DCM_VSET: u8 = 27;
 // HP active calibration dbias (esp-idf HP_CALI_ACTIVE_DBIAS_DEFAULT).
 const HP_CALI_ACTIVE_DBIAS: u8 = 24;
 
@@ -894,6 +883,8 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
+        let keep_usb = super::pmu_common::usb_serial_jtag::decide_for_sleep(self.deep);
+
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
                 matches!(
@@ -923,7 +914,9 @@ impl RtcSleepConfig {
             // place. Power down the analog clock sources nothing needs while the
             // core is gated. Powering down XTAL also makes the analog config use
             // the 0.6 V light-sleep operating point.
-            self.pd_flags.set_pd_xtal(true);
+            //
+            // A USB Serial/JTAG kept running needs XTAL as the SPLL reference.
+            self.pd_flags.set_pd_xtal(!keep_usb);
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
@@ -936,6 +929,8 @@ impl RtcSleepConfig {
     /// sleep ends.
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
+        let keep_usb = super::pmu_common::usb_serial_jtag::kept_in_sleep();
+
         // Switch the CPU root clock to XTAL for the duration of sleep.
         let restore_clock_config = ClockTree::with(|clocks| {
             let old_cpu_root_clk = clocks.cpu_root_clk();
@@ -952,8 +947,29 @@ impl RtcSleepConfig {
             })
         });
 
-        let power = PowerSleepConfig::defaults(self.pd_flags);
+        let mut power = PowerSleepConfig::defaults(self.pd_flags);
+        if keep_usb {
+            // The PAC does not document which `xpd_pll` bit is the SPLL, so keep
+            // all PLLs powered, as in HP_ACTIVE.
+            power.hp_sys.clk.set_i2c_iso_en(false);
+            power.hp_sys.clk.set_i2c_retention(false);
+            power.hp_sys.clk.set_xpd_pll_i2c(0xf);
+            power.hp_sys.clk.set_xpd_pll(0xf);
+        }
         power.apply();
+
+        // The USJ registers and the JTAG bridge sit behind the HP bus clock
+        // gates, which HP_SLEEP otherwise closes.
+        let icg = if keep_usb { u32::MAX } else { 0 };
+        PMU::regs()
+            .hp_sleep_icg_hp_func()
+            .write(|w| unsafe { w.bits(icg) });
+        PMU::regs()
+            .hp_sleep_icg_hp_apb()
+            .write(|w| unsafe { w.bits(icg) });
+        PMU::regs()
+            .hp_sleep_sysclk()
+            .modify(|_, w| w.hp_sleep_icg_sys_clock_en().bit(keep_usb));
 
         let config = if self.deep {
             SleepTimeConfig::deep_sleep()
@@ -1045,7 +1061,7 @@ impl RtcSleepConfig {
         // Light sleep keeps the HP domain (and thus the USJ PHY) powered, so
         // de-enumerate USB-Serial-JTAG cleanly before sleeping and restore it
         // in `finish_sleep`. Deep sleep powers the PHY off on its own.
-        if !self.deep {
+        if !self.deep && !keep_usb {
             usj_pad_backup_and_disable();
         }
 
@@ -1079,7 +1095,6 @@ impl RtcSleepConfig {
         // the DCDC back on did not run. Switch back to the DCDC, as the bootloader leaves it.
         if self.deep {
             const DCDC_STARTUP_TIME_US: u32 = 950;
-            const HP_CALI_ACTIVE_DCM_VSET: u8 = 27;
 
             PMU::regs().power_dcdc_switch().modify(|_, w| {
                 w.force_dcdc_switch_pu().clear_bit();
@@ -1110,9 +1125,8 @@ impl RtcSleepConfig {
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
 
-        // Re-enumerate USB-Serial-JTAG (only disabled for light sleep; in deep
-        // sleep we never reach here).
-        if !self.deep {
+        // Re-enumerate USB-Serial-JTAG if `start_sleep` disconnected it.
+        if !self.deep && !super::pmu_common::usb_serial_jtag::kept_in_sleep() {
             usj_pad_restore();
         }
     }
