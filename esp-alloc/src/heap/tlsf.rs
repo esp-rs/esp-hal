@@ -1,9 +1,16 @@
 use core::{alloc::Layout, ptr::NonNull};
 
-use rlsf::Tlsf;
+use esp_config::esp_config_int;
+use rlsf::{GRANULARITY, Tlsf};
 
-// TODO: make this configurable
-type Heap = Tlsf<'static, usize, usize, { usize::BITS as usize }, { usize::BITS as usize }>;
+const MAX_ALLOCATION: usize = esp_config_int!(usize, "ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION");
+
+// The largest block is `(GRANULARITY << FLLEN) - GRANULARITY` bytes. It must hold an allocation of
+// `MAX_ALLOCATION` bytes and the block header.
+const FLLEN: usize =
+    (usize::BITS - (MAX_ALLOCATION.div_ceil(GRANULARITY) + 1).leading_zeros()) as usize;
+
+type Heap = Tlsf<'static, usize, usize, FLLEN, { usize::BITS as usize }>;
 
 pub(crate) struct TlsfHeap {
     heap: Heap,

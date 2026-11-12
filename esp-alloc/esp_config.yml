@@ -3,9 +3,10 @@ crate: esp-alloc
 options:
   - name: max_regions
     description: "Maximum number of memory regions that can be added to a
-      heap allocator. Each region slot is a small constant cost in the
-      allocator itself; only increase this if you need to register more
-      regions than the default allows."
+      heap allocator. Each region slot uses static RAM, also when no region
+      uses it: about 30 bytes with LLFF, and about 2 to 3 KB with TLSF,
+      depending on `tlsf_max_allocation`. Set this to the number of regions
+      that the application adds."
     default:
       - value: 3
     constraints:
@@ -23,3 +24,18 @@ options:
           value:
             - "LLFF"
             - "TLSF"
+
+  - name: tlsf_max_allocation
+    description: "The largest allocation in bytes that the TLSF heap supports. Larger allocations
+      fail. The TLSF control structure of each heap region grows by about 132 bytes each time this
+      value doubles. Only used when `heap_algorithm` is `TLSF`."
+    default:
+      - if: "psram_driver_supported"
+        value: 67108864
+      - value: 524288
+    constraints:
+      - type:
+          validator: integer_in_range
+          value:
+            start: 16
+            end: 2147483648

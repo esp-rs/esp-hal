@@ -3,6 +3,8 @@
 //% CHIP_FILTER(llff, tlsf): psram_driver_supported
 //% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
+// One granule below 1 MiB, so that the block header needs the next TLSF size class.
+//% ENV(tlsf): ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION=1048560
 // The default 64KB leaves nothing to reclaim, see the dcache_reclaimed tests below.
 //% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
 //% FEATURES: unstable esp-alloc/nightly
@@ -64,6 +66,14 @@ mod tests {
             for i in 0..free {
                 assert_eq!(vec[i], crate::pattern(i));
             }
+        }
+    }
+
+    #[test]
+    fn largest_tlsf_allocation_succeeds() {
+        if option_env!("ESP_ALLOC_CONFIG_HEAP_ALGORITHM") == Some("TLSF") {
+            let mut vec = AllocVec::<u8>::new();
+            assert!(vec.try_reserve_exact(1048560).is_ok());
         }
     }
 
