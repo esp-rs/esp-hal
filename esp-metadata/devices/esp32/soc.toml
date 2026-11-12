@@ -19,7 +19,7 @@ page_size = 0x10000
 entry_num = 256
 
 [device.flash]
-support_status = "partial"
+support_status = { status = "partial", issue = 6757 }
 
 [device.rom]
 has_crc_le  = true
@@ -109,7 +109,7 @@ peripherals = [
 # {include clocks.toml}
 
 [device.adc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6747 }
 line_calibration = true
 instances = [
     { name = "adc1" },
@@ -127,7 +127,7 @@ key_length = { options = [
 ] }
 
 [device.dac]
-support_status = "partial"
+support_status = { status = "partial", issue = 6752 }
 instances = [
     { name = "dac1" },
     { name = "dac2" },
@@ -165,11 +165,11 @@ engines = [
 ]
 
 [device.gpio]
-support_status = "supported"
+support_status = { status = "supported", issue = 6758 }
 # {include gpio.toml}
 
 [device.i2c_master]
-support_status = "supported"
+support_status = { status = "supported", issue = 6760 }
 version = 1
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
@@ -189,7 +189,7 @@ support_status = "not_supported"
 version = "esp32"
 
 [device.interrupts]
-support_status = "partial"
+support_status = { status = "partial", issue = 6764 }
 status_registers = 3
 software_interrupt_count = 4
 controller = "Xtensa"
@@ -221,7 +221,7 @@ channel_count = 8
 version = 1
 fifo_size = 64
 bit_order_is_bool = true
-support_status = "supported"
+support_status = { status = "supported", issue = 6776 }
 instances = [
     {
         name = "spi2",
@@ -240,7 +240,7 @@ instances = [
 ]
 
 [device.spi_slave]
-support_status = "partial"
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",
@@ -261,13 +261,13 @@ instances = [
 ]
 
 [device.timergroup]
-support_status = "partial"
+support_status = { status = "partial", issue = 6779 }
 timg_has_timer1 = true
 timg_has_divcnt_rst = false
 instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
-support_status = { status = "supported", issue = 6138 }
+support_status = { status = "supported", issue = 6782 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
@@ -280,7 +280,7 @@ version = 1
 support_status = "not_supported"
 
 [device.ethernet]
-support_status = "partial"
+support_status = { status = "partial", issue = 6755 }
 rx_store_and_forward = true
 # Type-2 COE can mark valid frames as checksum errors (and CIC insertion
 # is also unreliable), so both directions stay in software.
@@ -292,7 +292,7 @@ dma_alignment = 4
 [device.camera]
 support_status = "not_supported"
 [device.rgb_display]
-support_status = "partial"
+support_status = { status = "partial", issue = 6744 }
 output_lines = 24
 
 [device.rng]
@@ -301,7 +301,7 @@ trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
 [device.sleep]
-support_status = "partial"
+support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 deep_sleep = true
 ext1_version = 1
@@ -326,6 +326,7 @@ wakeup_sources = {
 
 ## Interfaces
 [device.i2s]
+support_status = { status = "partial", issue = 6762 }
 version = 1
 mclk_divider_bit_width = 6
 max_ws_width = 128
@@ -358,9 +359,11 @@ instances = [
 ]
 
 [device.ledc]
+support_status = { status = "partial", issue = 6765 }
 version = 1
 channel_count = 8
 [device.mcpwm]
+support_status = { status = "partial", issue = 6768 }
 [device.pcnt]
 instances = {
     PCNT = {
@@ -380,7 +383,7 @@ instances = {
 }
 
 [device.sdmmc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6774 }
 has_iomux = true
 has_gpio_matrix = false
 psram_dma = false
@@ -406,11 +409,15 @@ slot_config = [
 [device.sd_slave]
 support_status = "not_supported"
 [device.touch]
+support_status = { status = "partial", issue = 6780 }
 [device.twai]
+support_status = { status = "partial", issue = 6781 }
 
 ## Miscellaneous
 [device.io_mux]
+support_status = { status = "partial", issue = 6758 }
 [device.psram]
+support_status = { status = "partial", issue = 6773 }
 extmem_origin = 0x3F800000
 [device.temp_sensor]
 support_status = "not_supported"
@@ -421,12 +428,13 @@ support_status = { status = "not_supported", issue = 376 }
 
 ## Radio
 [device.wifi]
+support_status = { status = "partial", issue = 6788 }
 mac_version = 1
 csi_supported = true
 has_nan = true
 
 [device.bt]
-support_status = "partial"
+support_status = { status = "partial", issue = 6750 }
 controller = "btdm"
 
 [device.phy]

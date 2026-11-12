@@ -18,7 +18,7 @@ page_size = 0x10000
 entry_num = 384
 
 [device.flash]
-support_status = "partial"
+support_status = { status = "partial", issue = 6757 }
 
 [device.rom]
 has_crc_le  = true
@@ -115,7 +115,7 @@ peripherals = [
 # {include clocks.toml}
 
 [device.adc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6747 }
 controller = "rtc"
 line_calibration = true
 curve_calibration = true
@@ -176,12 +176,12 @@ engines = [
 ]
 
 [device.gpio]
-support_status = "supported"
+support_status = { status = "supported", issue = 6758 }
 # {include gpio.toml}
 
 [device.dedicated_gpio]
 version = "esp32s3"
-support_status = "partial"
+support_status = { status = "partial", issue = 6753 }
 channels = [
     ["PRO_ALONEGPIO0", "PRO_ALONEGPIO1", "PRO_ALONEGPIO2", "PRO_ALONEGPIO3", "PRO_ALONEGPIO4", "PRO_ALONEGPIO5", "PRO_ALONEGPIO6", "PRO_ALONEGPIO7"],
     ["CORE1_GPIO0",    "CORE1_GPIO1",    "CORE1_GPIO2",    "CORE1_GPIO3",    "CORE1_GPIO4",    "CORE1_GPIO5",    "CORE1_GPIO6",    "CORE1_GPIO7"   ]
@@ -189,7 +189,7 @@ channels = [
 needs_initialization = true
 
 [device.i2c_master]
-support_status = "supported"
+support_status = { status = "supported", issue = 6760 }
 version = 3
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
@@ -212,11 +212,11 @@ has_pd_en = true
 support_status = { status = "not_supported", issue = 1909 }
 
 [device.lp_i2c_master]
-support_status = "partial"
+support_status = { status = "partial", issue = 6766 }
 version = "rtc_i2c"
 
 [device.interrupts]
-support_status = "partial"
+support_status = { status = "partial", issue = 6764 }
 status_registers = 4
 software_interrupt_count = 4
 controller = "Xtensa"
@@ -242,7 +242,7 @@ size_increment = 32
 memory_size_bytes = 512
 
 [device.sha]
-support_status = "partial"
+support_status = { status = "partial", issue = 6775 }
 algo = {
     sha1 = 0,
     sha224 = 1,
@@ -261,7 +261,7 @@ channel_count = 8
 [device.spi_master]
 version = 3
 fifo_size = 64
-support_status = "supported"
+support_status = { status = "supported", issue = 6776 }
 has_octal = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
@@ -283,7 +283,7 @@ instances = [
 ]
 
 [device.spi_slave]
-support_status = "partial"
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",
@@ -304,13 +304,13 @@ instances = [
 ]
 
 [device.timergroup]
-support_status = "partial"
+support_status = { status = "partial", issue = 6779 }
 timg_has_timer1 = true
 timg_has_divcnt_rst = false
 instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
-support_status = "supported"
+support_status = { status = "supported", issue = 6782 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
@@ -322,7 +322,7 @@ has_sclk_divider = true
 has_sclk_enable = true
 
 [device.uhci]
-support_status = "partial"
+support_status = { status = "partial", issue = 6783 }
 
 [device.touch]
 support_status = { status = "not_supported", issue = 1905 }
@@ -336,7 +336,7 @@ trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
 [device.sleep]
-support_status = "partial"
+support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 deep_sleep = true
 ext1_version = 1
@@ -384,9 +384,11 @@ cpu_retention_mem_end = 0x3FCF0000
 
 ## Crypto
 [device.hmac]
+support_status = { status = "partial", issue = 6759 }
 
 ## Interfaces
 [device.i2s]
+support_status = { status = "partial", issue = 6762 }
 version = 2
 mclk_divider_bit_width = 9
 max_ws_width = 128
@@ -422,13 +424,17 @@ instances = [
 ]
 
 [device.camera]
+support_status = { status = "partial", issue = 6751 }
 [device.rgb_display]
+support_status = { status = "partial", issue = 6744 }
 output_lines = 16
 
 [device.ledc]
+support_status = { status = "partial", issue = 6765 }
 version = 2
 channel_count = 8
 [device.mcpwm]
+support_status = { status = "partial", issue = 6768 }
 [device.pcnt]
 instances = {
     PCNT = {
@@ -444,7 +450,7 @@ instances = {
 }
 
 [device.sdmmc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6774 }
 delay_phase_num = 4
 has_iomux = false
 has_gpio_matrix = true
@@ -481,28 +487,36 @@ slot_config = [
 ]
 
 [device.twai]
+support_status = { status = "partial", issue = 6781 }
 [device.usb_otg]
+support_status = { status = "partial", issue = 6785 }
 fifo_depth_words = 256
 
 [device.usb_serial_jtag]
+support_status = { status = "partial", issue = 6787 }
 
 ## Miscellaneous
 [device.io_mux]
+support_status = { status = "partial", issue = 6758 }
 [device.psram]
+support_status = { status = "partial", issue = 6773 }
 extmem_origin = 0x3C000000
 octal_spi = true
 has_timing_tuning = true
 
 [device.systimer]
 [device.temp_sensor]
+support_status = { status = "partial", issue = 6778 }
 register_block = "sens"
 [device.ulp_fsm]
 support_status = { status = "not_supported", issue = 376 }
 [device.ulp_riscv]
+support_status = { status = "partial", issue = 6784 }
 [device.lp_timer]
 
 ## Radio
 [device.wifi]
+support_status = { status = "partial", issue = 6788 }
 mac_version = 1
 csi_supported = true
 has_ftm = true

@@ -528,7 +528,7 @@ pins = [
 ]
 
 [device.lp_io]
-support_status = "partial"
+support_status = { status = "partial", issue = 6767 }
 version = "esp32p4"
 lp_input_signals = [
     { name = "LP_I2C_SCL",   id = 0 },
