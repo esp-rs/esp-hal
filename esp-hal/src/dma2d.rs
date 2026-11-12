@@ -5,8 +5,6 @@
 
 use core::sync::atomic::{Ordering, compiler_fence};
 
-use esp_sync::NonReentrantMutex;
-
 pub use self::{rx::AnyDma2dRxChannel, tx::AnyDma2dTxChannel};
 use crate::{
     peripherals::{DMA2D, HP_SYS},
@@ -54,75 +52,22 @@ mod rx {
     }
 }
 
-static SHARED: NonReentrantMutex<Option<Shared>> = NonReentrantMutex::new(None);
+fn init_dma2d() {
+    // DMA2D transfers stall while SRAM low-power enable is set.
+    HP_SYS::regs()
+        .dma2d_mem_lp_ctrl()
+        .modify(|_, w| w._2ddma_mem_lp_en().clear_bit());
 
-struct Shared {
-    _clock: GenericPeripheralGuard<{ Peripheral::Dma2d as u8 }>,
-    memory_low_power: (bool, bool),
-    users: usize,
-}
-
-impl Shared {
-    fn new() -> Self {
-        let clock = GenericPeripheralGuard::new();
-        let memory = HP_SYS::regs().dma2d_mem_lp_ctrl();
-        let previous = memory.read();
-        memory.modify(|_, w| {
-            w._2ddma_mem_force_ctrl().set_bit();
-            w._2ddma_mem_lp_en().clear_bit()
-        });
-        let dma = DMA2D::regs();
-        dma.rst_conf().modify(|_, w| {
-            w.clk_en().set_bit();
-            w.axim_rd_rst().set_bit();
-            w.axim_wr_rst().set_bit()
-        });
-        dma.rst_conf().modify(|_, w| {
-            w.axim_rd_rst().clear_bit();
-            w.axim_wr_rst().clear_bit()
-        });
-        Self {
-            _clock: clock,
-            memory_low_power: (
-                previous._2ddma_mem_force_ctrl().bit(),
-                previous._2ddma_mem_lp_en().bit(),
-            ),
-            users: 0,
-        }
-    }
-}
-
-impl Drop for Shared {
-    fn drop(&mut self) {
-        HP_SYS::regs().dma2d_mem_lp_ctrl().modify(|_, w| {
-            w._2ddma_mem_force_ctrl().bit(self.memory_low_power.0);
-            w._2ddma_mem_lp_en().bit(self.memory_low_power.1)
-        });
-    }
-}
-
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-struct SharedGuard;
-
-impl SharedGuard {
-    fn new() -> Self {
-        SHARED.with(|state| state.get_or_insert_with(Shared::new).users += 1);
-        Self
-    }
-}
-
-impl Drop for SharedGuard {
-    fn drop(&mut self) {
-        SHARED.with(|state| {
-            let shared = state.as_mut().unwrap();
-            shared.users -= 1;
-            if shared.users == 0 {
-                // Restore memory settings and gate the clock before a new pair can initialize.
-                *state = None;
-            }
-        });
-    }
+    let dma = DMA2D::regs();
+    dma.rst_conf().modify(|_, w| {
+        w.clk_en().set_bit();
+        w.axim_rd_rst().set_bit();
+        w.axim_wr_rst().set_bit()
+    });
+    dma.rst_conf().modify(|_, w| {
+        w.axim_rd_rst().clear_bit();
+        w.axim_wr_rst().clear_bit()
+    });
 }
 
 #[derive(Debug)]
@@ -130,7 +75,7 @@ impl Drop for SharedGuard {
 pub(crate) struct Channels<'d> {
     tx: AnyDma2dTxChannel<'d>,
     rx: AnyDma2dRxChannel<'d>,
-    _guard: SharedGuard,
+    _guard: GenericPeripheralGuard<{ Peripheral::Dma2d as u8 }>,
 }
 
 impl<'d> Channels<'d> {
@@ -141,7 +86,7 @@ impl<'d> Channels<'d> {
         Self {
             tx: tx.into(),
             rx: rx.into(),
-            _guard: SharedGuard::new(),
+            _guard: GenericPeripheralGuard::new_with(init_dma2d),
         }
     }
 

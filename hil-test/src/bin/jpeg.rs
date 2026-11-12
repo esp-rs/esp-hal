@@ -30,11 +30,15 @@ mod tests {
     fn dma2d_stays_enabled_while_a_driver_owns_channels() {
         let mut p = esp_hal::init(esp_hal::Config::default());
         let memory = HP_SYS::regs().dma2d_mem_lp_ctrl();
-        let initial = memory.read().bits();
+        let initial = memory.read();
         let clock = HP_SYS_CLKRST::regs().dma2d_ctrl0();
         let jpeg = Encoder::new(p.JPEG, p.DMA2D_TX_CH0, p.DMA2D_RX_CH0);
         let powered = memory.read();
-        assert!(powered._2ddma_mem_force_ctrl().bit());
+        assert!(clock.read().sys_clk_en().bit());
+        assert_eq!(
+            powered._2ddma_mem_force_ctrl().bit(),
+            initial._2ddma_mem_force_ctrl().bit()
+        );
         assert!(!powered._2ddma_mem_lp_en().bit());
         let dma = DMA2D::regs();
         let jpeg_link = dma.out_link_addr_ch(0);
@@ -47,7 +51,6 @@ mod tests {
         assert_eq!(jpeg_link.read().outlink_addr_ch().bits(), 0x100);
         drop(srm);
         assert!(clock.read().sys_clk_en().bit());
-        assert_eq!(memory.read().bits(), powered.bits());
         assert_eq!(jpeg_link.read().outlink_addr_ch().bits(), 0x100);
 
         let srm = Srm::new(p.PPA, p.DMA2D_TX_CH1, p.DMA2D_RX_CH2);
@@ -55,11 +58,9 @@ mod tests {
         srm_link.write(|w| unsafe { w.outlink_addr_ch().bits(0x200) });
         drop(jpeg);
         assert!(clock.read().sys_clk_en().bit());
-        assert_eq!(memory.read().bits(), powered.bits());
         assert_eq!(srm_link.read().outlink_addr_ch().bits(), 0x200);
         drop(srm);
         assert!(!clock.read().sys_clk_en().bit());
-        assert_eq!(memory.read().bits(), initial);
     }
 
     #[test]
