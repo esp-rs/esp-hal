@@ -202,7 +202,11 @@ bus_timeout_is_exponential = true
 has_pd_en = true
 
 [device.i2c_slave]
-support_status = { status = "not_supported", issue = 1909 }
+support_status = { status = "partial", issue = 6761 }
+instances = [
+    { name = "i2c0" },
+    { name = "i2c1" },
+]
 
 [device.spi_master]
 support_status = { status = "partial", issue = 6776 }
