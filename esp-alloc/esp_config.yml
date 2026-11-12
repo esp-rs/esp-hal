@@ -26,9 +26,10 @@ options:
             - "TLSF"
 
   - name: tlsf_max_allocation
-    description: "The largest allocation in bytes that the TLSF heap supports. Larger allocations
-      fail. The TLSF control structure of each heap region grows by about 132 bytes each time this
-      value doubles. Only used when `heap_algorithm` is `TLSF`."
+    description: "The largest allocation in bytes that the TLSF heap is guaranteed to support,
+      with an alignment of up to 8 bytes. Larger allocations may fail. The TLSF control structure
+      of each heap region grows by about 132 bytes each time this value doubles. Only used when
+      `heap_algorithm` is `TLSF`."
     default:
       - if: "psram_driver_supported"
         value: 67108864

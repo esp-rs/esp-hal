@@ -5,12 +5,17 @@ use rlsf::{GRANULARITY, Tlsf};
 
 const MAX_ALLOCATION: usize = esp_config_int!(usize, "ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION");
 
-// The largest block is `(GRANULARITY << FLLEN) - GRANULARITY` bytes. It must hold an allocation of
-// `MAX_ALLOCATION` bytes and the block header.
-const FLLEN: usize =
-    (usize::BITS - (MAX_ALLOCATION.div_ceil(GRANULARITY) + 1).leading_zeros()) as usize;
+const SLLEN: usize = usize::BITS as usize;
 
-type Heap = Tlsf<'static, usize, usize, FLLEN, { usize::BITS as usize }>;
+// `Tlsf::allocate` searches for the allocation plus the block header, rounded up to
+// `GRANULARITY`. It then rounds that size up to the start of the next second-level list, which can
+// be up to `1 / SLLEN` larger. That list's first level must be below `FLLEN`.
+const SEARCH_SIZE: usize = (MAX_ALLOCATION + GRANULARITY / 2).next_multiple_of(GRANULARITY);
+const LIST_SIZE: usize =
+    SEARCH_SIZE.next_multiple_of(1 << SEARCH_SIZE.ilog2().saturating_sub(SLLEN.ilog2()));
+const FLLEN: usize = (LIST_SIZE.ilog2() - GRANULARITY.ilog2() + 1) as usize;
+
+type Heap = Tlsf<'static, usize, usize, FLLEN, SLLEN>;
 
 pub(crate) struct TlsfHeap {
     heap: Heap,
