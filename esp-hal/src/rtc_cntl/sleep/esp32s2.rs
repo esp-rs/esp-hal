@@ -591,12 +591,11 @@ impl RtcSleepConfig {
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
-    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
-    /// sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
-        let restore_clock_config = super::cpu_clock_for_sleep();
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        let cpu_clk = super::SleepCpuClock::switch_to_xtal();
 
         unsafe {
             LPWR::regs()
@@ -615,7 +614,7 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.sleep_reject_ena().bits(reject_mask));
         }
 
-        restore_clock_config
+        SavedState { cpu_clk }
     }
 
     /// Requests the sleep.
@@ -649,5 +648,18 @@ impl RtcSleepConfig {
                     .bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT)
             });
         }
+    }
+}
+
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    cpu_clk: super::SleepCpuClock,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        self.cpu_clk.restore();
     }
 }

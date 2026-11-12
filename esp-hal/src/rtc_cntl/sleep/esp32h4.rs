@@ -2,7 +2,6 @@ use core::ops::Not;
 
 use crate::{
     peripherals::{HP_APM, LP_AON, PMU},
-    private::DropGuard,
     rtc_cntl::{
         Rtc,
         rtc::{
@@ -719,37 +718,17 @@ impl RtcSleepConfig {
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
-    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
-    /// sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
         // rtc_clk_cpu_freq_set_xtal_for_sleep: XTAL as the root clock, without dividers.
-        let restore_clock_config = ClockTree::with(|clocks| {
-            let old_root = clocks.hp_root_clk();
-            let old_cpu = clocks.cpu_clk();
-            let old_ahb = clocks.ahb_clk();
-
+        let (hp_root_clk, cpu_clk, ahb_clk) = ClockTree::with(|clocks| {
+            let old = (clocks.hp_root_clk(), clocks.cpu_clk(), clocks.ahb_clk());
             clocks::configure_hp_root_clk(clocks, HpRootClkConfig::Xtal);
             clocks::configure_cpu_clk(clocks, CpuClkConfig::new(CpuClkDivisor::_0));
             clocks::configure_ahb_clk(clocks, AhbClkConfig::new(0));
-
-            DropGuard::new((), move |_| {
-                ClockTree::with(|clocks| {
-                    crate::soc::clocks::reconfigure_pll(clocks);
-                    // AHB_CLK may not exceed 32 MHz, so the dividers change before the root
-                    // clock.
-                    if let Some(old_ahb) = old_ahb {
-                        clocks::configure_ahb_clk(clocks, old_ahb);
-                    }
-                    if let Some(old_cpu) = old_cpu {
-                        clocks::configure_cpu_clk(clocks, old_cpu);
-                    }
-                    if let Some(old_root) = old_root {
-                        clocks::configure_hp_root_clk(clocks, old_root);
-                    }
-                });
-            })
+            old
         });
 
         // pmu_sleep_config_default + pmu_sleep_init.
@@ -810,7 +789,11 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl4()
             .write(|w| w.slp_reject_cause_clr().bit(true));
 
-        restore_clock_config
+        SavedState {
+            hp_root_clk,
+            cpu_clk,
+            ahb_clk,
+        }
     }
 
     /// Requests the sleep.
@@ -833,5 +816,32 @@ impl RtcSleepConfig {
 
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
+    }
+}
+
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    hp_root_clk: Option<HpRootClkConfig>,
+    cpu_clk: Option<CpuClkConfig>,
+    ahb_clk: Option<AhbClkConfig>,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        ClockTree::with(|clocks| {
+            clocks::reconfigure_pll(clocks);
+            // AHB_CLK may not exceed 32 MHz, so the dividers change before the root clock.
+            if let Some(ahb_clk) = self.ahb_clk {
+                clocks::configure_ahb_clk(clocks, ahb_clk);
+            }
+            if let Some(cpu_clk) = self.cpu_clk {
+                clocks::configure_cpu_clk(clocks, cpu_clk);
+            }
+            if let Some(hp_root_clk) = self.hp_root_clk {
+                clocks::configure_hp_root_clk(clocks, hp_root_clk);
+            }
+        });
     }
 }
