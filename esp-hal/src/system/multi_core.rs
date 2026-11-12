@@ -3,12 +3,38 @@
 use core::{
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
-    sync::atomic::{AtomicPtr, Ordering},
 };
 
 #[instability::unstable]
 pub use crate::soc::cpu_control::is_running;
 use crate::{peripherals::CPU_CTRL, soc::cpu_control::internal_park_core, system::Cpu};
+
+// Runtime contract, keep stable.
+cfg_select! {
+    feature = "rt" => {
+        mod start;
+
+        pub(crate) use start::app_core_takes_ipc;
+        use start::start_app_core;
+
+        use crate::interrupt::ipc::{defer_context_switch, resume_context_switch};
+    }
+    _ => {
+        unsafe extern "Rust" {
+            #[link_name = "esp_hal_start_app_core"]
+            fn start_app_core(
+                stack_top: *mut u32,
+                stack_guard: *mut u32,
+                entry: unsafe fn(*mut ()),
+                arg: *mut (),
+            ) -> bool;
+            #[link_name = "esp_hal_defer_context_switch"]
+            safe fn defer_context_switch();
+            #[link_name = "esp_hal_resume_context_switch"]
+            fn resume_context_switch();
+        }
+    }
+}
 
 /// Data type for a properly aligned stack of N bytes
 // Xtensa ISA 10.5: [B]y default, the
@@ -69,12 +95,6 @@ impl<const SIZE: usize> Stack<SIZE> {
         unsafe { self.bottom().add(SIZE / 4) }
     }
 }
-
-// Pointer to the closure that will be executed on the second core. The closure
-// is copied to the core's stack.
-pub(crate) static START_CORE1_FUNCTION: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
-pub(crate) static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
-pub(crate) static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 
 /// Will park the APP (second) core when dropped.
 ///
@@ -224,24 +244,6 @@ impl<'d> CpuControl<'d> {
         unsafe { internal_park_core(core, false) };
     }
 
-    /// Runs the core1 closure.
-    #[inline(never)]
-    pub(crate) unsafe fn start_core1_run<F>() -> !
-    where
-        F: FnOnce(),
-    {
-        let entry = START_CORE1_FUNCTION.load(Ordering::Acquire);
-        debug_assert!(!entry.is_null());
-
-        unsafe {
-            let entry = ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>());
-            entry();
-            loop {
-                internal_park_core(Cpu::current(), true);
-            }
-        }
-    }
-
     /// Starts the APP (second) core.
     ///
     /// The second core starts running the closure `entry`. The core enables interrupts before
@@ -290,21 +292,12 @@ impl<'d> CpuControl<'d> {
         F: FnOnce(),
         F: Send + 'a,
     {
-        if !crate::debugger::debugger_connected() && is_running(Cpu::AppCpu) {
+        let (entry, stack_top, stack_guard) =
+            setup_second_core_stack(stack, stack_guard_offset, entry);
+
+        if !unsafe { start_app_core(stack_top, stack_guard, run_entry::<F>, entry) } {
+            unsafe { ManuallyDrop::drop(&mut *entry.cast::<ManuallyDrop<F>>()) };
             return Err(Error::CoreAlreadyRunning);
-        }
-
-        setup_second_core_stack(stack, stack_guard_offset, entry);
-
-        app_core_starting();
-        crate::soc::cpu_control::start_core1(start_core1_init::<F> as *const u32);
-
-        self.unpark_core(Cpu::AppCpu);
-
-        // The APP core can hold a lock during startup. The flash driver must not park the APP
-        // core before startup ends.
-        while !app_core_takes_ipc() {
-            core::hint::spin_loop();
         }
 
         Ok(AppCoreGuard {
@@ -313,11 +306,21 @@ impl<'d> CpuControl<'d> {
     }
 }
 
+/// Calls the closure that [`setup_second_core_stack`] placed at `entry`.
+unsafe fn run_entry<F>(entry: *mut ())
+where
+    F: FnOnce(),
+{
+    unsafe { ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>())() }
+}
+
+/// Places `entry` on the stack. Returns the address of `entry`, the stack top and the stack guard.
 fn setup_second_core_stack<'a, F, const SIZE: usize>(
     stack: &'static mut Stack<SIZE>,
     stack_guard_offset: Option<usize>,
     entry: F,
-) where
+) -> (*mut (), *mut u32, *mut u32)
+where
     F: FnOnce(),
     F: Send + 'a,
 {
@@ -348,265 +351,6 @@ fn setup_second_core_stack<'a, F, const SIZE: usize>(
 
         entry_dst.write(entry);
 
-        let entry_fn = entry_dst.cast::<()>();
-        #[cfg(soc_cpu_pma_needs_core1_setup)]
-        pma::save_core0_pma(&mut *core0_pma_slot::<F>(entry_fn));
-        START_CORE1_FUNCTION.store(entry_fn, Ordering::Release);
-        APP_CORE_STACK_TOP.store(stack.top(), Ordering::Release);
-        APP_CORE_STACK_GUARD.store(stack_guard.cast(), Ordering::Release);
-    }
-}
-
-#[cfg(soc_cpu_pma_needs_core1_setup)]
-fn core0_pma_slot<F>(entry: *mut ()) -> *mut [u32; 32] {
-    let end = entry.cast::<u8>().wrapping_add(core::mem::size_of::<F>());
-    end.wrapping_add(end.align_offset(core::mem::align_of::<u32>()))
-        .cast()
-}
-
-#[cfg(soc_cpu_pma_needs_core1_setup)]
-mod pma {
-    macro_rules! read_csr {
-        ($csr:literal) => {{
-            let value: u32;
-            unsafe { core::arch::asm!(concat!("csrr {0}, ", $csr), out(reg) value) };
-            value
-        }};
-    }
-
-    macro_rules! write_csr {
-        ($csr:literal, $value:expr) => {
-            unsafe { core::arch::asm!(concat!("csrw ", $csr, ", {0}"), in(reg) $value) }
-        };
-    }
-
-    macro_rules! pma_entries {
-        ($($i:literal: $cfg:literal, $addr:literal;)*) => {
-            pub(super) fn save_core0_pma(dst: &mut [u32; 32]) {
-                $(
-                    dst[$i] = read_csr!($cfg);
-                    dst[$i + 16] = read_csr!($addr);
-                )*
-            }
-
-            pub(super) fn set_core1_pma(src: &[u32; 32]) {
-                $(
-                    write_csr!($addr, src[$i + 16]);
-                    write_csr!($cfg, src[$i]);
-                )*
-            }
-        };
-    }
-
-    pma_entries! {
-        0: "0xbc0", "0xbd0";
-        1: "0xbc1", "0xbd1";
-        2: "0xbc2", "0xbd2";
-        3: "0xbc3", "0xbd3";
-        4: "0xbc4", "0xbd4";
-        5: "0xbc5", "0xbd5";
-        6: "0xbc6", "0xbd6";
-        7: "0xbc7", "0xbd7";
-        8: "0xbc8", "0xbd8";
-        9: "0xbc9", "0xbd9";
-        10: "0xbca", "0xbda";
-        11: "0xbcb", "0xbdb";
-        12: "0xbcc", "0xbdc";
-        13: "0xbcd", "0xbdd";
-        14: "0xbce", "0xbde";
-        15: "0xbcf", "0xbdf";
-    }
-}
-
-/// Core 1 entry point, set as the boot address.
-#[cfg(xtensa)]
-pub(crate) fn start_core1_init<F>() -> !
-where
-    F: FnOnce(),
-{
-    // disables interrupts
-    unsafe {
-        xtensa_lx::interrupt::set_mask(0);
-    }
-
-    // reset cycle compare registers
-    xtensa_lx::timer::set_ccompare0(0);
-    xtensa_lx::timer::set_ccompare1(0);
-    xtensa_lx::timer::set_ccompare2(0);
-
-    unsafe extern "C" {
-        static mut _init_start: u32;
-    }
-
-    // set vector table and stack pointer
-    unsafe {
-        xtensa_lx::set_vecbase(&raw const _init_start);
-        xtensa_lx::set_stack_pointer(APP_CORE_STACK_TOP.load(Ordering::Acquire));
-
-        #[cfg(all(feature = "rt", stack_guard_monitoring))]
-        {
-            let stack_guard = APP_CORE_STACK_GUARD.load(Ordering::Acquire);
-            stack_guard.write_volatile(esp_config::esp_config_int!(
-                u32,
-                "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-            ));
-            // setting 0 effectively disables the functionality
-            crate::debugger::set_stack_watchpoint(stack_guard as usize);
-        }
-    }
-
-    // The ROM has already handed off to us; clear the AppCpu boot address so a
-    // subsequent reset doesn't see a stale entry point. Matches IDF's
-    // `call_start_cpu1`.
-    cfg_select! {
-        esp32 => {
-            crate::peripherals::DPORT::regs()
-                .appcpu_ctrl_d()
-                .write(|w| unsafe { w.appcpu_boot_addr().bits(0) });
-        }
-        _ => crate::rom::ets_set_appcpu_boot_addr(0),
-    }
-
-    // Do not call setup_interrupts as that would disable peripheral interrupts, too.
-    unsafe { crate::interrupt::init_vectoring() };
-
-    enable_app_core_interrupts();
-
-    // Trampoline to run from the new stack.
-    // start_core1_run should _NEVER_ be inlined
-    // as we rely on the function call to use
-    // the new stack.
-    unsafe { CpuControl::start_core1_run::<F>() }
-}
-
-/// Core 1 entry point, set as the boot address.
-///
-/// ROM jumps here directly, bypassing `_start`, so `gp`, the FPU and the stack pointer need to be
-/// set up before entering regular Rust.
-#[cfg(riscv)]
-#[unsafe(naked)]
-pub(crate) extern "C" fn start_core1_init<F>() -> !
-where
-    F: FnOnce(),
-{
-    core::arch::naked_asm!(
-        ".option push",
-        ".option norelax",
-        "la gp, __global_pointer$",
-        "li ra, 0", // ensure probe-rs stops unwinding
-        ".option pop",
-        // Follow IDF's FPU initialization (rv_utils_enable_fpu, rv_utils_clear_fpu): enable the
-        // FPU in Initial state, touch fcsr (which makes the state Dirty), then clear the dirty
-        // bit to leave mstatus.FS in Clean state (0b10), which is what the interrupt handler
-        // expects.
-        "li t0, 0x2000",
-        "csrs mstatus, t0",
-        "li t0, 1",
-        "csrw fcsr, t0",
-        "li t0, 0x2000",
-        "csrc mstatus, t0",
-        // Switch to Core 1's stack (stored by Core 0 before releasing this core).
-        "la t0, {stack_top}",
-        "lw sp, 0(t0)",
-        "j {init}",
-        stack_top = sym APP_CORE_STACK_TOP,
-        init = sym start_core1_init_impl::<F>,
-    )
-}
-
-#[cfg(riscv)]
-fn start_core1_init_impl<F>() -> !
-where
-    F: FnOnce(),
-{
-    #[cfg(soc_cpu_pma_needs_core1_setup)]
-    pma::set_core1_pma(unsafe {
-        &*core0_pma_slot::<F>(START_CORE1_FUNCTION.load(Ordering::Acquire))
-    });
-
-    crate::soc::branch_predictor::enable();
-
-    // The ROM has already handed off to us; clear the AppCpu boot address so a subsequent software
-    // reset doesn't re-enter this stale entry point. Matches IDF's `call_start_cpu1`.
-    crate::rom::ets_set_appcpu_boot_addr(0);
-
-    unsafe {
-        #[cfg(all(feature = "rt", stack_guard_monitoring))]
-        {
-            let guard = APP_CORE_STACK_GUARD.load(Ordering::Acquire);
-            guard.write_volatile(esp_config::esp_config_int!(
-                u32,
-                "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-            ));
-            crate::debugger::set_stack_watchpoint(guard as usize);
-        }
-        crate::interrupt::init_vectoring();
-    }
-
-    enable_app_core_interrupts();
-
-    unsafe { CpuControl::start_core1_run::<F>() }
-}
-
-fn enable_app_core_interrupts() {
-    unsafe {
-        crate::interrupt::RunLevel::change(crate::interrupt::RunLevel::ThreadMode);
-        #[cfg(riscv)]
-        core::arch::asm!("csrsi mstatus, 8", options(nomem, nostack));
-    }
-    app_core_started();
-}
-
-// A build can hold esp-hal versions without the `rt` feature. Those versions call the functions
-// below by symbol name. The names and signatures must stay stable.
-cfg_select! {
-    feature = "rt" => {
-        use core::sync::atomic::AtomicBool;
-
-        use crate::interrupt::ipc::{defer_context_switch, resume_context_switch};
-
-        static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
-
-        /// Marks the APP core as not running code of this program before the APP core starts.
-        #[unsafe(export_name = "esp_hal_app_core_starting")]
-        fn app_core_starting() {
-            APP_CORE_TAKES_IPC.store(false, Ordering::Release);
-            // Posts to the APP core return `Offline` after the store, so no post adds a request
-            // to the APP core while this call fails the requests that the APP core did not run.
-            unsafe { crate::interrupt::ipc::fail_stranded(Cpu::AppCpu) };
-            // The APP core can stop while a `SchedulerSuspendGuard` is alive on the APP core.
-            crate::interrupt::ipc::reset_context_switch_deferral(Cpu::AppCpu);
-        }
-
-        /// Lets the APP core take IPC interrupts. The APP core calls this function after it
-        /// enables its interrupts.
-        #[unsafe(export_name = "esp_hal_app_core_started")]
-        fn app_core_started() {
-            debug_assert_eq!(Cpu::current(), Cpu::AppCpu);
-            #[cfg(riscv)]
-            crate::interrupt::ipc::install_app();
-            APP_CORE_TAKES_IPC.store(true, Ordering::Release);
-        }
-
-        /// Returns `true` if [`CpuControl`] started the APP core in this boot. That core takes IPC
-        /// interrupts unless it masks them.
-        #[unsafe(export_name = "esp_hal_app_core_takes_ipc")]
-        pub(crate) fn app_core_takes_ipc() -> bool {
-            APP_CORE_TAKES_IPC.load(Ordering::Acquire)
-        }
-    }
-    _ => {
-        unsafe extern "Rust" {
-            #[link_name = "esp_hal_app_core_starting"]
-            safe fn app_core_starting();
-            #[link_name = "esp_hal_app_core_started"]
-            safe fn app_core_started();
-            #[link_name = "esp_hal_app_core_takes_ipc"]
-            pub(crate) safe fn app_core_takes_ipc() -> bool;
-            #[link_name = "esp_hal_defer_context_switch"]
-            safe fn defer_context_switch();
-            #[link_name = "esp_hal_resume_context_switch"]
-            fn resume_context_switch();
-        }
+        (entry_dst.cast(), stack.top(), stack_guard.cast())
     }
 }
