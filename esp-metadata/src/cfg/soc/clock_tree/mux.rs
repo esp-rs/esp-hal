@@ -465,7 +465,9 @@ impl Multiplexer {
             }
         };
 
-        let apply_impl = if let Some(refcount_accessor) = instance.properties.refcount_accessor() {
+        let apply_impl = if let Some(refcount_accessor) = instance.properties.refcount_accessor()
+            && !instance.properties.always_on()
+        {
             quote! {
                 let active = #refcount_accessor > 0;
                 if active {

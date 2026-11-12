@@ -604,6 +604,9 @@ macro_rules! property {
     ("soc.has_bus_clock_update") => {
         true
     };
+    ("soc.has_apb_frequency_reduction") => {
+        false
+    };
     ("soc.cpu_mcause_mask") => {
         63
     };
@@ -1829,10 +1832,6 @@ macro_rules! for_each_sw_interrupt {
 ///
 /// // CPU_CLK
 ///
-/// fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
 /// fn configure_cpu_clk_impl(
 ///     _clocks: &mut ClockTree,
 ///     _old_config: Option<CpuClkConfig>,
@@ -1842,10 +1841,6 @@ macro_rules! for_each_sw_interrupt {
 /// }
 ///
 /// // MEM_CLK
-///
-/// fn enable_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
 ///
 /// fn configure_mem_clk_impl(
 ///     _clocks: &mut ClockTree,
@@ -1857,10 +1852,6 @@ macro_rules! for_each_sw_interrupt {
 ///
 /// // SYS_CLK
 ///
-/// fn enable_sys_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
 /// fn configure_sys_clk_impl(
 ///     _clocks: &mut ClockTree,
 ///     _old_config: Option<SysClkConfig>,
@@ -1870,10 +1861,6 @@ macro_rules! for_each_sw_interrupt {
 /// }
 ///
 /// // APB_CLK
-///
-/// fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
 ///
 /// fn configure_apb_clk_impl(
 ///     _clocks: &mut ClockTree,
@@ -2163,6 +2150,13 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 /// }
+/// impl PcntInstance {
+///     // PCNT_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+/// }
 /// impl RmtInstance {
 ///     // RMT_SCLK
 ///
@@ -2246,6 +2240,11 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum ParlIoInstance {
             ParlIo = 0,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum PcntInstance {
+            Pcnt = 0,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2910,7 +2909,6 @@ macro_rules! define_clock_tree_types {
             pub(crate) pll_f240m_refcount: u32,
             pub(crate) spll_d3_clock_refcount: u32,
             pub(crate) pll_f50m_refcount: u32,
-            pub(crate) apb_clk_refcount: u32,
             pub(crate) lp_fast_clk_refcount: u32,
             pub(crate) crypto_clk_refcount: u32,
             pub(crate) timg_calibration_clock_refcount: u32,
@@ -2929,6 +2927,7 @@ macro_rules! define_clock_tree_types {
             pub(crate) mipi_dsi_phy_cfg_clk_refcount: [u32; 1],
             pub(crate) parl_io_rx_clock_refcount: [u32; 1],
             pub(crate) parl_io_tx_clock_refcount: [u32; 1],
+            pub(crate) pcnt_function_clock_refcount: [u32; 1],
             pub(crate) rmt_sclk_refcount: [u32; 1],
             pub(crate) psram_function_clock_refcount: [u32; 1],
         }
@@ -3165,7 +3164,6 @@ macro_rules! define_clock_tree_types {
                 pll_f240m_refcount: 0,
                 spll_d3_clock_refcount: 0,
                 pll_f50m_refcount: 0,
-                apb_clk_refcount: 0,
                 lp_fast_clk_refcount: 0,
                 crypto_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
@@ -3184,6 +3182,7 @@ macro_rules! define_clock_tree_types {
                 mipi_dsi_phy_cfg_clk_refcount: [0; 1],
                 parl_io_rx_clock_refcount: [0; 1],
                 parl_io_tx_clock_refcount: [0; 1],
+                pcnt_function_clock_refcount: [0; 1],
                 rmt_sclk_refcount: [0; 1],
                 psram_function_clock_refcount: [0; 1],
             });
@@ -3896,21 +3895,16 @@ macro_rules! define_clock_tree_types {
         pub fn configure_cpu_clk(clocks: &mut ClockTree, config: CpuClkConfig) {
             let old_config = clocks.cpu_clk.replace(config);
             refresh_cpu_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_cpu_root_clk(clocks);
+            }
             configure_cpu_clk_impl(clocks, old_config, config);
         }
         pub fn cpu_clk_config(clocks: &mut ClockTree) -> Option<CpuClkConfig> {
             clocks.cpu_clk
         }
-        pub fn request_cpu_clk(clocks: &mut ClockTree) {
-            trace!("Enabling CPU_CLK");
-            request_cpu_root_clk(clocks);
-            enable_cpu_clk_impl(clocks, true);
-        }
-        pub fn release_cpu_clk(clocks: &mut ClockTree) {
-            trace!("Disabling CPU_CLK");
-            enable_cpu_clk_impl(clocks, false);
-            release_cpu_root_clk(clocks);
-        }
+        fn request_cpu_clk(_clocks: &mut ClockTree) {}
+        fn release_cpu_clk(_clocks: &mut ClockTree) {}
         pub fn cpu_clk_config_frequency(config: CpuClkConfig) -> u32 {
             (cpu_root_clk_frequency() / (config.divisor() + 1))
         }
@@ -3923,21 +3917,16 @@ macro_rules! define_clock_tree_types {
         pub fn configure_mem_clk(clocks: &mut ClockTree, config: MemClkConfig) {
             let old_config = clocks.mem_clk.replace(config);
             refresh_mem_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_cpu_clk(clocks);
+            }
             configure_mem_clk_impl(clocks, old_config, config);
         }
         pub fn mem_clk_config(clocks: &mut ClockTree) -> Option<MemClkConfig> {
             clocks.mem_clk
         }
-        pub fn request_mem_clk(clocks: &mut ClockTree) {
-            trace!("Enabling MEM_CLK");
-            request_cpu_clk(clocks);
-            enable_mem_clk_impl(clocks, true);
-        }
-        pub fn release_mem_clk(clocks: &mut ClockTree) {
-            trace!("Disabling MEM_CLK");
-            enable_mem_clk_impl(clocks, false);
-            release_cpu_clk(clocks);
-        }
+        fn request_mem_clk(_clocks: &mut ClockTree) {}
+        fn release_mem_clk(_clocks: &mut ClockTree) {}
         pub fn mem_clk_config_frequency(config: MemClkConfig) -> u32 {
             (cpu_clk_frequency() / (config.divisor() + 1))
         }
@@ -3950,21 +3939,16 @@ macro_rules! define_clock_tree_types {
         pub fn configure_sys_clk(clocks: &mut ClockTree, config: SysClkConfig) {
             let old_config = clocks.sys_clk.replace(config);
             refresh_sys_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_mem_clk(clocks);
+            }
             configure_sys_clk_impl(clocks, old_config, config);
         }
         pub fn sys_clk_config(clocks: &mut ClockTree) -> Option<SysClkConfig> {
             clocks.sys_clk
         }
-        pub fn request_sys_clk(clocks: &mut ClockTree) {
-            trace!("Enabling SYS_CLK");
-            request_mem_clk(clocks);
-            enable_sys_clk_impl(clocks, true);
-        }
-        pub fn release_sys_clk(clocks: &mut ClockTree) {
-            trace!("Disabling SYS_CLK");
-            enable_sys_clk_impl(clocks, false);
-            release_mem_clk(clocks);
-        }
+        fn request_sys_clk(_clocks: &mut ClockTree) {}
+        fn release_sys_clk(_clocks: &mut ClockTree) {}
         pub fn sys_clk_config_frequency(config: SysClkConfig) -> u32 {
             (mem_clk_frequency() / (config.divisor() + 1))
         }
@@ -3977,27 +3961,16 @@ macro_rules! define_clock_tree_types {
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             let old_config = clocks.apb_clk.replace(config);
             refresh_apb_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_sys_clk(clocks);
+            }
             configure_apb_clk_impl(clocks, old_config, config);
         }
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
             clocks.apb_clk
         }
-        pub fn request_apb_clk(clocks: &mut ClockTree) {
-            trace!("Requesting APB_CLK");
-            if increment_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Enabling APB_CLK");
-                request_sys_clk(clocks);
-                enable_apb_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_apb_clk(clocks: &mut ClockTree) {
-            trace!("Releasing APB_CLK");
-            if decrement_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Disabling APB_CLK");
-                enable_apb_clk_impl(clocks, false);
-                release_sys_clk(clocks);
-            }
-        }
+        fn request_apb_clk(_clocks: &mut ClockTree) {}
+        fn release_apb_clk(_clocks: &mut ClockTree) {}
         pub fn apb_clk_config_frequency(config: ApbClkConfig) -> u32 {
             (sys_clk_frequency() / (config.divisor() + 1))
         }
@@ -5232,6 +5205,34 @@ macro_rules! define_clock_tree_types {
             }
             pub fn tx_clock_source_frequency(source: ParlIoClkConfig) -> u32 {
                 Self::tx_clock_config_frequency(source)
+            }
+        }
+        impl PcntInstance {
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(
+                    &mut clocks.pcnt_function_clock_refcount[self as usize],
+                ) {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    request_apb_clk(clocks);
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(
+                    &mut clocks.pcnt_function_clock_refcount[self as usize],
+                ) {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    release_apb_clk(clocks);
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                apb_clk_frequency()
+            }
+            pub fn function_clock_source_frequency() -> u32 {
+                apb_clk_frequency()
             }
         }
         impl RmtInstance {

@@ -1139,6 +1139,10 @@ impl RmtClockGuard {
             clocks::RmtInstance::Rmt.request_sclk(clocks);
         });
 
+        // The RMT stops if APB_CLK is less than about 1/10 of the RMT clock.
+        #[cfg(soc_has_apb_frequency_reduction)]
+        clocks::ClockTree::with(clocks::request_apb_clk);
+
         Self
     }
 }
@@ -1147,6 +1151,8 @@ impl Drop for RmtClockGuard {
     fn drop(&mut self) {
         #[cfg(soc_has_clock_node_rmt_sclk)]
         clocks::ClockTree::with(|clocks| clocks::RmtInstance::Rmt.release_sclk(clocks));
+        #[cfg(soc_has_apb_frequency_reduction)]
+        clocks::ClockTree::with(clocks::release_apb_clk);
     }
 }
 

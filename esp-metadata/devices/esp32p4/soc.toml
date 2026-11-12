@@ -123,7 +123,7 @@ peripherals = [
     { name = "MCPWM0", interrupts = { peri = "PWM0" } },
     { name = "MCPWM1", interrupts = { peri = "PWM1" } },
     { name = "PARL_IO", interrupts = { tx = "PARLIO_TX", rx = "PARLIO_RX" }, clock_group = "PARL_IO" },
-    { name = "PCNT", interrupts = { peri = "PCNT" } },
+    { name = "PCNT", interrupts = { peri = "PCNT" }, clock_group = "PCNT" },
     { name = "APB_SARADC", pac = "ADC" },
     { name = "LP_ADC" },
     { name = "RMT", interrupts = { peri = "RMT" }, clock_group = "RMT" },

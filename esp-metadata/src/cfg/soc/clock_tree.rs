@@ -527,6 +527,10 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn always_on(&self) -> bool {
         false
     }
+    /// Returns `true` if an `always_on` node counts its consumers.
+    fn refcounted(&self) -> bool {
+        false
+    }
     fn wake_locking(&self) -> bool {
         false
     }

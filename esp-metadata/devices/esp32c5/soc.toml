@@ -35,6 +35,7 @@ cpu_powers_down_cache = true
 
 has_swd_watchdog = true
 has_bus_clock_update = true
+has_apb_frequency_reduction = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4086_0000 },
@@ -102,7 +103,7 @@ peripherals = [
     # { name = "OTP_DEBUG" },
     { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, clock_group = "PARL_IO" },
     { name = "PAU" },
-    { name = "PCNT", interrupts = { peri = "PCNT" } },
+    { name = "PCNT", interrupts = { peri = "PCNT" }, clock_group = "PCNT" },
     { name = "PCR" },
     { name = "PMU" },
     # { name = "PSRAM_MEM_MONITOR" },

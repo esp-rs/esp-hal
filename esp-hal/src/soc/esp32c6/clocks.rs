@@ -9,8 +9,7 @@
 //!   can only give a rough estimate of their frequency. They can be calibrated separately using a
 //!   known crystal frequency.
 //! - Some of the SOC capabilities are not implemented: I2S external pad clock source, external 32k
-//!   oscillator, LP_DYN_FAST_CLK, APB_DECREASE_DIV (which seems unnecessary to model),
-//!   PCR_CPU_HS_120M_FORCE.
+//!   oscillator, LP_DYN_FAST_CLK, PCR_CPU_HS_120M_FORCE.
 #![allow(dead_code, reason = "Some of this is bound to be unused")]
 #![allow(missing_docs, reason = "Experimental")]
 
@@ -456,18 +455,23 @@ fn configure_ahb_ls_div_impl(
 
 // APB_CLK
 
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    crate::soc::enable_apb_frequency_reduction(!en);
 }
 
 fn configure_apb_clk_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<ApbClkConfig>,
+    old_config: Option<ApbClkConfig>,
     new_config: ApbClkConfig,
 ) {
     PCR::regs()
         .apb_freq_conf()
         .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
+
+    // No driver uses APB_CLK before the first configuration.
+    if old_config.is_none() {
+        crate::soc::enable_apb_frequency_reduction(true);
+    }
 }
 
 // MSPI_FAST_HS_CLK
@@ -726,6 +730,14 @@ impl AdcInstance {
                 AdcFunctionClockConfig::RcFast => 2,
             })
         });
+    }
+}
+
+impl PcntInstance {
+    // PCNT_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
     }
 }
 
