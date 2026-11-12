@@ -728,8 +728,8 @@ driver_configs![
             driver: ieee802154,
             name: "IEEE 802.15.4",
             properties: {
-                /// Whether the CPU clock must stay at its configured frequency while the radio
-                /// driver exists.
+                /// Whether the CPU clock must stay at its configured frequency while the radio is
+                /// awake.
                 #[serde(default)]
                 requires_fast_cpu: bool,
             }

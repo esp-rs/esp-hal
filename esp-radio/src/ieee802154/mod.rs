@@ -135,8 +135,6 @@ impl<'a> Ieee802154<'a> {
     /// NOTE: Coexistence with Wi-Fi is currently not supported.
     #[instability::unstable]
     pub fn new(radio: IEEE802154<'a>) -> Self {
-        #[cfg(ieee802154_requires_fast_cpu)]
-        esp_hal::clock::CpuFrequencyLock::acquire();
         let (_entropy_source_guard, _radio_stop_guard, _phy_clock_guard, _radio_clock_guard) =
             esp_ieee802154_enable(radio);
         Self {
@@ -197,8 +195,10 @@ impl<'a> Ieee802154<'a> {
     /// `transmit` and `start_receive` wake the radio up, so with `rx_when_idle` set the radio
     /// receives again after the next `transmit`.
     ///
-    /// With [`Config::modem_sleep`], the PHY reference is given back too, so the RF is closed
-    /// unless another radio still uses it. The radio is then not a source of true random numbers.
+    /// While asleep, the radio does not keep the CPU clock at its configured frequency, so idle
+    /// frequency scaling can lower it. With [`Config::modem_sleep`], the PHY reference is given
+    /// back too, so the RF is closed unless another radio still uses it. The radio is then not a
+    /// source of true random numbers.
     #[instability::unstable]
     pub fn sleep(&mut self) {
         ieee802154_sleep();
@@ -401,8 +401,6 @@ impl Drop for Ieee802154<'_> {
         self.clear_rx_available_callback_fn();
         self.clear_tx_failed_callback();
         self.clear_tx_failed_callback_fn();
-        #[cfg(ieee802154_requires_fast_cpu)]
-        esp_hal::clock::CpuFrequencyLock::release();
     }
 }
 

@@ -1,6 +1,6 @@
 use alloc::collections::VecDeque as Queue;
 
-use esp_hal::{handler, interrupt::Priority, peripherals::IEEE802154};
+use esp_hal::{clock::CpuFrequencyLock, handler, interrupt::Priority, peripherals::IEEE802154};
 use esp_phy::{PhyClockGuard, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
 
@@ -57,6 +57,9 @@ struct IeeeState {
     modem_sleep: bool,
     /// The driver's PHY reference. `None` while it is given back - the C driver's `s_rf_closed`.
     phy: Option<PhyInitGuard<'static>>,
+    /// Keeps the CPU clock at its configured frequency, which the modem needs, while the radio is
+    /// awake. `None` while asleep.
+    cpu_frequency_lock: Option<CpuFrequencyLock>,
 }
 
 impl IeeeState {
@@ -70,6 +73,7 @@ impl IeeeState {
             pending_rx: None,
             modem_sleep: false,
             phy: None,
+            cpu_frequency_lock: None,
         }
     }
 }
@@ -211,6 +215,8 @@ pub(crate) fn esp_ieee802154_enable<'a>(
     STATE.with(|state| {
         *state = IeeeState::new();
         state.phy = Some(phy);
+        // The radio starts out idle, not asleep.
+        wake(state);
     });
     let entropy_source_guard = EntropySourceGuard::new();
 
@@ -310,7 +316,7 @@ static mut TX_FRAME: *const u8 = core::ptr::null();
 
 pub fn ieee802154_transmit(frame: *const u8, cca: bool) -> i32 {
     STATE.with(|state| {
-        rf_enable(state);
+        wake(state);
 
         // TX deferral: don't abort in-flight frame reception or ACK transmission.
         // Matches the C driver's ieee802154_transmit() which defers to pending_tx.
@@ -349,7 +355,7 @@ fn transmit_internal(state: &mut IeeeState, frame: *const u8, cca: bool) {
 
 pub fn ieee802154_receive() -> i32 {
     STATE.with(|state| {
-        rf_enable(state);
+        wake(state);
 
         if state.state == Ieee802154State::Receive || state.state == Ieee802154State::TxAck {
             // already in rx or tx_ack state, don't abort current operation
@@ -370,8 +376,8 @@ pub fn ieee802154_receive() -> i32 {
 ///
 /// As there, the operation is stopped even with a frame on the air: a frame being received is
 /// lost, the ACK of a received frame is aborted (the frame itself is delivered), and a
-/// transmission fails. With modem sleep on, the PHY reference is given back too, so the RF is
-/// closed unless another radio still uses it.
+/// transmission fails. The CPU frequency lock is released. With modem sleep on, the PHY reference
+/// is given back too, so the RF is closed unless another radio still uses it.
 pub fn ieee802154_sleep() -> i32 {
     STATE.with(sleep_inner);
 
@@ -391,9 +397,20 @@ fn sleep_inner(state: &mut IeeeState) {
     }
 
     state.state = Ieee802154State::Sleep;
+    state.cpu_frequency_lock = None;
 
     if state.modem_sleep {
         rf_disable(state);
+    }
+}
+
+/// Takes back what the radio gives up while asleep: the CPU frequency lock, and the PHY reference
+/// if modem sleep gave it back.
+fn wake(state: &mut IeeeState) {
+    rf_enable(state);
+
+    if cfg!(ieee802154_requires_fast_cpu) && state.cpu_frequency_lock.is_none() {
+        state.cpu_frequency_lock = Some(CpuFrequencyLock::new());
     }
 }
 
