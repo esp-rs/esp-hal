@@ -445,7 +445,11 @@ tx_checksum_offload = false # TX FIFO is too small for store-and-forward inserti
 [device.etm]
 support_status = "not_supported"
 [device.i2c_slave]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6761 }
+instances = [
+    { name = "i2c0" },
+    { name = "i2c1" },
+]
 [device.i2s]
 support_status = { status = "partial", issue = 6762 }
 version = 3
