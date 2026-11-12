@@ -23,9 +23,9 @@ pub(crate) struct SleepRetentionProperties {
     /// `cpu_retention_mem_start` and `cpu_retention_mem_end`. `regdma` chips use REGDMA link
     /// lists. Either method also drives the `supports_modem_power_down` cfg.
     modem_retention: Option<String>,
-    /// The number of REGDMA entries, which is also the number of `next` pointers in a branch
-    /// node.
-    regdma_link_count: Option<u32>,
+    /// The number of REGDMA entries, each a separate link list. A branch node has one `next`
+    /// pointer for each entry.
+    regdma_list_count: Option<u32>,
     /// The REGDMA has one link address for all entries, which points to a branch node.
     ///
     /// Without this, the PAU has one link address register for each entry.
@@ -122,10 +122,10 @@ impl GenericProperty for SleepRetentionProperties {
                 };
             });
         }
-        if let Some(count) = self.regdma_link_count {
+        if let Some(count) = self.regdma_list_count {
             let count = number(count);
             branches.extend(quote! {
-                ("sleep.regdma_link_count") => {
+                ("sleep.regdma_list_count") => {
                     #count
                 };
             });

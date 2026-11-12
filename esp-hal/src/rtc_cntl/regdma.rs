@@ -20,7 +20,7 @@ use portable_atomic::{AtomicBool, Ordering};
 use crate::peripherals::PMU;
 
 /// The number of REGDMA entries.
-const ENTRIES: usize = property!("sleep.regdma_link_count");
+const ENTRIES: usize = property!("sleep.regdma_list_count");
 
 /// The entry that the PMU runs between the active and the sleep state.
 pub const SLEEP_ENTRY: u32 = 1 << 0;
@@ -85,7 +85,7 @@ pub struct LinkConfig {
     owner: u32,
 }
 
-const _: () = assert!(core::mem::size_of::<LinkConfig>() == 44);
+const _: () = ::core::assert!(core::mem::size_of::<LinkConfig>() == 44);
 
 impl LinkConfig {
     /// Copies `length` words from `backup` to memory before the sleep, and from memory to
@@ -144,6 +144,7 @@ pub const fn links_size(configs: &[LinkConfig]) -> usize {
 ///
 /// The REGDMA restores the modules in the order of this enum.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 pub enum Module {
     /// The clock and reset registers of the modem.
@@ -287,7 +288,7 @@ pub unsafe fn create(
 
     REGISTRY.with(|registry| {
         let links_of_module = &mut registry.links[module as usize];
-        assert!(links_of_module.is_none(), "{module:?} exists already");
+        assert!(links_of_module.is_none(), "{:?} exists already", module);
         *links_of_module = Some(links);
     });
     Ok(())
@@ -359,7 +360,8 @@ pub fn attach(module: Module) {
     REGISTRY.with(|registry| {
         assert!(
             registry.links[module as usize].is_some(),
-            "{module:?} does not exist"
+            "{:?} does not exist",
+            module
         );
         registry.attached |= 1 << module as u8;
         join(registry);
