@@ -1,46 +1,27 @@
 use core::{alloc::Layout, ptr::NonNull};
 
-use rlsf::{GRANULARITY, Tlsf};
+use rlsf::Tlsf;
 
-// The largest block, `(GRANULARITY << FLLEN) - GRANULARITY` bytes, is just below `isize::MAX`, the
-// largest size a `Layout` allows.
-const FLLEN: usize = (usize::BITS - GRANULARITY.trailing_zeros() - 1) as usize;
-
-type Heap = Tlsf<'static, usize, usize, FLLEN, { usize::BITS as usize }>;
+// TODO: make this configurable
+type Heap = Tlsf<'static, usize, usize, { usize::BITS as usize }, { usize::BITS as usize }>;
 
 pub(crate) struct TlsfHeap {
-    // The control structure is several KB. It lives at the start of the region it manages, so
-    // unused region slots do not cost static memory.
-    heap: &'static mut Heap,
+    heap: Heap,
     pool_start: usize,
     pool_end: usize,
 }
 
 impl TlsfHeap {
     pub unsafe fn new(heap_bottom: *mut u8, size: usize) -> Self {
-        let heap_offset = heap_bottom.align_offset(align_of::<Heap>());
-        let pool_offset = heap_offset + size_of::<Heap>();
-        assert!(
-            pool_offset < size,
-            "The heap region is too small for the TLSF control structure"
-        );
+        let mut heap = Heap::new();
 
-        let heap = unsafe {
-            let heap = heap_bottom.add(heap_offset).cast::<Heap>();
-            heap.write(Heap::new());
-            &mut *heap
-        };
-
-        let pool_bottom = unsafe { heap_bottom.add(pool_offset) };
-        let block = unsafe {
-            NonNull::slice_from_raw_parts(NonNull::new_unchecked(pool_bottom), size - pool_offset)
-        };
-        let actual_size = unsafe { heap.insert_free_block_ptr(block).unwrap() };
+        let block = unsafe { core::slice::from_raw_parts(heap_bottom, size) };
+        let actual_size = unsafe { heap.insert_free_block_ptr(block.into()).unwrap() };
 
         Self {
             heap,
-            pool_start: pool_bottom as usize,
-            pool_end: pool_bottom as usize + actual_size.get(),
+            pool_start: heap_bottom as usize,
+            pool_end: heap_bottom as usize + actual_size.get(),
         }
     }
 
