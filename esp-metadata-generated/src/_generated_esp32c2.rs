@@ -358,6 +358,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         true
     };
+    ("sleep.usb_serial_jtag_in_light_sleep") => {
+        false
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };

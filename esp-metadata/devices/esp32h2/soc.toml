@@ -338,6 +338,7 @@ max_data_width = 8
 support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 deep_sleep = true
+usb_serial_jtag_in_light_sleep = true
 # esp32h2 has no separate per-pin path: `pin_wakeup_version` stays unset because the per-pin
 # registers *are* the ext1 registers.
 ext1_version = 2

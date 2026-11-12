@@ -349,6 +349,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.usb_serial_jtag_in_light_sleep") => {
+        false
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };

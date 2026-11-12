@@ -14,7 +14,7 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-rtos = { path = "../../../esp-rtos", features = ["embassy", "log-04"] }
-esp-println = { path = "../../../esp-println", default-features = false, features = ["uart", "log-04", "critical-section"] }
+esp-println = { path = "../../../esp-println", features = ["log-04"] }
 static_cell = { version = "2.1.1", optional = true }
 
 [features]

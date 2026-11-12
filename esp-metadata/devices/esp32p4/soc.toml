@@ -480,6 +480,7 @@ channel_count = 8
 support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 deep_sleep = true
+usb_serial_jtag_in_light_sleep = true
 ext1_version = 3
 pin_wakeup_version = 3
 wakeup_sources = {

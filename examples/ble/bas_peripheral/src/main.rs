@@ -19,8 +19,8 @@
 //!   state in RAM. Only the ESP32-C3 and -S3 support this. On other chips the constant has no
 //!   effect.
 //!
-//! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
-//! the output.
+//! On ESP32-C3, ESP32-S3, and ESP32-S31, the USB Serial/JTAG console stops while the chip is
+//! in light sleep. Use the UART port to see the output on those chips.
 
 //% CHIP_FILTER: bt_driver_supported
 
