@@ -64,8 +64,11 @@ cfg_select! {
         pub(crate) use implem::install_app;
         use runtime::esp_hal_ipc_post;
         pub(crate) use runtime::{
+            defer_context_switch,
             fail_stranded,
             request_context_switch,
+            reset_context_switch_deferral,
+            resume_context_switch,
             set_context_switch_handler,
         };
     }

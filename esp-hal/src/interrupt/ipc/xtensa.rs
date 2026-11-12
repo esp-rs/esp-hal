@@ -72,6 +72,10 @@ fn ipc_handler(context: &mut TrapFrame) {
     // The posted requests return here, so they run first.
     unsafe { super::queue::drain(&state.lists, core as u32) };
 
+    if state.deferral.load(Ordering::Relaxed) != 0 {
+        return;
+    }
+
     // The context switch chooses the context that the interrupt returns to, so it runs last.
     let handler = state
         .pending_context_switch

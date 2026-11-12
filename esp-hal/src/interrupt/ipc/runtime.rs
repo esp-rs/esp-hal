@@ -2,7 +2,8 @@
 
 use core::ptr::NonNull;
 
-use portable_atomic::{AtomicPtr, Ordering};
+use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
+use portable_atomic::{AtomicPtr, AtomicU32, Ordering};
 
 use super::{IpcRequest, implem::raise, queue};
 use crate::{interrupt::__rtos_implementation::ContextSwitchHandler, system::Cpu};
@@ -23,6 +24,11 @@ pub(super) struct CoreState {
     /// This field is set once, and holds the only handler that the CPU accepts.
     pub(super) context_switch_handler: AtomicPtr<()>,
 
+    /// Non-zero while the CPU defers its context switches. The IPC handler then leaves
+    /// `pending_context_switch` for [`resume_context_switch`]. Only the CPU itself writes this
+    /// field while the CPU runs.
+    pub(super) deferral: AtomicU32,
+
     /// The address of the register that clears the request of this CPU.
     #[cfg(riscv)]
     pub(super) request: AtomicPtr<u32>,
@@ -36,6 +42,7 @@ impl CoreState {
         Self {
             pending_context_switch: AtomicPtr::new(core::ptr::null_mut()),
             context_switch_handler: AtomicPtr::new(core::ptr::null_mut()),
+            deferral: AtomicU32::new(0),
             #[cfg(riscv)]
             request: AtomicPtr::new(core::ptr::null_mut()),
             lists: queue::Lists::new(),
@@ -67,8 +74,6 @@ pub(crate) unsafe fn fail_stranded(core: Cpu) {
 // types, the encoding of the return value and the layout of `IpcRequest` must stay stable.
 #[unsafe(export_name = "esp_hal_ipc_post")]
 pub(super) unsafe extern "C" fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>) -> u32 {
-    use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
-
     let request = unsafe { request.as_ref() };
     let core = match core {
         0 => Cpu::ProCpu,
@@ -90,6 +95,81 @@ pub(super) unsafe extern "C" fn esp_hal_ipc_post(core: u8, request: NonNull<IpcR
     unsafe { SingleCoreInterruptLock.exit(token) };
 
     result
+}
+
+cfg_select! {
+    context_switch_source = "software0" => {
+        /// The bits of the deferral that count the active deferrals.
+        const DEFERRAL_COUNT: u32 = u32::MAX >> 1;
+        /// Set when the `Software0` context switch was enabled before the first active deferral.
+        const SOFTWARE0_ENABLED: u32 = !DEFERRAL_COUNT;
+    }
+    _ => {
+        /// The bits of the deferral that count the active deferrals.
+        const DEFERRAL_COUNT: u32 = u32::MAX;
+    }
+}
+
+/// Defers the context switches of the current CPU, so that the current thread stays on the CPU.
+///
+/// Interrupt handlers and IPC requests still run. The deferral lasts until each call has a
+/// matching call to [`resume_context_switch`].
+#[inline(always)]
+pub(crate) fn defer_context_switch() {
+    let token = unsafe { SingleCoreInterruptLock.enter() };
+    let deferral = &STATE[Cpu::current() as usize].deferral;
+    let state = deferral.load(Ordering::Relaxed);
+    debug_assert_ne!(state & DEFERRAL_COUNT, DEFERRAL_COUNT);
+    #[cfg(context_switch_source = "software0")]
+    let state =
+        if state == 0 && crate::interrupt::__rtos_implementation::mask_local_context_switch() {
+            SOFTWARE0_ENABLED
+        } else {
+            state
+        };
+    deferral.store(state + 1, Ordering::Relaxed);
+    unsafe { SingleCoreInterruptLock.exit(token) };
+}
+
+/// Ends one deferral of the current CPU. The end of the last deferral requests the deferred
+/// context switch.
+///
+/// # Safety
+///
+/// The call must match an earlier call to [`defer_context_switch`] on the current CPU.
+#[inline(always)]
+pub(crate) unsafe fn resume_context_switch() {
+    // The active deferral keeps the thread on the current CPU.
+    let core = Cpu::current();
+    let state = &STATE[core as usize];
+
+    let token = unsafe { SingleCoreInterruptLock.enter() };
+    let deferral = state.deferral.load(Ordering::Relaxed);
+    debug_assert_ne!(deferral & DEFERRAL_COUNT, 0);
+    let remaining = deferral - 1;
+    let last = remaining & DEFERRAL_COUNT == 0;
+    state
+        .deferral
+        .store(if last { 0 } else { remaining }, Ordering::Relaxed);
+    if last {
+        #[cfg(context_switch_source = "software0")]
+        if deferral & SOFTWARE0_ENABLED != 0 {
+            crate::interrupt::__rtos_implementation::unmask_local_context_switch();
+        }
+        if !state
+            .pending_context_switch
+            .load(Ordering::Acquire)
+            .is_null()
+        {
+            raise(core);
+        }
+    }
+    unsafe { SingleCoreInterruptLock.exit(token) };
+}
+
+/// Clears the deferral of `core` before the CPU starts.
+pub(crate) fn reset_context_switch_deferral(core: Cpu) {
+    STATE[core as usize].deferral.store(0, Ordering::Relaxed);
 }
 
 /// Registers the context-switch handler of `core`.
