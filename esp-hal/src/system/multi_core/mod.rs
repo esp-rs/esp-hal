@@ -3,6 +3,7 @@
 use core::{
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
 #[instability::unstable]
@@ -25,8 +26,7 @@ cfg_select! {
             fn start_app_core(
                 stack_top: *mut u32,
                 stack_guard: *mut u32,
-                entry: unsafe fn(*mut ()),
-                arg: *mut (),
+                entry: unsafe fn(),
             ) -> bool;
             #[link_name = "esp_hal_defer_context_switch"]
             safe fn defer_context_switch();
@@ -295,9 +295,16 @@ impl<'d> CpuControl<'d> {
         let (entry, stack_top, stack_guard) =
             setup_second_core_stack(stack, stack_guard_offset, entry);
 
-        if !unsafe { start_app_core(stack_top, stack_guard, run_entry::<F>, entry) } {
+        APP_CORE_CLOSURE.store(entry, Ordering::Release);
+        if !unsafe { start_app_core(stack_top, stack_guard, run_entry::<F>) } {
+            APP_CORE_CLOSURE.store(core::ptr::null_mut(), Ordering::Relaxed);
             unsafe { ManuallyDrop::drop(&mut *entry.cast::<ManuallyDrop<F>>()) };
             return Err(Error::CoreAlreadyRunning);
+        }
+
+        // A later call stores its closure in `APP_CORE_CLOSURE` also when it fails.
+        while !APP_CORE_CLOSURE.load(Ordering::Acquire).is_null() {
+            core::hint::spin_loop();
         }
 
         Ok(AppCoreGuard {
@@ -306,11 +313,14 @@ impl<'d> CpuControl<'d> {
     }
 }
 
-/// Calls the closure that [`setup_second_core_stack`] placed at `entry`.
-unsafe fn run_entry<F>(entry: *mut ())
+static APP_CORE_CLOSURE: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
+
+/// Calls the closure that [`setup_second_core_stack`] placed on the stack.
+unsafe fn run_entry<F>()
 where
     F: FnOnce(),
 {
+    let entry = APP_CORE_CLOSURE.swap(core::ptr::null_mut(), Ordering::AcqRel);
     unsafe { ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>())() }
 }
 

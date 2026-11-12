@@ -11,37 +11,31 @@ static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
 static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 static APP_CORE_ENTRY: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
-static APP_CORE_ENTRY_ARG: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 
-#[cfg(soc_cpu_pma_needs_core1_setup)]
-static mut CORE0_PMA: [u32; 32] = [0; 32];
-
-/// Starts the APP core with the stack that ends at `stack_top`. The APP core calls `entry(arg)`,
-/// and parks itself when `entry` returns.
+/// Starts the APP core with the stack that ends at `stack_top`. The APP core calls `entry`, and
+/// parks itself when `entry` returns.
 ///
 /// Returns `false`, and does not start the APP core, if the APP core runs.
 ///
 /// # Safety
 ///
-/// The stack and `arg` must stay valid while the APP core runs. `stack_guard` must be null or
-/// point into the stack.
+/// The stack must stay valid while the APP core runs. `stack_guard` must be null or point into
+/// the stack.
 #[unsafe(export_name = "esp_hal_start_app_core")]
 pub(super) unsafe fn start_app_core(
     stack_top: *mut u32,
     stack_guard: *mut u32,
-    entry: unsafe fn(*mut ()),
-    arg: *mut (),
+    entry: unsafe fn(),
 ) -> bool {
     if !crate::debugger::debugger_connected() && crate::soc::cpu_control::is_running(Cpu::AppCpu) {
         return false;
     }
 
+    #[cfg(soc_cpu_pma_needs_core1_setup)]
+    pma::save_core0_pma();
     APP_CORE_STACK_TOP.store(stack_top, Ordering::Release);
     APP_CORE_STACK_GUARD.store(stack_guard, Ordering::Release);
     APP_CORE_ENTRY.store(entry as *mut (), Ordering::Release);
-    APP_CORE_ENTRY_ARG.store(arg, Ordering::Release);
-    #[cfg(soc_cpu_pma_needs_core1_setup)]
-    pma::save_core0_pma(unsafe { &mut *(&raw mut CORE0_PMA) });
 
     app_core_starting();
     crate::soc::cpu_control::start_core1(start_core1_init as *const u32);
@@ -89,8 +83,8 @@ unsafe fn start_core1_run() -> ! {
     debug_assert!(!entry.is_null());
 
     unsafe {
-        let entry = core::mem::transmute::<*mut (), unsafe fn(*mut ())>(entry);
-        entry(APP_CORE_ENTRY_ARG.load(Ordering::Acquire));
+        let entry = core::mem::transmute::<*mut (), unsafe fn()>(entry);
+        entry();
         loop {
             internal_park_core(Cpu::current(), true);
         }
@@ -99,6 +93,10 @@ unsafe fn start_core1_run() -> ! {
 
 #[cfg(soc_cpu_pma_needs_core1_setup)]
 mod pma {
+    use core::sync::atomic::{AtomicU32, Ordering};
+
+    static CORE0_PMA: [AtomicU32; 32] = [const { AtomicU32::new(0) }; 32];
+
     macro_rules! read_csr {
         ($csr:literal) => {{
             let value: u32;
@@ -115,17 +113,17 @@ mod pma {
 
     macro_rules! pma_entries {
         ($($i:literal: $cfg:literal, $addr:literal;)*) => {
-            pub(super) fn save_core0_pma(dst: &mut [u32; 32]) {
+            pub(super) fn save_core0_pma() {
                 $(
-                    dst[$i] = read_csr!($cfg);
-                    dst[$i + 16] = read_csr!($addr);
+                    CORE0_PMA[$i].store(read_csr!($cfg), Ordering::Relaxed);
+                    CORE0_PMA[$i + 16].store(read_csr!($addr), Ordering::Relaxed);
                 )*
             }
 
-            pub(super) fn set_core1_pma(src: &[u32; 32]) {
+            pub(super) fn set_core1_pma() {
                 $(
-                    write_csr!($addr, src[$i + 16]);
-                    write_csr!($cfg, src[$i]);
+                    write_csr!($addr, CORE0_PMA[$i + 16].load(Ordering::Relaxed));
+                    write_csr!($cfg, CORE0_PMA[$i].load(Ordering::Relaxed));
                 )*
             }
         };
@@ -245,7 +243,7 @@ extern "C" fn start_core1_init() -> ! {
 #[cfg(riscv)]
 fn start_core1_init_impl() -> ! {
     #[cfg(soc_cpu_pma_needs_core1_setup)]
-    pma::set_core1_pma(unsafe { &*(&raw const CORE0_PMA) });
+    pma::set_core1_pma();
 
     crate::soc::branch_predictor::enable();
 
