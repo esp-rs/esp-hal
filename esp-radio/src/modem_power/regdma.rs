@@ -62,8 +62,7 @@ const PHY_FE: &[LinkConfig] = cfg_select! {
         registers(0xff02, 0x2010_0800, 57),
         registers(0xff03, 0x2010_0c00, 22),
     ],
-    // ESP-IDF retains no front end on the ESP32-H2. The ESP32-H4 restores its front end in the
-    // PHY entry of the REGDMA, which nothing runs yet.
+    // ESP-IDF retains no front end on the ESP32-H2 and the ESP32-H4.
     _ => &[],
 };
 
