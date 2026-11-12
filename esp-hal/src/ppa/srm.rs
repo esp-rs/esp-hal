@@ -597,8 +597,6 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
 
 impl<Dm: DriverMode> Drop for Srm<'_, Dm> {
     fn drop(&mut self) {
-        self.channels.reset();
-        PeripheralClockControl::reset(Peripheral::Ppa);
         HP_SYS::regs().ppa_mem_lp_ctrl().modify(|_, w| {
             w.ppa_sprf_mem_force_ctrl().bit(self.ppa_mem_lp.0);
             w.ppa_sprf_mem_lp_en().bit(self.ppa_mem_lp.1)
