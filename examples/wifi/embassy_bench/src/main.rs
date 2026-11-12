@@ -1,19 +1,24 @@
-//! Run a test of download, upload and download+upload in async fashion.
+//! Wi-Fi TCP throughput benchmark: download, upload, and both at the same time.
 //!
-//! A prerequisite to running the benchmark examples is to run the benchmark
-//! server on your local machine. Simply run the following commands to do so.
+//! Run the benchmark server on a computer in the same network:
 //! ```
 //! cd extras/bench-server
 //! cargo run --release
 //! ```
-//! Ensure you have set the IP of your local machine in the `HOST_IP` env
-//! variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env
-//! variable before running this example.
+//! Set `HOST_IP` to the address of that computer, for example `HOST_IP="192.168.0.24"`, and set
+//! `SSID` and `PASSWORD`.
+//!
+//! On chips with a small instruction cache, the example places code that runs for each Wi-Fi frame
+//! in RAM. `ESP_HAL_CONFIG_USE_RWTEXT_LD_HOOK` makes esp-hal's linker script include
+//! `rwtext_hook.x`. `build.rs` makes this file for the selected chip from `rwtext_heap.x` and
+//! `rwtext_os.x`.
+//!
+//! On the ESP32-S2, set `ESP_HAL_CONFIG_INSTRUCTION_CACHE_SIZE=16KB` and
+//! `ESP_HAL_CONFIG_INSTRUCTION_CACHE_LINE_SIZE=16B`. With the default 8 KB instruction cache, the
+//! throughput is 25 % to 55 % lower. `.cargo/config.toml` cannot set these values, because
+//! they also apply to the ESP32-S3.
 
-//% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
 //% CHIP_FILTER: wifi_driver_supported
-//% ENV-IF(esp32s2): ESP_HAL_CONFIG_INSTRUCTION_CACHE_SIZE=16KB
-//% ENV-IF(esp32s2): ESP_HAL_CONFIG_INSTRUCTION_CACHE_LINE_SIZE=16B
 
 #![allow(static_mut_refs)]
 #![no_std]
@@ -37,9 +42,13 @@ use esp_radio::wifi::{
     WifiController,
     sta::StationConfig,
 };
-use qa_test::DRAM2_UNINIT_SIZE;
-
 esp_bootloader_esp_idf::esp_app_desc!();
+
+// Full `.dram2_uninit` region for this chip.
+const DRAM2_UNINIT_SIZE: usize = {
+    let range: core::ops::Range<usize> = esp_metadata_generated::memory_range!("DRAM2_UNINIT");
+    range.end - range.start
+};
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {
@@ -138,7 +147,17 @@ const WIFI_BUFFERS: WifiBuffers = cfg_select! {
 const HEAP_SIZE: usize = {
     let total = 128 * 1024 + WIFI_BUFFERS.static_rx as usize * 1600;
     let main = total.saturating_sub(DRAM2_UNINIT_SIZE);
-    if main > 32 * 1024 { main } else { 32 * 1024 }
+    let main = if main > 32 * 1024 { main } else { 32 * 1024 };
+    main - CODE_IN_RAM_RESERVE
+};
+
+// On these chips, `build.rs` places code in RAM (see `rwtext_heap.x` and `rwtext_os.x`). The main
+// stack needs at least 8 KB, so the main heap is smaller. On the ESP32-S2, the value also leaves
+// room for the 16 KB instruction cache.
+const CODE_IN_RAM_RESERVE: usize = cfg_select! {
+    feature = "esp32c2" => 8 * 1024,
+    feature = "esp32s2" => 24 * 1024,
+    _ => 0,
 };
 
 #[esp_hal::main]

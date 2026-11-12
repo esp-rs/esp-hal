@@ -1,0 +1,31 @@
+[target.'cfg(target_arch = "riscv32")']
+runner    = "espflash flash --monitor"
+rustflags = [
+  "-C", "link-arg=-Tlinkall.x",
+  "-C", "force-frame-pointers",
+]
+
+[target.'cfg(target_arch = "xtensa")']
+runner    = "espflash flash --monitor"
+rustflags = [
+  # GNU LD
+  "-C", "link-arg=-Wl,-Tlinkall.x",
+  "-C", "link-arg=-nostartfiles",
+
+  # LLD
+  # "-C", "link-arg=-Tlinkall.x",
+  # "-C", "linker=rust-lld",
+]
+
+[env]
+ESP_LOG = "info"
+ESP_HAL_CONFIG_USE_RWTEXT_LD_HOOK = "true"
+ESP_ALLOC_CONFIG_HEAP_ALGORITHM = "TLSF"
+# The example adds two heap regions. Each TLSF region slot uses static RAM.
+ESP_ALLOC_CONFIG_MAX_REGIONS = "2"
+SSID = "SSID"
+PASSWORD = "PASSWORD"
+HOST_IP = "1.1.1.1"
+
+[unstable]
+build-std = ["alloc", "core"]
