@@ -197,8 +197,8 @@ pub(crate) mod low_speed {
         let too_fast = cfg_select! {
             // The PSRAM clock must not exceed the CPU clock.
             esp32p4 => clock_mhz > xtal_mhz,
-            // The PSRAM clock must not exceed 4/3 of the CPU clock.
-            esp32s31 => clock_mhz * 3 > xtal_mhz * 4,
+            // The PSRAM clock must not exceed 4 times the AXI clock, which is XTAL_CLK here.
+            esp32s31 => clock_mhz > xtal_mhz * 4,
         };
         let bits = if too_fast {
             super::bus_clock_bits(source_mhz.div_ceil(LOW_SPEED_MHZ) as u8)
