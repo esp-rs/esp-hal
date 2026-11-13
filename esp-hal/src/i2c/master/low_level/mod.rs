@@ -1945,7 +1945,7 @@ for_each_i2c_master!(
                 };
 
                 // `Driver::connect_pin` relies on this.
-                const _: () = assert!(
+                const _: () = ::core::assert!(
                     InputSignal::$scl.can_use_gpio_matrix()
                         && InputSignal::$sda.can_use_gpio_matrix()
                         && OutputSignal::$scl.can_use_gpio_matrix()
