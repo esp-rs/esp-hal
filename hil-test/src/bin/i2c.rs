@@ -1,7 +1,14 @@
 //! I2C test
 //!
 //! Slave tests use the runner's connected LP pair for SDA and HP pair for SCL:
-//! C3: GPIO2-GPIO3 and GPIO6-GPIO7; C6: GPIO2-GPIO3 and GPIO22-GPIO23.
+//! - C3: GPIO2-GPIO3 and GPIO6-GPIO7.
+//! - C5: GPIO4-GPIO5 and GPIO9-GPIO10.
+//! - C6 and C61: GPIO2-GPIO3 and GPIO22-GPIO23.
+//! - H2: GPIO10-GPIO11 and GPIO2-GPIO3.
+//! - H4: GPIO2-GPIO3 and GPIO19-GPIO20.
+//! - P4: GPIO5-GPIO6 and GPIO46-GPIO53.
+//! - S3: GPIO9-GPIO10 and GPIO40-GPIO41.
+//! - S31: GPIO2-GPIO3 and GPIO8-GPIO44.
 
 //% CHIP_FILTER: i2c_master_driver_supported
 //% FEATURES: unstable embassy
@@ -904,6 +911,43 @@ mod i2c_slave {
             },
             spawner: executor.start(Priority::Priority3),
         }
+    }
+
+    #[test]
+    #[cfg(i2c_slave_i2c1)]
+    async fn async_i2c1_write_read(peripherals: Peripherals) {
+        esp_rtos::start(TimerGroup::new(peripherals.TIMG0).timer0);
+        let (master_sda, slave_sda) = hil_test::lp_test_pins!(peripherals);
+        let (master_scl, slave_scl) = hil_test::hp_test_pins!(peripherals);
+        let mut master = I2c::new(peripherals.I2C0, super::Config::default())
+            .unwrap()
+            .with_sda(master_sda)
+            .with_scl(master_scl)
+            .into_async();
+        let mut slave = I2cSlave::new(peripherals.I2C1, Config::new(ADDRESS))
+            .unwrap()
+            .with_sda(slave_sda)
+            .with_scl(slave_scl)
+            .into_async();
+
+        embassy_futures::join::join(
+            async {
+                let mut response = [0; SECOND_RESPONSE.len()];
+                master
+                    .write_read_async(ADDRESS, &WRITE_DATA, &mut response)
+                    .await
+                    .unwrap();
+                assert_eq!(response, SECOND_RESPONSE);
+            },
+            async {
+                let mut data = [0; WRITE_DATA.len()];
+                slave.expect_write(&mut data, &WRITE_DATA).await;
+                slave
+                    .expect_read(&SECOND_RESPONSE, Ok(ReadStatus::Done))
+                    .await;
+            },
+        )
+        .await;
     }
 
     #[test]
