@@ -38,30 +38,54 @@ impl I2sInstance {
 
     pub(crate) fn configure_tx_clk_impl(
         self,
-        _clocks: &mut ClockTree,
+        clocks: &mut ClockTree,
         _old_config: Option<I2sClkConfig>,
         new_config: I2sClkConfig,
     ) {
+        // The divider can lose the fraction if the module clock is gated while the coefficients
+        // change.
+        let enabled = clocks.i2s_tx_clk_refcount[self as usize] > 0;
+        self.enable_tx_clk_impl(clocks, true);
+        self.set_tx_divider(new_config);
+        if !enabled {
+            self.enable_tx_clk_impl(clocks, false);
+        }
+    }
+
+    fn set_tx_divider(self, new_config: I2sClkConfig) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
 
-        // The divider applies twice, unless the coefficients are set in this sequence, with a
-        // small division before the target one.
+        // The divider applies twice, unless each coefficient has a separate register write in
+        // this sequence, with a small division before the target one.
+        // See <https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e>.
         self.regs()
             .tx_clkm_conf()
             .modify(|_, w| unsafe { w.tx_clkm_div_num().bits(2) });
-        self.regs().tx_clkm_div_conf().modify(|_, w| unsafe {
-            w.tx_clkm_div_yn1().clear_bit();
-            w.tx_clkm_div_y().bits(1);
-            w.tx_clkm_div_z().bits(0);
-            w.tx_clkm_div_x().bits(0)
-        });
+        self.regs()
+            .tx_clkm_div_conf()
+            .modify(|_, w| w.tx_clkm_div_yn1().clear_bit());
+        self.regs()
+            .tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.tx_clkm_div_y().bits(1) });
+        self.regs()
+            .tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.tx_clkm_div_z().bits(0) });
+        self.regs()
+            .tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.tx_clkm_div_x().bits(0) });
 
-        self.regs().tx_clkm_div_conf().modify(|_, w| unsafe {
-            w.tx_clkm_div_yn1().bit(fraction.yn1);
-            w.tx_clkm_div_z().bits(fraction.z);
-            w.tx_clkm_div_y().bits(fraction.y);
-            w.tx_clkm_div_x().bits(fraction.x)
-        });
+        self.regs()
+            .tx_clkm_div_conf()
+            .modify(|_, w| w.tx_clkm_div_yn1().bit(fraction.yn1));
+        self.regs()
+            .tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.tx_clkm_div_z().bits(fraction.z) });
+        self.regs()
+            .tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.tx_clkm_div_y().bits(fraction.y) });
+        self.regs()
+            .tx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.tx_clkm_div_x().bits(fraction.x) });
         self.regs().tx_clkm_conf().modify(|_, w| unsafe {
             w.tx_clk_sel().bits(clk_sel(new_config.sclk()));
             w.tx_clkm_div_num().bits(new_config.div_num() as u8)
@@ -78,28 +102,54 @@ impl I2sInstance {
 
     pub(crate) fn configure_rx_clk_impl(
         self,
-        _clocks: &mut ClockTree,
+        clocks: &mut ClockTree,
         _old_config: Option<I2sClkConfig>,
         new_config: I2sClkConfig,
     ) {
+        // The divider can lose the fraction if the module clock is gated while the coefficients
+        // change.
+        let enabled = clocks.i2s_rx_clk_refcount[self as usize] > 0;
+        self.enable_rx_clk_impl(clocks, true);
+        self.set_rx_divider(new_config);
+        if !enabled {
+            self.enable_rx_clk_impl(clocks, false);
+        }
+    }
+
+    fn set_rx_divider(self, new_config: I2sClkConfig) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
 
+        // The divider applies twice, unless each coefficient has a separate register write in
+        // this sequence, with a small division before the target one.
+        // See <https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e>.
         self.regs()
             .rx_clkm_conf()
             .modify(|_, w| unsafe { w.rx_clkm_div_num().bits(2) });
-        self.regs().rx_clkm_div_conf().modify(|_, w| unsafe {
-            w.rx_clkm_div_yn1().clear_bit();
-            w.rx_clkm_div_y().bits(1);
-            w.rx_clkm_div_z().bits(0);
-            w.rx_clkm_div_x().bits(0)
-        });
+        self.regs()
+            .rx_clkm_div_conf()
+            .modify(|_, w| w.rx_clkm_div_yn1().clear_bit());
+        self.regs()
+            .rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.rx_clkm_div_y().bits(1) });
+        self.regs()
+            .rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.rx_clkm_div_z().bits(0) });
+        self.regs()
+            .rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.rx_clkm_div_x().bits(0) });
 
-        self.regs().rx_clkm_div_conf().modify(|_, w| unsafe {
-            w.rx_clkm_div_yn1().bit(fraction.yn1);
-            w.rx_clkm_div_z().bits(fraction.z);
-            w.rx_clkm_div_y().bits(fraction.y);
-            w.rx_clkm_div_x().bits(fraction.x)
-        });
+        self.regs()
+            .rx_clkm_div_conf()
+            .modify(|_, w| w.rx_clkm_div_yn1().bit(fraction.yn1));
+        self.regs()
+            .rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.rx_clkm_div_z().bits(fraction.z) });
+        self.regs()
+            .rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.rx_clkm_div_y().bits(fraction.y) });
+        self.regs()
+            .rx_clkm_div_conf()
+            .modify(|_, w| unsafe { w.rx_clkm_div_x().bits(fraction.x) });
         self.regs().rx_clkm_conf().modify(|_, w| unsafe {
             w.rx_clk_sel().bits(clk_sel(new_config.sclk()));
             w.rx_clkm_div_num().bits(new_config.div_num() as u8)

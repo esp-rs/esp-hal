@@ -27,4 +27,10 @@ PROVIDE ( strnlen = __strnlen );
 PROVIDE ( atoi = __atoi );
 PROVIDE ( mktime = __mktime );
 
+/*
+The ROM function only updates the tick rate of the calling CPU.
 PROVIDE ( ets_update_cpu_frequency = ets_update_cpu_frequency_rom );
+*/
+EXTERN(esp_rom_set_cpu_ticks_per_us);
+INPUT(libesp_rom.a);
+PROVIDE ( ets_update_cpu_frequency = esp_rom_set_cpu_ticks_per_us );

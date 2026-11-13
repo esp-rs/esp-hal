@@ -9,8 +9,7 @@
 //!   can only give a rough estimate of their frequency. They can be calibrated separately using a
 //!   known crystal frequency.
 //! - Some of the SOC capabilities are not implemented: I2S external pad clock source, external 32k
-//!   oscillator, LP_DYN_FAST_CLK, APB_DECREASE_DIV (which seems unnecessary to model),
-//!   PCR_CPU_HS_120M_FORCE.
+//!   oscillator, LP_DYN_FAST_CLK, PCR_CPU_HS_120M_FORCE.
 #![allow(dead_code, reason = "Some of this is bound to be unused")]
 #![allow(missing_docs, reason = "Experimental")]
 
@@ -341,6 +340,51 @@ fn configure_soc_root_clk_impl(
             SocRootClkConfig::RcFast => 2,
         })
     });
+    update_rom_cpu_frequency();
+}
+
+/// `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+fn update_rom_cpu_frequency() {
+    esp_rom_sys::rom::ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+}
+
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+
+/// Switches SOC_ROOT_CLK to XTAL_CLK if it is the PLL. Returns whether the clock changed.
+///
+/// CPU_CLK, AHB_CLK and MSPI_FAST_CLK change to XTAL_CLK. APB_CLK changes to XTAL_CLK divided by
+/// the APB divider.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if clocks.soc_root_clk() != Some(SocRootClkConfig::Pll) {
+        return false;
+    }
+    // The LS dividers have no effect while SOC_ROOT_CLK is the PLL.
+    configure_cpu_ls_div_impl(clocks, None, CpuLsDivConfig::new(CpuLsDivDivisor::_0));
+    configure_ahb_ls_div_impl(clocks, None, AhbLsDivConfig::new(AhbLsDivDivisor::_0));
+    configure_mspi_fast_ls_clk_impl(
+        clocks,
+        None,
+        MspiFastLsClkConfig::new(MspiFastLsClkDivisor::_0),
+    );
+    configure_soc_root_clk_impl(clocks, None, SocRootClkConfig::Xtal);
+    true
+}
+
+/// Restores SOC_ROOT_CLK and the LS dividers that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    configure_soc_root_clk_impl(clocks, None, unwrap!(clocks.soc_root_clk()));
+    if let Some(config) = clocks.cpu_ls_div() {
+        configure_cpu_ls_div_impl(clocks, None, config);
+    }
+    if let Some(config) = clocks.ahb_ls_div() {
+        configure_ahb_ls_div_impl(clocks, None, config);
+    }
+    if let Some(config) = clocks.mspi_fast_ls_clk() {
+        configure_mspi_fast_ls_clk_impl(clocks, None, config);
+    }
 }
 
 // CPU_HS_DIV
@@ -357,6 +401,7 @@ fn configure_cpu_hs_div_impl(
     PCR::regs()
         .cpu_freq_conf()
         .modify(|_, w| unsafe { w.cpu_hs_div_num().bits(new_config.divisor() as u8) });
+    update_rom_cpu_frequency();
 }
 
 // CPU_LS_DIV
@@ -373,6 +418,7 @@ fn configure_cpu_ls_div_impl(
     PCR::regs()
         .cpu_freq_conf()
         .modify(|_, w| unsafe { w.cpu_ls_div_num().bits(new_config.divisor() as u8) });
+    update_rom_cpu_frequency();
 }
 
 // AHB_HS_DIV
@@ -409,18 +455,23 @@ fn configure_ahb_ls_div_impl(
 
 // APB_CLK
 
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    crate::soc::enable_apb_frequency_reduction(!en);
 }
 
 fn configure_apb_clk_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<ApbClkConfig>,
+    old_config: Option<ApbClkConfig>,
     new_config: ApbClkConfig,
 ) {
     PCR::regs()
         .apb_freq_conf()
         .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
+
+    // No driver uses APB_CLK before the first configuration.
+    if old_config.is_none() {
+        crate::soc::enable_apb_frequency_reduction(true);
+    }
 }
 
 // MSPI_FAST_HS_CLK
@@ -679,6 +730,14 @@ impl AdcInstance {
                 AdcFunctionClockConfig::RcFast => 2,
             })
         });
+    }
+}
+
+impl PcntInstance {
+    // PCNT_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
     }
 }
 

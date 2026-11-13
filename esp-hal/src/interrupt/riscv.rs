@@ -449,6 +449,7 @@ pub(crate) fn current_raw_runlevel() -> u32 {
 ///
 /// Must only be used to raise the runlevel and to restore it to a previous
 /// value. Must not be used to arbitrarily lower the runlevel.
+#[crate::ram]
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let previous = cpu_int::change_current_runlevel(level);
     unwrap!(RunLevel::try_from_u32(previous as u32))
@@ -490,6 +491,10 @@ fn cpu_wait_mode_on() -> bool {
 ///
 /// Returns immediately when a debugger is attached; intended to be called in a
 /// loop.
+///
+/// When the `ESP_HAL_CONFIG_IDLE_FREQUENCY_SCALING` option is enabled, the CPU
+/// clock comes from XTAL_CLK while the CPU waits. See
+/// [`CpuFrequencyLock`](crate::clock::CpuFrequencyLock).
 #[inline(always)]
 #[instability::unstable]
 pub fn wait_for_interrupt() {
@@ -499,7 +504,10 @@ pub fn wait_for_interrupt() {
         // https://github.com/espressif/esp-idf/blob/b9a308a47ca4128d018495662b009a7c461b6780/components/esp_hw_support/cpu.c#L57-L60
         return;
     }
-    unsafe { core::arch::asm!("wfi") };
+    cfg_select! {
+        idle_frequency_scaling => crate::clock::wait_for_interrupt(),
+        _ => unsafe { core::arch::asm!("wfi") },
+    }
 }
 
 pub(crate) fn priority_to_cpu_interrupt(_interrupt: Interrupt, level: Priority) -> CpuInterrupt {
@@ -511,7 +519,7 @@ pub(crate) fn priority_to_cpu_interrupt(_interrupt: Interrupt, level: Priority) 
 /// # Safety
 ///
 /// Must be called only during core startup.
-#[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
+#[cfg(any(feature = "rt", multi_core))]
 pub(crate) unsafe fn init_vectoring() {
     use riscv::register::mtvec;
 
@@ -661,7 +669,12 @@ pub(crate) mod rt {
             _ => {
                 // Change the current runlevel so that interrupt handlers can access the correct
                 // runlevel.
-                let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
+                let prio = unwrap!(
+                    INTERRUPT_TO_PRIORITY
+                        .get(cpu_intr as usize)
+                        .copied()
+                        .flatten()
+                );
                 let level = unsafe {
                     change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio)))
                 };
@@ -684,7 +697,16 @@ pub(crate) mod rt {
         // the cycles it takes to enable nesting unnecessarily.
         if prio != Priority::max() as u8 {
             unsafe {
+                // `nested` doesn't save `tcontrol`, and a nested trap overwrites `mpte`. The CLIC
+                // cores don't set it again on `mret`, which would leave the triggers, e.g. the
+                // stack guard watchpoints, disabled after this handler returns.
+                #[cfg(interrupt_controller = "clic")]
+                let triggers_enabled = crate::debugger::triggers_enabled_on_mret();
                 riscv::interrupt::nested(handle_interrupts);
+                #[cfg(interrupt_controller = "clic")]
+                if triggers_enabled {
+                    crate::debugger::enable_triggers_on_mret();
+                }
             }
         } else {
             handle_interrupts();

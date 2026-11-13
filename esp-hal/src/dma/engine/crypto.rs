@@ -17,7 +17,6 @@ use crate::{
         RegisterAccess,
         RxRegisterAccess,
         TxRegisterAccess,
-        asynch,
     },
     interrupt::InterruptHandler,
     peripherals::{DMA_CRYPTO, Interrupt},
@@ -27,12 +26,6 @@ use crate::{
 /// Immutable per-channel metadata.
 #[doc(hidden)]
 pub struct ChannelInfo {
-    #[expect(dead_code)]
-    pub(crate) peripheral_interrupt: Interrupt,
-
-    #[expect(dead_code)]
-    pub(crate) async_handler: InterruptHandler,
-
     /// Peripheral IDs this channel can serve. An empty slice means no runtime check is needed.
     pub(crate) compatible_peripherals: &'static [u8],
 }
@@ -476,14 +469,7 @@ pub type CryptoDmaChannel<'d> = DMA_CRYPTO<'d>;
 
 impl DMA_CRYPTO<'_> {
     pub(super) fn info(&self) -> &'static ChannelInfo {
-        #[crate::handler(priority = crate::interrupt::Priority::max())]
-        fn interrupt_handler() {
-            asynch::handle_in_interrupt::<DMA_CRYPTO<'static>>();
-            asynch::handle_out_interrupt::<DMA_CRYPTO<'static>>();
-        }
         static INFO: ChannelInfo = ChannelInfo {
-            peripheral_interrupt: Interrupt::CRYPTO_DMA,
-            async_handler: interrupt_handler,
             compatible_peripherals: &[DmaPeripheral::AES.0, DmaPeripheral::SHA.0],
         };
         &INFO

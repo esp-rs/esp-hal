@@ -8,13 +8,9 @@
     reason = "Clock-tree types come from generated macro code"
 )]
 
-use core::sync::atomic::{AtomicBool, Ordering};
-
-use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
-
 use crate::{
     peripherals::{HP_ALIVE_SYS, HP_SYS, HP_SYS_CLKRST, LP_AON_CLK_RST, MODEM_LPCON, PMU},
-    soc::{regi2c, xtal32k},
+    soc::{regi2c, update_bus_clocks, with_single_bus_clock_update, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -47,6 +43,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        lp_peri_clk: None,
         ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -64,6 +61,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        lp_peri_clk: None,
         ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -81,6 +79,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        lp_peri_clk: None,
         ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -117,36 +116,19 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(self, clocks: &mut ClockTree) {
-        // CPU_ROOT_CLK and the CPU, memory, AHB, and APB dividers share one
-        // update signal. Write the complete configuration before latching it;
-        // applying each change separately can temporarily overclock the buses.
-        BUS_CLOCK_UPDATE_DEFERRED.store(true, Ordering::Relaxed);
-        self.apply(clocks);
-        BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
+        if self.lp_peri_clk.is_none() {
+            // Keep the LP peripheral divider configured by the bootloader.
+            self.lp_peri_clk = Some(LpPeriClkConfig::new(
+                LP_AON_CLK_RST::regs()
+                    .lproot_clk_div()
+                    .read()
+                    .lpperi_clk_div_num()
+                    .bits() as u32,
+            ));
+        }
 
-        update_bus_clocks();
-        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
-    }
-}
-
-static BUS_CLOCK_UPDATE_DEFERRED: AtomicBool = AtomicBool::new(false);
-
-fn update_bus_clocks() {
-    if BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
-        return;
-    }
-
-    HP_SYS_CLKRST::regs()
-        .root_clk_ctrl0()
-        .modify(|_, w| w.soc_clk_div_update().set_bit());
-    while HP_SYS_CLKRST::regs()
-        .root_clk_ctrl0()
-        .read()
-        .soc_clk_div_update()
-        .bit_is_set()
-    {
-        core::hint::spin_loop();
+        with_single_bus_clock_update(|| self.apply(clocks));
     }
 }
 
@@ -188,6 +170,26 @@ fn enable_bbpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
         .modify(|_, w| w.hp_spll_480m_clk_en().bit(en));
 }
 
+/// Requests the clock source of the flash controller for the life of the program.
+///
+/// The bootloader selects the clock source of the flash controller: XTAL_CLK, the BBPLL or the
+/// CPLL. The flash controller must keep that clock while the program runs. The clock tree does
+/// not count the flash controller as a user of that clock, so a reference that nothing releases
+/// keeps the PLL on when the CPU moves to another clock.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/esp_clk_tree.c#L412-L413>.
+pub(crate) fn request_flash_clock_source(clocks: &mut ClockTree) {
+    match HP_SYS_CLKRST::regs()
+        .flash_ctrl0()
+        .read()
+        .clk_src_sel()
+        .bits()
+    {
+        1 => request_bbpll_clk(clocks),
+        2 => request_cpll_clk(clocks),
+        _ => {}
+    }
+}
+
 // CPLL_CLK
 
 fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
@@ -209,21 +211,7 @@ fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
             w.hp_active_xpd_pll().set_bit()
         });
 
-        HP_SYS_CLKRST::regs()
-            .ana_pll_ctrl0()
-            .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
-        while HP_SYS_CLKRST::regs()
-            .ana_pll_ctrl0()
-            .read()
-            .cpu_pll_cal_end()
-            .bit_is_clear()
-        {
-            core::hint::spin_loop();
-        }
-        crate::rom::ets_delay_us(10);
-        HP_SYS_CLKRST::regs()
-            .ana_pll_ctrl0()
-            .modify(|_, w| w.cpu_pll_cal_stop().set_bit());
+        calibrate_cpll();
     } else {
         PMU::regs()
             .imm_hp_ck_power_1()
@@ -239,6 +227,36 @@ fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
             w.hp_active_xpd_pll_i2c().clear_bit();
             w.hp_active_xpd_pll().clear_bit()
         });
+    }
+}
+
+/// Runs the self-calibration of the CPLL. The CPLL must have power.
+fn calibrate_cpll() {
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
+    while HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .read()
+        .cpu_pll_cal_end()
+        .bit_is_clear()
+    {
+        core::hint::spin_loop();
+    }
+    crate::rom::ets_delay_us(10);
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.cpu_pll_cal_stop().set_bit());
+}
+
+/// Calibrates the CPLL again, if a clock uses it.
+///
+/// A CPLL that no clock uses is off, and turning it on calibrates it.
+///
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182e3dabf6355160166fe007df775629/components/esp_hw_support/port/esp32s31/rtc_clk.c#L542-L554>.
+pub(crate) fn recalibrate_cpll(clocks: &ClockTree) {
+    if clocks.cpll_clk_refcount > 0 {
+        calibrate_cpll();
     }
 }
 
@@ -324,6 +342,16 @@ fn set_mpll_frequency(mpll_mhz: u32) {
     HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().set_bit());
+}
+
+/// Calibrates the MPLL again at the rate the clock tree holds, if a clock uses it.
+///
+/// The rate comes from the clock tree and not from the dividers, so that a calibration cannot
+/// change it.
+pub(crate) fn recalibrate_mpll(clocks: &ClockTree) {
+    if clocks.mpll_clk_refcount > 0 {
+        set_mpll_frequency(unwrap!(clocks.mpll_clk).value() / 1_000_000);
+    }
 }
 
 fn configure_mpll_clk_impl(
@@ -482,8 +510,50 @@ fn configure_cpu_root_clk_impl(
     update_bus_clocks();
 }
 
-fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+//
+// All dividers are 1 while the CPU clock comes from XTAL_CLK, so that MEM_CLK, SYS_CLK and APB_CLK
+// stay at the XTAL_CLK frequency. One bus clock update applies the root clock and all dividers.
+// See <https://github.com/espressif/esp-idf/blob/4d80c1b29aeabc8e735ffc6e1be9bb23e95d1d5d/components/esp_hw_support/port/esp32s31/rtc_clk.c#L163-L182>.
+
+/// Switches the CPU clock to XTAL_CLK if it comes from a PLL, with configured dividers that
+/// [`restore_cpu_clock`] can restore. Returns whether the clock changed.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if !matches!(
+        clocks.cpu_root_clk(),
+        Some(CpuRootClkConfig::Cpll | CpuRootClkConfig::PllF240m)
+    ) || clocks.cpu_clk().is_none()
+        || clocks.mem_clk().is_none()
+        || clocks.sys_clk().is_none()
+        || clocks.apb_clk().is_none()
+    {
+        return false;
+    }
+    // PSRAM slows down before the CPU clock, and speeds up after it.
+    crate::psram::implem::low_speed::enter();
+    with_single_bus_clock_update(|| {
+        configure_cpu_root_clk_impl(clocks, None, CpuRootClkConfig::Xtal);
+        configure_cpu_clk_impl(clocks, None, CpuClkConfig::new(0));
+        configure_mem_clk_impl(clocks, None, MemClkConfig::new(0));
+        configure_sys_clk_impl(clocks, None, SysClkConfig::new(0));
+        configure_apb_clk_impl(clocks, None, ApbClkConfig::new(0));
+    });
+    true
+}
+
+/// Restores the CPU clock and the dividers that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    with_single_bus_clock_update(|| {
+        configure_apb_clk_impl(clocks, None, unwrap!(clocks.apb_clk()));
+        configure_sys_clk_impl(clocks, None, unwrap!(clocks.sys_clk()));
+        configure_cpu_clk_impl(clocks, None, unwrap!(clocks.cpu_clk()));
+        configure_mem_clk_impl(clocks, None, unwrap!(clocks.mem_clk()));
+        configure_cpu_root_clk_impl(clocks, None, unwrap!(clocks.cpu_root_clk()));
+    });
+    crate::psram::implem::low_speed::exit();
 }
 
 fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, new: CpuClkConfig) {
@@ -500,17 +570,9 @@ fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, n
         .mem_freq_ctrl0()
         .modify(|_, w| w.mem_clk_div_num().bit(cpu_clk_frequency() > 160_000_000));
     update_bus_clocks();
-
-    if !BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
-        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
-    }
 }
 
 // MEM_CLK
-
-fn enable_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here
-}
 
 fn configure_mem_clk_impl(_clocks: &mut ClockTree, _old: Option<MemClkConfig>, new: MemClkConfig) {
     HP_SYS_CLKRST::regs()
@@ -520,10 +582,6 @@ fn configure_mem_clk_impl(_clocks: &mut ClockTree, _old: Option<MemClkConfig>, n
 }
 
 // SYS_CLK
-
-fn enable_sys_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here
-}
 
 fn configure_sys_clk_impl(_clocks: &mut ClockTree, _old: Option<SysClkConfig>, new: SysClkConfig) {
     HP_SYS_CLKRST::regs()
@@ -553,6 +611,16 @@ fn configure_apb_clk_impl(_clocks: &mut ClockTree, _old: Option<ApbClkConfig>, n
 
 fn enable_lp_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do here
+}
+
+fn configure_lp_peri_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<LpPeriClkConfig>,
+    new: LpPeriClkConfig,
+) {
+    LP_AON_CLK_RST::regs()
+        .lproot_clk_div()
+        .modify(|_, w| unsafe { w.lpperi_clk_div_num().bits(new.divisor() as u8) });
 }
 
 fn configure_lp_fast_clk_impl(
@@ -591,9 +659,12 @@ fn configure_lp_slow_clk_impl(
 }
 
 fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    HP_SYS_CLKRST::regs()
-        .timergrp0_tgrt_ctrl0()
-        .modify(|_, w| w.clk_en().bit(en));
+    // Do not gate the clock. After the gate opens, the calibration can start too late and time out.
+    if en {
+        HP_SYS_CLKRST::regs()
+            .timergrp0_tgrt_ctrl0()
+            .modify(|_, w| w.clk_en().set_bit());
+    }
 }
 
 fn configure_timg_calibration_clock_impl(
@@ -783,6 +854,14 @@ impl PsramInstance {
     }
 }
 
+impl PcntInstance {
+    // PCNT_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+}
+
 impl SdmInstance {
     // SDM_FUNCTION_CLOCK
 
@@ -790,6 +869,48 @@ impl SdmInstance {
         crate::peripherals::GPIO_SD::regs()
             .sigmadelta_misc()
             .modify(|_, w| w.sigmadelta_clk_en().bit(en));
+    }
+}
+
+impl CordicInstance {
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, enabled: bool) {
+        HP_SYS_CLKRST::regs()
+            .cordic_ctrl0()
+            .modify(|_, w| w.clk_en().bit(enabled));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<CordicFunctionClockConfig>,
+        config: CordicFunctionClockConfig,
+    ) {
+        let clocks = HP_SYS_CLKRST::regs();
+        let ctrl = clocks.cordic_ctrl0();
+        let enabled = ctrl.read().clk_en().bit_is_set();
+        ctrl.modify(|_, w| w.clk_en().clear_bit());
+
+        clocks.cordic_ctrl1().write(|w| unsafe {
+            let numerator = config.numerator() as u8;
+            w.clk_div_num().bits((config.divider() - 1) as u8);
+            w.clk_div_numerator().bits(numerator);
+            // The register uses `0 / 0` for integer dividers.
+            let denominator = if numerator == 0 {
+                0
+            } else {
+                config.denominator()
+            };
+            w.clk_div_denonimator().bits(denominator as u8)
+        });
+        let source = match config.source() {
+            CordicFunctionClockSource::Xtal => 0,
+            CordicFunctionClockSource::RcFast => 1,
+            CordicFunctionClockSource::PllF160m => 2,
+        };
+        ctrl.modify(|_, w| unsafe {
+            w.clk_src_sel().bits(source);
+            w.clk_en().bit(enabled)
+        });
     }
 }
 

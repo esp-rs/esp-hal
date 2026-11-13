@@ -158,6 +158,13 @@ impl TimeDriver {
         };
     }
 
+    #[cfg(multi_core)]
+    pub(crate) fn ensure_time_slice(&mut self, cpu: Cpu, now: u64) {
+        if self.timer_queue.time_slice_target[cpu as usize] == u64::MAX {
+            self.set_time_slice(cpu, now, true);
+        }
+    }
+
     pub(crate) fn arm_next_wakeup(&mut self, now: u64) {
         let next_wakeup = self.timer_queue.next_wakeup();
 

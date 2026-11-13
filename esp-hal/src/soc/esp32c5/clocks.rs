@@ -17,7 +17,7 @@
 
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU},
-    soc::{regi2c, xtal32k},
+    soc::{regi2c, update_bus_clocks, with_single_bus_clock_update, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -119,7 +119,7 @@ impl ClockConfig {
             Some(XtalClkConfig::_48)
         };
 
-        self.apply(clocks);
+        with_single_bus_clock_update(|| self.apply(clocks));
     }
 }
 
@@ -357,27 +357,46 @@ fn configure_hp_root_clk_impl(
         })
     });
 
-    bus_clock_update();
+    update_bus_clocks();
 }
 
-/// Applies the new `soc_clk_sel`, `cpu_div_num` and `ahb_div_num` values.
-fn bus_clock_update() {
-    PCR::regs()
-        .bus_clk_update()
-        .write(|w| w.bus_clock_update().set_bit());
-    while PCR::regs()
-        .bus_clk_update()
-        .read()
-        .bus_clock_update()
-        .bit_is_set()
-    {}
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+//
+// One bus clock update applies the root clock and both dividers together, so that CPU_CLK stays
+// an integer multiple of AHB_CLK, and AHB_CLK does not exceed XTAL_CLK.
+
+/// Switches the CPU clock to XTAL_CLK if it comes from the PLL, with configured dividers that
+/// [`restore_cpu_clock`] can restore. Returns whether the clock changed.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if !matches!(
+        clocks.hp_root_clk(),
+        Some(HpRootClkConfig::PllF160m | HpRootClkConfig::PllF240m)
+    ) || clocks.cpu_clk().is_none()
+        || clocks.ahb_clk().is_none()
+    {
+        return false;
+    }
+    with_single_bus_clock_update(|| {
+        configure_hp_root_clk_impl(clocks, None, HpRootClkConfig::Xtal);
+        configure_cpu_clk_impl(clocks, None, CpuClkConfig::new(0));
+        configure_ahb_clk_impl(clocks, None, AhbClkConfig::new(0));
+    });
+    true
+}
+
+/// Restores the CPU clock that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    with_single_bus_clock_update(|| {
+        configure_ahb_clk_impl(clocks, None, unwrap!(clocks.ahb_clk()));
+        configure_cpu_clk_impl(clocks, None, unwrap!(clocks.cpu_clk()));
+        configure_hp_root_clk_impl(clocks, None, unwrap!(clocks.hp_root_clk()));
+    });
 }
 
 // CPU_CLK
-
-fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
-}
 
 fn configure_cpu_clk_impl(
     _clocks: &mut ClockTree,
@@ -388,14 +407,10 @@ fn configure_cpu_clk_impl(
         .cpu_freq_conf()
         .modify(|_, w| unsafe { w.cpu_div_num().bits(new_config.divisor() as u8) });
 
-    bus_clock_update();
+    update_bus_clocks();
 }
 
 // AHB_CLK
-
-fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
-}
 
 fn configure_ahb_clk_impl(
     _clocks: &mut ClockTree,
@@ -406,23 +421,28 @@ fn configure_ahb_clk_impl(
         .ahb_freq_conf()
         .modify(|_, w| unsafe { w.ahb_div_num().bits(new_config.divisor() as u8) });
 
-    bus_clock_update();
+    update_bus_clocks();
 }
 
 // APB_CLK
 
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    crate::soc::enable_apb_frequency_reduction(!en);
 }
 
 fn configure_apb_clk_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<ApbClkConfig>,
+    old_config: Option<ApbClkConfig>,
     new_config: ApbClkConfig,
 ) {
     PCR::regs()
         .apb_freq_conf()
         .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
+
+    // No driver uses APB_CLK before the first configuration.
+    if old_config.is_none() {
+        crate::soc::enable_apb_frequency_reduction(true);
+    }
 }
 
 // XTAL_D2_CLK
@@ -607,6 +627,14 @@ impl AdcInstance {
                 AdcFunctionClockConfig::PllF80m => 2,
             })
         });
+    }
+}
+
+impl PcntInstance {
+    // PCNT_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
     }
 }
 

@@ -5,6 +5,8 @@
 //! Construct a [`Unit`] from a `PCNTn_UNITm` singleton. Units can be paused,
 //! resumed, and cleared, and can listen for threshold and limit events.
 
+#[cfg(soc_has_clock_node_pcnt_function_clock)]
+use crate::soc::clocks::ClockTree;
 use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     pcnt::{AnyPcntUnit, Instance, channel::Channel},
@@ -87,6 +89,8 @@ impl<'d> Unit<'d> {
     pub fn new(unit: impl Instance + 'd) -> Self {
         let (info, _) = unit.parts();
         let guard = PeripheralGuard::new(info.peripheral);
+        #[cfg(soc_has_clock_node_pcnt_function_clock)]
+        ClockTree::with(|clocks| info.clock.request_function_clock(clocks));
         let unit = unit.degrade();
 
         let regs = info.regs();
@@ -380,6 +384,8 @@ impl Drop for Unit<'_> {
             .conf0()
             .write(|w| unsafe { w.bits(0) });
         self.unit.state().clear();
+        #[cfg(soc_has_clock_node_pcnt_function_clock)]
+        ClockTree::with(|clocks| info.clock.release_function_clock(clocks));
     }
 }
 

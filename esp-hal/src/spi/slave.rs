@@ -64,7 +64,7 @@ transfer.wait();
 //! then the `SpiDmaTransfer` object can be `wait()`ed on or polled for
 //! `is_done()`.
 //!
-//! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
+//! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/1437) for more information.
 
 use core::marker::PhantomData;
 
@@ -423,6 +423,8 @@ pub mod dma {
                     self.spi_dma.channel.tx.stop_transfer();
                 }
             }
+            self.spi_dma.channel.rx.end_transfer();
+            self.spi_dma.channel.tx.end_transfer();
 
             let retval = unsafe {
                 (

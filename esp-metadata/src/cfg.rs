@@ -17,6 +17,7 @@ pub(crate) mod sleep;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
+pub(crate) mod temp_sensor;
 pub(crate) mod timergroup;
 pub(crate) mod uart;
 
@@ -38,6 +39,7 @@ pub(crate) use sleep::*;
 pub(crate) use soc::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
+pub(crate) use temp_sensor::*;
 pub(crate) use timergroup::*;
 pub(crate) use uart::*;
 
@@ -693,6 +695,10 @@ driver_configs![
             name: "Bluetooth",
             properties: {
                 controller: String,
+                /// Whether the CPU clock must stay at its configured frequency while the
+                /// controller uses the PHY.
+                #[serde(default)]
+                requires_fast_cpu: bool,
             }
         },
         WifiProperties {
@@ -712,12 +718,21 @@ driver_configs![
                 /// The Wi-Fi blobs contain Fine Timing Measurement code (`SOC_WIFI_FTM_SUPPORT`).
                 #[serde(default)]
                 has_ftm: bool,
+                /// Whether the CPU clock must stay at its configured frequency while the modem is
+                /// awake.
+                #[serde(default)]
+                requires_fast_cpu: bool,
             }
         },
         IeeeProperties {
             driver: ieee802154,
             name: "IEEE 802.15.4",
-            properties: {}
+            properties: {
+                /// Whether the CPU clock must stay at its configured frequency while the radio
+                /// driver exists.
+                #[serde(default)]
+                requires_fast_cpu: bool,
+            }
         },
         EthernetProperties {
             driver: ethernet,
@@ -742,6 +757,9 @@ driver_configs![
                 /// Programmable DMA burst length (`DMABUSMODE.PBL`). A 32-beat burst
                 /// overflows the AXI bus on some chips.
                 dma_burst_len: u32,
+                /// The alignment, in bytes, that the EMAC DMA needs for each descriptor and
+                /// buffer.
+                dma_alignment: u32,
                 /// When true, the MAC exposes RGMII (1000 Mbps) pads in addition to RMII/MII.
                 #[serde(default)]
                 has_rgmii: bool,
@@ -875,7 +893,10 @@ driver_configs![
         TempProperties {
             driver: temp_sensor,
             name: "Temperature sensor",
-            properties: {}
+            properties: {
+                #[serde(default)]
+                register_block: TempSensorRegisterBlock,
+            }
         },
         TouchProperties {
             driver: touch,
@@ -1060,6 +1081,10 @@ driver_configs![
                 /// that have none. `cfgs()` returns `None` when the table is empty.
                 #[serde(default)]
                 retention: SleepRetentionProperties,
+                /// Whether `wait_for_interrupt` can switch the CPU clock to XTAL_CLK. No peripheral
+                /// function clock may derive from the CPU clock or from the bus clocks.
+                #[serde(default)]
+                idle_frequency_scaling: bool,
             }
         },
         UlpFsmProperties {
@@ -1146,6 +1171,10 @@ driver_configs![
                 #[serde(default)]
                 has_timing_tuning: bool,
                 extmem_origin: u32,
+                /// Whether PSRAM must switch to a low speed while the CPU clock comes from
+                /// XTAL_CLK, because the AXI bus clock limits the PSRAM clock.
+                #[serde(default)]
+                idle_low_speed_switch: bool,
             }
         },
         RomProperties {
@@ -1187,8 +1216,18 @@ driver_configs![
                 cpu_csr_prv_mode: Option<u32>,
                 #[serde(default)]
                 internal_memory_cached: bool,
+                /// Whether the cache is in the CPU power domain. A CPU power-down loses the dirty
+                /// cache lines.
+                #[serde(default)]
+                cpu_powers_down_cache: bool,
                 #[serde(default)]
                 has_swd_watchdog: bool,
+                /// New CPU and bus clock dividers take effect only after a shared update signal.
+                #[serde(default)]
+                has_bus_clock_update: bool,
+                /// The hardware can lower APB_CLK while the APB bus is idle.
+                #[serde(default)]
+                has_apb_frequency_reduction: bool,
                 #[serde(default)]
                 cpu_mcause_mask: u32,
                 /// PMP address matching granularity, in bytes.

@@ -5,7 +5,7 @@
 
 use portable_atomic::Ordering;
 
-use super::STATE;
+use super::runtime::STATE;
 use crate::{
     interrupt::{Priority, software::SoftwareInterrupt},
     peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1, Interrupt},
@@ -69,11 +69,11 @@ fn ipc_handler(context: &mut TrapFrame) {
 
     let state = &STATE[core as usize];
 
-    // The callback returns here, so it runs first.
-    let callback = state.callback.swap(core::ptr::null_mut(), Ordering::AcqRel);
-    if !callback.is_null() {
-        let callback = unsafe { core::mem::transmute::<*mut (), fn()>(callback) };
-        callback();
+    // The posted requests return here, so they run first.
+    unsafe { super::queue::drain(&state.lists, core as u32) };
+
+    if state.deferral.load(Ordering::Relaxed) != 0 {
+        return;
     }
 
     // The context switch chooses the context that the interrupt returns to, so it runs last.

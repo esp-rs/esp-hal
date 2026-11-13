@@ -289,6 +289,12 @@ macro_rules! property {
     ("bt.controller") => {
         "btdm2"
     };
+    ("bt.requires_fast_cpu") => {
+        false
+    };
+    ("ieee802154.requires_fast_cpu") => {
+        false
+    };
     ("phy.combo_module") => {
         false
     };
@@ -349,6 +355,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.idle_frequency_scaling") => {
+        false
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -400,6 +409,9 @@ macro_rules! property {
     ("psram.extmem_origin", str) => {
         stringify!(1107296256)
     };
+    ("psram.idle_low_speed_switch") => {
+        false
+    };
     ("rom.has_crc_le") => {
         true
     };
@@ -439,7 +451,16 @@ macro_rules! property {
     ("soc.internal_memory_cached") => {
         false
     };
+    ("soc.cpu_powers_down_cache") => {
+        true
+    };
     ("soc.has_swd_watchdog") => {
+        true
+    };
+    ("soc.has_bus_clock_update") => {
+        true
+    };
+    ("soc.has_apb_frequency_reduction") => {
         true
     };
     ("soc.cpu_mcause_mask") => {
@@ -1803,29 +1824,29 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 2],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 2],
-            pll_f96m_clk_refcount: u32,
-            pll_f48m_clk_refcount: u32,
-            xtal_x2_clk_refcount: u32,
-            rc_fast_clk_refcount: u32,
+            pub(crate) pll_f96m_clk_refcount: u32,
+            pub(crate) pll_f48m_clk_refcount: u32,
+            pub(crate) xtal_x2_clk_refcount: u32,
+            pub(crate) rc_fast_clk_refcount: u32,
             #[cfg(use_xtal32k)]
-            xtal32k_clk_refcount: u32,
-            rc_slow_d4_clk_refcount: u32,
-            apb_clk_refcount: u32,
-            lp_fast_clk_refcount: u32,
-            lp_slow_clk_refcount: u32,
-            ble_lp_clk_refcount: u32,
-            timg_calibration_clock_refcount: u32,
-            i2s_tx_clk_refcount: [u32; 1],
-            i2s_rx_clk_refcount: [u32; 1],
-            i2s_mclk_out_refcount: [u32; 1],
-            i2c_function_clock_refcount: [u32; 2],
-            parl_io_rx_clock_refcount: [u32; 1],
-            parl_io_tx_clock_refcount: [u32; 1],
-            spi_function_clock_refcount: [u32; 2],
-            timg_function_clock_refcount: [u32; 2],
-            timg_wdt_clock_refcount: [u32; 2],
-            uart_function_clock_refcount: [u32; 2],
-            uart_baud_rate_generator_refcount: [u32; 2],
+            pub(crate) xtal32k_clk_refcount: u32,
+            pub(crate) rc_slow_d4_clk_refcount: u32,
+            pub(crate) apb_clk_refcount: u32,
+            pub(crate) lp_fast_clk_refcount: u32,
+            pub(crate) lp_slow_clk_refcount: u32,
+            pub(crate) ble_lp_clk_refcount: u32,
+            pub(crate) timg_calibration_clock_refcount: u32,
+            pub(crate) i2s_tx_clk_refcount: [u32; 1],
+            pub(crate) i2s_rx_clk_refcount: [u32; 1],
+            pub(crate) i2s_mclk_out_refcount: [u32; 1],
+            pub(crate) i2c_function_clock_refcount: [u32; 2],
+            pub(crate) parl_io_rx_clock_refcount: [u32; 1],
+            pub(crate) parl_io_tx_clock_refcount: [u32; 1],
+            pub(crate) spi_function_clock_refcount: [u32; 2],
+            pub(crate) timg_function_clock_refcount: [u32; 2],
+            pub(crate) timg_wdt_clock_refcount: [u32; 2],
+            pub(crate) uart_function_clock_refcount: [u32; 2],
+            pub(crate) uart_baud_rate_generator_refcount: [u32; 2],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.
@@ -2448,6 +2469,9 @@ macro_rules! define_clock_tree_types {
         pub fn configure_cpu_clk(clocks: &mut ClockTree, config: CpuClkConfig) {
             let old_config = clocks.cpu_clk.replace(config);
             refresh_cpu_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_hp_root_clk(clocks);
+            }
             configure_cpu_clk_impl(clocks, old_config, config);
         }
         pub fn cpu_clk_config(clocks: &mut ClockTree) -> Option<CpuClkConfig> {
@@ -2467,6 +2491,9 @@ macro_rules! define_clock_tree_types {
         pub fn configure_ahb_clk(clocks: &mut ClockTree, config: AhbClkConfig) {
             let old_config = clocks.ahb_clk.replace(config);
             refresh_ahb_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_cpu_clk(clocks);
+            }
             configure_ahb_clk_impl(clocks, old_config, config);
         }
         pub fn ahb_clk_config(clocks: &mut ClockTree) -> Option<AhbClkConfig> {
@@ -2486,6 +2513,9 @@ macro_rules! define_clock_tree_types {
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             let old_config = clocks.apb_clk.replace(config);
             refresh_apb_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_ahb_clk(clocks);
+            }
             configure_apb_clk_impl(clocks, old_config, config);
         }
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
@@ -2494,17 +2524,13 @@ macro_rules! define_clock_tree_types {
         pub fn request_apb_clk(clocks: &mut ClockTree) {
             trace!("Requesting APB_CLK");
             if increment_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Enabling APB_CLK");
-                request_ahb_clk(clocks);
                 enable_apb_clk_impl(clocks, true);
             }
         }
         pub fn release_apb_clk(clocks: &mut ClockTree) {
             trace!("Releasing APB_CLK");
             if decrement_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Disabling APB_CLK");
                 enable_apb_clk_impl(clocks, false);
-                release_ahb_clk(clocks);
             }
         }
         pub fn apb_clk_config_frequency(config: ApbClkConfig) -> u32 {
@@ -4572,9 +4598,16 @@ macro_rules! for_each_peripheral {
         { bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         DMA_OUT_CH4 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable))); _for_each_inner_peripheral!((@
-        peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        peri_type #[doc = "PCNT0_UNIT0 peripheral singleton"] PCNT0_UNIT0 <= virtual()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PCNT0_UNIT1 peripheral singleton"] PCNT0_UNIT1 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PCNT0_UNIT2 peripheral singleton"] PCNT0_UNIT2 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PCNT0_UNIT3 peripheral singleton"] PCNT0_UNIT3 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "AES peripheral singleton"] AES
+        <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC(APB_ADC : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -4772,6 +4805,10 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((DMA_CH2(unstable)));
         _for_each_inner_peripheral!((DMA_CH3(unstable)));
         _for_each_inner_peripheral!((DMA_CH4(unstable)));
+        _for_each_inner_peripheral!((PCNT0_UNIT0(unstable)));
+        _for_each_inner_peripheral!((PCNT0_UNIT1(unstable)));
+        _for_each_inner_peripheral!((PCNT0_UNIT2(unstable)));
+        _for_each_inner_peripheral!((PCNT0_UNIT3(unstable)));
         _for_each_inner_peripheral!((AES(unstable)));
         _for_each_inner_peripheral!((APB_SARADC(unstable)));
         _for_each_inner_peripheral!((ASRC(unstable)));
@@ -5010,16 +5047,21 @@ macro_rules! for_each_peripheral {
         bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         DMA_OUT_CH4 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
-        "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC(APB_ADC : {
+        "PCNT0_UNIT0 peripheral singleton"] PCNT0_UNIT0 <= virtual() (unstable)), (@
+        peri_type #[doc = "PCNT0_UNIT1 peripheral singleton"] PCNT0_UNIT1 <= virtual()
+        (unstable)), (@ peri_type #[doc = "PCNT0_UNIT2 peripheral singleton"] PCNT0_UNIT2
+        <= virtual() (unstable)), (@ peri_type #[doc =
+        "PCNT0_UNIT3 peripheral singleton"] PCNT0_UNIT3 <= virtual() (unstable)), (@
+        peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "ASRC peripheral singleton"] ASRC <=
-        ASRC(ASRC_CHNL0 : { bind_chnl0_interrupt, enable_chnl0_interrupt,
-        disable_chnl0_interrupt }, ASRC_CHNL1 : { bind_chnl1_interrupt,
-        enable_chnl1_interrupt, disable_chnl1_interrupt }) (unstable)), (@ peri_type
-        #[doc = "BUS_MONITOR peripheral singleton"] BUS_MONITOR <=
-        BUS_MONITOR(BUS_MONITOR : { bind_peri_interrupt, enable_peri_interrupt,
+        (unstable)), (@ peri_type #[doc = "APB_SARADC peripheral singleton"] APB_SARADC
+        <= APB_SARADC(APB_ADC : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "ASRC peripheral singleton"] ASRC <= ASRC(ASRC_CHNL0 : { bind_chnl0_interrupt,
+        enable_chnl0_interrupt, disable_chnl0_interrupt }, ASRC_CHNL1 : {
+        bind_chnl1_interrupt, enable_chnl1_interrupt, disable_chnl1_interrupt })
+        (unstable)), (@ peri_type #[doc = "BUS_MONITOR peripheral singleton"] BUS_MONITOR
+        <= BUS_MONITOR(BUS_MONITOR : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
         "CACHE peripheral singleton"] CACHE <= CACHE(CACHE : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
@@ -5154,9 +5196,10 @@ macro_rules! for_each_peripheral {
         (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27), (GPIO28), (GPIO29), (GPIO30),
         (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38),
         (GPIO39), (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)),
-        (DMA_CH3(unstable)), (DMA_CH4(unstable)), (AES(unstable)),
-        (APB_SARADC(unstable)), (ASRC(unstable)), (BUS_MONITOR(unstable)),
-        (CACHE(unstable)), (CLIC(unstable)), (CLINT(unstable)),
+        (DMA_CH3(unstable)), (DMA_CH4(unstable)), (PCNT0_UNIT0(unstable)),
+        (PCNT0_UNIT1(unstable)), (PCNT0_UNIT2(unstable)), (PCNT0_UNIT3(unstable)),
+        (AES(unstable)), (APB_SARADC(unstable)), (ASRC(unstable)),
+        (BUS_MONITOR(unstable)), (CACHE(unstable)), (CLIC(unstable)), (CLINT(unstable)),
         (CLINT_OTHER_CORE(unstable)), (CPU_APM(unstable)), (DMA(unstable)),
         (ECC(unstable)), (ECDSA(unstable)), (ETM(unstable)), (GPIO(unstable)),
         (GPIO_DEDICATED(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),

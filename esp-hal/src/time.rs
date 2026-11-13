@@ -305,6 +305,29 @@ impl Instant {
     pub fn elapsed(&self) -> Duration {
         Self::now() - *self
     }
+
+    #[procmacros::doc_replace]
+    /// Subtracts `other` from this `Instant`, returning [`Duration::ZERO`] if
+    /// `other` is later than this `Instant`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::{Duration, Instant};
+    /// let deadline = Instant::now() + Duration::from_millis(10);
+    /// let remaining = deadline.saturating_sub(Instant::now());
+    /// # {after_snippet}
+    /// ```
+    #[inline]
+    #[instability::unstable]
+    pub fn saturating_sub(self, other: Instant) -> Duration {
+        if self > other {
+            self - other
+        } else {
+            Duration::ZERO
+        }
+    }
 }
 
 impl core::ops::Add<Duration> for Instant {

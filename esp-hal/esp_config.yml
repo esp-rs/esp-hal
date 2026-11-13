@@ -243,5 +243,29 @@ options:
       - value: true
     active: "riscv && !esp32c2 && !esp32c3"
 
+  - name: idle-frequency-scaling
+    description: "EXPERIMENTAL: this option can cause peripherals and radio drivers to fail.
+      Switches the CPU clock to XTAL_CLK while `wait_for_interrupt` waits, to decrease the current
+      consumption of an idle CPU. The bus clocks that come from the CPU clock also decrease. The
+      PLL continues to run. The switch back to the PLL increases the interrupt latency. Hold a
+      `CpuFrequencyLock` to keep the CPU clock unchanged."
+    default:
+      - value: false
+    active: "sleep_idle_frequency_scaling"
+  - name: apb-frequency-reduction
+    description: "Divide AHB_CLK by this value to get APB_CLK while the APB bus is idle. The
+      value 1 disables the reduction. The reduction has an effect only if this divider is larger
+      than the APB_CLK divider. Drivers that need a constant APB_CLK frequency stop the reduction
+      while they operate."
+    default:
+      - value: 1
+    constraints:
+      - type:
+          validator: integer_in_range
+          value:
+            start: 1
+            end: 257
+    active: "soc_has_apb_frequency_reduction"
+
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"

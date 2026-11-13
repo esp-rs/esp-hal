@@ -1,8 +1,7 @@
 name: Upload metrics to S3
 description: >-
   Validate and upload a metrics JSON artifact to the Espressif App Metrics S3
-  storage using `esp-metrics-cli`. Must run on a Brno self-hosted runner with
-  access to the internal S3 endpoint.
+  storage using `esp-metrics-cli`.
 
 inputs:
   artifact:
@@ -30,11 +29,11 @@ inputs:
   long-term-bucket:
     description: S3 bucket for default/release branches.
     required: false
-    default: longterm
+    default: metrics-longterm
   short-term-bucket:
     description: S3 bucket for other branches.
     required: false
-    default: idf-artifacts
+    default: metrics-shortterm
   s3-access-key:
     description: S3 access key.
     required: true
@@ -68,10 +67,9 @@ runs:
         ESP_METRICS_BRANCH_NAME: ${{ inputs.branch-name }}
         DEFINITIONS: ${{ inputs.definitions }}
         METRICS_FILE: metrics/${{ inputs.metrics-file }}
-        PYTHON: /opt/homebrew/bin/python3
       run: |
         trap 'rm -rf .metrics-venv metrics' EXIT
-        "$PYTHON" -m venv .metrics-venv
+        python3 -m venv .metrics-venv
         .metrics-venv/bin/pip install --no-cache-dir esp-metrics-cli
         .metrics-venv/bin/esp-metrics-cli validate -d "$DEFINITIONS" -i "$METRICS_FILE" --verbose
         .metrics-venv/bin/esp-metrics-cli upload   -d "$DEFINITIONS" -i "$METRICS_FILE" --verbose

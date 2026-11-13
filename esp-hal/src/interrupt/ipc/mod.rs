@@ -3,35 +3,23 @@
 //!
 //! ## Overview
 //!
-//! [`Ipc`] posts a function to a CPU, then raises that CPU's IPC interrupt. The interrupt
-//! handler runs the posted function at [`Priority::min`][super::Priority::min].
+//! [`Ipc::post`] queues a run of an [`IpcRequest`] on a CPU, then raises that CPU's IPC
+//! interrupt. The interrupt handler calls the function of each queued request at
+//! [`Priority::min`][super::Priority::min], in post order.
 //!
-//! The same interrupt also carries a context switch. A CPU asks the other CPU to switch tasks
-//! through this interrupt. The context-switch handler of the RTOS that owns scheduling runs
-//! after the posted function, and chooses the context that the interrupt returns to. A posted
-//! function and a context switch do not wait for each other. A posted function alone does not
-//! make a CPU switch tasks.
+//! A post never waits. It returns a [`Ticket`], and [`Ticket::wait`] waits for the run with a
+//! deadline. A busy CPU does not block the poster.
+//!
+//! A request has at most one pending run. A post of a pending request joins that run.
+//! [`IpcRequest`] lists the rules for the function.
 //!
 //! ## Configuration
-#![cfg_attr(
-    xtensa,
-    doc = " The HAL reserves `FROM_CPU_INTR0` and `FROM_CPU_INTR1` for this path."
-)]
-#![cfg_attr(
-    riscv,
-    doc = " Each CPU takes the call in its machine software interrupt. The path needs no peripheral interrupt."
-)]
+#![doc = cfg_select! {
+    xtensa => "The HAL reserves `FROM_CPU_INTR0` and `FROM_CPU_INTR1` for this path.",
+    riscv => "Each CPU takes the call in its machine software interrupt. The path needs no peripheral interrupt.",
+}]
 //! [`crate::init`] installs the handler on the PRO CPU. The start of the APP CPU installs the
 //! handler on that CPU.
-//!
-//! ## Usage
-//!
-//! [`Ipc::new`] creates a handle from the `IPC` peripheral singleton, and
-//! [`Ipc::call_function`] posts a function to a CPU.
-//!
-//! The posted function runs in an interrupt handler. The handler saves the registers that the
-//! calling convention lets the callee clobber, except the floating-point registers. The posted
-//! function must not use those registers, and must be callable with the cache disabled.
 //!
 //! ## Examples
 //!
@@ -39,74 +27,61 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::{interrupt::ipc::Ipc, system::Cpu};
+//! use esp_hal::{
+//!     interrupt::ipc::{Ipc, IpcRequest},
+//!     system::Cpu,
+//! };
 //!
-//! fn on_cpu() {
+//! extern "C" fn on_cpu() {
 //!     // Runs on the selected CPU at minimum interrupt priority.
 //! }
 //!
+//! static ON_CPU: IpcRequest = IpcRequest::new(on_cpu);
+//!
 //! let ipc = Ipc::new(peripherals.IPC);
-//! ipc.call_function(Cpu::ProCpu, on_cpu);
+//! let ticket = ipc.post(Cpu::ProCpu, &ON_CPU)?;
+//! ticket.wait(Instant::now() + Duration::from_millis(10))?;
 //! # {after_snippet}
 //! ```
 
-use portable_atomic::{AtomicPtr, Ordering};
+use core::ptr::NonNull;
 
-use crate::{
-    interrupt::__rtos_implementation::ContextSwitchHandler,
-    peripherals::IPC,
-    system::Cpu,
-};
+pub use self::request::IpcRequest;
+use crate::{peripherals::IPC, system::Cpu, time::Instant};
 
-#[cfg_attr(riscv, path = "riscv.rs")]
-#[cfg_attr(xtensa, path = "xtensa.rs")]
-mod implem;
+mod request;
 
-pub(crate) use implem::install;
-use implem::raise;
+cfg_select! {
+    feature = "rt" => {
+        #[cfg_attr(riscv, path = "riscv.rs")]
+        #[cfg_attr(xtensa, path = "xtensa.rs")]
+        mod implem;
+        mod queue;
+        mod runtime;
 
-#[cfg(riscv)]
-pub(crate) use self::implem::install_app;
-
-/// The IPC state of one CPU.
-///
-/// Every CPU has its own handler, which reads the fields at constant addresses.
-#[repr(C)]
-struct CoreState {
-    /// The function that [`Ipc::call_function`] posts, or null if the CPU has none.
-    callback: AtomicPtr<()>,
-
-    /// The context-switch handler that the CPU runs, or null if the CPU has none pending.
-    ///
-    /// [`request_context_switch`] copies `context_switch_handler` here. A posted function alone
-    /// therefore does not make the CPU switch tasks.
-    pending_context_switch: AtomicPtr<()>,
-
-    /// The context-switch handler of the CPU, or null if no RTOS registered one.
-    ///
-    /// This field is set once, and holds the only handler that the CPU accepts.
-    context_switch_handler: AtomicPtr<()>,
-
-    /// The address of the register that clears the request of this CPU.
-    #[cfg(riscv)]
-    request: AtomicPtr<u32>,
-}
-
-impl CoreState {
-    const fn new() -> Self {
-        Self {
-            callback: AtomicPtr::new(core::ptr::null_mut()),
-            pending_context_switch: AtomicPtr::new(core::ptr::null_mut()),
-            context_switch_handler: AtomicPtr::new(core::ptr::null_mut()),
-            #[cfg(riscv)]
-            request: AtomicPtr::new(core::ptr::null_mut()),
+        pub(crate) use implem::install;
+        #[cfg(riscv)]
+        pub(crate) use implem::install_app;
+        use runtime::esp_hal_ipc_post;
+        pub(crate) use runtime::{
+            defer_context_switch,
+            fail_stranded,
+            request_context_switch,
+            reset_context_switch_deferral,
+            resume_context_switch,
+            set_context_switch_handler,
+        };
+    }
+    _ => {
+        // A build can hold esp-hal copies without the `rt` feature. Those copies post through the
+        // symbol of the copy with `rt`.
+        unsafe extern "C" {
+            fn esp_hal_ipc_post(core: u8, request: NonNull<IpcRequest>) -> u32;
         }
     }
 }
 
-static STATE: [CoreState; Cpu::COUNT] = [const { CoreState::new() }; Cpu::COUNT];
-
-/// Handle that posts a function to a CPU through the IPC interrupt.
+/// Handle that posts requests to a CPU through the IPC interrupt.
 ///
 /// Copies of this handle share one state table.
 #[derive(Clone, Copy, Debug)]
@@ -123,111 +98,130 @@ impl Ipc {
         Self
     }
 
-    /// Runs `handler` on `core`.
+    /// Queues a run of `request` on `core`, and returns a [`Ticket`] that can be used to wait for
+    /// the run.
     ///
-    /// `handler` runs in an interrupt handler at [`Priority::min`][super::Priority::min]. This
-    /// call does not wait for `handler` to return, and a context switch does not delay it.
+    /// This function never waits. If `request` is pending on `core`, the post joins that run. If
+    /// `request` runs on `core`, the post queues a new run, which starts after the current run
+    /// returns.
     ///
-    /// The interrupt handler saves the registers that the calling convention lets the callee
-    /// clobber, except the floating-point registers. `handler` must not use those registers, and
-    /// must be callable with the cache disabled.
+    /// # Errors
     ///
-    /// A CPU holds one posted function at a time. If `core` already holds one, this call behaves
-    /// as follows:
-    ///
-    /// - If `core` holds `handler`, that function has not run yet, and it runs after this call. The
-    ///   two calls coalesce into one run, and this call returns. A caller that needs a run of its
-    ///   own must wait for the pending run.
-    /// - If `core` holds a different function, this call waits until `core` takes that function.
-    ///   `core` takes it in a minimum-priority interrupt. That interrupt cannot run in an
-    ///   interrupt-free context, and cannot run on the APP CPU while that CPU is in reset. The wait
-    ///   never ends in those cases.
-    ///
-    /// # Panics
-    ///
-    /// In debug builds, panics if `core` is the APP CPU and that CPU is not running.
-    pub fn call_function(self, core: Cpu, handler: fn()) {
-        let handler = handler as *mut ();
-        assert_target_runs(core);
-
-        while let Err(pending) = STATE[core as usize].callback.compare_exchange(
-            core::ptr::null_mut(),
-            handler,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            // The IPC handler takes the callback before it runs it, so a pending copy of `handler`
-            // has not run yet. It runs after this call, which covers this call, too.
-            if pending == handler {
-                break;
-            }
-
-            core::hint::spin_loop();
+    /// - [`IpcError::Offline`] when `core` does not take IPC interrupts.
+    /// - [`IpcError::Busy`] when `request` is pending on a CPU other than `core`, or runs on it.
+    pub fn post(self, core: Cpu, request: &'static IpcRequest) -> Result<Ticket, IpcError> {
+        let result = unsafe { esp_hal_ipc_post(core as u8, NonNull::from(request)) };
+        match result & request::POST_RESULT_MASK {
+            request::POST_OK => Ok(Ticket {
+                request,
+                core,
+                seq: result,
+            }),
+            request::POST_OFFLINE => Err(IpcError::Offline),
+            _ => Err(IpcError::Busy),
         }
-
-        raise(core);
     }
 }
 
-/// Registers the context-switch handler of `core`.
+/// A run that [`Ipc::post`] queued or joined.
 ///
-/// A CPU accepts one context-switch handler. [`request_context_switch`] therefore takes no
-/// handler of its own, and never waits.
-///
-/// # Panics
-///
-/// Panics if `core` already has a context-switch handler.
-///
-/// # Safety
-///
-/// See [`__rtos_implementation::set_context_switch_handler`].
-///
-/// [`__rtos_implementation::set_context_switch_handler`]:
-///     super::__rtos_implementation::set_context_switch_handler
-pub(crate) unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitchHandler) {
-    unwrap!(
-        STATE[core as usize]
-            .context_switch_handler
-            .compare_exchange(
-                core::ptr::null_mut(),
-                handler as *mut (),
-                Ordering::Release,
-                Ordering::Relaxed,
-            ),
-        "A CPU accepts one context switch handler"
-    );
+/// If a later run of the request ended, the ticket gives the outcome of that later run.
+#[derive(Clone, Copy, Debug)]
+pub struct Ticket {
+    request: &'static IpcRequest,
+    core: Cpu,
+    /// The sequence number of the run, in the `seq` bits.
+    seq: u32,
 }
 
-/// Asks `core` to run its context-switch handler.
-///
-/// The handler runs at [`Priority::min`][super::Priority::min], after the function that
-/// [`Ipc::call_function`] posts. The call does not wait, not even for a pending posted function.
-///
-/// # Panics
-///
-/// In debug builds, panics if `core` has no context-switch handler, or if `core` is the APP CPU
-/// and that CPU is not running.
-#[inline]
-pub(crate) fn request_context_switch(core: Cpu) {
-    assert_target_runs(core);
+impl Ticket {
+    /// Waits until the run of this ticket ends, or until `deadline`.
+    ///
+    /// # Errors
+    ///
+    /// - [`IpcError::Offline`] when the CPU stopped before the run.
+    /// - [`IpcError::Timeout`] when the deadline passed before the run ended. The run stays queued,
+    ///   and can happen later.
+    /// - [`IpcError::WouldDeadlock`] when the run is on the current CPU, and the caller masks the
+    ///   IPC interrupt: it runs in an interrupt handler, or with interrupts disabled.
+    pub fn wait(self, deadline: Instant) -> Result<(), IpcError> {
+        // A masked context cannot move to the other CPU, so the check has no race.
+        if self.core == Cpu::current() && ipc_interrupt_masked() {
+            return Err(IpcError::WouldDeadlock);
+        }
 
-    let state = &STATE[core as usize];
+        loop {
+            if let Some(outcome) = self.poll() {
+                return outcome;
+            }
+            if Instant::now() >= deadline {
+                return Err(IpcError::Timeout);
+            }
+            core::hint::spin_loop();
+        }
+    }
 
-    // A CPU accepts one context switch handler, so this needs no read-modify-write: the store
-    // is idempotent, and the IPC handler takes the handler before it runs it, which makes the
-    // handler run at least once after this store.
-    let handler = state.context_switch_handler.load(Ordering::Relaxed);
-    debug_assert!(!handler.is_null(), "The CPU has no context switch handler");
-    state
-        .pending_context_switch
-        .store(handler, Ordering::Release);
-
-    raise(core);
+    /// Returns the outcome of the run of this ticket, or `None` if the run did not end.
+    ///
+    /// This function never waits.
+    pub fn poll(self) -> Option<Result<(), IpcError>> {
+        request::poll(self.request, self.seq).map(|outcome| match outcome {
+            request::DONE => Ok(()),
+            _ => Err(IpcError::Offline),
+        })
+    }
 }
 
-fn assert_target_runs(core: Cpu) {
-    debug_assert!(
-        core != Cpu::AppCpu || crate::soc::cpu_control::is_running(Cpu::AppCpu),
-        "IPC target APP core is not running"
-    );
+/// Returns whether the IPC interrupt cannot preempt the current code.
+fn ipc_interrupt_masked() -> bool {
+    if super::current_raw_runlevel() != 0 {
+        return true;
+    }
+    cfg_select! {
+        riscv => !riscv::register::mstatus::read().mie(),
+        // `PS.INTLEVEL` is the run level.
+        xtensa => false,
+    }
 }
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Ticket {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::write!(
+            f,
+            "Ticket {{ core: {}, seq: {} }}",
+            self.core,
+            self.seq >> request::SEQ_SHIFT
+        )
+    }
+}
+
+/// An error of an IPC post or wait.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum IpcError {
+    /// The CPU does not take IPC interrupts, or [`CpuControl`] started it again before the run.
+    ///
+    /// [`CpuControl`]: crate::system::CpuControl
+    Offline,
+    /// The request is pending on a CPU other than the target CPU, or runs on it.
+    Busy,
+    /// The deadline passed before the run ended.
+    Timeout,
+    /// The caller waits for a run on its own CPU, and masks the IPC interrupt.
+    WouldDeadlock,
+}
+
+impl core::fmt::Display for IpcError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            IpcError::Offline => write!(f, "The CPU does not take IPC interrupts"),
+            IpcError::Busy => write!(f, "The request is busy"),
+            IpcError::Timeout => write!(f, "The deadline passed before the run ended"),
+            IpcError::WouldDeadlock => write!(f, "The wait cannot end"),
+        }
+    }
+}
+
+impl core::error::Error for IpcError {}

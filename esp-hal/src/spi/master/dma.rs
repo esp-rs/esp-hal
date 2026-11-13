@@ -409,6 +409,8 @@ impl<'d> SpiDma<'d, Async> {
             }
             self.dma_driver().state.tx_transfer_in_progress.set(false);
         }
+        self.channel.rx.end_transfer();
+        self.channel.tx.end_transfer();
     }
 
     /// Fills the given buffer with data from the bus.
@@ -909,10 +911,8 @@ impl<'a> MaybeCopyRxBuf<'a> {
                 align_buffer,
                 ..
             } => {
-                #[cfg(soc_internal_memory_cached)]
-                unsafe {
-                    crate::soc::cache_invalidate_addr(chunk.as_ptr() as u32, chunk.len() as u32);
-                }
+                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                crate::dma::invalidate_received(NonNull::from(&*chunk));
 
                 #[cfg(dma_can_access_psram)]
                 for buffer in align_buffer.iter_mut() {
@@ -952,9 +952,12 @@ impl DmaOperationKind {
             if is_slice_in_psram(buffer) {
                 #[cfg(spi_master_version = "2")]
                 if _direction == TransferDirection::In {
-                    // For some reason, having tail bytes in internal RAM causes issues, so we
-                    // force copying if the end of the PSRAM buffer is not aligned.
-                    let tail_bytes = (buffer.as_ptr() as usize + buffer.len()).wrapping_neg() & 15;
+                    // The S2's DMA does not write an internal descriptor that follows a PSRAM
+                    // descriptor. A PSRAM buffer that does not end on a cache line would need an
+                    // internal tail bounce buffer, so the DMA receives into the driver's internal
+                    // buffer instead, and the CPU copies the data to the PSRAM buffer.
+                    let tail_bytes = (buffer.as_ptr() as usize + buffer.len()).wrapping_neg()
+                        & (crate::dma::aligned::PSRAM_CACHE_LINE - 1);
                     if tail_bytes > 0 {
                         return false;
                     }
@@ -1041,6 +1044,8 @@ where
         }
         self.dma_driver().state.rx_transfer_in_progress.set(false);
         self.dma_driver().state.tx_transfer_in_progress.set(false);
+        self.channel.rx.end_transfer();
+        self.channel.tx.end_transfer();
         fence(Ordering::Acquire);
     }
 
@@ -1852,6 +1857,8 @@ impl DmaDriver {
             self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
             self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
         }
+        #[cfg(spi_master_version = "1")]
+        crate::dma::connect_spi_dma(self.dma_peripheral, false);
     }
 
     fn regs(&self) -> &RegisterBlock {
@@ -1926,6 +1933,8 @@ impl DmaDriver {
     fn enable_dma(&self) {
         cfg_select! {
             any(spi_master_version = "1", spi_master_version = "2") => {
+                #[cfg(spi_master_version = "1")]
+                crate::dma::connect_spi_dma(self.dma_peripheral, true);
                 self.reset_dma();
             }
             _ => {

@@ -48,6 +48,8 @@ rtc-ram = []
 uncached-ram = []
 ## CLIC with 48 total interrupt lines
 clic-48 = []
+## Save and restore floating-point registers in interrupt routines
+float-save-restore = []
 
 ## Implement `defmt::Format`
 defmt = ["dep:defmt", "riscv-rt/defmt"]

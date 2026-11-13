@@ -694,6 +694,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
             .regs()
             .lc_dma_int_clr()
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
+        self.i8080.tx_channel.end_transfer();
 
         // SAFETY: Since forget is called on self, we know that self.i8080 and
         // self.buf_view won't be touched again.

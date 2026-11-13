@@ -1,5 +1,3 @@
-use bitfield::Bit;
-
 use super::Info;
 use crate::i2s::master::{
     Alignment,
@@ -99,22 +97,22 @@ impl Info {
 
         self.regs().tx_tdm_ctrl().modify(|_, w| unsafe {
             w.tx_tdm_tot_chan_num().bits(config.channels.count - 1);
-            w.tx_tdm_chan0_en().bit(config.channels.mask.bit(0));
-            w.tx_tdm_chan1_en().bit(config.channels.mask.bit(1));
-            w.tx_tdm_chan2_en().bit(config.channels.mask.bit(2));
-            w.tx_tdm_chan3_en().bit(config.channels.mask.bit(3));
-            w.tx_tdm_chan4_en().bit(config.channels.mask.bit(4));
-            w.tx_tdm_chan5_en().bit(config.channels.mask.bit(5));
-            w.tx_tdm_chan6_en().bit(config.channels.mask.bit(6));
-            w.tx_tdm_chan7_en().bit(config.channels.mask.bit(7));
-            w.tx_tdm_chan8_en().bit(config.channels.mask.bit(8));
-            w.tx_tdm_chan9_en().bit(config.channels.mask.bit(9));
-            w.tx_tdm_chan10_en().bit(config.channels.mask.bit(10));
-            w.tx_tdm_chan11_en().bit(config.channels.mask.bit(11));
-            w.tx_tdm_chan12_en().bit(config.channels.mask.bit(12));
-            w.tx_tdm_chan13_en().bit(config.channels.mask.bit(13));
-            w.tx_tdm_chan14_en().bit(config.channels.mask.bit(14));
-            w.tx_tdm_chan15_en().bit(config.channels.mask.bit(15));
+            w.tx_tdm_chan0_en().bit(config.channels.is_enabled(0));
+            w.tx_tdm_chan1_en().bit(config.channels.is_enabled(1));
+            w.tx_tdm_chan2_en().bit(config.channels.is_enabled(2));
+            w.tx_tdm_chan3_en().bit(config.channels.is_enabled(3));
+            w.tx_tdm_chan4_en().bit(config.channels.is_enabled(4));
+            w.tx_tdm_chan5_en().bit(config.channels.is_enabled(5));
+            w.tx_tdm_chan6_en().bit(config.channels.is_enabled(6));
+            w.tx_tdm_chan7_en().bit(config.channels.is_enabled(7));
+            w.tx_tdm_chan8_en().bit(config.channels.is_enabled(8));
+            w.tx_tdm_chan9_en().bit(config.channels.is_enabled(9));
+            w.tx_tdm_chan10_en().bit(config.channels.is_enabled(10));
+            w.tx_tdm_chan11_en().bit(config.channels.is_enabled(11));
+            w.tx_tdm_chan12_en().bit(config.channels.is_enabled(12));
+            w.tx_tdm_chan13_en().bit(config.channels.is_enabled(13));
+            w.tx_tdm_chan14_en().bit(config.channels.is_enabled(14));
+            w.tx_tdm_chan15_en().bit(config.channels.is_enabled(15));
             w.tx_tdm_skip_msk_en().clear_bit()
         });
 
@@ -159,22 +157,22 @@ impl Info {
 
         self.regs().rx_tdm_ctrl().modify(|_, w| unsafe {
             w.rx_tdm_tot_chan_num().bits(config.channels.count - 1);
-            w.rx_tdm_pdm_chan0_en().bit(config.channels.mask.bit(0));
-            w.rx_tdm_pdm_chan1_en().bit(config.channels.mask.bit(1));
-            w.rx_tdm_pdm_chan2_en().bit(config.channels.mask.bit(2));
-            w.rx_tdm_pdm_chan3_en().bit(config.channels.mask.bit(3));
-            w.rx_tdm_pdm_chan4_en().bit(config.channels.mask.bit(4));
-            w.rx_tdm_pdm_chan5_en().bit(config.channels.mask.bit(5));
-            w.rx_tdm_pdm_chan6_en().bit(config.channels.mask.bit(6));
-            w.rx_tdm_pdm_chan7_en().bit(config.channels.mask.bit(7));
-            w.rx_tdm_chan8_en().bit(config.channels.mask.bit(8));
-            w.rx_tdm_chan9_en().bit(config.channels.mask.bit(9));
-            w.rx_tdm_chan10_en().bit(config.channels.mask.bit(10));
-            w.rx_tdm_chan11_en().bit(config.channels.mask.bit(11));
-            w.rx_tdm_chan12_en().bit(config.channels.mask.bit(12));
-            w.rx_tdm_chan13_en().bit(config.channels.mask.bit(13));
-            w.rx_tdm_chan14_en().bit(config.channels.mask.bit(14));
-            w.rx_tdm_chan15_en().bit(config.channels.mask.bit(15))
+            w.rx_tdm_pdm_chan0_en().bit(config.channels.is_enabled(0));
+            w.rx_tdm_pdm_chan1_en().bit(config.channels.is_enabled(1));
+            w.rx_tdm_pdm_chan2_en().bit(config.channels.is_enabled(2));
+            w.rx_tdm_pdm_chan3_en().bit(config.channels.is_enabled(3));
+            w.rx_tdm_pdm_chan4_en().bit(config.channels.is_enabled(4));
+            w.rx_tdm_pdm_chan5_en().bit(config.channels.is_enabled(5));
+            w.rx_tdm_pdm_chan6_en().bit(config.channels.is_enabled(6));
+            w.rx_tdm_pdm_chan7_en().bit(config.channels.is_enabled(7));
+            w.rx_tdm_chan8_en().bit(config.channels.is_enabled(8));
+            w.rx_tdm_chan9_en().bit(config.channels.is_enabled(9));
+            w.rx_tdm_chan10_en().bit(config.channels.is_enabled(10));
+            w.rx_tdm_chan11_en().bit(config.channels.is_enabled(11));
+            w.rx_tdm_chan12_en().bit(config.channels.is_enabled(12));
+            w.rx_tdm_chan13_en().bit(config.channels.is_enabled(13));
+            w.rx_tdm_chan14_en().bit(config.channels.is_enabled(14));
+            w.rx_tdm_chan15_en().bit(config.channels.is_enabled(15))
         });
 
         Ok(())

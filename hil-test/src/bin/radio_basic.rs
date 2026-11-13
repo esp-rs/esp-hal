@@ -18,6 +18,7 @@
 
 #![no_std]
 #![no_main]
+#![cfg_attr(all(xtensa, float_save_restore), feature(asm_experimental_arch))]
 
 #[cfg(multi_core)]
 use esp_hal::system::Stack;
@@ -75,6 +76,6 @@ mod adc;
 #[cfg(feature = "esp-radio-unstable")]
 mod esp_now_config;
 
-#[cfg(xtensa)]
+#[cfg(any(xtensa, float_save_restore))]
 #[path = "radio_basic/fpu.rs"]
 mod fpu;

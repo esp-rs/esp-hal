@@ -3,7 +3,7 @@
 use core::{
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
-    sync::atomic::{AtomicBool, AtomicPtr, Ordering},
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
 #[instability::unstable]
@@ -82,6 +82,9 @@ pub(crate) static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::pt
 /// ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the APP core is parked during
 /// such an operation, the next cache operation on the PRO core waits forever. Make sure that the
 /// APP core does no DMA or cache operation before you drop this guard.
+///
+/// The parked APP core runs no [IPC requests][crate::interrupt::ipc::IpcRequest]. A request that
+/// the APP core posted or took at the park can stay busy.
 #[must_use = "Dropping this guard will park the APP core"]
 #[instability::unstable]
 pub struct AppCoreGuard<'a> {
@@ -91,6 +94,42 @@ pub struct AppCoreGuard<'a> {
 impl Drop for AppCoreGuard<'_> {
     fn drop(&mut self) {
         unsafe { internal_park_core(Cpu::AppCpu, true) };
+    }
+}
+
+/// Suspends the scheduler of the current core until the guard drops.
+///
+/// The current core defers its context switches while a guard is alive. The current thread thus
+/// keeps the current core, and cannot move to the other core. Interrupt handlers and
+/// [IPC requests][crate::interrupt::ipc::IpcRequest] still run. The deferred context switch runs
+/// when the last guard drops.
+///
+/// The scheduler of the other core continues to run. Do not keep a guard for a long time,
+/// because other threads cannot run on the current core.
+#[must_use = "The scheduler continues when the guard drops"]
+#[instability::unstable]
+pub struct SchedulerSuspendGuard {
+    // The guard must drop on the core that made the guard.
+    _not_send: PhantomData<*const ()>,
+}
+
+impl SchedulerSuspendGuard {
+    /// Creates a new guard, and suspends the scheduler of the current core.
+    #[instability::unstable]
+    #[inline(always)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        defer_context_switch();
+        Self {
+            _not_send: PhantomData,
+        }
+    }
+}
+
+impl Drop for SchedulerSuspendGuard {
+    #[inline(always)]
+    fn drop(&mut self) {
+        unsafe { resume_context_switch() };
     }
 }
 
@@ -167,6 +206,8 @@ impl<'d> CpuControl<'d> {
     /// ESP32-H4 and ESP32-P4, DMA buffer operations lock the cache. If the core is parked during
     /// such an operation, the next cache operation on the other core waits forever. Make sure that
     /// the parked core does no DMA or cache operation when you call this function.
+    ///
+    /// IPC requests to the parked core run after [`Self::unpark_core`].
     ///
     /// # Safety
     ///
@@ -255,7 +296,7 @@ impl<'d> CpuControl<'d> {
 
         setup_second_core_stack(stack, stack_guard_offset, entry);
 
-        APP_CORE_TAKES_IPC.store(false, Ordering::Release);
+        app_core_starting();
         crate::soc::cpu_control::start_core1(start_core1_init::<F> as *const u32);
 
         self.unpark_core(Cpu::AppCpu);
@@ -500,8 +541,6 @@ where
             crate::debugger::set_stack_watchpoint(guard as usize);
         }
         crate::interrupt::init_vectoring();
-        #[cfg(feature = "rt")]
-        crate::interrupt::ipc::install_app();
     }
 
     enable_app_core_interrupts();
@@ -515,13 +554,59 @@ fn enable_app_core_interrupts() {
         #[cfg(riscv)]
         core::arch::asm!("csrsi mstatus, 8", options(nomem, nostack));
     }
-    APP_CORE_TAKES_IPC.store(true, Ordering::Release);
+    app_core_started();
 }
 
-static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
+// A build can hold esp-hal versions without the `rt` feature. Those versions call the functions
+// below by symbol name. The names and signatures must stay stable.
+cfg_select! {
+    feature = "rt" => {
+        use core::sync::atomic::AtomicBool;
 
-/// Returns `true` if [`CpuControl`] started the APP core in this boot. That core takes IPC
-/// interrupts unless it masks them.
-pub(crate) fn app_core_takes_ipc() -> bool {
-    APP_CORE_TAKES_IPC.load(Ordering::Acquire)
+        use crate::interrupt::ipc::{defer_context_switch, resume_context_switch};
+
+        static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
+
+        /// Marks the APP core as not running code of this program before the APP core starts.
+        #[unsafe(export_name = "esp_hal_app_core_starting")]
+        fn app_core_starting() {
+            APP_CORE_TAKES_IPC.store(false, Ordering::Release);
+            // Posts to the APP core return `Offline` after the store, so no post adds a request
+            // to the APP core while this call fails the requests that the APP core did not run.
+            unsafe { crate::interrupt::ipc::fail_stranded(Cpu::AppCpu) };
+            // The APP core can stop while a `SchedulerSuspendGuard` is alive on the APP core.
+            crate::interrupt::ipc::reset_context_switch_deferral(Cpu::AppCpu);
+        }
+
+        /// Lets the APP core take IPC interrupts. The APP core calls this function after it
+        /// enables its interrupts.
+        #[unsafe(export_name = "esp_hal_app_core_started")]
+        fn app_core_started() {
+            debug_assert_eq!(Cpu::current(), Cpu::AppCpu);
+            #[cfg(riscv)]
+            crate::interrupt::ipc::install_app();
+            APP_CORE_TAKES_IPC.store(true, Ordering::Release);
+        }
+
+        /// Returns `true` if [`CpuControl`] started the APP core in this boot. That core takes IPC
+        /// interrupts unless it masks them.
+        #[unsafe(export_name = "esp_hal_app_core_takes_ipc")]
+        pub(crate) fn app_core_takes_ipc() -> bool {
+            APP_CORE_TAKES_IPC.load(Ordering::Acquire)
+        }
+    }
+    _ => {
+        unsafe extern "Rust" {
+            #[link_name = "esp_hal_app_core_starting"]
+            safe fn app_core_starting();
+            #[link_name = "esp_hal_app_core_started"]
+            safe fn app_core_started();
+            #[link_name = "esp_hal_app_core_takes_ipc"]
+            pub(crate) safe fn app_core_takes_ipc() -> bool;
+            #[link_name = "esp_hal_defer_context_switch"]
+            safe fn defer_context_switch();
+            #[link_name = "esp_hal_resume_context_switch"]
+            fn resume_context_switch();
+        }
+    }
 }

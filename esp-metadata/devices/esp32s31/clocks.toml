@@ -35,13 +35,14 @@ system_clocks = { clock_tree = [
         { name = "PLL_F240M", outputs = "PLL_F240M" },
     ] },
 
-    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_ROOT_CLK / (divisor + 1)" },
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_ROOT_CLK / (divisor + 1)", always_on = true },
     # MEM_CLK divider
-    { name = "MEM_CLK", type = "generic", params = { divisor = "0..2" }, output = "CPU_CLK / (divisor + 1)" },
+    { name = "MEM_CLK", type = "generic", params = { divisor = "0..2" }, output = "CPU_CLK / (divisor + 1)", always_on = true },
     # SYS_CLK divider
-    { name = "SYS_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)" },
+    { name = "SYS_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)", always_on = true },
     # APB is a core system bus and must not be released with a peripheral clock.
-    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "SYS_CLK / (divisor + 1)", always_on = true },
+    # The reference count tells if a consumer needs a constant APB_CLK frequency.
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "SYS_CLK / (divisor + 1)", always_on = true, refcounted = true },
 
     # LP clocks
     { name = "LP_FAST_CLK", type = "mux", variants = [
@@ -52,6 +53,8 @@ system_clocks = { clock_tree = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
+    # LP_DYN_FAST uses LP_SLOW_CLK in LP_SLEEP mode and LP_FAST_CLK otherwise.
+    { name = "LP_PERI_CLK", type = "generic", always_on = true, params = { divisor = "0..8" }, output = "LP_FAST_CLK / (divisor + 1)" },
     # BLE RTC timer (MODEM_LPCON). Independent of LP_SLOW_CLK.
     { name = "BLE_LP_XTAL_CLK", type = "derived", from = "XTAL_CLK", output = "100_000" },
     { name = "BLE_LP_CLK", type = "mux", variants = [
@@ -83,6 +86,11 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "LP_PERI", outputs = "LP_PERI_CLK", default = true },
+        ] },
+    ] },
     { group = "PSRAM", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL", outputs = "XTAL_CLK", default = true },
@@ -162,6 +170,10 @@ system_clocks = { clock_tree = [
     { group = "SDM", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
     ] },
+    # The glitch filter counts APB_CLK cycles.
+    { group = "PCNT", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "APB_CLK" },
+    ] },
     # HP_SYS_CLKRST.parlio_{rx,tx}_ctrl0.clk_src_sel, see SOC_PARLIO_CLKS. The driver selects
     # source 3, the clock from the pad.
     { group = "PARL_IO",
@@ -181,6 +193,17 @@ system_clocks = { clock_tree = [
         { name = "TX_CLOCK", preset = "CLK" },
       ],
     },
+    # The function clock owns the calculation gate. The peripheral clock owns the bus and reset.
+    { group = "CORDIC", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "(source * denominator) / (divider * denominator + numerator)", params = {
+            source = [
+                { name = "XTAL", outputs = "XTAL_CLK" },
+                { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+                { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
+            ],
+            divider = "1 ..= 256", numerator = "0 ..= 254", denominator = "1 ..= 255",
+        } },
+    ] },
     # Function clocks live in HP_SYS_CLKRST. The divider register stores N - 1.
     { group = "LCD_CAM", clocks = [
         { name = "LCD_CLOCK", type = "generic", wake_locking = true, output = "(sclk * div_a) / (div_num * div_a + div_b)", params = { sclk = [
@@ -249,6 +272,8 @@ peripheral_clocks = { templates = [
     { name = "AxiGdma", template_params = { peripheral = "axi_pdma", clk_en = "{{sys_clk}}" } },
     { name = "AhbGdma", template_params = { peripheral = "ahb_pdma", clk_en = "{{sys_clk}}" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
+    { name = "Dma2d", template_params = { peripheral = "dma2d", clk_en = "{{sys_clk}}" } },
+    { name = "Ppa", template_params = { peripheral = "ppa", clk_en = "{{sys_clk}}" } },
     # USB
     { name = "UsbHs", template_params = { peripheral = "usb_otghs", rst_template = "{{no_rst}}" } },
     # APB gate in HP_SYS_CLKRST; 48 MHz PHY clock and reset in CNNT_SYS.
@@ -262,6 +287,9 @@ peripheral_clocks = { templates = [
     { name = "Ecc", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Sha", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Rsa", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
+    { name = "Cordic", template_params = {
+        rst_en = ".apb_rst_en().bit(reset).sys_rst_en().bit(reset).core_rst_en().bit(reset)",
+    } },
     # Timers
     { name = "Systimer", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}" }, keep_enabled = true },
     { name = "Timg0", template_params = { peripheral = "timergrp0", clk_en = "{{apb_clk}}" }, keep_enabled = true },
@@ -272,6 +300,10 @@ peripheral_clocks = { templates = [
     { name = "ApbSarAdc", keep_enabled = true, template_params = {
         clk_en_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_clk_en().bit(enable));",
         rst_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_rst_en().bit(reset));"
+    } },
+    { name = "Tsens", template_params = {
+        clk_en_template = "crate::peripherals::LP_PERI::regs().tsens_ctrl().modify(|_, w| w.lp_tsens_clk_en().bit(enable));",
+        rst_template = "crate::peripherals::LP_PERI::regs().tsens_ctrl().modify(|_, w| w.lp_tsens_rst_en().bit(reset));"
     } },
     { name = "Rmt", template_params = { clk_en = "{{sys_clk}}" } },
     { name = "ParlIo", template_params = { peripheral = "parlio" } },

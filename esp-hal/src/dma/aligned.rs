@@ -71,6 +71,20 @@ impl<T> InternalMemory<T> {
     }
 }
 
+/// The length of the data cache line in front of PSRAM.
+#[cfg(dma_can_access_psram)]
+pub(crate) const PSRAM_CACHE_LINE: usize = cfg_select! {
+    // TODO(esp32p4): PSRAM is cached through the L2 cache,
+    // whose line size is configurable (64 or 128
+    // bytes) and is not encoded anywhere yet. Assume the
+    // larger, always-safe value until the L2 line size is
+    // available.
+    soc_internal_memory_cached => 128,
+    esp32s31 => 64,
+    any(esp32, esp32c5, esp32c61) => 32, // TODO: fixed 32-bytes, metadata-ify
+    _ => crate::soc::CONFIG_DATA_CACHE_LINE_SIZE,
+};
+
 /// Returns the DMA alignment (applying to both the start address and the
 /// length) required by the memory region containing `addr`, or `None` if
 /// `addr` is not in a DMA-capable region.
@@ -89,17 +103,7 @@ pub(crate) fn region_dma_alignment(addr: usize) -> Option<usize> {
 
     #[cfg(dma_can_access_psram)]
     if is_valid_psram_address(addr) {
-        return Some(cfg_select! {
-            // TODO(esp32p4): PSRAM is cached through the L2 cache,
-            // whose line size is configurable (64 or 128
-            // bytes) and is not encoded anywhere yet. Assume the
-            // larger, always-safe value until the L2 line size is
-            // available.
-            soc_internal_memory_cached => 128,
-            esp32s31 => 64,
-            any(esp32, esp32c5, esp32c61) => 32, // TODO: fixed 32-bytes, metadata-ify
-            _ => crate::soc::CONFIG_DATA_CACHE_LINE_SIZE,
-        });
+        return Some(PSRAM_CACHE_LINE);
     }
 
     None
@@ -130,7 +134,7 @@ fn validate_dma_alignment(addr: usize, size: usize) -> Result<(), DmaBufError> {
 /// Returns whether the value at `addr` spanning `size` bytes occupies a
 /// cached memory region and therefore needs explicit cache maintenance.
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-fn region_needs_cache_op(addr: usize, size: usize) -> bool {
+pub(crate) fn region_needs_cache_op(addr: usize, size: usize) -> bool {
     // Do not do cache operations on zero-sized values.
     if size == 0 {
         return false;

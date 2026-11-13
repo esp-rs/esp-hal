@@ -8,8 +8,8 @@
 //! (RMII), and ESP32-S31-Function-Coreboard (RGMII, YT8531 PHY).
 //!
 //! The ESP32 and ESP32-P4 kits use an IP101GRI PHY, the ESP32-S31 a Motorcomm
-//! YT8531. Both are driven by `GenericPhy`, which this example wraps to poll
-//! the link from embassy-time.
+//! YT8531. Both are driven by `GenericPhy`, which polls the link from
+//! embassy-time through esp-hal's `embassy-time-05` feature.
 //!
 //! # Board pin mapping
 //!
@@ -38,8 +38,6 @@
 #![no_std]
 #![no_main]
 
-use core::task::{Context, Poll};
-
 use embassy_executor::Spawner;
 use embassy_net::{
     Runner,
@@ -47,7 +45,7 @@ use embassy_net::{
     dns::DnsSocket,
     tcp::client::{TcpClient, TcpClientState},
 };
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, Timer, with_timeout};
 use esp_alloc as _;
 use esp_backtrace as _;
 cfg_select! {
@@ -60,18 +58,12 @@ cfg_select! {
 }
 use esp_hal::{
     clock::CpuClock,
-    ethernet::{
-        Ethernet,
-        EthernetDmaStorage,
-        mac::{Duplex, LinkState, Speed},
-        phy::{MdioBus, Phy, PhyError, generic::GenericPhy},
-    },
+    ethernet::{Ethernet, EthernetDmaStorage, phy::generic::GenericPhy},
     gpio::{Level, Output, OutputConfig},
     rng::Rng,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use futures_util::FutureExt;
 use reqwless::{
     client::HttpClient,
     request::{Method, RequestBuilder},
@@ -91,61 +83,7 @@ static STACK_RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
 static TCP_CLIENT_STATE: ConstStaticCell<TcpClientState<1, 1500, 1500>> =
     ConstStaticCell::new(TcpClientState::new());
 
-type EthDriver = Ethernet<'static, esp_hal::Async, ExamplePhy>;
-
-/// Wraps [`GenericPhy`] to poll it from embassy-time instead of busy-looping.
-struct ExamplePhy {
-    phy: GenericPhy,
-    timer: Timer,
-    cached_link_state: LinkState,
-}
-
-impl ExamplePhy {
-    fn new_auto() -> Self {
-        Self {
-            phy: GenericPhy::new_auto(),
-            timer: Timer::after_ticks(0),
-            cached_link_state: LinkState {
-                up: false,
-                speed: Speed::_100M,
-                duplex: Duplex::Full,
-            },
-        }
-    }
-}
-
-impl Phy for ExamplePhy {
-    fn address(&self) -> u8 {
-        self.phy.address()
-    }
-
-    fn init<M: MdioBus>(&mut self, mdio: &mut M, max_speed: Speed) -> Result<(), PhyError> {
-        self.phy.init(mdio, max_speed)
-    }
-
-    fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, cx: Option<&mut Context<'_>>) -> LinkState {
-        if let Some(cx) = cx {
-            if matches!(self.timer.poll_unpin(cx), Poll::Pending) {
-                return self.cached_link_state;
-            }
-
-            // Timer done, re-arm it
-            self.timer = Timer::after(Duration::from_millis(500));
-
-            // Ensure the next wakeup is scheduled
-            let _ = self.timer.poll_unpin(cx);
-        }
-
-        let new_state = self.phy.poll_link(mdio, None);
-        if new_state.up != self.cached_link_state.up
-            || new_state.speed != self.cached_link_state.speed
-        {
-            println!("Link {:?}", new_state);
-        }
-        self.cached_link_state = new_state;
-        self.cached_link_state
-    }
-}
+type EthDriver = Ethernet<'static, esp_hal::Async, GenericPhy>;
 
 #[esp_rtos::main]
 async fn main(spawner: Spawner) {
@@ -180,7 +118,7 @@ async fn main(spawner: Spawner) {
         peripherals.ETH,
         STORAGE.take(),
         MAC_ADDR,
-        ExamplePhy::new_auto(),
+        GenericPhy::new_auto(),
         RmiiPinBundle {
             clock: ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from IP101GRI REFCLKO
             rxd0: peripherals.GPIO25,
@@ -201,7 +139,7 @@ async fn main(spawner: Spawner) {
         peripherals.ETH,
         STORAGE.take(),
         MAC_ADDR,
-        ExamplePhy::new_auto(),
+        GenericPhy::new_auto(),
         RmiiPinBundle {
             clock: ExternalRefClock::new(peripherals.GPIO50), // REF_CLK from IP101GRI REFCLKO
             rxd0: peripherals.GPIO29,
@@ -222,7 +160,7 @@ async fn main(spawner: Spawner) {
         peripherals.ETH,
         STORAGE.take(),
         MAC_ADDR,
-        ExamplePhy::new_auto(),
+        GenericPhy::new_auto(),
         RgmiiPinBundle {
             rx_clk: peripherals.GPIO14,
             tx_clk: peripherals.GPIO13,
@@ -276,28 +214,35 @@ async fn main(spawner: Spawner) {
     let dns_client = DnsSocket::new(stack);
 
     loop {
+        stack.wait_link_up().await;
+        stack.wait_config_up().await;
+
         Timer::after(Duration::from_millis(1000)).await;
 
-        let mut client = HttpClient::new(&tcp_client, &dns_client);
-        let mut rx_buf = [0u8; 4096];
+        let result = with_timeout(Duration::from_secs(10), async {
+            let mut client = HttpClient::new(&tcp_client, &dns_client);
+            let mut rx_buf = [0u8; 4096];
 
-        let builder = client
-            .request(Method::GET, "http://httpbin.org/get?hello=Hello+esp-hal")
-            .await
-            .unwrap();
+            let mut builder = client
+                .request(Method::GET, "http://httpbin.org/get?hello=Hello+esp-hal")
+                .await?
+                .headers(&[("Host", "httpbin.org"), ("Connection", "close")]);
 
-        let mut builder = builder.headers(&[("Host", "httpbin.org"), ("Connection", "close")]);
-
-        let response = builder.send(&mut rx_buf).await.unwrap();
-
-        match response.body().read_to_end().await {
-            Ok(data) => {
-                if let Ok(st) = core::str::from_utf8(data) {
-                    println!("Body: {}", st);
-                }
+            let response = builder.send(&mut rx_buf).await?;
+            let data = response.body().read_to_end().await?;
+            if let Ok(st) = core::str::from_utf8(data) {
+                println!("Body: {}", st);
             }
-            Err(e) => println!("Body error: {:?}", e),
+            Ok::<_, reqwless::Error>(())
+        })
+        .await;
+
+        match result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => println!("HTTP error: {:?}", e),
+            Err(_) => println!("HTTP request timed out"),
         }
+
         Timer::after(Duration::from_millis(3000)).await;
     }
 }

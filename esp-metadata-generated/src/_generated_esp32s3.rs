@@ -340,6 +340,9 @@ macro_rules! property {
     ("bt.controller") => {
         "btdm"
     };
+    ("bt.requires_fast_cpu") => {
+        false
+    };
     ("wifi.has_wifi6") => {
         false
     };
@@ -360,6 +363,9 @@ macro_rules! property {
     };
     ("wifi.has_ftm") => {
         true
+    };
+    ("wifi.requires_fast_cpu") => {
+        false
     };
     ("phy.combo_module") => {
         true
@@ -502,6 +508,9 @@ macro_rules! property {
     ("sleep.cpu_retention_mem_end") => {
         1070530560
     };
+    ("sleep.idle_frequency_scaling") => {
+        false
+    };
     ("assist_debug.has_sp_monitor") => {
         false
     };
@@ -556,6 +565,9 @@ macro_rules! property {
     ("psram.extmem_origin", str) => {
         stringify!(1006632960)
     };
+    ("psram.idle_low_speed_switch") => {
+        false
+    };
     ("rom.has_crc_le") => {
         true
     };
@@ -589,8 +601,17 @@ macro_rules! property {
     ("soc.internal_memory_cached") => {
         false
     };
+    ("soc.cpu_powers_down_cache") => {
+        false
+    };
     ("soc.has_swd_watchdog") => {
         true
+    };
+    ("soc.has_bus_clock_update") => {
+        false
+    };
+    ("soc.has_apb_frequency_reduction") => {
+        false
     };
     ("soc.cpu_mcause_mask") => {
         0
@@ -1845,6 +1866,13 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 /// }
+/// impl TsensInstance {
+///     // TSENS_SCLK
+///
+///     fn enable_sclk_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+/// }
 /// impl UartInstance {
 ///     // UART_FUNCTION_CLOCK
 ///
@@ -1929,6 +1957,11 @@ macro_rules! define_clock_tree_types {
         pub enum TimgInstance {
             Timg0 = 0,
             Timg1 = 1,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TsensInstance {
+            Tsens = 0,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2445,6 +2478,14 @@ macro_rules! define_clock_tree_types {
             /// Selects `APB_CLK`.
             ApbClk,
         }
+        /// The list of clock signals that the `TSENS_SCLK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TsensSclkConfig {
+            #[default]
+            /// Selects `RC_FAST_CLK`.
+            RcFast,
+        }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum UartFunctionClockSclk {
@@ -2554,36 +2595,37 @@ macro_rules! define_clock_tree_types {
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 3],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 3],
-            pll_clk_refcount: u32,
-            rc_fast_clk_refcount: u32,
+            pub(crate) pll_clk_refcount: u32,
+            pub(crate) rc_fast_clk_refcount: u32,
             #[cfg(use_xtal32k)]
-            xtal32k_clk_refcount: u32,
-            rc_slow_clk_refcount: u32,
-            rc_fast_div_clk_refcount: u32,
-            apb_clk_refcount: u32,
-            crypto_pwm_clk_refcount: u32,
-            pll_d2_refcount: u32,
-            pll_160m_refcount: u32,
-            rtc_slow_clk_refcount: u32,
-            ble_lp_clk_refcount: u32,
-            rtc_fast_clk_refcount: u32,
-            low_power_clk_refcount: u32,
-            uart_mem_clk_refcount: u32,
-            timg_calibration_clock_refcount: u32,
-            sdm_function_clock_refcount: [u32; 1],
-            i2c_function_clock_refcount: [u32; 2],
-            i2s_tx_clk_refcount: [u32; 2],
-            i2s_rx_clk_refcount: [u32; 2],
-            i2s_mclk_out_refcount: [u32; 2],
-            lcd_cam_lcd_clock_refcount: [u32; 1],
-            lcd_cam_cam_clock_refcount: [u32; 1],
-            mcpwm_function_clock_refcount: [u32; 2],
-            rmt_sclk_refcount: [u32; 1],
-            spi_function_clock_refcount: [u32; 2],
-            timg_function_clock_refcount: [u32; 2],
-            uart_function_clock_refcount: [u32; 3],
-            uart_baud_rate_generator_refcount: [u32; 3],
-            uart_mem_clock_refcount: [u32; 3],
+            pub(crate) xtal32k_clk_refcount: u32,
+            pub(crate) rc_slow_clk_refcount: u32,
+            pub(crate) rc_fast_div_clk_refcount: u32,
+            pub(crate) apb_clk_refcount: u32,
+            pub(crate) crypto_pwm_clk_refcount: u32,
+            pub(crate) pll_d2_refcount: u32,
+            pub(crate) pll_160m_refcount: u32,
+            pub(crate) rtc_slow_clk_refcount: u32,
+            pub(crate) ble_lp_clk_refcount: u32,
+            pub(crate) rtc_fast_clk_refcount: u32,
+            pub(crate) low_power_clk_refcount: u32,
+            pub(crate) uart_mem_clk_refcount: u32,
+            pub(crate) timg_calibration_clock_refcount: u32,
+            pub(crate) sdm_function_clock_refcount: [u32; 1],
+            pub(crate) i2c_function_clock_refcount: [u32; 2],
+            pub(crate) i2s_tx_clk_refcount: [u32; 2],
+            pub(crate) i2s_rx_clk_refcount: [u32; 2],
+            pub(crate) i2s_mclk_out_refcount: [u32; 2],
+            pub(crate) lcd_cam_lcd_clock_refcount: [u32; 1],
+            pub(crate) lcd_cam_cam_clock_refcount: [u32; 1],
+            pub(crate) mcpwm_function_clock_refcount: [u32; 2],
+            pub(crate) rmt_sclk_refcount: [u32; 1],
+            pub(crate) spi_function_clock_refcount: [u32; 2],
+            pub(crate) timg_function_clock_refcount: [u32; 2],
+            pub(crate) tsens_sclk_refcount: [u32; 1],
+            pub(crate) uart_function_clock_refcount: [u32; 3],
+            pub(crate) uart_baud_rate_generator_refcount: [u32; 3],
+            pub(crate) uart_mem_clock_refcount: [u32; 3],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.
@@ -2785,6 +2827,7 @@ macro_rules! define_clock_tree_types {
                 rmt_sclk_refcount: [0; 1],
                 spi_function_clock_refcount: [0; 2],
                 timg_function_clock_refcount: [0; 2],
+                tsens_sclk_refcount: [0; 1],
                 uart_function_clock_refcount: [0; 3],
                 uart_baud_rate_generator_refcount: [0; 3],
                 uart_mem_clock_refcount: [0; 3],
@@ -4567,6 +4610,32 @@ macro_rules! define_clock_tree_types {
                 Self::function_clock_config_frequency(source)
             }
         }
+        impl TsensInstance {
+            pub fn request_sclk(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::SCLK", self);
+                if increment_reference_count(&mut clocks.tsens_sclk_refcount[self as usize]) {
+                    trace!("Enabling {:?}::SCLK", self);
+                    request_rc_fast_clk(clocks);
+                    self.enable_sclk_impl(clocks, true);
+                }
+            }
+            pub fn release_sclk(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::SCLK", self);
+                if decrement_reference_count(&mut clocks.tsens_sclk_refcount[self as usize]) {
+                    trace!("Disabling {:?}::SCLK", self);
+                    self.enable_sclk_impl(clocks, false);
+                    release_rc_fast_clk(clocks);
+                }
+            }
+            pub fn sclk_frequency(self) -> u32 {
+                rc_fast_clk_frequency()
+            }
+            pub fn sclk_source_frequency(source: TsensSclkConfig) -> u32 {
+                match source {
+                    TsensSclkConfig::RcFast => rc_fast_clk_frequency(),
+                }
+            }
+        }
         impl UartInstance {
             pub fn configure_function_clock(
                 self,
@@ -5169,6 +5238,8 @@ macro_rules! implement_peripheral_clocks {
             Timg0,
             /// TIMG1 peripheral clock signal
             Timg1,
+            /// TSENS peripheral clock signal
+            Tsens,
             /// TWAI0 peripheral clock signal
             Twai0,
             /// UART0 peripheral clock signal
@@ -5228,6 +5299,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Systimer,
                 Self::Timg0,
                 Self::Timg1,
+                Self::Tsens,
                 Self::Twai0,
                 Self::Uart0,
                 Self::Uart1,
@@ -5384,6 +5456,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en0()
                         .modify(|_, w| w.timergroup1_clk_en().bit(enable));
+                }
+                Peripheral::Tsens => {
+                    crate::peripherals::SENS::regs()
+                        .sar_peri_clk_gate_conf()
+                        .modify(|_, w| w.tsens_clk_en().bit(enable));
                 }
                 Peripheral::Twai0 => {
                     crate::peripherals::SYSTEM::regs()
@@ -5563,6 +5640,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en0()
                         .modify(|_, w| w.timergroup1_rst().bit(reset));
+                }
+                Peripheral::Tsens => {
+                    crate::peripherals::SENS::regs()
+                        .sar_peri_reset_conf()
+                        .modify(|_, w| w.sar_tsens_reset().bit(reset));
                 }
                 Peripheral::Twai0 => {
                     crate::peripherals::SYSTEM::regs()
@@ -6198,21 +6280,23 @@ macro_rules! for_each_peripheral {
         #[doc = "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG1 peripheral singleton"]
         TIMG1 <= TIMG1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "TWAI0 peripheral singleton"] TWAI0 <= TWAI0() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UART0 peripheral singleton"]
-        UART0 <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART1 peripheral singleton"] UART1 <= UART1(UART1 : { bind_peri_interrupt,
+        "TSENS peripheral singleton"] TSENS <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TWAI0 peripheral singleton"]
+        TWAI0 <= TWAI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UART2 peripheral singleton"]
-        UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART1 peripheral singleton"]
+        UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "USB_FS peripheral singleton"]
-        USB_FS <= USB_FS(USB : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE :
-        { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        "UART2 peripheral singleton"] UART2 <= UART2(UART2 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UHCI0 peripheral singleton"]
+        UHCI0 <= UHCI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "USB_FS peripheral singleton"] USB_FS <= USB_FS(USB : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "WCL peripheral singleton"] WCL
@@ -6328,6 +6412,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((SYSTIMER(unstable)));
         _for_each_inner_peripheral!((TIMG0(unstable)));
         _for_each_inner_peripheral!((TIMG1(unstable)));
+        _for_each_inner_peripheral!((TSENS(unstable)));
         _for_each_inner_peripheral!((TWAI0(unstable)));
         _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
         _for_each_inner_peripheral!((UART2));
@@ -6628,9 +6713,10 @@ macro_rules! for_each_peripheral {
         (@ peri_type #[doc = "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER()
         (unstable)), (@ peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <= TIMG0()
         (unstable)), (@ peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <= TIMG1()
-        (unstable)), (@ peri_type #[doc = "TWAI0 peripheral singleton"] TWAI0 <= TWAI0()
-        (unstable)), (@ peri_type #[doc = "UART0 peripheral singleton"] UART0 <=
-        UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
+        (unstable)), (@ peri_type #[doc = "TSENS peripheral singleton"] TSENS <=
+        virtual() (unstable)), (@ peri_type #[doc = "TWAI0 peripheral singleton"] TWAI0
+        <= TWAI0() (unstable)), (@ peri_type #[doc = "UART0 peripheral singleton"] UART0
+        <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UART1 peripheral singleton"]
         UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UART2 peripheral singleton"]
@@ -6688,12 +6774,12 @@ macro_rules! for_each_peripheral {
         (RTC_CNTL(unstable)), (LP_I2C0(unstable)), (RTC_IO(unstable)),
         (SDHOST(unstable)), (SENS(unstable)), (SENSITIVE(unstable)), (SHA(unstable)),
         (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (SYSTEM(unstable)),
-        (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TWAI0(unstable)),
-        (UART0), (UART1), (UART2), (UHCI0(unstable)), (USB_FS(unstable)),
-        (USB_DEVICE(unstable)), (WCL(unstable)), (XTS_AES(unstable)), (ADC1(unstable)),
-        (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (FLASH(unstable)),
-        (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (ULP_RISCV_CORE(unstable)),
-        (WIFI), (IPC(unstable)), (FROM_CPU_INTR2(unstable)),
+        (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TSENS(unstable)),
+        (TWAI0(unstable)), (UART0), (UART1), (UART2), (UHCI0(unstable)),
+        (USB_FS(unstable)), (USB_DEVICE(unstable)), (WCL(unstable)), (XTS_AES(unstable)),
+        (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)),
+        (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (PSRAM(unstable)),
+        (ULP_RISCV_CORE(unstable)), (WIFI), (IPC(unstable)), (FROM_CPU_INTR2(unstable)),
         (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
         Spi2, 0, AhbGdmaChannel), (SPI3, Spi3, 1, AhbGdmaChannel), (UHCI0, Uhci0, 2,
         AhbGdmaChannel), (I2S0, I2s0, 3, AhbGdmaChannel), (I2S1, I2s1, 4,

@@ -2,9 +2,12 @@ crate: esp-radio
 
 options:
   - name: wifi_max_burst_size
-    description: See [embassy-net's documentation](https://docs.rs/embassy-net-driver/0.2.0/embassy_net_driver/struct.Capabilities.html#structfield.max_burst_size)
+    description: "Maximum number of frames the network stack expects in one burst. smoltcp limits
+      the advertised TCP receive window to this many segments. 0 means no limit: the whole socket
+      RX buffer is advertised, and the RX queue (`rx_queue_size` in `ControllerConfig`) must hold
+      that many frames. See [embassy-net's documentation](https://docs.rs/embassy-net-driver/0.2.0/embassy_net_driver/struct.Capabilities.html#structfield.max_burst_size)"
     default:
-      - value: 3
+      - value: 0
     constraints:
       - type:
           validator: non_negative_integer
@@ -16,6 +19,14 @@ options:
     constraints:
       - type:
           validator: positive_integer
+
+  - name: wifi_tx_retry
+    description: "Keep one TX frame that the Wi-Fi driver refuses for lack of heap memory, and send
+      the frame again. The network stack waits until the frame is sent. While Wi-Fi is initialized,
+      this reserves `wifi_mtu` bytes on the heap. When disabled, a refused frame is dropped, and TCP
+      must send the data again."
+    default:
+      - value: true
 
   - name: dump_packets
     description: "Dump packets via an info log statement"

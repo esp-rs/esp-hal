@@ -110,6 +110,10 @@ pub struct Generic {
     #[serde(default)]
     always_on: bool,
 
+    /// Counts the consumers of an `always_on` node.
+    #[serde(default)]
+    refcounted: bool,
+
     #[serde(default)]
     wake_locking: bool,
 
@@ -175,6 +179,10 @@ impl ClockTreeNodeType for Generic {
 
     fn always_on(&self) -> bool {
         self.always_on
+    }
+
+    fn refcounted(&self) -> bool {
+        self.refcounted
     }
 
     fn wake_locking(&self) -> bool {
@@ -291,7 +299,20 @@ impl ClockTreeNodeType for Generic {
         // TODO: support reject exprs - implement `value(node, property)` in expressions
 
         let func_body = if num_inputs == 1 {
+            // An always-on node holds its source from the first configuration on.
+            let hold_upstream = if instance.properties.always_on() {
+                let request_upstream =
+                    self.impl_request_upstream(instance, tree, quote! { config });
+                quote! {
+                    if old_config.is_none() {
+                        #request_upstream
+                    }
+                }
+            } else {
+                quote! {}
+            };
             quote! {
+                #hold_upstream
                 #hal_impl(clocks, old_config, config);
             }
         } else {
@@ -335,7 +356,9 @@ impl ClockTreeNodeType for Generic {
                 quote! {}
             };
 
-            if let Some(refcount_accessor) = instance.properties.refcount_accessor() {
+            if let Some(refcount_accessor) = instance.properties.refcount_accessor()
+                && !instance.properties.always_on()
+            {
                 quote! {
                     #configures
                     let active = #refcount_accessor > 0;

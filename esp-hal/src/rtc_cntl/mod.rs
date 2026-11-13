@@ -126,6 +126,18 @@ unstable_module! {
 }
 
 cfg_select! {
+    any(supports_cpu_power_down, modem_retention = "backup_dma") => {
+        mod retention_memory;
+        #[doc(hidden)]
+        #[instability::unstable]
+        pub use retention_memory::RetentionSlot;
+        #[instability::unstable]
+        pub use retention_memory::{RetentionMemory, RetentionMemoryError, RetentionStorage};
+    }
+    _ => {}
+}
+
+cfg_select! {
     supports_cpu_power_down => {
         mod cpu_retention;
         pub(crate) use cpu_retention::installed_buffer_ptr;

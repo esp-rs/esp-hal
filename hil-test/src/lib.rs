@@ -10,6 +10,23 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 use esp_hal as _;
 
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
+    // Without a debugger, a semihosting call raises a debug exception that panics again. On
+    // Xtensa, the nested panics run at the debug interrupt level, so the stack grows into the
+    // peripheral registers until the chip resets, and the chip state can stay damaged after the
+    // reset.
+    #[cfg(target_arch = "xtensa")]
+    if !esp_hal::debugger::debugger_connected() {
+        loop {
+            core::hint::spin_loop();
+        }
+    }
+
+    semihosting::eprintln!("{info}");
+    semihosting::process::exit(101)
+}
+
 #[cfg(not(feature = "defmt"))]
 #[defmt::global_logger]
 struct Logger;

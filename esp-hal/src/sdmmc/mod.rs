@@ -37,7 +37,6 @@ use core::{
     task::{Context, Poll},
 };
 
-use embassy_futures::yield_now;
 use embassy_sync::{mutex::MutexGuard, waitqueue::WakerRegistration};
 use esp_sync::{NonReentrantMutex, RawMutex};
 use portable_atomic::AtomicBool;
@@ -50,7 +49,8 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
-    asynch::AtomicWaker,
+    asynch::{AtomicWaker, wait_until},
+    clock::CpuFrequencyLock,
     dma::{
         DmaBufError,
         aligned::{DmaAlignedMut, DmaAlignedRef, InternalMemory},
@@ -356,6 +356,14 @@ impl From<DmaBufError> for MmcError {
 
 /// Spin-poll bound for self-clearing hardware bits.
 const POLL_LIMIT: u32 = 1_000_000;
+
+/// Upper bound for the card to release DAT0 after an R1b command in async mode.
+///
+/// Generous because `CMD38` (erase) is R1b and may keep the card busy for seconds.
+const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Interval between DAT0 busy checks in async mode.
+const BUSY_POLL_INTERVAL: Duration = Duration::from_micros(100);
 
 // `rintsts` event bits (see `sdmmc_ll.h` `SDMMC_LL_EVENT_*`).
 const EVT_RESP_ERR: u32 = 1 << 1;
@@ -754,6 +762,7 @@ impl EngineSession {
         block_size: u16,
         auto_stop: bool,
     ) -> Result<[u32; 4], Error> {
+        let _cpu_frequency_lock = CpuFrequencyLock::new();
         let guard = DropGuard::new((), |()| abort_transfer());
         let r = SDHOST::regs();
 
@@ -2108,13 +2117,15 @@ async fn wait_busy_async() -> Result<(), Error> {
 /// does not generate a Busy Clear Interrupt for those, so polling is the
 /// only option, mirroring ESP-IDF's `wait_for_busy_cleared`.
 async fn wait_busy_poll() -> Result<(), Error> {
-    for _ in 0..POLL_LIMIT {
-        if !SDHOST::regs().status().read().data_busy().bit_is_set() {
-            return Ok(());
+    let deadline = Instant::now() + BUSY_TIMEOUT;
+    while SDHOST::regs().status().read().data_busy().bit_is_set() {
+        let now = Instant::now();
+        if now > deadline {
+            return Err(Error::Timeout);
         }
-        yield_now().await;
+        wait_until(now + BUSY_POLL_INTERVAL).await;
     }
-    Err(Error::Timeout)
+    Ok(())
 }
 
 /// Reads response registers into spec word order (`words[3]` is the MSW).

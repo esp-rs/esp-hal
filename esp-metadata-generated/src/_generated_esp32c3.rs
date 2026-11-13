@@ -313,6 +313,9 @@ macro_rules! property {
     ("bt.controller") => {
         "btdm"
     };
+    ("bt.requires_fast_cpu") => {
+        false
+    };
     ("wifi.has_wifi6") => {
         false
     };
@@ -333,6 +336,9 @@ macro_rules! property {
     };
     ("wifi.has_ftm") => {
         true
+    };
+    ("wifi.requires_fast_cpu") => {
+        false
     };
     ("phy.combo_module") => {
         true
@@ -469,6 +475,9 @@ macro_rules! property {
     ("sleep.cpu_retention_mem_end") => {
         1070465024
     };
+    ("sleep.idle_frequency_scaling") => {
+        false
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
@@ -544,8 +553,17 @@ macro_rules! property {
     ("soc.internal_memory_cached") => {
         false
     };
+    ("soc.cpu_powers_down_cache") => {
+        false
+    };
     ("soc.has_swd_watchdog") => {
         true
+    };
+    ("soc.has_bus_clock_update") => {
+        false
+    };
+    ("soc.has_apb_frequency_reduction") => {
+        false
     };
     ("soc.cpu_mcause_mask") => {
         31
@@ -2226,35 +2244,35 @@ macro_rules! define_clock_tree_types {
             uart_function_clock: [Option<UartFunctionClockConfig>; 2],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 2],
             tsens_sclk: [Option<TsensSclkConfig>; 1],
-            rc_fast_clk_refcount: u32,
+            pub(crate) rc_fast_clk_refcount: u32,
             #[cfg(use_xtal32k)]
-            xtal32k_clk_refcount: u32,
-            rc_slow_clk_refcount: u32,
-            rc_fast_div_clk_refcount: u32,
-            apb_clk_refcount: u32,
-            crypto_clk_refcount: u32,
-            pll_80m_refcount: u32,
-            pll_160m_refcount: u32,
-            rtc_slow_clk_refcount: u32,
-            ble_lp_clk_refcount: u32,
-            rtc_fast_clk_refcount: u32,
-            low_power_clk_refcount: u32,
-            uart_mem_clk_refcount: u32,
-            timg_calibration_clock_refcount: u32,
-            adc_function_clock_refcount: [u32; 1],
-            sdm_function_clock_refcount: [u32; 1],
-            i2c_function_clock_refcount: [u32; 1],
-            i2s_tx_clk_refcount: [u32; 1],
-            i2s_rx_clk_refcount: [u32; 1],
-            i2s_mclk_out_refcount: [u32; 1],
-            rmt_sclk_refcount: [u32; 1],
-            spi_function_clock_refcount: [u32; 1],
-            timg_function_clock_refcount: [u32; 2],
-            timg_wdt_clock_refcount: [u32; 2],
-            uart_function_clock_refcount: [u32; 2],
-            uart_mem_clock_refcount: [u32; 2],
-            uart_baud_rate_generator_refcount: [u32; 2],
-            tsens_sclk_refcount: [u32; 1],
+            pub(crate) xtal32k_clk_refcount: u32,
+            pub(crate) rc_slow_clk_refcount: u32,
+            pub(crate) rc_fast_div_clk_refcount: u32,
+            pub(crate) apb_clk_refcount: u32,
+            pub(crate) crypto_clk_refcount: u32,
+            pub(crate) pll_80m_refcount: u32,
+            pub(crate) pll_160m_refcount: u32,
+            pub(crate) rtc_slow_clk_refcount: u32,
+            pub(crate) ble_lp_clk_refcount: u32,
+            pub(crate) rtc_fast_clk_refcount: u32,
+            pub(crate) low_power_clk_refcount: u32,
+            pub(crate) uart_mem_clk_refcount: u32,
+            pub(crate) timg_calibration_clock_refcount: u32,
+            pub(crate) adc_function_clock_refcount: [u32; 1],
+            pub(crate) sdm_function_clock_refcount: [u32; 1],
+            pub(crate) i2c_function_clock_refcount: [u32; 1],
+            pub(crate) i2s_tx_clk_refcount: [u32; 1],
+            pub(crate) i2s_rx_clk_refcount: [u32; 1],
+            pub(crate) i2s_mclk_out_refcount: [u32; 1],
+            pub(crate) rmt_sclk_refcount: [u32; 1],
+            pub(crate) spi_function_clock_refcount: [u32; 1],
+            pub(crate) timg_function_clock_refcount: [u32; 2],
+            pub(crate) timg_wdt_clock_refcount: [u32; 2],
+            pub(crate) uart_function_clock_refcount: [u32; 2],
+            pub(crate) uart_mem_clock_refcount: [u32; 2],
+            pub(crate) uart_baud_rate_generator_refcount: [u32; 2],
+            pub(crate) tsens_sclk_refcount: [u32; 1],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.

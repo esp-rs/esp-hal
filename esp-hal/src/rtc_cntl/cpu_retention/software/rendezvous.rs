@@ -9,10 +9,11 @@
 //! The handshake is one shared [`Phase`]. Every transition has one writer, except the ways out of
 //! [`Phase::Wanted`] and [`Phase::Requested`], which both cores take with a compare-and-swap.
 
-use core::{cell::UnsafeCell, mem::MaybeUninit, ptr};
+use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use portable_atomic::{AtomicU8, Ordering};
+use procmacros::ram;
 
 use super::{
     CoreRetentionContext,
@@ -22,7 +23,7 @@ use super::{
     save_pre_critical,
 };
 use crate::{
-    interrupt::ipc::Ipc,
+    interrupt::ipc::{Ipc, IpcRequest},
     peripherals::{IPC, LPWR},
     rtc_cntl::sleep::{LowPower, RtcSleepConfig, SleepKind},
     soc::cpu_control,
@@ -130,9 +131,7 @@ pub(crate) fn engage() -> bool {
     // An APP CPU that asked for a sleep waits for it with interrupts disabled, and reads the phase
     // itself. It could not take the doorbell anyway.
     if !app_cpu_waits {
-        // Only this function posts to the APP CPU, so the post merges with a pending doorbell
-        // instead of waiting for it.
-        Ipc::new(unsafe { IPC::steal() }).call_function(Cpu::AppCpu, helper_entry);
+        let _ = Ipc::new(unsafe { IPC::steal() }).post(Cpu::AppCpu, &HELPER);
     }
 
     let deadline = raw_time::raw_counter() + raw_time::us_to_ticks(ANSWER_TIMEOUT_US);
@@ -196,8 +195,7 @@ pub(crate) fn sleep_from_app_cpu(config: RtcSleepConfig) {
                     // configuration.
                     unsafe { (*SLEEP_CONFIG.0.get()).write(config) };
                     if swap_phase(Phase::Idle, Phase::Wanted) {
-                        // Only this function posts to the PRO CPU, so the post never waits.
-                        Ipc::new(unsafe { IPC::steal() }).call_function(Cpu::ProCpu, kick_entry);
+                        let _ = Ipc::new(unsafe { IPC::steal() }).post(Cpu::ProCpu, &KICK);
                         deadline = Some(
                             raw_time::raw_counter() + raw_time::us_to_ticks(ANSWER_TIMEOUT_US),
                         );
@@ -224,9 +222,15 @@ pub(crate) fn sleep_from_app_cpu(config: RtcSleepConfig) {
     }
 }
 
+/// Asks the PRO CPU to run [`kick_entry`].
+static KICK: IpcRequest = IpcRequest::new(kick_entry);
+
+/// Asks the APP CPU to run [`helper_entry`].
+static HELPER: IpcRequest = IpcRequest::new(helper_entry);
+
 /// Takes the request of the APP CPU, and requests the sleep for it.
 #[crate::ram]
-fn kick_entry() {
+extern "C" fn kick_entry() {
     // The answer of `can_sleep` holds for the whole sleep, so nothing may give this core work
     // between the two.
     let irq_token = unsafe { SingleCoreInterruptLock.enter() };
@@ -248,7 +252,7 @@ fn kick_entry() {
 
 /// Takes the doorbell of the PRO CPU.
 #[crate::ram]
-fn helper_entry() {
+extern "C" fn helper_entry() {
     // The answer of `can_sleep` holds for the whole sleep, so nothing may give this core work
     // between the two.
     let irq_token = unsafe { SingleCoreInterruptLock.enter() };
@@ -272,20 +276,27 @@ fn helper_entry() {
 ///
 /// The branch predictor starts cache requests of its own, so it must be off while the CPU domain
 /// has no power. esp-idf turns it off for this routine only, and not for the single-core path.
-#[crate::ram]
+///
+/// The APP CPU waits here while the PRO CPU suspends the caches. After a wake, the APP CPU
+/// restores its state before the caches resume.
+#[ram(unstable(checked))]
 fn run_helper() {
     let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 
-    // SAFETY: the PRO CPU starts the rendezvous for a sleep that retains the CPU only, so the
-    // memory of the frames is installed.
-    let buffer = unsafe { crate::rtc_cntl::installed_buffer_ptr().unwrap_unchecked() };
+    // The PRO CPU starts the rendezvous only for a sleep that retains the CPU, so the frame memory
+    // is installed. With debug assertions, `unwrap_unchecked` checks the value, and the panic path
+    // is in flash.
+    let Some(buffer) = crate::rtc_cntl::installed_buffer_ptr() else {
+        PHASE.store(Phase::Refused as u8, Ordering::Release);
+        return;
+    };
     let mut ctx = CoreRetentionContext::new(buffer.as_ptr(), Cpu::AppCpu as usize);
     save_pre_critical(&mut ctx);
     let frame = save_critical_frame(&ctx);
 
     // The wake stub writes this word while the compiler believes that nothing did.
     // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
-    let pmufunc = unsafe { ptr::read_volatile(&raw const (*frame).pmufunc) };
+    let pmufunc = unsafe { device_regs::load_word(&raw const (*frame).pmufunc) };
     if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
         // The CPU domain can lose power from here on. This core then comes back through the wake
         // stub, after the PRO CPU released it from reset. This core does not arm the wake stub:
@@ -294,7 +305,7 @@ fn run_helper() {
     } else {
         // The wake stub restored the critical frame already.
         // SAFETY: the frame holds what this core saved before the sleep.
-        unsafe { ctx.non_critical().as_ref().unwrap().restore() };
+        unsafe { (*ctx.non_critical()).restore() };
         device_regs::restore(&super::regions(), ctx.device_frame());
     }
 

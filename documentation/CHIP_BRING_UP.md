@@ -40,6 +40,11 @@ Once completed, probe-rs can be used for flashing, debugging, and automated test
 ## Linker Scripts
 The process usually begins with linker scripts.
 
+The memory layout depends on the bootloader, so these scripts live in the bootloader support crate:
+`esp-bootloader-esp-idf/ld/<chip>/` (`memory.x`, `<chip>.x` and `linkall.x`) and the shared
+`esp-bootloader-esp-idf/ld/sections/`. esp-hal only provides `hal-defaults.x` and the fragments
+generated from its configuration. See `esp-bootloader-esp-idf/ld/README.md`.
+
 ### `memory.x`
 
 First, determine the source of truth for memory mappings. For example, using `esp32c6` as a reference, you will see the following definition:
@@ -111,7 +116,7 @@ These linker files are slightly more involved.
 
 It is recommended to copy an existing script (e.g., `esp32c6.x`) and adjust it as needed.
 
-In `linkall.x`, include the required linker scripts as done for other chips, and `PROVIDE_ALIAS` for:
+In `linkall.x`, include the required linker scripts as done for other chips (starting with `esp_hal_config.x`, ending with `hal-defaults.x` and `esp_idf_boot.x`), and `PROVIDE_ALIAS` for:
 
 - `ROTEXT` / `RODATA`
 - `RWTEXT` / `RWDATA`
@@ -283,6 +288,12 @@ Implementing further peripheral support boils down to a relatively simple loop o
 - Check the driver in `esp-hal` for the presence of `cfg`-gates that restrict your chip, or implement the missing parts of the functionality for it.
 - Enable and run the relevant tests and examples.
 - If it didn't work and errors were returned, fix them. 
+- Set the support status of the driver and link it to the driver's tracking issue:
+  `support_status = { status = "partial", issue = <number> }`, or `status = "supported"`. A
+  tracking issue covers one driver on all chips and lists the features that are still missing
+  on each chip. A supported driver is not necessarily feature complete, so it links to the issue
+  too. Add the new chip to the existing tracking issue. If the driver has no tracking issue yet,
+  open one.
 
 ## Troubleshooting
 

@@ -91,6 +91,20 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    #[cfg(riscv)]
+    fn stack_guard_is_monitored_after_a_context_switch() {
+        unsafe extern "C" {
+            static mut __stack_chk_guard: u32;
+        }
+
+        // Switches to the idle hook and back, re-arming the watchpoint from the scheduler's trap
+        CurrentThreadHandle::get().delay(Duration::from_millis(10));
+
+        unsafe { (&raw mut __stack_chk_guard).write_volatile(0) };
+    }
+
+    #[test]
     fn thread_runs_a_function_and_returns_its_value() {
         fn worker() -> u32 {
             42
@@ -595,6 +609,90 @@ mod tests {
             // Park the second core, we don't need it anymore
             esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
         }
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    fn unpinned_threads_make_progress(ctx: Context) {
+        static START: AtomicBool = AtomicBool::new(false);
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        let workers = [(); 4].map(|()| {
+            ThreadSpawner::new(4096).with_priority(1).spawn(|| {
+                while !START.load(Ordering::Acquire) {
+                    CurrentThreadHandle::get().delay(Duration::from_millis(1));
+                }
+
+                for _ in 0..512 {
+                    CurrentThreadHandle::get().delay(Duration::from_micros(50));
+                }
+            })
+        });
+        START.store(true, Ordering::Release);
+
+        for worker in workers {
+            worker.join();
+        }
+
+        unsafe { esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu) };
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    fn preempted_thread_can_share_peer_core(ctx: Context) {
+        static PEER_READY: AtomicBool = AtomicBool::new(false);
+        static MIGRATED: AtomicBool = AtomicBool::new(false);
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {
+                CurrentThreadHandle::get().set_priority(1);
+                PEER_READY.store(true, Ordering::Release);
+                while !MIGRATED.load(Ordering::Acquire) {
+                    core::hint::spin_loop();
+                }
+            },
+        );
+        CurrentThreadHandle::get().set_priority(0);
+        while !PEER_READY.load(Ordering::Acquire) {
+            core::hint::spin_loop();
+        }
+
+        ThreadSpawner::new(4096)
+            .with_priority(1)
+            .spawn(|| {
+                hil_test::assert_eq!(Cpu::current(), Cpu::ProCpu);
+
+                let high = ThreadSpawner::new(4096)
+                    .with_priority(2)
+                    .with_pinned_to(Cpu::ProCpu)
+                    .spawn(|| {
+                        while !MIGRATED.load(Ordering::Acquire) {
+                            core::hint::spin_loop();
+                        }
+                    });
+
+                while Cpu::current() != Cpu::AppCpu {
+                    core::hint::spin_loop();
+                }
+                MIGRATED.store(true, Ordering::Release);
+                high.join();
+            })
+            .join();
+
+        unsafe { esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu) };
     }
 
     #[test]

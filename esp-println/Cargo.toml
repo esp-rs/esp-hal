@@ -20,6 +20,7 @@ check-configs = [
     { features = ["jtag-serial"], if = 'soc_has_usb_device' },
     { features = ["uart"] },
     { features = ["no-op"] },
+    { features = ["auto", "uart"] },
     { features = ["auto", "log-04", "timestamp"] },
     { features = ["auto", "defmt-espflash", "timestamp"] },
 ]
@@ -98,13 +99,14 @@ critical-section = ["dep:esp-sync"]
 timestamp = []
 
 #! ### Output interfaces
-#! You must enable exactly 1 of the below features to enable to intended
-#! communication method.
+#! Enable one of the features below to select the communication method. An explicit interface
+#! takes precedence over `auto`. A package that defaults to `auto` can then select the interface
+#! of one binary with a feature such as `esp-println/uart`.
 #!
 #! > Note: some boards, such as Waveshare's ESP32-C6-DEV-KIT-N8, come with a USB hub.
 #! This can confuse the `auto` feature. If you experience no log output, try selecting an output interface instead of relying on `auto`.
 
-## Automatically select the best output interface for the target.
+## Automatically select the best output interface for the target. An explicit interface takes precedence.
 auto        = ["dep:portable-atomic"]
 ## Use the `USB_SERIAL_JTAG` interface for printing. Available on ESP32-C3, ESP32-C5, ESP32-C6, ESP32-H2, and ESP32-S3.
 jtag-serial = ["dep:portable-atomic"]

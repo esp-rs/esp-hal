@@ -157,6 +157,26 @@ fn main() -> ! {
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_hal_config_table.md"))]
 #![doc = ""]
+//! ## Optimization level
+//!
+//! Some operations suspend the caches or change the MSPI clocks. The code that runs in that time
+//! must not call code in flash. The documentation of each operation with this requirement links to
+//! this section.
+//!
+//! To use these operations, build esp-hal at `opt-level` 2 or 3 in each profile. At other levels,
+//! the link can fail with `prohibited cross reference from '.rwtext.checked'` and the
+//! name of a helper function. GNU ld, the default linker for the ESP32, ESP32-S2 and ESP32-S3,
+//! finds only some of these calls. The link can then pass, and the chip locks up at run time. The
+//! `Cargo.toml` of the application can set the level for esp-hal only:
+//!
+//! ```toml
+//! [profile.dev.package.esp-hal]
+//! opt-level = 2
+//!
+//! [profile.release.package.esp-hal]
+//! opt-level = 2
+//! ```
+//!
 //! ## Don't use `core::mem::forget`
 //!
 //! You should never use `core::mem::forget` on any type defined in [esp crates].
@@ -376,6 +396,8 @@ unstable_driver! {
     pub mod assist_debug;
     #[cfg(canfd_driver_supported)]
     pub mod canfd;
+    #[cfg(cordic_driver_supported)]
+    pub mod cordic;
     pub mod delay;
     #[cfg(ecc_driver_supported)]
     pub mod ecc;
@@ -395,6 +417,8 @@ unstable_driver! {
     pub mod parl_io;
     #[cfg(pcnt_driver_supported)]
     pub mod pcnt;
+    #[cfg(pixel_accelerator_driver_supported)]
+    pub mod ppa;
     #[cfg(rmt_driver_supported)]
     pub mod rmt;
     #[cfg(rsa_driver_supported)]
@@ -798,7 +822,7 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(all(riscv, write_vec_table_monitoring))]
     crate::soc::setup_trap_section_protection();
 
-    #[cfg(all(feature = "unstable", multi_core))]
+    #[cfg(multi_core)]
     crate::interrupt::ipc::install();
 
     peripherals
