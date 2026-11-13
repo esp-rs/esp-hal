@@ -20,34 +20,43 @@ use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use crate::rtc_cntl::WakeupSource;
 use crate::{gpio, peripherals::LPWR, rtc_cntl::Rtc};
 
-/// Runs the CPU from the crystal until the guard drops, then configures the PLL again.
+/// The CPU clock that [`SleepCpuClock::switch_to_xtal`] replaced for the length of the sleep.
 ///
 /// The PLL is powered down across the sleep.
 #[cfg(not(soc_has_pmu))]
-fn cpu_clock_for_sleep() -> impl Sized {
-    use crate::{
-        private::DropGuard,
-        soc::clocks::{self, ClockTree, CpuClkConfig},
-    };
+#[must_use]
+struct SleepCpuClock {
+    cpu_clk: Option<crate::soc::clocks::CpuClkConfig>,
+}
 
-    ClockTree::with(|clocks| {
-        let old_cpu_clk = clocks.cpu_clk();
+#[cfg(not(soc_has_pmu))]
+impl SleepCpuClock {
+    /// Runs the CPU from the crystal until [`Self::restore`].
+    fn switch_to_xtal() -> Self {
+        use crate::soc::clocks::{self, ClockTree, CpuClkConfig};
 
-        clocks::configure_cpu_clk(clocks, CpuClkConfig::Xtal);
-
-        DropGuard::new((), move |_| {
-            ClockTree::with(|clocks| {
-                // If another consumer kept `PLL_CLK` requested while the CPU ran from `XTAL`,
-                // restoring `CPU_CLK` below will not re-enable the PLL. `PLL_CLK` on esp32c2 and
-                // esp32c3 has no other consumer, so restoring `CPU_CLK` configures it again.
-                #[cfg(not(any(esp32c2, esp32c3)))]
-                clocks::reconfigure_pll(clocks);
-                if let Some(old_cpu_clk) = old_cpu_clk {
-                    clocks::configure_cpu_clk(clocks, old_cpu_clk);
-                }
-            });
+        ClockTree::with(|clocks| {
+            let cpu_clk = clocks.cpu_clk();
+            clocks::configure_cpu_clk(clocks, CpuClkConfig::Xtal);
+            Self { cpu_clk }
         })
-    })
+    }
+
+    /// Configures the PLL again and restores the CPU clock.
+    fn restore(self) {
+        use crate::soc::clocks::{self, ClockTree};
+
+        ClockTree::with(|clocks| {
+            // If another consumer kept `PLL_CLK` requested while the CPU ran from `XTAL`,
+            // restoring `CPU_CLK` below will not re-enable the PLL. `PLL_CLK` on esp32c2 and
+            // esp32c3 has no other consumer, so restoring `CPU_CLK` configures it again.
+            #[cfg(not(any(esp32c2, esp32c3)))]
+            clocks::reconfigure_pll(clocks);
+            if let Some(cpu_clk) = self.cpu_clk {
+                clocks::configure_cpu_clk(clocks, cpu_clk);
+            }
+        });
+    }
 }
 
 #[cfg(soc_has_pmu)]
@@ -470,16 +479,13 @@ impl<'d> LowPower<'d> {
         let sar_power = SarPower::for_sleep(kind).replace();
 
         let rejected = {
-            // A chip can keep a guard for the length of the sleep, to restore what sleep entry
-            // changed for the sleep only. The guard must therefore outlive the wait below.
             // ESP-IDF arms RTC_CNTL retention in `misc_modules_sleep_prepare`, before it arms the
             // wakeup sources.
 
             #[cfg(cpu_retention = "rtc_cntl")]
             cpu_retention::prepare_cpu_retention(retention_buffer);
 
-            #[allow(clippy::let_unit_value)]
-            let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
+            let saved = config.start_sleep(wakeup_mask, reject_mask);
 
             // Last, because this step takes the pads away from the peripherals that drove them. The
             // wakeup sources have their holds now, and no later step needs a pad.
@@ -519,6 +525,7 @@ impl<'d> LowPower<'d> {
             }
 
             config.finish_sleep();
+            saved.restore();
 
             rejected
         };

@@ -2,7 +2,6 @@ use core::ops::Not;
 
 use crate::{
     peripherals::{LP_AON, PMU},
-    private::DropGuard,
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpBackupClk, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
@@ -734,25 +733,14 @@ impl RtcSleepConfig {
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
-    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
-    /// sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
-        let restore_clock_config = ClockTree::with(|clocks| {
-            let old_root = clocks.soc_root_clk();
-
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        let soc_root_clk = ClockTree::with(|clocks| {
+            let old = clocks.soc_root_clk();
             clocks::configure_soc_root_clk(clocks, SocRootClkConfig::Xtal);
-
-            // Restore the old clock settings when we return
-            DropGuard::new((), move |_| {
-                ClockTree::with(|clocks| {
-                    crate::soc::clocks::reconfigure_pll(clocks);
-                    if let Some(old_root) = old_root {
-                        clocks::configure_soc_root_clk(clocks, old_root);
-                    }
-                });
-            })
+            old
         });
 
         // pmu_sleep_config_default + pmu_sleep_init.
@@ -830,7 +818,7 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
-        restore_clock_config
+        SavedState { soc_root_clk }
     }
 
     /// Requests the sleep.
@@ -848,5 +836,23 @@ impl RtcSleepConfig {
 
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
+    }
+}
+
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    soc_root_clk: Option<SocRootClkConfig>,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        ClockTree::with(|clocks| {
+            clocks::reconfigure_pll(clocks);
+            if let Some(soc_root_clk) = self.soc_root_clk {
+                clocks::configure_soc_root_clk(clocks, soc_root_clk);
+            }
+        });
     }
 }
