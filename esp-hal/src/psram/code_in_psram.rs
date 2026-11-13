@@ -23,6 +23,8 @@
 //! Where flash and PSRAM share one MMU, the code links at flash addresses. It runs from flash
 //! until the start-up copies each page to PSRAM and points the page's entry at the copy, at the
 //! same address. The chip then also supplies `FLASH_PSRAM`, the entry bit that selects PSRAM.
+//! `.bss.psram` links in the same window after the code, and the start-up maps the next PSRAM
+//! pages there and zeroes them.
 
 use portable_atomic::{AtomicU32, AtomicUsize, Ordering};
 
@@ -34,9 +36,14 @@ pub(crate) static SIZE: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static CODE_END: AtomicUsize = AtomicUsize::new(0);
 /// The flash offset of the booted app, for `flash_mmu_entry_offset`.
 pub(crate) static APP_OFFSET: AtomicU32 = AtomicU32::new(0);
-/// The PSRAM pages that hold the code, from page 0. The heap takes the pages after them.
+/// The number of PSRAM pages that hold the code, from page 0. `.bss.psram` takes the pages after
+/// them.
 #[cfg(not(psram_separate_window))]
 static COPIED_PAGES: AtomicU32 = AtomicU32::new(0);
+/// The number of PSRAM pages that `.bss.psram` takes after the code's. The heap takes the pages
+/// after them.
+#[cfg(not(psram_separate_window))]
+static STATIC_PAGES: AtomicU32 = AtomicU32::new(0);
 
 /// The stage the start-up reached, for a probe to read.
 ///
@@ -66,12 +73,20 @@ static ESP_HAL_CODE_IN_PSRAM_STAGE: AtomicU32 = AtomicU32::new(0);
 
 const FLASH_ENTRIES: u32 = property!("mmu.entry_num");
 
-#[cfg(psram_separate_window)]
 unsafe extern "C" {
     pub(crate) static _psram_bss_start: u8;
     pub(crate) static _psram_bss_end: u8;
 }
 const IMAGE_MAGIC: u32 = 0xE9;
+
+/// Returns whether `.bss.psram` is empty.
+#[inline(always)]
+pub(crate) fn statics_empty() -> bool {
+    // The compiler assumes that two statics have different addresses, so it folds `==` between
+    // their addresses to `false`. An empty section puts both symbols at one address, so the test
+    // must compare their order.
+    &raw const _psram_bss_end as usize <= &raw const _psram_bss_start as usize
+}
 
 #[inline(always)]
 fn stage(n: u32) {
@@ -237,7 +252,10 @@ pub(crate) fn start() {
     stage(4);
     cfg_select! {
         psram_separate_window => copy_segments(&mut flash, app, size as u32),
-        _ => remap_pages(&mmu, spare, size as u32),
+        _ => {
+            remap_pages(&mmu, spare, size as u32);
+            map_statics(&mmu, size as u32);
+        }
     }
 
     stage(5);
@@ -301,12 +319,32 @@ fn copy_segments(flash: &mut FlashReader<'_>, app: u32, size: u32) {
     let bss_start = &raw const _psram_bss_start as u32;
     let bss_end = &raw const _psram_bss_end as u32;
     if bss_start < bss_end && bss_end <= end {
-        let mut addr = bss_start;
-        while addr < bss_end {
-            store_word(addr, 0);
-            addr = addr.wrapping_add(4);
-        }
-        chip::cache_writeback(bss_start, bss_end.wrapping_sub(bss_start));
+        zero_words(bss_start, bss_end);
+    }
+}
+
+/// Zeroes the words from `start` to `end` and writes them back from the cache.
+#[inline(always)]
+fn zero_words(start: u32, end: u32) {
+    let mut addr = start;
+    while addr < end {
+        store_word(addr, 0);
+        addr = addr.wrapping_add(4);
+    }
+    chip::cache_writeback(start, end.wrapping_sub(start));
+}
+
+/// Points `count` flash entries from `first_entry` at the PSRAM pages from `first_page`.
+#[cfg(not(psram_separate_window))]
+#[inline(always)]
+fn map_psram_pages(first_entry: u32, first_page: u32, count: u32) {
+    let mut i = 0;
+    while i < count {
+        chip::set_flash_entry(
+            first_entry.wrapping_add(i),
+            chip::FLASH_VALID | chip::FLASH_PSRAM | first_page.wrapping_add(i),
+        );
+        i = i.wrapping_add(1);
     }
 }
 
@@ -367,24 +405,71 @@ fn remap_pages(mmu: &FlashMmu, spare: u32, size: u32) {
     CODE_END.store(code_end as usize, Ordering::Relaxed);
 }
 
-/// Maps the PSRAM pages after the code at the entries after the code, and returns their range.
+/// Maps the PSRAM pages after the code's at the entries that `.bss.psram` covers, and zeroes the
+/// section.
+///
+/// It maps nothing when `.bss.psram` is empty, when the code and the statics do not fit in PSRAM
+/// together, or when an entry that it needs is already valid. `start_with_code` panics in the last
+/// two cases, and nothing touches the statics before then.
+#[cfg(not(psram_separate_window))]
+#[inline(always)]
+fn map_statics(mmu: &FlashMmu, size: u32) {
+    let bss_start = &raw const _psram_bss_start as u32;
+    let bss_end = &raw const _psram_bss_end as u32;
+    if bss_start >= bss_end {
+        return;
+    }
+    let first = bss_start.wrapping_sub(chip::FLASH_WINDOW) >> mmu.page_shift;
+    let end = bss_end
+        .wrapping_sub(chip::FLASH_WINDOW)
+        .wrapping_add(mmu.page_size())
+        .wrapping_sub(1)
+        >> mmu.page_shift;
+    let pages = end.wrapping_sub(first);
+    let copied = COPIED_PAGES.load(Ordering::Relaxed);
+    if copied.wrapping_add(pages) > size >> mmu.page_shift {
+        return;
+    }
+    let mut entry = first;
+    while entry < end {
+        if chip::flash_entry(entry) & chip::FLASH_VALID != 0 {
+            return;
+        }
+        entry = entry.wrapping_add(1);
+    }
+
+    map_psram_pages(first, copied, pages);
+    let mapped = mmu.entry_addr(first);
+    chip::cache_invalidate(mapped, pages.wrapping_shl(mmu.page_shift));
+    zero_words(bss_start, bss_end);
+    STATIC_PAGES.store(pages, Ordering::Relaxed);
+}
+
+/// Returns whether `.bss.psram` is empty, or mapped and zeroed by the start-up.
+#[cfg(not(psram_separate_window))]
+pub(crate) fn statics_mapped() -> bool {
+    statics_empty() || STATIC_PAGES.load(Ordering::Relaxed) != 0
+}
+
+/// Maps the PSRAM pages after the code's and the statics' at the entries after both, and returns
+/// the heap's range.
 ///
 /// It leaves the last two entries free: the bootloader can hold the last one, and the flash driver
-/// maps its encrypted reads at the one before it.
+/// maps its encrypted reads at the one before it. It invalidates the cache over the heap's range
+/// only, so the statics keep the values that are in the cache.
 #[cfg(not(psram_separate_window))]
 pub(crate) fn map_heap(size: usize) -> core::ops::Range<usize> {
     const PAGE: u32 = property!("mmu.page_size");
 
-    let start = CODE_END.load(Ordering::Relaxed) as u32;
-    let first_entry = (start - chip::FLASH_WINDOW) / PAGE;
-    let copied = COPIED_PAGES.load(Ordering::Relaxed);
-    let pages = (size as u32 / PAGE - copied).min((FLASH_ENTRIES - 2).saturating_sub(first_entry));
-    for i in 0..pages {
-        chip::set_flash_entry(
-            first_entry + i,
-            chip::FLASH_VALID | chip::FLASH_PSRAM | (copied + i),
-        );
+    let mut start = CODE_END.load(Ordering::Relaxed) as u32;
+    let statics = STATIC_PAGES.load(Ordering::Relaxed);
+    if statics != 0 {
+        start = start.max((&raw const _psram_bss_end as u32).next_multiple_of(PAGE));
     }
+    let first_entry = (start - chip::FLASH_WINDOW) / PAGE;
+    let used = COPIED_PAGES.load(Ordering::Relaxed) + statics;
+    let pages = (size as u32 / PAGE - used).min((FLASH_ENTRIES - 2).saturating_sub(first_entry));
+    map_psram_pages(first_entry, used, pages);
     chip::cache_invalidate(start, pages * PAGE);
     start as usize..(start + pages * PAGE) as usize
 }

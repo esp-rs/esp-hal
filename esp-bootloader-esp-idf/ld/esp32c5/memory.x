@@ -36,6 +36,13 @@ MEMORY
     /* Instruction and Data ROM */
     ROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x1000000 - 0x20
 
+    /* The same range as `ROM`, for `.bss.psram` after the code. A region of its own gives the
+       section its own location counter. The linker keeps the section inside the region, which
+       ends below the last MMU entry. That entry stays free for the flash driver. The linker does
+       not check the section against the PSRAM fitted: `esp_hal::init` panics when the section
+       does not fit after the code. */
+    PSRAM_BSS : ORIGIN = ORIGIN(ROM), LENGTH = LENGTH(ROM)
+
     /* RTC fast memory (executable). Persists over deep sleep. */
     RTC_FAST : ORIGIN = 0x50000000, LENGTH = 16K /*- ESP_BOOTLOADER_RESERVE_RTC*/
 }
