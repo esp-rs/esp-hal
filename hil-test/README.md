@@ -118,6 +118,7 @@ Our self-hosted runners have the following setup:
     - `GPIO20` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO5` and `GPIO6` are connected (LP pads).
     - `GPIO46` and `GPIO53` are connected (HP pads).
+    - `Ethernet` cable is connected to the runner
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S2 (`esp32s2-jtag`):
   - Devkit: `ESP32-S2-Saola-1` connected via UART (`UART` port).
@@ -135,11 +136,12 @@ Our self-hosted runners have the following setup:
     - `GPIO40` and `GPIO41` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S31 (`esp32s31-jtag`):
-  - Devkit: `ESP32-S31_QFN80_Test_Board` connected via UART (`USB-UART` port).
-    - `GPIO6` and `GPIO7` are I2C pins (connected to MCP4725).
+  - Devkit: `ESP32-S31-Function-CoreBoard-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
+    - `GPIO0` and `GPIO1` are I2C pins (connected to MCP4725).
     - `GPIO47` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO3` are connected (LP pads).
-    - `GPIO8` and `GPIO44` are connected (HP pads).
+    - `GPIO43` and `GPIO44` are connected (HP pads).
+    - `Ethernet` cable is connected to the runner
   - Probe: `ESP-Prog` connected with the [following connections][connection_s31]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32 (`esp32-jtag`):
@@ -147,6 +149,7 @@ Our self-hosted runners have the following setup:
     - `GPIO32` and `GPIO33` are I2C pins (connected to MCP4725).
     - `GPIO36` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO4` are connected (LP pads). The used devkit exposes no free HP pad, so the HP tests do not run on this chip.
+    - `Ethernet` cable is connected to the runner
   - RPi: Raspbian 12 configured with the following [setup]
 
 [connection_s31]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
