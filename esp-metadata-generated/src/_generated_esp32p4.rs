@@ -532,6 +532,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.usb_serial_jtag_light_sleep") => {
+        "keep"
+    };
     ("sleep.idle_frequency_scaling") => {
         false
     };
@@ -6833,6 +6836,9 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl2()
                         .modify(|_, w| w.usb_device_apb_clk_en().bit(enable));
+                    crate::peripherals::LP_AON_CLKRST::regs()
+                        .lp_aonclkrst_hp_usb_clkrst_ctrl0()
+                        .modify(|_, w| w.lp_aonclkrst_usb_device_48m_clk_en().bit(enable));
                 }
                 Peripheral::UsbFs => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -7107,7 +7113,9 @@ macro_rules! implement_peripheral_clocks {
                         .modify(|_, w| w.rst_en_uhci().bit(reset));
                 }
                 Peripheral::UsbDevice => {
-                    let _ = reset;
+                    crate::peripherals::LP_AON_CLKRST::regs()
+                        .lp_aonclkrst_hp_usb_clkrst_ctrl1()
+                        .modify(|_, w| w.lp_aonclkrst_rst_en_usb_device().bit(reset));
                 }
                 Peripheral::UsbFs => {
                     let _ = reset;

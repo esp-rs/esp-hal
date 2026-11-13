@@ -791,7 +791,10 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl4()
             .write(|w| w.slp_reject_cause_clr().bit(true));
 
+        let usb_serial_jtag = (!self.deep).then(super::usb_serial_jtag::pad_backup_and_disable);
+
         SavedState {
+            usb_serial_jtag,
             hp_root_clk,
             cpu_clk,
             ahb_clk,
@@ -824,6 +827,7 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
+    usb_serial_jtag: Option<super::usb_serial_jtag::PadBackup>,
     hp_root_clk: Option<HpRootClkConfig>,
     cpu_clk: Option<CpuClkConfig>,
     ahb_clk: Option<AhbClkConfig>,
@@ -832,6 +836,9 @@ pub(crate) struct SavedState {
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
+        if let Some(backup) = self.usb_serial_jtag {
+            super::usb_serial_jtag::pad_restore(backup);
+        }
         ClockTree::with(|clocks| {
             clocks::reconfigure_pll(clocks);
             // AHB_CLK may not exceed 32 MHz, so the dividers change before the root clock.

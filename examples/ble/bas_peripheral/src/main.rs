@@ -19,9 +19,9 @@
 //!   state in RAM. Only the ESP32-C3, -C5, -C6, -C61, -H2, -H4, -S3 and -S31 support this. On other
 //!   chips the constant has no effect.
 //!
-//! On ESP32-C3, ESP32-S3, and ESP32-S31, the USB Serial/JTAG console stops while the chip
-//! is in light sleep, so use the UART port to see the output on those targets. On ESP32-C5,
-//! ESP32-C6, ESP32-C61, and ESP32-H2, USB Serial/JTAG remains active across light sleep.
+//! While a USB host is connected to USB Serial/JTAG, the ESP32-C3, ESP32-H4 and ESP32-S3 do not
+//! enter light sleep, so `LIGHT_SLEEP` saves no current there. Use the UART port, or set
+//! `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` to `false`, to measure the saving.
 
 //% CHIP_FILTER: bt_driver_supported
 

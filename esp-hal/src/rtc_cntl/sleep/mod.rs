@@ -107,6 +107,8 @@ impl WakeupWaits {
 
 #[cfg(soc_has_pmu)]
 pub(crate) mod pmu_common;
+#[cfg(sleep_usb_serial_jtag_light_sleep_is_set)]
+mod usb_serial_jtag;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
@@ -154,6 +156,28 @@ pub enum LightSleep {
 
 #[cfg(supports_cpu_power_down)]
 use crate::rtc_cntl::cpu_retention;
+
+/// The parts of the sleep path that an RTOS queries.
+#[cfg(sleep_driver_supported)]
+#[doc(hidden)]
+#[instability::unstable]
+pub mod __rtos_implementation {
+    /// Returns whether automatic light sleep should keep the chip awake for USB Serial/JTAG.
+    ///
+    /// On chips whose light sleep cannot keep USB Serial/JTAG running, a light sleep disconnects
+    /// it from the host. Automatic light sleep stays out of light sleep while a host is connected,
+    /// so the console and the debugger keep working, unless the `keep-usb-serial-jtag-connected`
+    /// option is disabled.
+    pub fn usb_serial_jtag_blocks_light_sleep() -> bool {
+        cfg_select! {
+            sleep_usb_serial_jtag_light_sleep = "disconnect" => {
+                cfg!(keep_usb_serial_jtag_connected) && super::usb_serial_jtag::host_connected()
+            }
+            _ => false,
+        }
+    }
+}
+
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
 /// The wakeup-enable mask survives a deep-sleep wake, so here it still holds the request of the run
@@ -165,8 +189,9 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     // changes a path.
     gpio::wakeup::record_wakeup();
 
-    // Release the pads after a deep-sleep wake only, and only if the previous
-    // run armed an IO wake source.
+    // Release the pads after a deep-sleep wake, and only if the previous run armed an IO wake
+    // source. A reset that ended a light sleep has the same reset reason, and the holds that the
+    // light sleep took stay too, so the release applies to it as well.
     if super::reset_reason(crate::system::Cpu::ProCpu) == Some(super::SocResetReason::CoreDeepSleep)
         && gpio::wakeup::wake_enabled()
     {
@@ -176,6 +201,25 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     RtcSleepConfig::base_settings(rtc);
 
     set_mask(0);
+}
+
+/// Returns whether the last reset was a wakeup from deep sleep.
+///
+/// On a chip that keeps USB Serial/JTAG running in light sleep, a USB reset from the host can end
+/// a light sleep, and that reset has the same reset reason. Bit 0 of `RTC_SLEEP_MODE_REG` tells
+/// the two apart. The sleep code sets it for a deep sleep and clears it for a light sleep, and the
+/// ROM only reads it. The next sleep writes it again, also a sleep that the hardware rejects.
+/// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/esp_rom/esp32c6/include/esp32c6/rom/rtc.h#L68-L69>.
+pub(crate) fn deep_sleep_wakeup() -> bool {
+    let deep_sleep_reset = super::reset_reason(crate::system::Cpu::ProCpu)
+        == Some(super::SocResetReason::CoreDeepSleep);
+
+    cfg_select! {
+        sleep_usb_serial_jtag_light_sleep = "keep" => {
+            deep_sleep_reset && sleep_impl::last_sleep_was_deep()
+        }
+        _ => deep_sleep_reset,
+    }
 }
 
 /// Low-power management.
@@ -452,8 +496,14 @@ impl<'d> LowPower<'d> {
         //
         // The buffer is read once, because the save of the APP CPU and the power-down must agree on
         // it. A buffer that another core installs during this sleep serves the next one.
+        //
+        // A sleep that keeps USB Serial/JTAG connected keeps the CPU powered. The ROM treats a
+        // USB reset during the sleep as a sleep wakeup, and would restore a powered-down CPU onto
+        // peripherals that the reset cleared.
         #[cfg(supports_cpu_power_down)]
         let retention_buffer = match kind {
+            #[cfg(sleep_usb_serial_jtag_light_sleep = "keep")]
+            SleepKind::Light if config.keep_usb => None,
             SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
             SleepKind::Deep => None,
         };

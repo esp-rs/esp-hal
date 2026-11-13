@@ -31,6 +31,7 @@ check-configs = [
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_APB_FREQUENCY_REDUCTION = "4" }, if = 'soc_has_apb_frequency_reduction' },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_KEEP_UART0_ENABLED = "false" } },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_ENABLED = "false" }, if = 'soc_has_usb_device' },
+    { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED = "false" }, if = 'sleep_usb_serial_jtag_light_sleep_is_set' },
     { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
     { features = ["unstable", "rt", "__sdmmc"],     if = 'sdmmc_driver_supported' },

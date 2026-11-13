@@ -795,11 +795,12 @@ static LIGHT_SLEEP_WAKEUP: portable_atomic::AtomicBool = portable_atomic::Atomic
 /// A sleep can be ended by more than one source simultaneously, so all matching sources are
 /// returned. The result is empty if the chip was not woken from sleep (for example on a cold boot,
 /// or after a reset unrelated to deep sleep).
+///
+/// A USB reset from the host during a light sleep is not a wakeup either, although
+/// [`reset_reason`] returns [`SocResetReason::CoreDeepSleep`] for it.
 #[cfg(sleep_driver_supported)]
 pub fn wakeup_cause() -> WakeupReason {
-    if reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep)
-        && !LIGHT_SLEEP_WAKEUP.load(portable_atomic::Ordering::Relaxed)
-    {
+    if !sleep::deep_sleep_wakeup() && !LIGHT_SLEEP_WAKEUP.load(portable_atomic::Ordering::Relaxed) {
         return WakeupReason::default();
     }
 
