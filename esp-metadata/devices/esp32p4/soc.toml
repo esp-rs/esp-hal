@@ -494,6 +494,7 @@ light_sleep = true
 # stalls the other core. A switch without the stall must run from the uncached view of HP L2MEM,
 # with its stack and data there.
 deep_sleep = true
+usb_serial_jtag_light_sleep = "keep"
 ext1_version = 3
 pin_wakeup_version = 3
 wakeup_sources = {

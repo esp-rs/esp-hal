@@ -12,10 +12,14 @@
 //! observe the chip waking from light sleep via the timer (`WakeupSource::Timer`)
 //! or via the BOOT button (`WakeupSource::Gpio`).
 //!
-//! On ESP32-C3, ESP32-S3, ESP32-S31, and ESP32-P4, USB Serial/JTAG disconnects
-//! when the device enters sleep, so use the UART port on those targets. On
-//! ESP32-C5, ESP32-C6, ESP32-C61, and ESP32-H2, USB Serial/JTAG remains active
-//! across light sleep.
+//! The USB Serial/JTAG console keeps working while a USB host is connected.
+//! ESP32-C3, ESP32-H4 and ESP32-S3 stay out of light sleep while a host is
+//! connected, and the other chips' light sleep then draws more current. JTAG
+//! only responds while the chip is awake. Set
+//! `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` to `false` to let light
+//! sleep disconnect the console instead. A USB host that
+//! connects after boot only gets the console while the chip stays awake, for
+//! example while `wake_lock_demo` holds its wake lock.
 
 //% CHIP_FILTER: sleep_driver_supported && sleep_light_sleep
 

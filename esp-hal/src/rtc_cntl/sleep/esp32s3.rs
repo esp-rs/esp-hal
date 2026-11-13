@@ -674,6 +674,8 @@ impl RtcSleepConfig {
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
         let cpu_clk = super::SleepCpuClock::switch_to_xtal();
+        let usb_serial_jtag =
+            (!self.deep_slp()).then(super::usb_serial_jtag::pad_backup_and_disable);
 
         unsafe {
             LPWR::regs()
@@ -692,7 +694,10 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.sleep_reject_ena().bits(reject_mask));
         }
 
-        SavedState { cpu_clk }
+        SavedState {
+            cpu_clk,
+            usb_serial_jtag,
+        }
     }
 
     /// Requests the sleep.
@@ -731,11 +736,15 @@ impl RtcSleepConfig {
 #[must_use]
 pub(crate) struct SavedState {
     cpu_clk: super::SleepCpuClock,
+    usb_serial_jtag: Option<super::usb_serial_jtag::PadBackup>,
 }
 
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
+        if let Some(backup) = self.usb_serial_jtag {
+            super::usb_serial_jtag::pad_restore(backup);
+        }
         self.cpu_clk.restore();
     }
 }

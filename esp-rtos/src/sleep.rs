@@ -41,8 +41,9 @@ impl Sleep {
     /// draws less current than a light sleep that keeps the domain powered. The saving costs the
     /// memory, and it adds the save and the restore to the sleep and the wake.
     ///
-    /// Every light sleep after this call powers the CPU domain down. Nothing turns it off again,
-    /// because the memory stays with the driver for the life of the program.
+    /// After this call, light sleep powers the CPU domain down. Nothing turns it off again, because
+    /// the memory stays with the driver for the life of the program. Only a light sleep that keeps
+    /// USB Serial/JTAG connected to a host keeps the CPU domain powered.
     ///
     /// # Errors
     ///
@@ -113,7 +114,9 @@ impl DeepSleep {
 /// takes the scheduler lock, and checks that:
 /// - no [`WakeLock`] is held,
 /// - all cores are idle,
-/// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
+/// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away,
+/// - on the ESP32-C3, ESP32-H4 and ESP32-S3, no USB host is connected to USB Serial/JTAG, unless
+///   `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` is `false`.
 ///
 /// If all hold, it releases the lock and enters light sleep with interrupts still disabled. The
 /// sleep path keeps interrupts disabled, and parks every other running core for the duration of
@@ -172,7 +175,9 @@ extern "C" fn auto_light_sleep_hook() -> ! {
         let irq_token = unsafe { SingleCoreInterruptLock.enter() };
 
         let sleep = SCHEDULER.with(|scheduler| {
-            if WakeLock::is_active() {
+            if WakeLock::is_active()
+                || esp_hal::rtc_cntl::sleep::__rtos_implementation::usb_serial_jtag_blocks_light_sleep()
+            {
                 return false;
             }
 

@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    peripherals::{LP_AON, PCR, PMU, USB_DEVICE},
+    peripherals::{LP_AON, PMU},
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpBackupClk, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
@@ -15,20 +15,6 @@ use crate::{
         xtal32k,
     },
 };
-
-#[inline(always)]
-fn usb_device_is_active() -> bool {
-    PCR::regs()
-        .usb_device_conf()
-        .read()
-        .usb_device_clk_en()
-        .bit_is_set()
-        && USB_DEVICE::regs()
-            .conf0()
-            .read()
-            .usb_pad_enable()
-            .bit_is_set()
-}
 
 /// Configuration for controlling the behavior during sleep modes.
 #[derive(Clone, Copy)]
@@ -190,13 +176,15 @@ pub struct DigitalSleepConfig {
 }
 
 impl DigitalSleepConfig {
-    fn defaults_light_sleep(pd_flags: PowerDownFlags) -> Self {
+    fn defaults_light_sleep(pd_flags: PowerDownFlags, keep_usb: bool) -> Self {
         Self {
             // PMU_SLEEP_DIGITAL_LSLP_CONFIG_DEFAULT
             syscntl: {
                 let mut cfg = HpSysCntlReg::default();
 
-                cfg.set_dig_pad_slp_sel(!pd_flags.pd_top() && pd_flags.pd_xtal());
+                // USB Serial/JTAG kept running in light sleep needs its pads in the active
+                // configuration.
+                cfg.set_dig_pad_slp_sel(!pd_flags.pd_top() && !keep_usb);
 
                 cfg
             },
@@ -575,6 +563,8 @@ pub struct RtcSleepConfig {
     pub deep: bool,
     /// Powers Down flags.
     pub pd_flags: PowerDownFlags,
+    /// Whether the sleep keeps USB Serial/JTAG running.
+    pub(super) keep_usb: bool,
 }
 
 impl Default for RtcSleepConfig {
@@ -585,6 +575,7 @@ impl Default for RtcSleepConfig {
         Self {
             deep: false,
             pd_flags: PowerDownFlags(0),
+            keep_usb: false,
         }
     }
 }
@@ -707,6 +698,8 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
+        self.keep_usb = super::usb_serial_jtag::keep_running_in_sleep(self.deep);
+
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
                 matches!(
@@ -740,9 +733,8 @@ impl RtcSleepConfig {
             // active calibration voltage (see `AnalogSleepConfig::defaults_light_sleep`),
             // which is the dominant saving.
             //
-            // When USB_DEVICE (USB Serial/JTAG) is active, keep XTAL and BBPLL powered
-            // so the USB SIE continues responding to host packets during light sleep.
-            self.pd_flags.set_pd_xtal(!usb_device_is_active());
+            // USB Serial/JTAG needs XTAL and BBPLL to keep answering the host.
+            self.pd_flags.set_pd_xtal(!self.keep_usb);
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
@@ -754,11 +746,11 @@ impl RtcSleepConfig {
     /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
-        let keep_usb_clock = !self.deep && usb_device_is_active();
+        let keep_usb = self.keep_usb;
 
         let soc_root_clk = ClockTree::with(|clocks| {
             let old = clocks.soc_root_clk();
-            if keep_usb_clock {
+            if keep_usb {
                 clocks::request_pll_clk(clocks);
             }
             clocks::configure_soc_root_clk(clocks, SocRootClkConfig::Xtal);
@@ -768,7 +760,7 @@ impl RtcSleepConfig {
         // pmu_sleep_config_default + pmu_sleep_init.
 
         let mut power = PowerSleepConfig::defaults(self.pd_flags);
-        if keep_usb_clock {
+        if keep_usb {
             power.hp_sys.clk.set_i2c_iso_en(false);
             power.hp_sys.clk.set_i2c_retention(false);
             power.hp_sys.clk.set_xpd_bb_i2c(true);
@@ -795,41 +787,26 @@ impl RtcSleepConfig {
             AnalogSleepConfig::defaults_deep_sleep().apply();
         } else {
             AnalogSleepConfig::defaults_light_sleep(self.pd_flags).apply();
-            DigitalSleepConfig::defaults_light_sleep(self.pd_flags).apply();
+            DigitalSleepConfig::defaults_light_sleep(self.pd_flags, keep_usb).apply();
         }
 
         // https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/lowpower/port/esp32c6/sleep_clock_icg.c#L40-L48
         // https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/port/esp32c6/pmu_sleep.c#L299-L302
         let mut icg_func = HpBackupClk::default();
         icg_func.set_retention(!self.deep && clocks::wifi_pwr_clk_runs_in_sleep());
-        if keep_usb_clock {
+        if keep_usb {
             icg_func.set_usb_device(true);
             icg_func.set_hpbus(true);
             icg_func.set_iomux(true);
         }
-        const HP_SYSCLK_XTAL: u8 = 0;
-        const HP_SYSCLK_PLL: u8 = 1;
-        PMU::regs().hp_sleep_sysclk().modify(|_, w| unsafe {
-            w.hp_sleep_icg_sys_clock_en().bit(icg_func.0 != 0);
-            w.hp_sleep_dig_sys_clk_sel().bits(if keep_usb_clock {
-                HP_SYSCLK_PLL
-            } else {
-                HP_SYSCLK_XTAL
-            })
-        });
+        PMU::regs()
+            .hp_sleep_sysclk()
+            .modify(|_, w| w.hp_sleep_icg_sys_clock_en().bit(icg_func.0 != 0));
         PMU::regs()
             .hp_sleep_icg_hp_func()
             .write(|w| unsafe { w.hp_sleep_dig_icg_func_en().bits(icg_func.0) });
-        const PMU_ICG_APB_ENA_USB_DEVICE: u32 = 1 << 17;
-        const PMU_ICG_APB_ENA_IOMUX: u32 = 1 << 26;
-        let icg_apb = if keep_usb_clock {
-            PMU_ICG_APB_ENA_USB_DEVICE | PMU_ICG_APB_ENA_IOMUX
-        } else {
-            0
-        };
-        PMU::regs()
-            .hp_sleep_icg_hp_apb()
-            .write(|w| unsafe { w.hp_sleep_dig_icg_apb_en().bits(icg_apb) });
+        const HP_SYSCLK_PLL: u8 = 1;
+        super::pmu_common::configure_hp_sleep_clocks(keep_usb, HP_SYSCLK_PLL);
 
         param.apply();
 
@@ -869,9 +846,13 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
+        let usb_serial_jtag =
+            (!self.deep && !keep_usb).then(super::usb_serial_jtag::pad_backup_and_disable);
+
         SavedState {
+            usb_serial_jtag,
             soc_root_clk,
-            keep_usb_clock,
+            keep_usb,
         }
     }
 
@@ -896,21 +877,25 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
+    usb_serial_jtag: Option<super::usb_serial_jtag::PadBackup>,
     soc_root_clk: Option<SocRootClkConfig>,
-    keep_usb_clock: bool,
+    keep_usb: bool,
 }
 
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
+        if let Some(backup) = self.usb_serial_jtag {
+            super::usb_serial_jtag::pad_restore(backup);
+        }
         ClockTree::with(|clocks| {
-            if !self.keep_usb_clock {
+            if !self.keep_usb {
                 clocks::reconfigure_pll(clocks);
             }
             if let Some(soc_root_clk) = self.soc_root_clk {
                 clocks::configure_soc_root_clk(clocks, soc_root_clk);
             }
-            if self.keep_usb_clock {
+            if self.keep_usb {
                 clocks::release_pll_clk(clocks);
             }
         });
@@ -926,3 +911,8 @@ pub(crate) fn pmu_sleep_start(_saved: &SavedState) -> bool {
 /// Runs the wake steps after a CPU power-down. The ESP32-C6 has no wake steps.
 #[inline(always)]
 pub(crate) fn pmu_sleep_finish(_saved: &SavedState) {}
+
+/// Returns whether the last sleep that [`RtcSleepConfig::start_sleep`] prepared was a deep sleep.
+pub(super) fn last_sleep_was_deep() -> bool {
+    LP_AON::regs().store9().read().bits() & 0x01 != 0
+}
