@@ -421,6 +421,13 @@ impl Driver<'_> {
         output: OutputSignal,
         guard: &mut PinGuard,
     ) {
+        // SAFETY: each `Instance` impl checks at compile time that its signals can use the GPIO
+        // matrix. This lets the compiler remove the routing panic of the GPIO driver.
+        unsafe {
+            core::hint::assert_unchecked(input.can_use_gpio_matrix());
+            core::hint::assert_unchecked(output.can_use_gpio_matrix());
+        }
+
         // avoid the pin going low during configuration
         pin.set_output_high(true);
 
@@ -1936,6 +1943,14 @@ for_each_i2c_master!(
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
                 };
+
+                // `Driver::connect_pin` relies on this.
+                const _: () = assert!(
+                    InputSignal::$scl.can_use_gpio_matrix()
+                        && InputSignal::$sda.can_use_gpio_matrix()
+                        && OutputSignal::$scl.can_use_gpio_matrix()
+                        && OutputSignal::$sda.can_use_gpio_matrix()
+                );
 
                 static PERIPHERAL: Info = Info {
                     #[cfg(soc_has_i2c1)]

@@ -650,6 +650,13 @@ impl Driver<'_> {
         output: OutputSignal,
         guard: &mut PinGuard,
     ) {
+        // SAFETY: each `Instance` impl checks at compile time that its signals can use the GPIO
+        // matrix. This lets the compiler remove the routing panic of the GPIO driver.
+        unsafe {
+            core::hint::assert_unchecked(input.can_use_gpio_matrix());
+            core::hint::assert_unchecked(output.can_use_gpio_matrix());
+        }
+
         pin.set_output_high(true);
         pin.apply_output_config(
             &OutputConfig::default()
@@ -1020,6 +1027,14 @@ for_each_i2c_master!(
                         rx_start_pending: AtomicBool::new(false),
                         rx_stop_pending: AtomicBool::new(false),
                     };
+
+                    // `Driver::connect_pin` relies on this.
+                    const _: () = ::core::assert!(
+                        InputSignal::$scl.can_use_gpio_matrix()
+                            && InputSignal::$sda.can_use_gpio_matrix()
+                            && OutputSignal::$scl.can_use_gpio_matrix()
+                            && OutputSignal::$sda.can_use_gpio_matrix()
+                    );
 
                     static PERIPHERAL: Info = Info {
                         register_block: crate::peripherals::$inst::ptr(),
