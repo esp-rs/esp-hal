@@ -93,8 +93,6 @@ peripherals = [
     { name = "ADC2", virtual = true },
     { name = "BT", virtual = true, interrupts = { rwbt = "RWBT", rwble = "RWBLE", bb = "BT_BB" } },
     { name = "CPU_CTRL", virtual = true },
-    { name = "DAC1", virtual = true },
-    { name = "DAC2", virtual = true },
     { name = "FLASH", virtual = true },
     { name = "PSRAM", virtual = true },
     { name = "TOUCH", virtual = true },
@@ -128,10 +126,9 @@ key_length = { options = [
 
 [device.dac]
 support_status = { status = "partial", issue = 6752 }
-instances = [
-    { name = "dac1" },
-    { name = "dac2" },
-]
+version = 1
+channel_count = 2
+resolution = 8
 
 [device.dma]
 support_status = "partial"
