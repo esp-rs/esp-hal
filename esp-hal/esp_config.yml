@@ -39,6 +39,15 @@ options:
       - value: true
     active: "esp32"
 
+  - name: cache-livelock-workaround
+    description: "Enables a workaround for the cache live lock of ESP32 v3.0 and v3.1 (errata
+      WDT-3.15), which can stop both cores when they use PSRAM. The workaround runs while PSRAM
+      is mapped and the second core runs. It uses the TIMG1 watchdog and CPU interrupt 24, so the
+      application must not use the TIMG1 watchdog."
+    default:
+      - value: true
+    active: "esp32"
+
   - name: stack-guard-offset
     description: The stack guard variable will be placed this many bytes from the stack's end. Needs to be a multiple of 4.
     default:
