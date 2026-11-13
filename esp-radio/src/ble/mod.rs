@@ -1,6 +1,9 @@
 //! Bluetooth Low Energy HCI interface
 
 mod lp_clk;
+#[cfg(modem_retention = "regdma")]
+#[path = "mac_bb_regdma.rs"]
+mod mac_bb;
 
 #[cfg_attr(bt_controller = "btdm", path = "btdm/mod.rs")]
 #[cfg_attr(bt_controller = "npl", path = "npl/mod.rs")]
@@ -20,6 +23,8 @@ pub struct InvalidConfigError;
 
 impl core::error::Error for InvalidConfigError {}
 
+#[cfg(modem_retention = "regdma")]
+pub use mac_bb::{RetentionMemory, RetentionStorage, install_retention_memory};
 // Expose chip-specific configuration types
 pub use porting::chip_specific::*;
 

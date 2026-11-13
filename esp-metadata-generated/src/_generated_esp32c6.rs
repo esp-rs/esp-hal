@@ -520,6 +520,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.regdma_list_count") => {
+        4
+    };
     ("sleep.idle_frequency_scaling") => {
         true
     };

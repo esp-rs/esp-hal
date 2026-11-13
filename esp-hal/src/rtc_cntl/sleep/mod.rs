@@ -328,6 +328,8 @@ impl<'d> LowPower<'d> {
 
         let mut config = config;
         config.set_sleep_kind(kind);
+        #[cfg(modem_retention = "regdma")]
+        crate::rtc_cntl::regdma::prepare_sleep(kind == SleepKind::Light);
 
         // Retention serves light sleep only. Deep sleep resets the chip, so it has no CPU state to
         // bring back, and an armed descriptor would outlive the sleep in the RTC domain. esp-idf

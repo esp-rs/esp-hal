@@ -77,7 +77,7 @@ pub(crate) fn claim_wake_source() {
         WakeupSource::Bt.enable_with_hooks(
             Some(sleep_entry),
             cfg_select! {
-                modem_retention = "backup_dma" => Some(sleep_exit),
+                any(modem_retention = "backup_dma", regdma_bt_needs_pll) => Some(sleep_exit),
                 _ => None,
             },
         );
@@ -129,6 +129,8 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
                 config.reject_sleep();
                 return;
             }
+            #[cfg(regdma_bt_needs_pll)]
+            super::mac_bb::power_down();
         }
         // The BLE timer wakes the chip through the `Bt` source.
         _ => {}
@@ -139,9 +141,15 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     }
 }
 
-#[cfg(all(sleep_driver_supported, modem_retention = "backup_dma"))]
+#[cfg(all(
+    sleep_driver_supported,
+    any(modem_retention = "backup_dma", regdma_bt_needs_pll)
+))]
 fn sleep_exit() {
-    super::porting::power_up_mac_bb();
+    cfg_select! {
+        modem_retention = "backup_dma" => super::porting::power_up_mac_bb(),
+        _ => super::mac_bb::power_up(),
+    }
 }
 
 /// Returns whether the clock node's root source is an internal RC oscillator.

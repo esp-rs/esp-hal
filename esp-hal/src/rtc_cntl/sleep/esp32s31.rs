@@ -224,7 +224,8 @@ impl PowerSleepConfig {
         self.hp_sys
             .dig_power
             .set_modem_top_pd_en(pd_flags.pd_modem());
-        self.hp_sys.dig_power.set_hp_cnnt_pd_en(pd_flags.pd_modem());
+        // The CNNT domain may lose power only together with the TOP domain.
+        self.hp_sys.dig_power.set_hp_cnnt_pd_en(pd_flags.pd_top());
         self.hp_sys.dig_power.set_hp_cpu_pd_en(pd_flags.pd_cpu());
         self.hp_sys.dig_power.set_modem_pwr_pd_en(pd_flags.pd_mem());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
@@ -662,6 +663,8 @@ impl RtcSleepConfig {
         } else {
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags
+                .set_pd_modem(crate::rtc_cntl::regdma::modem_power_down());
             self.pd_flags
                 .set_pd_xtal32k(!lp_slow_uses_xtal32k && !xtal32k::use_xtal32k());
         }

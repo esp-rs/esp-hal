@@ -47,6 +47,9 @@ impl State {
         true
     }
 
+    /// [`sleep`] checks whether the modem domain can lose power, so this does nothing.
+    pub(super) fn allow_power_down(&mut self, _allowed: bool) {}
+
     /// Releases what [`Self::enable`] prepared.
     pub(super) fn release(&mut self) {
         self.phy_memory = None;

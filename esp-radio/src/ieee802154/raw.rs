@@ -114,6 +114,8 @@ impl Drop for RadioClockGuard {
     fn drop(&mut self) {
         enable_ieee802154(false);
         crate::btbb_disable();
+        #[cfg(all(feature = "ble", supports_modem_power_down))]
+        crate::modem_power::stop(crate::modem_power::Radio::Ieee802154);
         crate::release_modem_domain();
     }
 }
@@ -158,6 +160,8 @@ pub(crate) fn esp_ieee802154_enable(
     // BLE: taken here so that a BLE controller created later does not reset the MAC configured
     // below, and so that the baseband is initialized once, by whichever radio comes first.
     crate::acquire_modem_domain();
+    #[cfg(all(feature = "ble", supports_modem_power_down))]
+    crate::modem_power::start(crate::modem_power::Radio::Ieee802154);
     let phy_clock_guard = esp_phy::enable_phy_clock();
     enable_ieee802154(true);
 

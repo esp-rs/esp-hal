@@ -257,6 +257,8 @@ wakeup_sources = {
 [device.sleep.retention]
 cpu_retention = "software"
 modem_retention = "regdma"
+regdma_list_count = 5
+regdma_link_configurable = true
 cpu_retention_frame = "s31"
 supports_top_power_down = true
 

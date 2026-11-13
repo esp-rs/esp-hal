@@ -1,7 +1,7 @@
 use crate::{
     hal::{interrupt::Priority, peripherals::WIFI, ram},
     interrupt_dispatch::Handler,
-    sys::c_types::{c_int, c_void},
+    sys::c_types::c_void,
 };
 
 static ISR_INTERRUPT_1: Handler = Handler::new();
@@ -40,6 +40,7 @@ pub(crate) unsafe extern "C" fn set_intr(
     // These are expected to be direct-bound, but we don't do that for now.
 }
 
+#[cfg(not(feature = "unstable"))]
 pub(crate) unsafe extern "C" fn regdma_link_set_write_wait_content_dummy(
     _arg1: *mut c_void,
     _arg2: u32,
@@ -48,7 +49,10 @@ pub(crate) unsafe extern "C" fn regdma_link_set_write_wait_content_dummy(
     todo!()
 }
 
-pub(crate) unsafe extern "C" fn sleep_retention_find_link_by_id_dummy(_arg1: c_int) -> *mut c_void {
+#[cfg(not(feature = "unstable"))]
+pub(crate) unsafe extern "C" fn sleep_retention_find_link_by_id_dummy(
+    _arg1: crate::sys::c_types::c_int,
+) -> *mut c_void {
     todo!()
 }
 

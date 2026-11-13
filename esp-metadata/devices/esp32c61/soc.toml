@@ -248,6 +248,7 @@ wakeup_sources = {
 [device.sleep.retention]
 cpu_retention = "software"
 modem_retention = "regdma"
+regdma_list_count = 4
 cpu_retention_frame = "clic"
 supports_top_power_down = true
 
