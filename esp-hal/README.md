@@ -138,7 +138,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | Bit Scrambler                | ❌     |
 | Image Signal Processor       | ❌     |
 | Pixel Processing Accelerator | 🚧     |
-| JPEG Codec                   | ❌     |
+| JPEG Codec                   | 🚧     |
 | H.264 encoder                | ❌     |
 | Audio Sample Rate Converter  | ❌     |
 | CORDIC accelerator           | 🚧     |
@@ -159,6 +159,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | Driver          | Status |
 | --------------- |:------:|
 | LEDC            | [⚠️][2286] [^1] |
+| 2D DMA          | 🚧     |
 | MCPWM           | 🚧     |
 | PCNT            | 🚧     |
 | RTC Timekeeping | 🚧     |

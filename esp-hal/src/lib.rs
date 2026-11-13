@@ -399,6 +399,8 @@ unstable_driver! {
     #[cfg(cordic_driver_supported)]
     pub mod cordic;
     pub mod delay;
+    #[cfg(dma2d_driver_supported)]
+    pub mod dma2d;
     #[cfg(ecc_driver_supported)]
     pub mod ecc;
     #[cfg(flash_driver_supported)]
@@ -407,6 +409,8 @@ unstable_driver! {
     pub mod hmac;
     #[cfg(i2s_driver_supported)]
     pub mod i2s;
+    #[cfg(jpeg_driver_supported)]
+    pub mod jpeg;
     #[cfg(soc_has_lcd_cam)]
     pub mod lcd_cam;
     #[cfg(ledc_driver_supported)]

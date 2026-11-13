@@ -916,6 +916,14 @@ driver_configs![
                 channel_count: u32,
             }
         },
+        Dma2dProperties {
+            driver: dma2d,
+            name: "2D DMA",
+            properties: {
+                tx_channel_count: u32,
+                rx_channel_count: u32,
+            }
+        },
         McpwmProperties {
             driver: mcpwm,
             name: "MCPWM",
