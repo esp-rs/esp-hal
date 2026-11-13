@@ -7,7 +7,11 @@
 //!
 //! [errata WDT-3.15]: https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/watchdog-issue-caused-by-live-lock.html
 
-use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use core::{
+    cell::UnsafeCell,
+    mem::offset_of,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use crate::{
     efuse::ChipRevision,
@@ -21,7 +25,8 @@ use crate::{
 /// The level-triggered CPU interrupt with priority 4.
 const CPU_INTERRUPT: u32 = 24;
 
-const LEVEL_4_CPU_INTERRUPTS: u32 = (1 << 24) | (1 << 25) | (1 << 28) | (1 << 30);
+/// The other CPU interrupts with priority 4.
+const OTHER_LEVEL_4_CPU_INTERRUPTS: [u32; 3] = [25, 28, 30];
 
 const PERIOD: Duration = Duration::from_millis(20);
 
@@ -38,13 +43,6 @@ const WDT_WKEY: u32 = 0x50D8_3AA1;
 static PSRAM_MAPPED: AtomicBool = AtomicBool::new(false);
 static APP_CORE_STARTED: AtomicBool = AtomicBool::new(false);
 static STARTED: AtomicBool = AtomicBool::new(false);
-static CYCLES_PER_US: AtomicU32 = AtomicU32::new(0);
-
-/// Whether each core is in the handler.
-static IN_HANDLER: [AtomicBool; 2] = [const { AtomicBool::new(false) }; 2];
-
-/// Set while the PRO CPU keeps the APP CPU in the handler, and finishes its own access.
-static HOLD_APP: AtomicBool = AtomicBool::new(false);
 
 /// Enables the CPU interrupt of the workaround on the current core.
 pub(crate) fn enable_cpu_interrupt() {
@@ -72,7 +70,7 @@ fn try_start() {
         return;
     }
 
-    CYCLES_PER_US.store(crate::clock::cpu_clock().as_mhz(), Ordering::Relaxed);
+    init_handler_state(crate::clock::cpu_clock().as_mhz());
 
     // A `TimerGroup` resets TIMG1 when no other user keeps its clock enabled.
     if PeripheralClockControl::enable(Peripheral::Timg1) {
@@ -133,94 +131,6 @@ fn set_watchdog_enabled(enabled: bool) {
         .write(|w| unsafe { w.wdt_wkey().bits(0) });
 }
 
-/// Handles the interrupt of the workaround. Returns `false` if another priority 4 interrupt is
-/// pending.
-///
-/// The handler runs while a flash operation disables the cache. It must not access flash or PSRAM.
-#[crate::ram]
-pub(crate) fn handle_interrupt() -> bool {
-    let pending: u32;
-    unsafe { core::arch::asm!("rsr.interrupt {0}", out(reg) pending, options(nostack)) };
-    if pending & (1 << CPU_INTERRUPT) == 0 {
-        // The other core can clear the interrupt after this core takes it.
-        return pending & LEVEL_4_CPU_INTERRUPTS == 0;
-    }
-
-    // ESP-IDF releases the cores in three stages. First, both cores wait in the handler until their
-    // write buffers are empty. Then the APP CPU finishes its access while the PRO CPU waits. Last,
-    // the PRO CPU finishes its access while the APP CPU waits.
-    //
-    // Only the PRO CPU changes the interrupt map of the APP CPU, and it restores the map before it
-    // returns.
-    match Cpu::current() {
-        Cpu::ProCpu => {
-            IN_HANDLER[0].store(true, Ordering::Release);
-            if wait_until(JOIN_US, || IN_HANDLER[1].load(Ordering::Acquire)) {
-                // The interrupt stays pending until the PRO CPU clears it. Without the map
-                // change, the APP CPU takes the interrupt again when it returns.
-                map(Cpu::AppCpu, DISABLED_CPU_INTERRUPT);
-                wait_until(JOIN_US, || !IN_HANDLER[1].load(Ordering::Acquire));
-                wait_until(ACCESS_US, || false);
-
-                HOLD_APP.store(true, Ordering::Release);
-                map(Cpu::AppCpu, CPU_INTERRUPT);
-                wait_until(JOIN_US, || IN_HANDLER[1].load(Ordering::Acquire));
-            }
-            restart_watchdog();
-            map(Cpu::AppCpu, CPU_INTERRUPT);
-            HOLD_APP.store(false, Ordering::Release);
-            IN_HANDLER[0].store(false, Ordering::Release);
-        }
-        Cpu::AppCpu => {
-            IN_HANDLER[1].store(true, Ordering::Release);
-            if HOLD_APP.load(Ordering::Acquire)
-                || wait_until(JOIN_US, || IN_HANDLER[0].load(Ordering::Acquire))
-            {
-                wait_until(ACCESS_US, || false);
-            } else {
-                restart_watchdog();
-            }
-            IN_HANDLER[1].store(false, Ordering::Release);
-        }
-    }
-    true
-}
-
-/// Waits until `done` returns `true`, for at most `limit_us`. Returns whether `done` returned
-/// `true`.
-#[inline(always)]
-fn wait_until(limit_us: u32, done: impl Fn() -> bool) -> bool {
-    let limit = limit_us * CYCLES_PER_US.load(Ordering::Relaxed);
-    let start = cycle_count();
-    loop {
-        if done() {
-            return true;
-        }
-        if cycle_count().wrapping_sub(start) >= limit {
-            return false;
-        }
-    }
-}
-
-#[inline(always)]
-fn cycle_count() -> u32 {
-    let count: u32;
-    unsafe { core::arch::asm!("rsr.ccount {0}", out(reg) count, options(nostack)) };
-    count
-}
-
-#[inline(always)]
-fn restart_watchdog() {
-    let regs = TIMG1::regs();
-    regs.wdtwprotect()
-        .write(|w| unsafe { w.wdt_wkey().bits(WDT_WKEY) });
-    regs.wdtfeed().write(|w| unsafe { w.bits(1) });
-    regs.wdtwprotect()
-        .write(|w| unsafe { w.wdt_wkey().bits(0) });
-    regs.int_clr().write(|w| w.wdt().clear_bit_by_one());
-}
-
-#[inline(always)]
 fn map(cpu: Cpu, cpu_interrupt: u32) {
     let source = Interrupt::TG1_WDT_LEVEL as usize;
     match cpu {
@@ -236,3 +146,253 @@ fn map(cpu: Cpu, cpu_interrupt: u32) {
         }
     }
 }
+
+/// The data that the interrupt handler reads and writes.
+#[repr(C)]
+struct State {
+    wdt_wprotect: *mut u32,
+    wdt_feed: *mut u32,
+    int_clr: *mut u32,
+    app_map: *mut u32,
+    wdt_wkey: u32,
+    wdt_int: u32,
+    mapped: u32,
+    unmapped: u32,
+    access_cycles: u32,
+    join_cycles: u32,
+    in_handler: [u32; 2],
+    hold_app: u32,
+}
+
+#[repr(transparent)]
+struct HandlerData<T>(UnsafeCell<T>);
+
+// SAFETY: Rust code writes `STATE` before the handler runs. Only the handler accesses `SAVED`.
+unsafe impl<T> Sync for HandlerData<T> {}
+
+static STATE: HandlerData<State> = HandlerData(UnsafeCell::new(State {
+    wdt_wprotect: core::ptr::null_mut(),
+    wdt_feed: core::ptr::null_mut(),
+    int_clr: core::ptr::null_mut(),
+    app_map: core::ptr::null_mut(),
+    wdt_wkey: WDT_WKEY,
+    wdt_int: 1 << 2,
+    mapped: CPU_INTERRUPT,
+    unmapped: DISABLED_CPU_INTERRUPT,
+    access_cycles: 0,
+    join_cycles: 0,
+    in_handler: [0; 2],
+    hold_app: 0,
+}));
+
+/// The registers that the handler saves, for each core.
+static SAVED: HandlerData<[[u32; 8]; 2]> = HandlerData(UnsafeCell::new([[0; 8]; 2]));
+
+fn init_handler_state(cycles_per_us: u32) {
+    let regs = TIMG1::regs();
+    let source = Interrupt::TG1_WDT_LEVEL as usize;
+    // SAFETY: CPU interrupt 24 is not mapped yet, so the handler does not run.
+    let state = unsafe { &mut *STATE.0.get() };
+    state.wdt_wprotect = regs.wdtwprotect().as_ptr();
+    state.wdt_feed = regs.wdtfeed().as_ptr();
+    state.int_clr = regs.int_clr().as_ptr();
+    state.app_map = DPORT::regs().core_1_intr_map(source).as_ptr();
+    state.access_cycles = ACCESS_US * cycles_per_us;
+    state.join_cycles = JOIN_US * cycles_per_us;
+}
+
+// The handler interrupts code that runs with PS.EXCM set, for example the window overflow and
+// underflow handlers. It must not cause an exception: it uses no windowed calls, no stack and no
+// memory other than `STATE` and `SAVED`. It runs while a flash operation disables the cache, so it
+// must be in internal RAM.
+//
+// ESP-IDF releases the cores in three stages. First, both cores wait in the handler until their
+// write buffers are empty. Then the APP CPU finishes its access while the PRO CPU waits. Last, the
+// PRO CPU finishes its access while the APP CPU waits. Only the PRO CPU changes the interrupt map
+// of the APP CPU, and it restores the map before it returns.
+//
+// The vector saves a0 in EXCSAVE4. EPS4 restores PS at `rfi 4`.
+core::arch::global_asm!(
+    "
+    .section .rwtext,\"ax\",@progbits
+    .literal sym_livelock_state, {state}
+    .literal sym_livelock_saved, {saved}
+
+    .global __naked_level_4_interrupt
+    .p2align 2
+    .type __naked_level_4_interrupt,@function
+__naked_level_4_interrupt:
+    rsr.interrupt a0
+    bbsi    a0, {cpu_interrupt}, .Llivelock
+    bbsi    a0, {other0}, .Lother_level_4
+    bbsi    a0, {other1}, .Lother_level_4
+    bbsi    a0, {other2}, .Lother_level_4
+    // The other core can clear the interrupt after this core takes it.
+    rsr     a0, EXCSAVE4
+    rfi     4
+.Lother_level_4:
+    call0   __default_naked_level_4_interrupt
+
+.Llivelock:
+    rsil    a0, 5
+    // Level 5 is masked, so no other code uses EXCSAVE5.
+    wsr     a2, EXCSAVE5
+    rsr.prid a2
+    extui   a2, a2, 13, 1
+    slli    a2, a2, 5
+    l32r    a0, sym_livelock_saved
+    add     a0, a0, a2
+    rsr     a2, EXCSAVE5
+    s32i    a2, a0, 0
+    s32i    a3, a0, 4
+    s32i    a4, a0, 8
+    s32i    a5, a0, 12
+    s32i    a6, a0, 16
+
+    rsr.prid a5
+    extui   a5, a5, 13, 1
+    l32r    a2, sym_livelock_state
+    bnez    a5, .Lapp
+
+    movi    a4, 1
+    s32i    a4, a2, {in_pro}
+    memw
+    rsr.ccount a3
+    l32i    a6, a2, {join}
+.Lpro_join:
+    l32i    a4, a2, {in_app}
+    bnez    a4, .Lpro_joined
+    rsr.ccount a4
+    sub     a4, a4, a3
+    bltu    a4, a6, .Lpro_join
+    j       .Lpro_restart
+.Lpro_joined:
+    // The interrupt stays pending until the PRO CPU clears it. Without the map change, the APP CPU
+    // takes the interrupt again when it returns.
+    l32i    a3, a2, {app_map}
+    l32i    a4, a2, {unmapped}
+    s32i    a4, a3, 0
+    memw
+    rsr.ccount a3
+.Lpro_app_leaves:
+    l32i    a4, a2, {in_app}
+    beqz    a4, .Lpro_app_left
+    rsr.ccount a4
+    sub     a4, a4, a3
+    bltu    a4, a6, .Lpro_app_leaves
+.Lpro_app_left:
+    rsr.ccount a3
+    l32i    a6, a2, {access}
+.Lpro_access:
+    rsr.ccount a4
+    sub     a4, a4, a3
+    bltu    a4, a6, .Lpro_access
+    movi    a4, 1
+    s32i    a4, a2, {hold_app}
+    memw
+    l32i    a3, a2, {app_map}
+    l32i    a4, a2, {mapped}
+    s32i    a4, a3, 0
+    memw
+    rsr.ccount a3
+    l32i    a6, a2, {join}
+.Lpro_rejoin:
+    l32i    a4, a2, {in_app}
+    bnez    a4, .Lpro_restart
+    rsr.ccount a4
+    sub     a4, a4, a3
+    bltu    a4, a6, .Lpro_rejoin
+.Lpro_restart:
+    call0   .Lrestart_watchdog
+    l32i    a3, a2, {app_map}
+    l32i    a4, a2, {mapped}
+    s32i    a4, a3, 0
+    memw
+    movi    a4, 0
+    s32i    a4, a2, {hold_app}
+    memw
+    s32i    a4, a2, {in_pro}
+    memw
+    j       .Lreturn
+
+.Lapp:
+    movi    a4, 1
+    s32i    a4, a2, {in_app}
+    memw
+    l32i    a4, a2, {hold_app}
+    bnez    a4, .Lapp_access
+    rsr.ccount a3
+    l32i    a6, a2, {join}
+.Lapp_join:
+    l32i    a4, a2, {in_pro}
+    bnez    a4, .Lapp_access
+    rsr.ccount a4
+    sub     a4, a4, a3
+    bltu    a4, a6, .Lapp_join
+    call0   .Lrestart_watchdog
+    j       .Lapp_leave
+.Lapp_access:
+    rsr.ccount a3
+    l32i    a6, a2, {access}
+.Lapp_wait:
+    rsr.ccount a4
+    sub     a4, a4, a3
+    bltu    a4, a6, .Lapp_wait
+.Lapp_leave:
+    movi    a4, 0
+    s32i    a4, a2, {in_app}
+    memw
+
+.Lreturn:
+    slli    a5, a5, 5
+    l32r    a0, sym_livelock_saved
+    add     a0, a0, a5
+    l32i    a2, a0, 0
+    l32i    a3, a0, 4
+    l32i    a4, a0, 8
+    l32i    a5, a0, 12
+    l32i    a6, a0, 16
+    rsr     a0, EXCSAVE4
+    rfi     4
+
+    // Feeds the watchdog and clears its interrupt. Reads a2, changes a0, a3 and a4.
+    .p2align 2
+.Lrestart_watchdog:
+    l32i    a3, a2, {wdt_wprotect}
+    l32i    a4, a2, {wdt_wkey}
+    s32i    a4, a3, 0
+    memw
+    l32i    a3, a2, {wdt_feed}
+    movi    a4, 1
+    s32i    a4, a3, 0
+    memw
+    l32i    a3, a2, {wdt_wprotect}
+    movi    a4, 0
+    s32i    a4, a3, 0
+    memw
+    l32i    a3, a2, {int_clr}
+    l32i    a4, a2, {wdt_int}
+    s32i    a4, a3, 0
+    memw
+    ret
+    ",
+    state = sym STATE,
+    saved = sym SAVED,
+    cpu_interrupt = const CPU_INTERRUPT,
+    other0 = const OTHER_LEVEL_4_CPU_INTERRUPTS[0],
+    other1 = const OTHER_LEVEL_4_CPU_INTERRUPTS[1],
+    other2 = const OTHER_LEVEL_4_CPU_INTERRUPTS[2],
+    wdt_wprotect = const offset_of!(State, wdt_wprotect),
+    wdt_feed = const offset_of!(State, wdt_feed),
+    int_clr = const offset_of!(State, int_clr),
+    app_map = const offset_of!(State, app_map),
+    wdt_wkey = const offset_of!(State, wdt_wkey),
+    wdt_int = const offset_of!(State, wdt_int),
+    mapped = const offset_of!(State, mapped),
+    unmapped = const offset_of!(State, unmapped),
+    access = const offset_of!(State, access_cycles),
+    join = const offset_of!(State, join_cycles),
+    in_pro = const offset_of!(State, in_handler),
+    in_app = const offset_of!(State, in_handler) + 4,
+    hold_app = const offset_of!(State, hold_app),
+);

@@ -574,10 +574,6 @@ pub(crate) mod rt {
     #[unsafe(no_mangle)]
     #[ram]
     unsafe fn __level_4_interrupt(save_frame: &mut Context) {
-        #[cfg(cache_livelock_workaround)]
-        if crate::soc::cache_livelock::handle_interrupt() {
-            return;
-        }
         unsafe { level4_interrupt(save_frame) }
     }
 
