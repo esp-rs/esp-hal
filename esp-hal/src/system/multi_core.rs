@@ -470,7 +470,7 @@ where
     // Do not call setup_interrupts as that would disable peripheral interrupts, too.
     unsafe { crate::interrupt::init_vectoring() };
 
-    #[cfg(all(esp32, cache_livelock_workaround, feature = "rt"))]
+    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
     crate::soc::cache_livelock::app_core_started();
 
     enable_app_core_interrupts();

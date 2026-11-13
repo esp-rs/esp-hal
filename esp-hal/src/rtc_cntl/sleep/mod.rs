@@ -600,7 +600,7 @@ fn park_other_cores() -> u8 {
     }
 
     // The handler of the workaround waits for the stalled core.
-    #[cfg(all(esp32, cache_livelock_workaround, feature = "rt"))]
+    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
     crate::soc::cache_livelock::pause();
 
     let mut parked = 0;
@@ -624,7 +624,7 @@ fn unpark_cores(parked: u8) {
             unsafe { crate::soc::cpu_control::internal_park_core(cpu, false) };
         }
     }
-    #[cfg(all(esp32, cache_livelock_workaround, feature = "rt"))]
+    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
     crate::soc::cache_livelock::resume();
 }
 

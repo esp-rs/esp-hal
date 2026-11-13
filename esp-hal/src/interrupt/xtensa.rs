@@ -415,7 +415,7 @@ pub(crate) unsafe fn init_vectoring() {
     ] {
         cpu_int.enable();
     }
-    #[cfg(all(esp32, cache_livelock_workaround, feature = "rt"))]
+    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
     crate::soc::cache_livelock::enable_cpu_interrupt();
 }
 

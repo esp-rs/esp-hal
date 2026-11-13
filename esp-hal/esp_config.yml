@@ -46,6 +46,8 @@ options:
       application must not use the TIMG1 watchdog."
     default:
       - value: true
+        if: "esp32"
+      - value: false
     active: "esp32"
 
   - name: stack-guard-offset
