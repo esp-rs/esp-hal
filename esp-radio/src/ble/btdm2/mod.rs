@@ -679,7 +679,11 @@ fn queue_rx_packet(header: &[u8], payload: &[u8]) {
     let mut data = alloc::vec::Vec::with_capacity(header.len() + payload.len());
     data.extend_from_slice(header);
     data.extend_from_slice(payload);
+    queue_rx_data(data);
+}
 
+/// Hands an already assembled HCI packet, indicator byte first, to the host reader.
+fn queue_rx_data(data: alloc::vec::Vec<u8>) {
     super::dump_packet_info(&data);
     super::BT_STATE.with(|state| {
         state.rx_queue.push_back(ReceivedPacket {
@@ -711,9 +715,16 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, _arg: *const c_void) -> i
 }
 
 unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, _arg: *const c_void) -> i32 {
-    queue_rx_packet(&[0x02], unsafe {
-        core::slice::from_raw_parts((*om).om_data, (*om).om_len as usize)
-    });
+    // The controller may split one ACL packet over a chain of mbufs.
+    let chain = || {
+        core::iter::successors(unsafe { om.as_ref() }, |mbuf| unsafe { mbuf.next.as_ref() })
+            .map(|mbuf| unsafe { core::slice::from_raw_parts(mbuf.om_data, mbuf.om_len as usize) })
+    };
+
+    let mut data = alloc::vec::Vec::with_capacity(1 + chain().map(<[u8]>::len).sum::<usize>());
+    data.push(0x02);
+    chain().for_each(|payload| data.extend_from_slice(payload));
+    queue_rx_data(data);
     unsafe { r_os_mbuf_free_chain(om.cast_mut()) };
     0
 }
