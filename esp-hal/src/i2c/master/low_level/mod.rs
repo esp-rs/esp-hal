@@ -1854,7 +1854,7 @@ pub struct State {
 }
 
 /// A peripheral singleton compatible with the I2C master driver.
-pub trait Instance: crate::private::Sealed + any::Degrade {
+pub trait Instance: crate::private::Sealed {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&'static Info, &'static State);
