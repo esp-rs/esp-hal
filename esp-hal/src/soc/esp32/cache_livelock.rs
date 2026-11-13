@@ -119,12 +119,23 @@ pub(crate) fn resume() {
 #[inline(always)]
 fn set_watchdog_enabled(enabled: bool) {
     let regs = TIMG1::regs();
-    regs.wdtwprotect()
-        .write(|w| unsafe { w.wdt_wkey().bits(WDT_WKEY) });
-    regs.wdtfeed().write(|w| unsafe { w.bits(1) });
-    regs.wdtconfig0().modify(|_, w| w.wdt_en().bit(enabled));
-    regs.wdtwprotect()
-        .write(|w| unsafe { w.wdt_wkey().bits(0) });
+    // The handler locks the write protection. Level 5 keeps the handler off this core, but the
+    // handler on the other core can lock it between the writes below.
+    let ps: u32;
+    unsafe { core::arch::asm!("rsil {0}, 5", out(reg) ps, options(nostack)) };
+    while regs.wdtconfig0().read().wdt_en().bit() != enabled {
+        regs.wdtwprotect()
+            .write(|w| unsafe { w.wdt_wkey().bits(WDT_WKEY) });
+        regs.wdtfeed().write(|w| unsafe { w.bits(1) });
+        regs.wdtconfig0().modify(|_, w| w.wdt_en().bit(enabled));
+        regs.wdtwprotect()
+            .write(|w| unsafe { w.wdt_wkey().bits(0) });
+    }
+    if !enabled {
+        // A stage 0 timeout before the stop leaves the level interrupt active.
+        regs.int_clr().write(|w| w.wdt().clear_bit_by_one());
+    }
+    unsafe { core::arch::asm!("wsr.ps {0}", "rsync", in(reg) ps, options(nostack)) };
 }
 
 fn map(cpu: Cpu, cpu_interrupt: u32) {
