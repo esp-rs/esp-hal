@@ -202,10 +202,38 @@ mod tests {
 
         hil_test::assert!(cpu == Cpu::AppCpu);
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    fn a_thread_pinned_to_a_parked_core_runs_after_the_park(ctx: Context) {
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        let cpu_control = esp_hal::system::CpuControl::new(ctx.cpu_cntl);
+        let parked = cpu_control.park_core(Cpu::AppCpu);
+
+        // The spawn asks the parked core to switch to the new thread.
+        let worker = ThreadSpawner::new(4096)
+            .with_pinned_to(Cpu::AppCpu)
+            .with_priority(2)
+            .spawn(Cpu::current);
+
+        drop(parked);
+        let (cpu, _spawner) = worker.join();
+        hil_test::assert!(cpu == Cpu::AppCpu);
+
+        cpu_control.park_core(Cpu::AppCpu).keep_parked();
     }
 
     #[test]
@@ -605,10 +633,10 @@ mod tests {
         test_context.ready_semaphore.take(None);
         test_context.ready_semaphore.take(None);
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
     }
 
     #[test]
@@ -642,7 +670,9 @@ mod tests {
             worker.join();
         }
 
-        unsafe { esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu) };
+        esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
     }
 
     #[test]
@@ -692,7 +722,9 @@ mod tests {
             })
             .join();
 
-        unsafe { esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu) };
+        esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
     }
 
     #[test]
@@ -778,10 +810,10 @@ mod tests {
             );
         }
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
     }
 
     /// State that the victim and the waker of `woken_task_runs_on_one_core` share.
@@ -884,10 +916,10 @@ mod tests {
             "The victim never woke up"
         );
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
     }
 
     #[test]
@@ -930,10 +962,10 @@ mod tests {
 
         SIGNAL.wait().await;
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
     }
 
     #[test]
@@ -983,10 +1015,10 @@ mod tests {
             );
         }
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
     }
 
     #[test]

@@ -201,9 +201,7 @@ impl defmt::Format for Ticket {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum IpcError {
-    /// The CPU does not take IPC interrupts, or [`CpuControl`] started it again before the run.
-    ///
-    /// [`CpuControl`]: crate::system::CpuControl
+    /// The CPU does not take IPC interrupts, or the CPU stopped before the run.
     Offline,
     /// The request is pending on a CPU other than the target CPU, or runs on it.
     Busy,
