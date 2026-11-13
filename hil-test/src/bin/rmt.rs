@@ -748,6 +748,97 @@ mod tests {
         do_rmt_loopback_async(&mut ctx, &conf).await;
     }
 
+    // Data read while the reception is still running is a prefix of the final data.
+    #[test]
+    fn rmt_loopback_rx_fetch(mut ctx: Context) {
+        // With rx wrap, receive more than the channel RAM holds, so that `fetch` interleaves with
+        // the threshold reads.
+        let conf = LoopbackConfig {
+            tx_len: if HAS_RX_WRAP {
+                CHANNEL_RAM_SIZE * 3 / 2
+            } else {
+                CHANNEL_RAM_SIZE / 2
+            },
+            tx_memsize: 2,
+            rx_memsize: 1,
+            ..Default::default()
+        };
+        let (tx_channel, rx_channel) = ctx.setup_loopback(&conf);
+
+        let tx_data = generate_tx_data(&conf);
+        let mut rcv_data = vec![PulseCode::end_marker(); conf.tx_len];
+
+        let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
+        let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+
+        let mut live_count = 0;
+        loop {
+            tx_transaction.poll();
+            let count = rx_transaction.fetch();
+            if rx_transaction.poll() {
+                break;
+            }
+            if count > live_count {
+                live_count = count;
+                for (idx, (&code_tx, &code_rx)) in
+                    core::iter::zip(&tx_data, rx_transaction.received()).enumerate()
+                {
+                    assert!(
+                        pulse_code_matches(code_tx, code_rx, conf.tolerance),
+                        "live rx/tx code mismatch at {}",
+                        idx
+                    );
+                }
+            }
+        }
+
+        assert!(live_count > 0, "no data before the reception ended");
+        assert!(live_count < conf.tx_len);
+
+        tx_transaction.wait().unwrap();
+        let rx_res = match rx_transaction.wait() {
+            Ok((count, _)) => Ok(count),
+            Err((err, _)) => Err(err),
+        };
+        check_data_eq(&conf, &tx_data, &rcv_data, rx_res);
+    }
+
+    // Stopping a reception returns the data received so far and nothing beyond it.
+    #[test]
+    fn rmt_loopback_rx_stop(mut ctx: Context) {
+        let conf = LoopbackConfig::default();
+        let (tx_channel, rx_channel) = ctx.setup_loopback(&conf);
+
+        let tx_data = generate_tx_data(&conf);
+        let mut rcv_data = vec![PulseCode::end_marker(); conf.tx_len];
+
+        let rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
+        let tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+
+        // Each code takes 300 us to 590 us, so this is several codes into the transmission.
+        Delay::new().delay_millis(4);
+
+        let (count, _rx_channel) = rx_transaction.stop();
+        core::mem::drop(tx_transaction);
+
+        assert!(count > 0, "no data before stop");
+        assert!(count < conf.tx_len - 2, "reception was not stopped early");
+        for (idx, (&code_tx, &code_rx)) in core::iter::zip(&tx_data, &rcv_data[..count]).enumerate()
+        {
+            assert!(
+                pulse_code_matches(code_tx, code_rx, conf.tolerance),
+                "rx/tx code mismatch at {}",
+                idx
+            );
+        }
+        assert!(
+            rcv_data[count..]
+                .iter()
+                .all(|c| *c == PulseCode::end_marker()),
+            "rx buffer unexpectedly overwritten beyond the stop"
+        );
+    }
+
     // Test that errors on invalid data are returned as expected (in particular, checks that the
     // methods don't hang executing a never-ending/never-started transmission).
     #[test]

@@ -1862,10 +1862,18 @@ pub struct RxTransaction<'ch, 'data> {
 
     reader: RmtReader,
 
+    // `data[..reader.total]` holds the received codes.
     data: &'data mut [PulseCode],
 }
 
 impl<'ch> RxTransaction<'ch, '_> {
+    #[inline(always)]
+    fn read(&mut self, final_: bool) -> bool {
+        let raw = self.channel.raw;
+        let mut rest = &mut self.data[self.reader.total..];
+        self.reader.read(&mut rest, raw, final_)
+    }
+
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.channel.raw;
@@ -1885,7 +1893,7 @@ impl<'ch> RxTransaction<'ch, '_> {
 
                 // `RmtReader::read()` is safe to call even if `poll_internal` is called repeatedly
                 // after the receiver finished since it returns immediately if already done.
-                if !self.reader.read(&mut self.data, raw, true) {
+                if !self.read(true) {
                     return Some(Event::Error);
                 }
             }
@@ -1894,13 +1902,72 @@ impl<'ch> RxTransaction<'ch, '_> {
                 raw.clear_rx_interrupts(Event::Threshold);
 
                 if self.reader.state == ReaderState::Active {
-                    self.reader.read(&mut self.data, raw, false);
+                    self.read(false);
                 }
             }
             _ => (),
         }
 
         status
+    }
+
+    /// Copies the pulse codes received so far into the buffer and returns their number.
+    ///
+    /// The reception continues. Use [`Self::received`] to read the codes.
+    ///
+    /// The hardware makes a [`PulseCode`] available only when both of its pulses are complete.
+    /// Thus, the last pulse can be missing until the next edge on the input.
+    ///
+    /// This method also does the work of [`Self::poll`]. When the reception has ended, the buffer
+    /// contains all codes, including the end marker.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[instability::unstable]
+    pub fn fetch(&mut self) -> usize {
+        let status = self.poll_internal();
+
+        if !matches!(status, Some(Event::End | Event::Error))
+            && self.reader.state == ReaderState::Active
+        {
+            self.read(false);
+        }
+
+        self.reader.total
+    }
+
+    /// Returns the pulse codes in the buffer.
+    ///
+    /// [`Self::fetch`] copies new codes from the hardware into the buffer.
+    #[inline]
+    #[instability::unstable]
+    pub fn received(&self) -> &[PulseCode] {
+        &self.data[..self.reader.total]
+    }
+
+    /// Stops the reception and returns the number of received pulse codes and the channel.
+    ///
+    /// The reception stops immediately, before the idle threshold. The codes that the hardware
+    /// completed before this call are copied into the buffer. The buffer contains an end marker
+    /// only if the reception ended before this call.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[instability::unstable]
+    pub fn stop(mut self) -> (usize, Channel<'ch, Blocking, Rx>) {
+        let raw = self.channel.raw;
+
+        let status = self.poll_internal();
+
+        if !matches!(status, Some(Event::End | Event::Error)) {
+            if self.reader.state == ReaderState::Active {
+                self.read(false);
+            }
+
+            raw.stop_rx(true);
+            raw.update();
+        }
+
+        raw.unlisten_rx_interrupt(EnumSet::all());
+        self._guard.set_completed();
+
+        (self.reader.total, self.channel)
     }
 
     /// Checks receive status.
@@ -1961,7 +2028,7 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
             return Err((Error::InvalidDataLength, self));
         }
 
-        let reader = RmtReader::new();
+        let reader = RmtReader::new(memsize);
 
         raw.clear_rx_interrupts(EnumSet::all());
         raw.start_receive(true, memsize);
@@ -2151,7 +2218,7 @@ impl Channel<'_, Async, Rx> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        let mut reader = RmtReader::new();
+        let mut reader = RmtReader::new(memsize);
 
         let _guard = if !property!("rmt.has_rx_wrap") && data.len() > memsize.codes() {
             reader.state = ReaderState::Error(Error::InvalidDataLength);
