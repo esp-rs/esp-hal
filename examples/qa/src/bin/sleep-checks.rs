@@ -9,7 +9,8 @@
 //! 1. The length of the sleep. The sleep must last at least 90 percent of the time to the wakeup
 //!    deadline.
 //! 2. The wakeup cause.
-//! 3. Every word of PSRAM, on a chip with PSRAM.
+//! 3. Every word of PSRAM, on a chip with PSRAM. With code in PSRAM, the check includes a PSRAM
+//!    static.
 //!
 //! The checks run at the default and at the maximum CPU clock, without and with CPU retention. On a
 //! chip with two cores, each core requests a light sleep.
@@ -82,6 +83,21 @@ const SLICE_WORDS: usize = 16 * 1024;
 /// The seed of the PSRAM pattern. Each check puts its number in the high bits, and each slice adds
 /// its number. A read that returns the data of a different check or slice fails the check.
 const PSRAM_SEED: u32 = 0x6C07_8965;
+
+/// The PSRAM static's seed is the check's seed XOR this value, so the static and the heap hold
+/// different patterns.
+#[cfg(code_in_psram)]
+const STATIC_SEED: u32 = 0x5354_4154;
+
+/// The number of words in [`PSRAM_STATIC`].
+#[cfg(code_in_psram)]
+const STATIC_WORDS: usize = 1024;
+
+/// A static in `.bss.psram`, which lies outside the PSRAM that `Psram::raw_parts` returns. 4 KiB
+/// spans many cache lines.
+#[cfg(code_in_psram)]
+#[esp_hal::psram(zeroed)]
+static mut PSRAM_STATIC: [u32; STATIC_WORDS] = [0; STATIC_WORDS];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Clock {
@@ -248,6 +264,13 @@ fn fill_psram(board: &mut Board<'_>) {
             };
         }
     }
+    // The static must be written last. Only the lines that are still dirty at the sleep can lose
+    // their data.
+    #[cfg(code_in_psram)]
+    for i in 0..STATIC_WORDS {
+        let word = pattern(i, STATIC_SEED ^ board.seed);
+        unsafe { core::ptr::write_volatile(addr_of_mut!(PSRAM_STATIC[i]), word) };
+    }
 }
 
 fn check_psram(board: &mut Board<'_>) -> Result<(), &'static str> {
@@ -265,8 +288,25 @@ fn check_psram(board: &mut Board<'_>) -> Result<(), &'static str> {
             failed = true;
         }
     }
+    #[cfg(code_in_psram)]
+    let static_failed = {
+        let bad = (0..STATIC_WORDS)
+            .filter(|&i| {
+                let word = unsafe { core::ptr::read_volatile(addr_of_mut!(PSRAM_STATIC[i])) };
+                word != pattern(i, STATIC_SEED ^ board.seed)
+            })
+            .count();
+        if bad != 0 {
+            report!("  the PSRAM static read {bad} bad words");
+        }
+        bad != 0
+    };
+    #[cfg(not(code_in_psram))]
+    let static_failed = false;
     if failed {
         Err("PSRAM lost data")
+    } else if static_failed {
+        Err("a PSRAM static changed across the sleep")
     } else {
         Ok(())
     }

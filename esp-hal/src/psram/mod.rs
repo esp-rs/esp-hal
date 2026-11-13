@@ -117,10 +117,10 @@ pub(crate) fn psram_heap_range() -> Range<usize> {
 pub(crate) fn psram_range() -> Range<usize> {
     let heap = psram_heap_range();
     cfg_select! {
-        all(code_in_psram, psram_separate_window) => {
+        code_in_psram => {
             let start = &raw const code_in_psram::_psram_bss_start as usize;
             let end = &raw const code_in_psram::_psram_bss_end as usize;
-            if start == end {
+            if code_in_psram::statics_empty() {
                 heap
             } else if heap.is_empty() {
                 start..end
@@ -158,7 +158,8 @@ pub struct Psram {
 ///
 /// # Panics
 ///
-/// Panics if `.bss.psram` ends past the end of PSRAM. The start-up then left it unzeroed.
+/// Panics if `.bss.psram` does not fit in PSRAM after the code, or, on a chip where flash and PSRAM
+/// share one MMU, if the start-up could not map it. The section is then not zeroed.
 #[cfg(code_in_psram)]
 pub(crate) fn start_with_code() {
     implem::request_clock();
@@ -186,9 +187,18 @@ pub(crate) fn start_with_code() {
         let used = code_in_psram::CODE_END.load(Ordering::Relaxed).max(bss_end);
         used.next_multiple_of(PAGE)..end
     };
-    // The heap needs entries of its own, after the code's.
+    // The heap needs entries of its own, after the code's and the statics'.
     #[cfg(not(psram_separate_window))]
-    let range = code_in_psram::map_heap(size);
+    let range = {
+        if !code_in_psram::statics_mapped() {
+            panic!(
+                "The start-up could not map the PSRAM statics, which end at {:#x}, after the code in {} MB of PSRAM",
+                &raw const code_in_psram::_psram_bss_end as usize,
+                size / 1_024 / 1_024
+            );
+        }
+        code_in_psram::map_heap(size)
+    };
     unsafe { set_psram_range(range) };
 }
 

@@ -26,35 +26,27 @@ static RODATA: [u32; 4] = [0x5053_524D; 4];
 static mut DATA: u32 = 0x4441_5441;
 static mut BSS: u32 = 0;
 
-// Statics in PSRAM need a separate PSRAM window, which the S31 has.
-
 // 256 KiB, so the static spans several MMU pages.
-#[cfg(psram_separate_window)]
 #[esp_hal::psram(zeroed)]
 static mut PSRAM_BSS: [u32; 0x1_0000] = [0; 0x1_0000];
 
-#[cfg(psram_separate_window)]
 struct PsramState {
     waker: Mutex<RefCell<Option<core::task::Waker>>>,
     flag: core::sync::atomic::AtomicBool,
 }
 
-#[cfg(psram_separate_window)]
 #[esp_hal::psram(zeroed)]
 static PSRAM_STATE: PsramState = PsramState {
     waker: Mutex::new(RefCell::new(None)),
     flag: core::sync::atomic::AtomicBool::new(false),
 };
 
-#[cfg(psram_separate_window)]
 #[repr(C, align(64))]
 struct DmaBlock([u8; 4096]);
 
-#[cfg(psram_separate_window)]
 #[esp_hal::psram(zeroed)]
 static mut DMA_SOURCE: DmaBlock = DmaBlock([0; 4096]);
 
-#[cfg(psram_separate_window)]
 unsafe extern "C" {
     static _psram_code_end: u8;
     static _psram_bss_end: u8;
@@ -280,14 +272,14 @@ mod tests {
         }
     }
 
-    // PSRAM keeps its content across a reset, so the zeros come from the start-up, at every boot.
-    #[cfg(psram_separate_window)]
-    #[test]
-    fn test_psram_static_is_zeroed_above_the_code() {
-        let _peripherals = esp_hal::init(esp_hal::Config::default());
-
+    /// Asserts that `PSRAM_BSS` is all zero and above the code, then writes a pattern to it.
+    ///
+    /// PSRAM keeps its content across the reset between two tests, so the second test that calls
+    /// this reads zeros only if the start-up zeroed the static.
+    fn assert_psram_bss_zeroed_then_write() {
         let start = addr_of!(PSRAM_BSS) as u32;
         assert!(in_window(start));
+        assert!(in_psram(start));
         assert!(start >= addr_of!(_psram_code_end) as u32);
 
         let words = unsafe { &mut *addr_of_mut!(PSRAM_BSS) };
@@ -301,7 +293,42 @@ mod tests {
         }
     }
 
-    #[cfg(psram_separate_window)]
+    #[test]
+    fn test_psram_static_is_zeroed_above_the_code() {
+        let _peripherals = esp_hal::init(esp_hal::Config::default());
+        assert_psram_bss_zeroed_then_write();
+    }
+
+    #[test]
+    fn test_psram_static_is_zeroed_again() {
+        let _peripherals = esp_hal::init(esp_hal::Config::default());
+        assert_psram_bss_zeroed_then_write();
+    }
+
+    #[test]
+    fn test_psram_static_survives_flash_write() {
+        const BLOCK: u32 = 0x1_0000;
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
+        let block = scratch_block(&mut flash);
+
+        let words = unsafe { &mut *addr_of_mut!(PSRAM_BSS) };
+        for (i, word) in words.iter_mut().enumerate().step_by(997) {
+            *word = (i as u32).wrapping_mul(0x9E37_79B9);
+        }
+
+        let data = [PATTERN; 64];
+        unsafe {
+            flash.erase(block, block + BLOCK).unwrap();
+            flash.write(block, &data).unwrap();
+        }
+
+        for (i, word) in words.iter().enumerate().step_by(997) {
+            assert_eq!(*word, (i as u32).wrapping_mul(0x9E37_79B9));
+        }
+    }
+
     #[test]
     fn test_psram_static_holds_none_and_false() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
@@ -319,7 +346,7 @@ mod tests {
     // The CPU writes the source through the cache just before the transfer, so the DMA reads the
     // written bytes only if the driver treats the static as PSRAM and writes the cache back.
     // Outside `psram_range`, the driver rejects the buffer.
-    #[cfg(all(psram_separate_window, dma_can_access_psram, dma_supports_mem2mem))]
+    #[cfg(all(dma_can_access_psram, dma_supports_mem2mem))]
     #[test]
     fn test_dma_reads_psram_static() {
         use esp_hal::dma::{BurstConfig, ExternalBurstConfig, Mem2Mem};
@@ -358,7 +385,6 @@ mod tests {
         }
     }
 
-    #[cfg(psram_separate_window)]
     #[test]
     fn test_heap_after_psram_statics() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
