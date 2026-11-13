@@ -198,6 +198,22 @@ peripheral_clocks = { templates = [
     { name = "UsbDevice", template_params = { reg_group = "en1" }, keep_enabled = true },
     { name = "DedicatedGpio", template_params = { clk_en_register = "cpu_peri_clk_en", rst_register = "cpu_peri_rst_en" } },
 
+    { name = "RtcIoMux", keep_enabled = true, template_params = {
+        control = "crate::peripherals::SENS",
+        clk_en_register = "sar_peri_clk_gate_conf", clk_en_field = "iomux_clk_en",
+        rst_template = ""
+    } },
+    { name = "SarAdc", keep_enabled = true, template_params = {
+        control = "crate::peripherals::SENS",
+        clk_en_register = "sar_peri_clk_gate_conf", clk_en_field = "saradc_clk_en",
+        rst_template = ""
+    } },
+    { name = "RtcI2c", keep_enabled = true, template_params = {
+        control = "crate::peripherals::SENS",
+        clk_en_register = "sar_peri_clk_gate_conf", clk_en_field = "rtc_i2c_clk_en",
+        rst_register = "sar_peri_reset_conf", rst_field = "sar_rtc_i2c_reset"
+    } },
+
     #{ name = "Adc2Arb" },
     { name = "Systimer", keep_enabled = true },
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },

@@ -149,6 +149,11 @@ impl PeripheralClockControl {
         PERIPHERAL_REF_COUNT.with(|ref_counts| Self::enable_with_counts(peripheral, ref_counts))
     }
 
+    /// Sets a caller-managed clock gate without changing its reference count.
+    pub(crate) fn set_enabled_untracked(peripheral: Peripheral, enabled: bool) {
+        PERIPHERAL_REF_COUNT.with(|_| unsafe { enable_internal_racey(peripheral, enabled) });
+    }
+
     /// Enables the given peripheral.
     ///
     /// This keeps track of enabling a peripheral - i.e. a peripheral
@@ -217,6 +222,10 @@ impl PeripheralClockControl {
     /// Resets the given peripheral.
     pub(crate) fn reset(peripheral: Peripheral) {
         PERIPHERAL_REF_COUNT.with(|_| unsafe { Self::reset_racey(peripheral) })
+    }
+
+    pub(crate) fn set_reset(peripheral: Peripheral, reset: bool) {
+        PERIPHERAL_REF_COUNT.with(|_| unsafe { assert_peri_reset_racey(peripheral, reset) });
     }
 }
 

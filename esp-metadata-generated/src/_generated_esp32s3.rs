@@ -5218,6 +5218,12 @@ macro_rules! implement_peripheral_clocks {
             Rmt,
             /// RSA peripheral clock signal
             Rsa,
+            /// RTC_I2C peripheral clock signal
+            RtcI2c,
+            /// RTC_IO_MUX peripheral clock signal
+            RtcIoMux,
+            /// SAR_ADC peripheral clock signal
+            SarAdc,
             /// SDIO_HOST peripheral clock signal
             SdioHost,
             /// SHA peripheral clock signal
@@ -5253,6 +5259,9 @@ macro_rules! implement_peripheral_clocks {
         }
         impl Peripheral {
             const KEEP_ENABLED: &[Peripheral] = &[
+                Self::RtcI2c,
+                Self::RtcIoMux,
+                Self::SarAdc,
                 Self::Systimer,
                 Self::Timg0,
                 Self::Uart0,
@@ -5280,6 +5289,9 @@ macro_rules! implement_peripheral_clocks {
                 Self::PeriBackup,
                 Self::Rmt,
                 Self::Rsa,
+                Self::RtcI2c,
+                Self::RtcIoMux,
+                Self::SarAdc,
                 Self::SdioHost,
                 Self::Sha,
                 Self::Spi2,
@@ -5394,6 +5406,21 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en1()
                         .modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
+                }
+                Peripheral::RtcI2c => {
+                    crate::peripherals::SENS::regs()
+                        .sar_peri_clk_gate_conf()
+                        .modify(|_, w| w.rtc_i2c_clk_en().bit(enable));
+                }
+                Peripheral::RtcIoMux => {
+                    crate::peripherals::SENS::regs()
+                        .sar_peri_clk_gate_conf()
+                        .modify(|_, w| w.iomux_clk_en().bit(enable));
+                }
+                Peripheral::SarAdc => {
+                    crate::peripherals::SENS::regs()
+                        .sar_peri_clk_gate_conf()
+                        .modify(|_, w| w.saradc_clk_en().bit(enable));
                 }
                 Peripheral::SdioHost => {
                     crate::peripherals::SYSTEM::regs()
@@ -5572,6 +5599,13 @@ macro_rules! implement_peripheral_clocks {
                         .perip_rst_en1()
                         .modify(|_, w| w.crypto_rsa_rst().bit(reset));
                 }
+                Peripheral::RtcI2c => {
+                    crate::peripherals::SENS::regs()
+                        .sar_peri_reset_conf()
+                        .modify(|_, w| w.sar_rtc_i2c_reset().bit(reset));
+                }
+                Peripheral::RtcIoMux => {}
+                Peripheral::SarAdc => {}
                 Peripheral::SdioHost => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en1()
