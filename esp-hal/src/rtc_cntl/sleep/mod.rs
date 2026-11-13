@@ -44,7 +44,7 @@ mod timer;
 mod wakeup;
 pub(crate) use wakeup::*;
 #[instability::unstable]
-pub use wakeup::{SleepEntryHook, SleepExitHook, WrappedSleepConfig};
+pub use wakeup::{SleepEntryHook, SleepExitHook, SleepKind, WrappedSleepConfig};
 
 /// The result of a light sleep.
 #[cfg(sleep_light_sleep)]
@@ -68,42 +68,6 @@ pub enum LightSleep {
 
 #[cfg(supports_cpu_power_down)]
 use crate::rtc_cntl::cpu_retention;
-
-/// The handler that answers whether this core still agrees to a light sleep, or null.
-///
-/// Only the rendezvous of the software retention path reads this, which is why the read lives
-/// there.
-#[cfg(all(multi_core, sleep_driver_supported))]
-pub(crate) static CAN_SLEEP_HANDLER: portable_atomic::AtomicPtr<()> =
-    portable_atomic::AtomicPtr::new(core::ptr::null_mut());
-
-/// The parts of the sleep path that an RTOS fills in.
-#[cfg(all(multi_core, sleep_driver_supported))]
-#[doc(hidden)]
-#[instability::unstable]
-pub mod __rtos_implementation {
-    use portable_atomic::Ordering;
-
-    /// Registers the function that answers whether the core that runs it agrees to a light sleep.
-    ///
-    /// A light sleep that powers the CPU domain down needs every running core to save itself, so
-    /// the core that calls the sleep function asks the other core to join it. The core that calls
-    /// decides for itself. The other core answers this function, and a `false` answer stops the
-    /// sleep. Either core can be the one that answers.
-    ///
-    /// The answer holds for the whole sleep. The core that gives it has its interrupts disabled
-    /// already, so nothing can give that core work while the sleep runs.
-    ///
-    /// # Safety
-    ///
-    /// The handler runs in an interrupt handler, with interrupts disabled and with the caches of
-    /// the sleep path. It must return, it must take no lock that a core can hold across a sleep,
-    /// and it must stay callable for the life of the program.
-    pub unsafe fn set_can_sleep_handler(handler: fn() -> bool) {
-        super::CAN_SLEEP_HANDLER.store(handler as *mut (), Ordering::Release);
-    }
-}
-
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
 /// The wakeup-enable mask survives a deep-sleep wake, so here it still holds the request of the run
@@ -200,7 +164,7 @@ impl<'d> LowPower<'d> {
             );
         }
 
-        self.sleep(config, SleepKind::Deep, false);
+        self.sleep(config, SleepKind::Deep, false, None);
 
         unreachable!("deep sleep without rejection cannot return")
     }
@@ -231,7 +195,7 @@ impl<'d> LowPower<'d> {
     #[cfg(sleep_deep_sleep)]
     #[cfg(feature = "rt")]
     pub fn sleep_deep_with_rejection(&mut self, config: RtcSleepConfig) {
-        self.sleep(config, SleepKind::Deep, true);
+        self.sleep(config, SleepKind::Deep, true, None);
     }
 
     /// Enters light sleep, and returns when a wakeup source ends it.
@@ -261,29 +225,43 @@ impl<'d> LowPower<'d> {
     #[cfg(sleep_light_sleep)]
     #[cfg(feature = "rt")]
     pub fn sleep_light(&mut self, config: RtcSleepConfig) -> LightSleep {
-        if self.sleep(config, SleepKind::Light, true) {
+        if self.sleep(config, SleepKind::Light, true, None) {
             LightSleep::Refused
         } else {
             LightSleep::Ended
         }
     }
 
-    /// Calculates the sleep configuration from the wakeup-enable mask, and enters the sleep.
+    /// Enters the sleep `kind`, and returns whether a wakeup source or `may_sleep` refused it.
     ///
-    /// Returns whether a wakeup source refused a light sleep. A deep sleep ignores a refusal,
-    /// so this function does not return `true` for a deep sleep.
+    /// [`Self::sleep_light`], [`Self::sleep_deep`] and [`Self::sleep_deep_with_rejection`] call
+    /// this function, and their documentation applies. `allow_reject` lets the hardware reject the
+    /// sleep if a wakeup source is already asserted. A deep sleep ignores a refusal, so this
+    /// function does not return `true` for a deep sleep. It returns from a deep sleep only if the
+    /// hardware rejected it.
     ///
-    /// A sleep limit can end the call before the sleep starts. That result is `false`. It is not a
-    /// refusal. A deep sleep whose limit the transition cannot catch panics when the caller cannot
-    /// accept a rejection.
+    /// A light sleep parks the other cores, and then calls `may_sleep`. A `false` answer refuses
+    /// the sleep. No other core runs until `may_sleep` returns, so the answer holds for the whole
+    /// sleep. A light sleep that the APP core starts can run on the PRO core, and `may_sleep` then
+    /// runs on the PRO core too.
+    ///
+    /// `may_sleep` runs with interrupts disabled. It must not take a lock that a core holds while
+    /// it parks another core.
+    ///
+    /// # Panics
+    ///
+    /// Panics as [`Self::sleep_deep`] does, for a deep sleep that `allow_reject` does not allow to
+    /// return.
     #[cfg(sleep_driver_supported)]
     #[crate::ram]
     #[cfg(feature = "rt")]
-    pub(crate) fn sleep(
+    #[instability::unstable]
+    pub fn sleep(
         &mut self,
         config: RtcSleepConfig,
         kind: SleepKind,
         allow_reject: bool,
+        may_sleep: Option<fn() -> bool>,
     ) -> bool {
         // ESP-IDF runs `esp_light_sleep_start` inside `portENTER_CRITICAL(&light_sleep_lock)`.
         // A sleep ends when `wait_for_sleep_result` sees a wakeup or reject bit, so nothing in
@@ -294,22 +272,25 @@ impl<'d> LowPower<'d> {
                 // The PRO CPU requests every light sleep, because the wake releases the APP CPU
                 // from the PRO CPU.
                 match (kind, crate::system::Cpu::current()) {
+                    (SleepKind::Light, crate::system::Cpu::AppCpu) => {
+                        cpu_retention::rendezvous::sleep_from_app_cpu(config, may_sleep)
+                    }
                     (SleepKind::Light, crate::system::Cpu::ProCpu) => {
-                        cpu_retention::rendezvous::take_request();
-                        let refused =
-                            self.sleep_with_interrupts_disabled(config, kind, allow_reject);
-                        cpu_retention::rendezvous::release_app_cpu();
+                        let refused = self.sleep_with_interrupts_disabled(
+                            config,
+                            kind,
+                            allow_reject,
+                            may_sleep,
+                        );
+                        if !refused {
+                            cpu_retention::rendezvous::answer_app_cpu();
+                        }
                         refused
                     }
-                    // The APP CPU does not learn whether a wakeup source refused the sleep.
-                    (SleepKind::Light, _) => {
-                        cpu_retention::rendezvous::sleep_from_app_cpu(config);
-                        false
-                    }
-                    _ => self.sleep_with_interrupts_disabled(config, kind, allow_reject),
+                    _ => self.sleep_with_interrupts_disabled(config, kind, allow_reject, may_sleep),
                 }
             }
-            _ => self.sleep_with_interrupts_disabled(config, kind, allow_reject),
+            _ => self.sleep_with_interrupts_disabled(config, kind, allow_reject, may_sleep),
         };
         unsafe { SingleCoreInterruptLock.exit(irq_token) };
         refused
@@ -323,7 +304,17 @@ impl<'d> LowPower<'d> {
         config: RtcSleepConfig,
         kind: SleepKind,
         allow_reject: bool,
+        may_sleep: Option<fn() -> bool>,
     ) -> bool {
+        // First, so that no other core changes what the check and the hooks read. Dropped last, so
+        // that the other cores run again with the time base and the wakeup cause of this sleep.
+        #[cfg(multi_core)]
+        let _parked = ParkedCores::new(kind);
+
+        if kind == SleepKind::Light && may_sleep.is_some_and(|may_sleep| !may_sleep()) {
+            return true;
+        }
+
         let rtc = Rtc::new(unsafe { crate::peripherals::RTC_TIMER::steal() });
 
         let mut config = config;
@@ -333,21 +324,13 @@ impl<'d> LowPower<'d> {
         // bring back, and an armed descriptor would outlive the sleep in the RTC domain. esp-idf
         // arms retention from its light sleep path alone.
         //
-        // The buffer is read once, because the rendezvous and the power-down must agree on it. A
-        // buffer that another core installs during this sleep serves the next one.
+        // The buffer is read once, because the save of the APP CPU and the power-down must agree on
+        // it. A buffer that another core installs during this sleep serves the next one.
         #[cfg(supports_cpu_power_down)]
         let retention_buffer = match kind {
             SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
             SleepKind::Deep => None,
         };
-
-        // A chip that retains the CPU in software needs every running core to save itself, so the
-        // rendezvous comes first, before any step that a refusal would have to undo. A return
-        // after it must call `rendezvous::finish`.
-        #[cfg(all(cpu_retention = "software", multi_core))]
-        if retention_buffer.is_some() && !cpu_retention::rendezvous::engage() {
-            return false;
-        }
 
         // The hooks run before `apply`, so that a request to keep a power domain powered reaches
         // the hardware. They also run before the last read of the mask, because a hook can
@@ -365,8 +348,6 @@ impl<'d> LowPower<'d> {
                 timer::restore_after_limit(clamp);
             }
             run_exit_hooks();
-            #[cfg(all(cpu_retention = "software", multi_core))]
-            cpu_retention::rendezvous::finish();
             return true;
         }
 
@@ -376,8 +357,6 @@ impl<'d> LowPower<'d> {
         #[cfg(sleep_has_wakeup_source_timer)]
         if matches!(&entry.clamp, Some(timer::LimitClamp::TooShort)) {
             run_exit_hooks();
-            #[cfg(all(cpu_retention = "software", multi_core))]
-            cpu_retention::rendezvous::finish();
             if kind == SleepKind::Deep && !allow_reject {
                 panic!("the wakeup deadline is too near to be caught by the sleep transition");
             }
@@ -403,8 +382,6 @@ impl<'d> LowPower<'d> {
             if let Some(clamp) = entry.clamp {
                 timer::restore_after_limit(clamp);
             }
-            #[cfg(all(cpu_retention = "software", multi_core))]
-            cpu_retention::rendezvous::finish();
 
             match kind {
                 // Not a software refusal. Light sleep does not report a missing wakeup source.
@@ -417,6 +394,10 @@ impl<'d> LowPower<'d> {
 
         let reject_mask = if allow_reject { reject_mask() } else { 0 };
 
+        // Each core saves itself, and a parked core saves nothing on its own.
+        #[cfg(all(cpu_retention = "software", multi_core))]
+        let app_cpu_saved = retention_buffer.is_some_and(cpu_retention::rendezvous::save_app_cpu);
+
         sleep_uart_prepare();
 
         // Latch the systimer value *before* sleeping. The systimer keeps running during
@@ -427,14 +408,6 @@ impl<'d> LowPower<'d> {
         let before = rtc.time_since_boot_raw();
 
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
-
-        #[cfg(multi_core)]
-        let parked = match kind {
-            SleepKind::Light => park_other_cores(),
-            // A deep sleep resets the chip, so the other core needs no stall, and nothing thaws
-            // it afterwards.
-            SleepKind::Deep => 0,
-        };
 
         let rejected = {
             // A chip can keep a guard for the length of the sleep, to restore what sleep entry
@@ -495,13 +468,12 @@ impl<'d> LowPower<'d> {
             // First, because the other core comes back through the wake stub that the next call
             // disarms.
             #[cfg(all(cpu_retention = "software", multi_core))]
-            cpu_retention::rendezvous::finish();
+            if app_cpu_saved {
+                cpu_retention::rendezvous::resume_app_cpu();
+            }
 
             cpu_retention::finish_cpu_retention(rejected);
         }
-
-        #[cfg(multi_core)]
-        unpark_cores(parked);
 
         let after = rtc.time_since_boot_raw();
 
@@ -536,53 +508,41 @@ impl<'d> LowPower<'d> {
     }
 }
 
-/// Hardware-stalls the other running cores for the length of a light sleep, or thaws them.
+/// The parks of the other running cores for the length of a light sleep, as a bit for each
+/// [`Cpu`](crate::system::Cpu). The drop releases them.
 ///
-/// A stall is enough where the retention DMA saves the CPU domain, because the domain holds every
-/// core and the hardware brings the stalled core back with this one. esp-idf stalls the other core
-/// the same way and adds nothing more (`sleep_modes.c`, where the SMP retention work is gated on
-/// `SOC_PM_CPU_RETENTION_BY_SW`).
-///
-/// FIXME: a stall freezes the other core wherever it stands, which can be inside an interrupt
-/// handler that holds a cross-core lock, such as the clock tree, the peripheral reference counts,
-/// or the UART locks that this path takes. This core then spins for that lock for ever, because the
-/// frozen core cannot release it.
-///
-/// A chip that retains the CPU in software needs more than a stall, because each core saves
-/// itself, and a frozen core saves nothing. The rendezvous of that path keeps the other core
-/// running, so this function stalls nothing while that core waits in the rendezvous.
-///
-/// Returns the cores that it stalled, as a bit for each [`Cpu`], for [`unpark_cores`]. A core that
-/// the program stalled before the sleep stays stalled after it.
-#[cfg(all(multi_core, sleep_driver_supported))]
-#[crate::ram]
-fn park_other_cores() -> u8 {
-    // A core that saves itself in the rendezvous must keep running, because a stalled core saves
-    // nothing.
-    #[cfg(all(cpu_retention = "software", multi_core, feature = "rt"))]
-    if cpu_retention::rendezvous::helper_saved() {
-        return 0;
-    }
+/// A parked core holds no lock. Where the retention DMA saves the CPU domain, the hardware brings
+/// the parked core back with this one. Where each core saves itself, the parked core saves itself
+/// later in the sleep path.
+#[cfg(all(multi_core, sleep_driver_supported, feature = "rt"))]
+struct ParkedCores(u8);
 
-    let mut parked = 0;
-    for cpu in crate::system::Cpu::other() {
-        if crate::soc::cpu_control::is_running(cpu) {
-            // SAFETY: [`unpark_cores`] runs before this function returns to its caller.
-            unsafe { crate::soc::cpu_control::internal_park_core(cpu, true) };
-            parked |= 1 << cpu as u8;
+#[cfg(all(multi_core, sleep_driver_supported, feature = "rt"))]
+impl ParkedCores {
+    /// Parks the other running cores for a light sleep. A deep sleep resets the chip, so it parks
+    /// no core.
+    #[inline(always)]
+    fn new(kind: SleepKind) -> Self {
+        let mut parked = 0;
+        if kind == SleepKind::Light {
+            for cpu in crate::system::Cpu::other() {
+                if crate::system::multi_core::park(cpu) {
+                    parked |= 1 << cpu as u8;
+                }
+            }
         }
+        Self(parked)
     }
-    parked
 }
 
-/// Thaws the cores that [`park_other_cores`] stalled.
-#[cfg(all(multi_core, sleep_driver_supported))]
-#[crate::ram]
-fn unpark_cores(parked: u8) {
-    for cpu in crate::system::Cpu::other() {
-        if parked & (1 << cpu as u8) != 0 {
-            // SAFETY: this core stalled that core for the sleep, and the sleep is over.
-            unsafe { crate::soc::cpu_control::internal_park_core(cpu, false) };
+#[cfg(all(multi_core, sleep_driver_supported, feature = "rt"))]
+impl Drop for ParkedCores {
+    #[inline(always)]
+    fn drop(&mut self) {
+        for cpu in crate::system::Cpu::other() {
+            if self.0 & (1 << cpu as u8) != 0 {
+                crate::system::multi_core::unpark(cpu);
+            }
         }
     }
 }

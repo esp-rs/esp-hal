@@ -29,8 +29,6 @@ use frames::chip::{
     PMUFUNC_JUST_WOKE,
 };
 
-// The rendezvous needs the IPC path, which `interrupt::ipc` gives to a
-// multi-core chip with the `rt` and the `unstable` features.
 #[cfg(all(multi_core, feature = "rt"))]
 pub(crate) mod rendezvous;
 
@@ -520,10 +518,10 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool
         arm_wake_stub();
         enter_sleep()
     } else {
-        // The wake holds the APP CPU in reset. A core that waits in the rendezvous comes back
-        // through the wake stub once it runs again.
+        // The wake holds the APP CPU in reset. A core that saved itself comes back through the
+        // wake stub once it runs again.
         #[cfg(all(multi_core, feature = "rt"))]
-        if rendezvous::helper_saved() {
+        if rendezvous::app_cpu_saved() {
             crate::soc::cpu_control::restart_core1_after_wake();
         }
         false
@@ -669,8 +667,8 @@ pub(crate) const BUFFER_SIZE: usize = BLOCK_SIZE * Cpu::COUNT;
 /// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
 /// cannot carry a power-down into a light sleep that has no retention memory.
 ///
-/// A second running core must save itself, so the power-down also needs the rendezvous. The sleep
-/// path engages it before this call, and does not get here if the other core stays out.
+/// A second running core must save itself too. The sleep path lets the parked core do that, after
+/// this call.
 #[cfg(feature = "rt")]
 pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
     config.pd_flags.set_pd_cpu(buffer.is_some());

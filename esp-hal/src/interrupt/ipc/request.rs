@@ -35,7 +35,8 @@ pub(crate) const POST_RESULT_MASK: u32 = (1 << SEQ_SHIFT) - 1;
 /// - return,
 /// - not use the floating-point registers,
 /// - not enable interrupts, and not lower the run level,
-/// - not wait for a run on its own CPU.
+/// - not wait for a run on its own CPU,
+/// - not wait for a thread that an RTOS can move to its own CPU.
 ///
 /// A caller can stop its wait before the run starts, so `func` can run late. `func` must then find
 /// its protocol state stale, and do nothing.
