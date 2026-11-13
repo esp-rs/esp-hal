@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicU32, Ordering};
+
 use esp_hal::ram;
 
 /// **************************************************************************
@@ -42,6 +44,43 @@ unsafe extern "C" fn __esp_phy_exit_critical(level: u32) {
     unsafe {
         let token = esp_sync::RestoreState::new(level);
         crate::ESP_PHY_LOCK.release(token);
+    }
+}
+
+/// Nesting depth of `phy_i2c_enter_critical`, only accessed with the analog I2C lock held.
+static I2C_CRITICAL_DEPTH: AtomicU32 = AtomicU32::new(0);
+/// Token of the outermost `phy_i2c_enter_critical`, only accessed with the analog I2C lock held.
+static I2C_CRITICAL_TOKEN: AtomicU32 = AtomicU32::new(0);
+
+/// Locks the analog I2C master, which esp-hal also uses.
+///
+/// The PHY library's weak default does not lock anything, so this definition replaces it. The
+/// library keeps no token between this call and `phy_i2c_exit_critical`, and it nests the calls.
+/// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e3/components/esp_phy/src/phy_override.c#L50-L59>.
+#[ram]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn phy_i2c_enter_critical() {
+    let token = unsafe { esp_hal::__regi2c::LOCK.acquire() };
+    let depth = I2C_CRITICAL_DEPTH.load(Ordering::Relaxed);
+    if depth == 0 {
+        I2C_CRITICAL_TOKEN.store(token.inner(), Ordering::Relaxed);
+    }
+    I2C_CRITICAL_DEPTH.store(depth + 1, Ordering::Relaxed);
+}
+
+/// Unlocks the analog I2C master locked by `phy_i2c_enter_critical`.
+#[ram]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn phy_i2c_exit_critical() {
+    let depth = unwrap!(
+        I2C_CRITICAL_DEPTH.load(Ordering::Relaxed).checked_sub(1),
+        "phy_i2c_exit_critical without phy_i2c_enter_critical"
+    );
+    I2C_CRITICAL_DEPTH.store(depth, Ordering::Relaxed);
+    if depth == 0 {
+        // Nested tokens are reentries, which release nothing, so only the outermost one is kept.
+        let token = I2C_CRITICAL_TOKEN.load(Ordering::Relaxed);
+        unsafe { esp_hal::__regi2c::LOCK.release(esp_sync::RestoreState::new(token)) };
     }
 }
 

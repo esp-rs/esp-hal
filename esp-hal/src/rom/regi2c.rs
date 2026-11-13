@@ -1,4 +1,9 @@
+use esp_sync::RawMutex;
+
 use crate::soc::regi2c::{regi2c_read, regi2c_write};
+
+/// Serializes accesses to the analog I2C master, which esp-hal shares with the PHY library.
+pub static LOCK: RawMutex = RawMutex::new();
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -14,12 +19,12 @@ impl RegI2cMaster {
 
     #[allow(unused)]
     pub fn write(&self, reg: u8, data: u8) {
-        regi2c_write(self.master, self.host_id, reg, data);
+        LOCK.lock(|| regi2c_write(self.master, self.host_id, reg, data));
     }
 
     #[allow(unused)]
     pub fn read(&self, reg: u8) -> u8 {
-        regi2c_read(self.master, self.host_id, reg)
+        LOCK.lock(|| regi2c_read(self.master, self.host_id, reg))
     }
 }
 
@@ -77,9 +82,11 @@ impl RawRegI2cField {
     #[allow(unused)]
     pub fn write_field(&self, data: u8) {
         let mask = self.mask() << self.lsb;
-        let bits = self.register.read();
-        self.register
-            .write_reg((bits & !mask) | ((data << self.lsb) & mask));
+        LOCK.lock(|| {
+            let bits = self.register.read();
+            self.register
+                .write_reg((bits & !mask) | ((data << self.lsb) & mask));
+        });
     }
 }
 
