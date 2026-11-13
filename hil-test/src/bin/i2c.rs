@@ -18,7 +18,9 @@ use esp_hal::{
     Blocking,
     i2c::master::{
         AcknowledgeCheckFailedReason,
+        BusTimeout,
         Config,
+        ConfigError,
         Error,
         I2c,
         I2cAddress,
@@ -427,6 +429,86 @@ mod tests {
                 clock_source,
                 read_data
             );
+        }
+    }
+
+    #[test]
+    fn zero_frequency_is_rejected(mut ctx: Context) {
+        assert_eq!(
+            ctx.i2c
+                .apply_config(&Config::default().with_frequency(time::Rate::from_hz(0))),
+            Err(ConfigError::FrequencyOutOfRange)
+        );
+    }
+
+    #[test]
+    fn too_long_bus_timeout_is_rejected(mut ctx: Context) {
+        assert_eq!(
+            ctx.i2c
+                .apply_config(&Config::default().with_timeout(BusTimeout::BusCycles(u32::MAX))),
+            Err(ConfigError::TimeoutTooLong)
+        );
+    }
+
+    #[test]
+    fn frequency_limits(mut ctx: Context) {
+        use esp_hal::i2c::master::ClockSource;
+
+        // (clock source, frequency in Hz, accepted)
+        let cases = cfg_select! {
+            any(i2c_master_version = "3", i2c_master_version = "4") => {{
+                // The clock divider is at most 256, and half an SCL cycle takes at least 4
+                // clock cycles.
+                let xtal = esp_hal::clock::xtal_clock().as_hz();
+                let lowest = xtal / (256 * 1024) + 1;
+                let highest = xtal / 8;
+                [
+                    (ClockSource::Xtal, lowest - 1, false),
+                    (ClockSource::Xtal, lowest, true),
+                    (ClockSource::Xtal, highest, true),
+                    (ClockSource::Xtal, highest + 1, false),
+                    // RC_FAST is calibrated at run time, so its exact limit can change.
+                    (ClockSource::RcFast, 5_000_000, false),
+                ]
+            }}
+            // Half an SCL cycle takes at least 13 cycles of the 80 MHz APB clock, and the
+            // SCL low period has to fit in its 14-bit field.
+            i2c_master_version = "1" => [
+                (ClockSource::Apb, 2_441, false),
+                (ClockSource::Apb, 2_442, true),
+                // The setup and hold times are clamped to their 10-bit fields.
+                (ClockSource::Apb, 39_062, true),
+                (ClockSource::Apb, 3_076_923, true),
+                (ClockSource::Apb, 3_076_924, false),
+            ],
+            // Half an SCL cycle takes at least 3 clock cycles: 80 MHz APB, 1 MHz REF_TICK.
+            // The SCL low period has to fit in its 14-bit field.
+            _ => [
+                (ClockSource::Apb, 2_441, false),
+                (ClockSource::Apb, 2_442, true),
+                (ClockSource::Apb, 39_062, true),
+                (ClockSource::Apb, 13_333_333, true),
+                (ClockSource::Apb, 13_333_334, false),
+                (ClockSource::RefTick, 30, false),
+                (ClockSource::RefTick, 31, true),
+                (ClockSource::RefTick, 488, true),
+                (ClockSource::RefTick, 166_666, true),
+                (ClockSource::RefTick, 166_667, false),
+            ],
+        };
+
+        for (clock_source, hz, accepted) in cases {
+            let result = ctx.i2c.apply_config(
+                &Config::default()
+                    .with_clock_source(clock_source)
+                    .with_frequency(time::Rate::from_hz(hz)),
+            );
+            let expected = if accepted {
+                Ok(())
+            } else {
+                Err(ConfigError::FrequencyOutOfRange)
+            };
+            assert_eq!(result, expected, "{:?} at {} Hz", clock_source, hz);
         }
     }
 
