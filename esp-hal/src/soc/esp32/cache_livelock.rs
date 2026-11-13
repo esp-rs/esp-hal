@@ -40,7 +40,7 @@ const JOIN_US: u32 = 50;
 
 const WDT_WKEY: u32 = 0x50D8_3AA1;
 
-static PSRAM_MAPPED: AtomicBool = AtomicBool::new(false);
+/// Set after the APP CPU enabled the CPU interrupt of the workaround.
 static APP_CORE_STARTED: AtomicBool = AtomicBool::new(false);
 static STARTED: AtomicBool = AtomicBool::new(false);
 
@@ -51,7 +51,6 @@ pub(crate) fn enable_cpu_interrupt() {
 
 /// Starts the workaround if the APP CPU runs.
 pub(crate) fn psram_mapped() {
-    PSRAM_MAPPED.store(true, Ordering::Release);
     try_start();
 }
 
@@ -62,7 +61,7 @@ pub(crate) fn app_core_started() {
 }
 
 fn try_start() {
-    if !PSRAM_MAPPED.load(Ordering::Acquire)
+    if crate::psram::psram_range().is_empty()
         || !APP_CORE_STARTED.load(Ordering::Acquire)
         || crate::efuse::chip_revision() < ChipRevision::from_combined(300)
         || STARTED.swap(true, Ordering::AcqRel)
