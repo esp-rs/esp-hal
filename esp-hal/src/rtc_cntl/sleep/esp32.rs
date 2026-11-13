@@ -67,6 +67,10 @@ pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 
 /// Default wait cycles for the 8 MHz clock.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
+/// Default wait cycles for the PLL buffer.
+pub const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
+/// Default wait cycles for the XTL buffer.
+pub const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u16 = 20;
 /// Default wait cycles to enable the 8 MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 
@@ -243,6 +247,23 @@ impl RtcSleepConfig {
                 // set digital wrap timer
                 w.dg_wrap_powerup_timer().bits(DG_WRAP_POWERUP_CYCLES);
                 w.dg_wrap_wait_timer().bits(DG_WRAP_WAIT_CYCLES)
+            });
+
+            // like esp-idf rtc_sleep_low_init()
+            rtc_cntl.timer1().modify(|_, w| {
+                if self.deep_slp() {
+                    w.pll_buf_wait().bits(RTC_CNTL_PLL_BUF_WAIT_DEFAULT);
+                    w.xtl_buf_wait().bits(RTC_CNTL_XTL_BUF_WAIT_DEFAULT);
+                    w.ck8m_wait().bits(RTC_CNTL_CK8M_WAIT_DEFAULT)
+                } else {
+                    // The CPU runs from XTAL_CLK right after the wake, so the crystal must be
+                    // stable before the wake ends.
+                    let xtal_wait =
+                        crate::clock::us_to_rtc_ticks(RTC_CNTL_XTL_BUF_WAIT_SLP_US as u64);
+                    w.pll_buf_wait().bits(RTC_CNTL_PLL_BUF_WAIT_SLP_CYCLES);
+                    w.xtl_buf_wait().bits(xtal_wait.min(0x3ff) as u16);
+                    w.ck8m_wait().bits(RTC_CNTL_CK8M_WAIT_SLP_CYCLES)
+                }
             });
 
             rtc_cntl

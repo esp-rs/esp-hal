@@ -525,6 +525,9 @@ impl ParkedCores {
     fn new(kind: SleepKind) -> Self {
         let mut parked = 0;
         if kind == SleepKind::Light {
+            // The handler of the workaround waits for the parked core.
+            #[cfg(cache_livelock_workaround)]
+            crate::soc::cache_livelock::pause();
             for cpu in crate::system::Cpu::other() {
                 if crate::system::multi_core::park(cpu) {
                     parked |= 1 << cpu as u8;
@@ -544,6 +547,8 @@ impl Drop for ParkedCores {
                 crate::system::multi_core::unpark(cpu);
             }
         }
+        #[cfg(cache_livelock_workaround)]
+        crate::soc::cache_livelock::resume();
     }
 }
 

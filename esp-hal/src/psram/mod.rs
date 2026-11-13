@@ -119,6 +119,9 @@ impl Psram {
             let range = map_psram(config);
 
             unsafe { set_psram_range(range) };
+
+            #[cfg(all(cache_livelock_workaround, feature = "rt"))]
+            crate::soc::cache_livelock::psram_mapped();
         }
         Self { _peri: peri }
     }
