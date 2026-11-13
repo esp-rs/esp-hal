@@ -11,6 +11,33 @@ mod tests {
         _ = esp_hal::init(esp_hal::Config::default());
     }
 
+    #[cfg(temp_sensor_driver_supported)]
+    #[test]
+    fn temperature_calibration_matches_efuse() {
+        let Some(calibration) = esp_hal::efuse::temperature_sensor_calibration() else {
+            return;
+        };
+        let (raw, sign_bit) = core::cfg_select! {
+            temp_sensor_register_block_lp_tsens => (
+                esp_hal::efuse::read_field_le::<u32>(esp_hal::efuse::SYS_DATA_PART1_4) & 0x3ff,
+                9,
+            ),
+            _ => (
+                u32::from(esp_hal::efuse::read_field_le::<u16>(
+                    esp_hal::efuse::TEMP_CALIB,
+                )),
+                8,
+            ),
+        };
+        let magnitude = (raw & ((1 << sign_bit) - 1)) as i16;
+        let expected = if raw & (1 << sign_bit) == 0 {
+            magnitude
+        } else {
+            -magnitude
+        };
+        hil_test::assert_eq!(calibration, expected);
+    }
+
     /// All available interface MACs must be distinct from each other.
     #[test]
     fn interface_macs_are_distinct() {
