@@ -369,8 +369,8 @@ pub(super) struct I2cClockGuard {
 }
 
 impl I2cClockGuard {
-    pub(super) fn new(i2c: AnyI2c<'_>) -> Self {
-        let clock = i2c.info().clock_instance;
+    pub(super) fn new(info: &Info) -> Self {
+        let clock = info.clock_instance;
         ClockTree::with(|clocks| clock.request_function_clock(clocks));
         Self { clock }
     }
@@ -1847,19 +1847,19 @@ pub struct State {
 pub trait Instance: crate::private::Sealed + any::Degrade {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
-    fn parts(&self) -> (&Info, &State);
+    fn parts(&self) -> (&'static Info, &'static State);
 
     /// Returns the peripheral data describing this instance.
     #[doc(hidden)]
     #[inline(always)]
-    fn info(&self) -> &Info {
+    fn info(&self) -> &'static Info {
         self.parts().0
     }
 
     /// Returns the peripheral state for this instance.
     #[doc(hidden)]
     #[inline(always)]
-    fn state(&self) -> &State {
+    fn state(&self) -> &'static State {
         self.parts().1
     }
 }
@@ -1919,11 +1919,15 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 for_each_i2c_master!(
     ($id:literal, $inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
-            fn parts(&self) -> (&Info, &State) {
-                #[handler]
-                #[ram]
-                pub(super) fn irq_handler() {
-                    async_handler(&PERIPHERAL, &STATE);
+            fn parts(&self) -> (&'static Info, &'static State) {
+                // `#[ram]` names the section after the function, and the linker keeps or drops
+                // a section whole, so each instance needs a handler with a unique name.
+                paste::paste! {
+                    #[handler]
+                    #[ram]
+                    pub(super) fn [<i2c $id _irq_handler>]() {
+                        async_handler(&PERIPHERAL, &STATE);
+                    }
                 }
 
                 static STATE: State = State {
@@ -1935,7 +1939,7 @@ for_each_i2c_master!(
                     id: $id,
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
-                    async_handler: irq_handler,
+                    async_handler: paste::paste! { [<i2c $id _irq_handler>] },
                     scl_output: OutputSignal::$scl,
                     scl_input: InputSignal::$scl,
                     sda_output: OutputSignal::$sda,
@@ -1959,7 +1963,7 @@ crate::any_peripheral! {
 }
 
 impl Instance for AnyI2c<'_> {
-    fn parts(&self) -> (&Info, &State) {
+    fn parts(&self) -> (&'static Info, &'static State) {
         any::delegate!(self, i2c => { i2c.parts() })
     }
 }
@@ -1969,16 +1973,61 @@ impl AnyI2c<'_> {
         any::delegate!(self, i2c => { i2c.bind_peri_interrupt(handler) })
     }
 
-    pub(super) fn disable_peri_interrupt_on_all_cores(&self) {
+    fn disable_peri_interrupt_on_all_cores(&self) {
         any::delegate!(self, i2c => { i2c.disable_peri_interrupt_on_all_cores() })
+    }
+}
+
+/// An I2C peripheral with the data of its instance.
+pub(super) struct I2cWrapper<'d> {
+    i2c: AnyI2c<'d>,
+    // Read before `degrade()`. `AnyI2c::parts()` refers to the data of every instance, so the
+    // linker could not drop the unused ones.
+    info: &'static Info,
+    state: &'static State,
+}
+
+impl<'d> I2cWrapper<'d> {
+    pub(super) fn new(i2c: impl Instance + 'd) -> Self {
+        let (info, state) = i2c.parts();
+        Self {
+            info,
+            state,
+            i2c: i2c.degrade(),
+        }
+    }
+
+    pub(super) fn info(&self) -> &'static Info {
+        self.info
+    }
+
+    pub(super) fn state(&self) -> &'static State {
+        self.state
+    }
+
+    pub(super) fn disable_peri_interrupt_on_all_cores(&self) {
+        self.i2c.disable_peri_interrupt_on_all_cores();
     }
 
     pub(super) fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        self.disable_peri_interrupt_on_all_cores();
+        self.i2c.disable_peri_interrupt_on_all_cores();
 
-        self.info().enable_listen(EnumSet::all(), false);
-        self.info().clear_interrupts(EnumSet::all());
+        self.info.enable_listen(EnumSet::all(), false);
+        self.info.clear_interrupts(EnumSet::all());
 
-        self.bind_peri_interrupt(handler);
+        self.i2c.bind_peri_interrupt(handler);
+    }
+}
+
+impl core::fmt::Debug for I2cWrapper<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(&self.i2c, f)
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for I2cWrapper<'_> {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::Format::format(&self.i2c, f)
     }
 }
