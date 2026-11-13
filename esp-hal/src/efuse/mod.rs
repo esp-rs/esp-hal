@@ -36,7 +36,7 @@ println!("MAC bytes: {:02x?}", mac.as_bytes());
 ```
 "#
 )]
-use core::{cmp, mem, slice, sync::atomic::Ordering};
+use core::{cell::UnsafeCell, cmp, mem, slice, sync::atomic::Ordering};
 
 use bytemuck::AnyBitPattern;
 use portable_atomic::AtomicU8;
@@ -192,20 +192,47 @@ pub(crate) fn sign_magnitude(value: u32, sign_bit: u32) -> i32 {
 /// otherwise.
 #[instability::unstable]
 pub fn override_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
-    if MAC_OVERRIDE_STATE
-        .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
-        .is_err()
-    {
-        return Err(SetMacError::AlreadySet);
+    BASE_MAC_OVERRIDE.set(mac)
+}
+
+#[procmacros::doc_replace(
+    "interface_mac_override_example" => {
+        cfg(soc_has_bt) => "efuse::override_interface_mac_address(InterfaceMacAddress::Bluetooth, mac)?;",
+        _ => "efuse::override_interface_mac_address(InterfaceMacAddress::AccessPoint, mac)?;"
     }
-
-    unsafe {
-        MAC_OVERRIDE = mac;
-    }
-
-    MAC_OVERRIDE_STATE.store(2, Ordering::Release);
-
-    Ok(())
+)]
+/// Overrides the MAC address of one interface.
+///
+/// After a successful call, [`interface_mac_address`] returns `mac` for `kind`
+/// as it is, instead of an address derived from the base MAC address. The
+/// addresses of the other interfaces do not change.
+///
+/// A radio driver reads the MAC address of its interface when it starts, so
+/// the override must be set before the driver starts. The override does not
+/// persist across device resets.
+///
+/// # Examples
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::efuse::{self, InterfaceMacAddress, MacAddress};
+///
+/// let mac = MacAddress::new_eui48([0x02, 0x00, 0x00, 0x00, 0x00, 0x01]);
+/// # {interface_mac_override_example}
+/// # {after_snippet}
+/// ```
+///
+/// # Errors
+///
+/// [`SetMacError::AlreadySet`] when the MAC address of `kind` is already
+/// overridden.
+#[cfg(any(soc_has_wifi, soc_has_bt))]
+#[instability::unstable]
+pub fn override_interface_mac_address(
+    kind: InterfaceMacAddress,
+    mac: MacAddress,
+) -> Result<(), SetMacError> {
+    kind.mac_override().set(mac)
 }
 
 #[procmacros::doc_replace]
@@ -249,12 +276,13 @@ pub fn base_mac_address() -> MacAddress {
         _ => "let mac = efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);"
     }
 )]
-/// Returns the MAC address for a specific interface, derived from the base
-/// MAC.
+/// Returns the MAC address for a specific interface.
 ///
-/// By default, addresses are derived from the factory eFuse MAC returned
-/// by [`base_mac_address`]. If [`override_mac_address`] has been called, the
-/// overridden base address is used instead.
+/// The address is the first of these that applies:
+///
+/// - the address set for `kind` with [`override_interface_mac_address`]
+/// - an address derived from the MAC set with [`override_mac_address`]
+/// - an address derived from the factory eFuse MAC returned by [`base_mac_address`]
 ///
 /// Each chip is programmed with a unique base MAC address during manufacturing.
 /// Different interfaces (Wi-Fi Station, SoftAP, Bluetooth, etc.) each use a
@@ -276,11 +304,11 @@ pub fn base_mac_address() -> MacAddress {
 /// ```
 #[cfg(any(soc_has_wifi, soc_has_bt))]
 pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
-    let mut mac = if MAC_OVERRIDE_STATE.load(Ordering::Acquire) == 2 {
-        unsafe { MAC_OVERRIDE }
-    } else {
-        base_mac_address()
-    };
+    if let Some(mac) = kind.mac_override().get() {
+        return mac;
+    }
+
+    let mut mac = BASE_MAC_OVERRIDE.get().unwrap_or_else(base_mac_address);
 
     match kind {
         #[cfg(soc_has_wifi)]
@@ -431,16 +459,59 @@ impl ChipRevision {
     }
 }
 
-// Indicates the state of setting the mac address
-// 0 -- unset
-// 1 -- in the process of being set
-// 2 -- set
-//
-// Values other than 0 indicate that we cannot attempt setting the mac address
-// again, and values other than 2 indicate that we should read the mac address
-// from eFuse.
-static MAC_OVERRIDE_STATE: AtomicU8 = AtomicU8::new(0);
-static mut MAC_OVERRIDE: MacAddress = MacAddress::new_eui48([0; 6]);
+/// A MAC address that can be set once.
+struct MacOverride {
+    // 0 -- unset
+    // 1 -- in the process of being set
+    // 2 -- set
+    //
+    // Values other than 0 indicate that we cannot attempt setting the mac address
+    // again, and values other than 2 indicate that `mac` must not be read.
+    state: AtomicU8,
+    mac: UnsafeCell<MacAddress>,
+}
+
+// SAFETY: `mac` is written only once, before `state` becomes 2 with `Release` ordering, and it
+// is read only after `state` is read as 2 with `Acquire` ordering.
+unsafe impl Sync for MacOverride {}
+
+impl MacOverride {
+    const fn new() -> Self {
+        Self {
+            state: AtomicU8::new(0),
+            mac: UnsafeCell::new(MacAddress::new_eui48([0; 6])),
+        }
+    }
+
+    fn set(&self, mac: MacAddress) -> Result<(), SetMacError> {
+        if self
+            .state
+            .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            return Err(SetMacError::AlreadySet);
+        }
+
+        unsafe {
+            *self.mac.get() = mac;
+        }
+
+        self.state.store(2, Ordering::Release);
+
+        Ok(())
+    }
+
+    #[cfg(any(soc_has_wifi, soc_has_bt))]
+    fn get(&self) -> Option<MacAddress> {
+        if self.state.load(Ordering::Acquire) == 2 {
+            Some(unsafe { *self.mac.get() })
+        } else {
+            None
+        }
+    }
+}
+
+static BASE_MAC_OVERRIDE: MacOverride = MacOverride::new();
 
 /// Error indicating issues with setting the MAC address.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
@@ -480,8 +551,11 @@ fn derive_local_mac(mac: &mut MacAddress) {
 
 /// Interface selection for [`interface_mac_address`].
 ///
-/// Each interface uses a distinct MAC address derived from either the base MAC or the overridden
-/// MAC if [`override_mac_address`] has been called.
+/// Each interface uses a distinct MAC address, which is the first of these that applies:
+///
+/// - the address set for the interface with [`override_interface_mac_address`]
+/// - an address derived from the MAC set with [`override_mac_address`]
+/// - an address derived from the base MAC
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(any(soc_has_wifi, soc_has_bt))]
@@ -499,6 +573,30 @@ pub enum InterfaceMacAddress {
     #[cfg(soc_has_bt)]
     #[cfg_attr(not(soc_has_wifi), default)]
     Bluetooth,
+}
+
+#[cfg(any(soc_has_wifi, soc_has_bt))]
+impl InterfaceMacAddress {
+    /// Returns the override of the MAC address of this interface.
+    fn mac_override(self) -> &'static MacOverride {
+        match self {
+            #[cfg(soc_has_wifi)]
+            Self::Station => {
+                static OVERRIDE: MacOverride = MacOverride::new();
+                &OVERRIDE
+            }
+            #[cfg(soc_has_wifi)]
+            Self::AccessPoint => {
+                static OVERRIDE: MacOverride = MacOverride::new();
+                &OVERRIDE
+            }
+            #[cfg(soc_has_bt)]
+            Self::Bluetooth => {
+                static OVERRIDE: MacOverride = MacOverride::new();
+                &OVERRIDE
+            }
+        }
+    }
 }
 
 /// Hardware (MAC) address.
