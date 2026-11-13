@@ -611,7 +611,7 @@ unsafe impl Sync for Info {}
 
 // Public constructor bound; implementations are sealed.
 #[doc(hidden)]
-pub trait Instance: crate::private::Sealed + any::Degrade {
+pub trait Instance: crate::private::Sealed {
     #[doc(hidden)]
     fn parts(&self) -> (&'static Info, &'static State);
 
