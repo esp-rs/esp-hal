@@ -132,11 +132,9 @@ pub(crate) mod utils {
         unsafe { cache_sram_mmu_set_rom(cpu_no, pid, vaddr, paddr, psize, num) }
     }
 
-    // PSRAM clock and cs IO should be configured based on hardware design.
-    // For ESP32-WROVER or ESP32-WROVER-B module, the clock IO is IO17, the cs IO is
-    // IO16, they are the default value for these two configs.
-    const D0WD_PSRAM_CLK_IO: u8 = 17;
-    const D0WD_PSRAM_CS_IO: u8 = 16;
+    const D0WD_PSRAM_CLK_IO: u8 =
+        esp_config::esp_config_int!(u8, "ESP_HAL_CONFIG_D0WD_PSRAM_CLK_IO");
+    const D0WD_PSRAM_CS_IO: u8 = esp_config::esp_config_int!(u8, "ESP_HAL_CONFIG_D0WD_PSRAM_CS_IO");
 
     const D2WD_PSRAM_CLK_IO: u8 = 9; // Default value is 9
     const D2WD_PSRAM_CS_IO: u8 = 10; // Default value is 10
