@@ -367,6 +367,10 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
+// `register_block` points to registers, which are `UnsafeCell`s. `Info` never changes, so a panic
+// that unwinds cannot leave it inconsistent.
+impl core::panic::RefUnwindSafe for Info {}
+
 pub(super) struct I2cClockGuard {
     clock: crate::clock::ll::I2cInstance,
 }

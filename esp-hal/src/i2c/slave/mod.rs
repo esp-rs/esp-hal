@@ -609,6 +609,10 @@ impl Info {
 
 unsafe impl Sync for Info {}
 
+// `register_block` points to registers, which are `UnsafeCell`s. `Info` never changes, so a panic
+// that unwinds cannot leave it inconsistent.
+impl core::panic::RefUnwindSafe for Info {}
+
 // Public constructor bound; implementations are sealed.
 #[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
