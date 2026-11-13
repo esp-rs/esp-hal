@@ -1,5 +1,3 @@
-ENTRY(_start)
-
 /*
 We don't use the linker scripts defined in riscv-rt (since we have special needs) but we need to define some symbols to satisfy riscv-rt
 */
@@ -34,6 +32,9 @@ PROVIDE(_setup_interrupts = _default_setup_interrupts);
    instead of main directly allow HALs to inject code before jumping to user main. */
 PROVIDE(hal_main = main);
 
+/* Called right before `main`. A bootloader support crate may define it. */
+PROVIDE(__esp_bootloader_init = __esp_bootloader_default_init);
+
 /* Default exception handler. By default, the exception handler is abort.
    Users can override this alias by defining the symbol themselves */
 PROVIDE(ExceptionHandler = abort);
@@ -49,11 +50,6 @@ PROVIDE(_start_DefaultHandler_trap = _start_trap);
 PROVIDE(DefaultHandler = EspDefaultHandler);
 
 PROVIDE(_max_hart_id = 0);
-
-/* don't init data - expect the bootloader to do it */
-__sdata = 0;
-__edata = 0;
-__sidata = 0;
 
 /* alias bss start + end as expected by riscv-rt */
 __sbss = _bss_start;
@@ -93,3 +89,5 @@ PROVIDE(interrupt31 = DefaultHandler);
 
 /* external interrupts (from PAC) */
 INCLUDE "device.x"
+
+INCLUDE "esp_hal_checks.x"

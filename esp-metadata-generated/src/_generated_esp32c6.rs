@@ -343,6 +343,9 @@ macro_rules! property {
     ("bt.controller") => {
         "npl"
     };
+    ("bt.requires_fast_cpu") => {
+        true
+    };
     ("wifi.has_wifi6") => {
         true
     };
@@ -362,6 +365,12 @@ macro_rules! property {
         false
     };
     ("wifi.has_ftm") => {
+        true
+    };
+    ("wifi.requires_fast_cpu") => {
+        true
+    };
+    ("ieee802154.requires_fast_cpu") => {
         true
     };
     ("phy.combo_module") => {
@@ -511,6 +520,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.idle_frequency_scaling") => {
+        true
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
@@ -580,6 +592,9 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         false
     };
+    ("soc.cpu_pma_needs_core1_setup") => {
+        false
+    };
     ("soc.cpu_csr_prv_mode") => {
         3088
     };
@@ -589,7 +604,16 @@ macro_rules! property {
     ("soc.internal_memory_cached") => {
         false
     };
+    ("soc.cpu_powers_down_cache") => {
+        false
+    };
     ("soc.has_swd_watchdog") => {
+        true
+    };
+    ("soc.has_bus_clock_update") => {
+        false
+    };
+    ("soc.has_apb_frequency_reduction") => {
         true
     };
     ("soc.cpu_mcause_mask") => {
@@ -1854,6 +1878,13 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 /// }
+/// impl PcntInstance {
+///     // PCNT_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+/// }
 /// impl RmtInstance {
 ///     // RMT_SCLK
 ///
@@ -1996,6 +2027,11 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum ParlIoInstance {
             ParlIo = 0,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum PcntInstance {
+            Pcnt = 0,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2792,38 +2828,39 @@ macro_rules! define_clock_tree_types {
             uart_function_clock: [Option<UartFunctionClockConfig>; 2],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 2],
             tsens_sclk: [Option<TsensSclkConfig>; 1],
-            pll_clk_refcount: u32,
-            rc_fast_clk_refcount: u32,
+            pub(crate) pll_clk_refcount: u32,
+            pub(crate) rc_fast_clk_refcount: u32,
             #[cfg(use_xtal32k)]
-            xtal32k_clk_refcount: u32,
-            rc_slow_clk_refcount: u32,
-            hp_root_clk_refcount: u32,
-            mspi_fast_clk_refcount: u32,
-            apb_clk_refcount: u32,
-            pll_f48m_refcount: u32,
-            pll_f80m_refcount: u32,
-            pll_f160m_refcount: u32,
-            pll_f240m_refcount: u32,
-            ledc_sclk_refcount: u32,
-            lp_fast_clk_refcount: u32,
-            ble_lp_clk_refcount: u32,
-            timg_calibration_clock_refcount: u32,
-            adc_function_clock_refcount: [u32; 1],
-            sdm_function_clock_refcount: [u32; 1],
-            i2c_function_clock_refcount: [u32; 1],
-            i2s_tx_clk_refcount: [u32; 1],
-            i2s_rx_clk_refcount: [u32; 1],
-            i2s_mclk_out_refcount: [u32; 1],
-            mcpwm_function_clock_refcount: [u32; 1],
-            parl_io_rx_clock_refcount: [u32; 1],
-            parl_io_tx_clock_refcount: [u32; 1],
-            rmt_sclk_refcount: [u32; 1],
-            spi_function_clock_refcount: [u32; 1],
-            timg_function_clock_refcount: [u32; 2],
-            timg_wdt_clock_refcount: [u32; 2],
-            uart_function_clock_refcount: [u32; 2],
-            uart_baud_rate_generator_refcount: [u32; 2],
-            tsens_sclk_refcount: [u32; 1],
+            pub(crate) xtal32k_clk_refcount: u32,
+            pub(crate) rc_slow_clk_refcount: u32,
+            pub(crate) hp_root_clk_refcount: u32,
+            pub(crate) mspi_fast_clk_refcount: u32,
+            pub(crate) apb_clk_refcount: u32,
+            pub(crate) pll_f48m_refcount: u32,
+            pub(crate) pll_f80m_refcount: u32,
+            pub(crate) pll_f160m_refcount: u32,
+            pub(crate) pll_f240m_refcount: u32,
+            pub(crate) ledc_sclk_refcount: u32,
+            pub(crate) lp_fast_clk_refcount: u32,
+            pub(crate) ble_lp_clk_refcount: u32,
+            pub(crate) timg_calibration_clock_refcount: u32,
+            pub(crate) adc_function_clock_refcount: [u32; 1],
+            pub(crate) sdm_function_clock_refcount: [u32; 1],
+            pub(crate) i2c_function_clock_refcount: [u32; 1],
+            pub(crate) i2s_tx_clk_refcount: [u32; 1],
+            pub(crate) i2s_rx_clk_refcount: [u32; 1],
+            pub(crate) i2s_mclk_out_refcount: [u32; 1],
+            pub(crate) mcpwm_function_clock_refcount: [u32; 1],
+            pub(crate) parl_io_rx_clock_refcount: [u32; 1],
+            pub(crate) parl_io_tx_clock_refcount: [u32; 1],
+            pub(crate) pcnt_function_clock_refcount: [u32; 1],
+            pub(crate) rmt_sclk_refcount: [u32; 1],
+            pub(crate) spi_function_clock_refcount: [u32; 1],
+            pub(crate) timg_function_clock_refcount: [u32; 2],
+            pub(crate) timg_wdt_clock_refcount: [u32; 2],
+            pub(crate) uart_function_clock_refcount: [u32; 2],
+            pub(crate) uart_baud_rate_generator_refcount: [u32; 2],
+            pub(crate) tsens_sclk_refcount: [u32; 1],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.
@@ -3044,6 +3081,7 @@ macro_rules! define_clock_tree_types {
                 mcpwm_function_clock_refcount: [0; 1],
                 parl_io_rx_clock_refcount: [0; 1],
                 parl_io_tx_clock_refcount: [0; 1],
+                pcnt_function_clock_refcount: [0; 1],
                 rmt_sclk_refcount: [0; 1],
                 spi_function_clock_refcount: [0; 1],
                 timg_function_clock_refcount: [0; 2],
@@ -3792,6 +3830,9 @@ macro_rules! define_clock_tree_types {
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             let old_config = clocks.apb_clk.replace(config);
             refresh_apb_clk_downstream(clocks);
+            if old_config.is_none() {
+                request_ahb_clk(clocks);
+            }
             configure_apb_clk_impl(clocks, old_config, config);
         }
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
@@ -3800,17 +3841,13 @@ macro_rules! define_clock_tree_types {
         pub fn request_apb_clk(clocks: &mut ClockTree) {
             trace!("Requesting APB_CLK");
             if increment_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Enabling APB_CLK");
-                request_ahb_clk(clocks);
                 enable_apb_clk_impl(clocks, true);
             }
         }
         pub fn release_apb_clk(clocks: &mut ClockTree) {
             trace!("Releasing APB_CLK");
             if decrement_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Disabling APB_CLK");
                 enable_apb_clk_impl(clocks, false);
-                release_ahb_clk(clocks);
             }
         }
         pub fn apb_clk_config_frequency(config: ApbClkConfig) -> u32 {
@@ -4928,6 +4965,34 @@ macro_rules! define_clock_tree_types {
             }
             pub fn tx_clock_source_frequency(source: ParlIoClkConfig) -> u32 {
                 Self::tx_clock_config_frequency(source)
+            }
+        }
+        impl PcntInstance {
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(
+                    &mut clocks.pcnt_function_clock_refcount[self as usize],
+                ) {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    request_apb_clk(clocks);
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(
+                    &mut clocks.pcnt_function_clock_refcount[self as usize],
+                ) {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    release_apb_clk(clocks);
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                apb_clk_frequency()
+            }
+            pub fn function_clock_source_frequency() -> u32 {
+                apb_clk_frequency()
             }
         }
         impl RmtInstance {

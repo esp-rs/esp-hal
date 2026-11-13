@@ -786,8 +786,7 @@ pub(crate) mod utils {
     #[derive(Debug, Clone, Copy, PartialEq)]
     enum PsramCmdMode {
         PsramCmdQpi,
-        #[expect(unused)]
-        PsramCmdSpi,
+        // PsramCmdSpi,
     }
 
     // start sending cmd/addr and optionally, receiving data
@@ -804,10 +803,10 @@ pub(crate) mod utils {
             & (SPI_FREAD_DIO_M | SPI_FREAD_DUAL_M | SPI_FREAD_QUAD_M | SPI_FREAD_QIO_M);
 
         match cmd_mode {
-            PsramCmdMode::PsramCmdSpi => {
-                psram_set_basic_write_mode_spi1();
-                psram_set_basic_read_mode_spi1();
-            }
+            // PsramCmdMode::PsramCmdSpi => {
+            //    psram_set_basic_write_mode_spi1();
+            //    psram_set_basic_read_mode_spi1();
+            //}
             PsramCmdMode::PsramCmdQpi => {
                 psram_set_qio_write_mode_spi1();
                 psram_set_qio_read_mode_spi1();
@@ -870,14 +869,14 @@ pub(crate) mod utils {
     }
 
     // set basic SPI write mode
-    fn psram_set_basic_write_mode_spi1() {
-        SPI1::regs().user().modify(|_, w| {
-            w.fwrite_qio().clear_bit();
-            w.fwrite_dio().clear_bit();
-            w.fwrite_quad().clear_bit();
-            w.fwrite_dual().clear_bit()
-        });
-    }
+    // fn psram_set_basic_write_mode_spi1() {
+    //     SPI1::regs().user().modify(|_, w| {
+    //         w.fwrite_qio().clear_bit();
+    //         w.fwrite_dio().clear_bit();
+    //         w.fwrite_quad().clear_bit();
+    //         w.fwrite_dual().clear_bit()
+    //     });
+    // }
 
     // set QPI write mode
     fn psram_set_qio_write_mode_spi1() {
@@ -900,14 +899,14 @@ pub(crate) mod utils {
     }
 
     // set SPI read mode
-    fn psram_set_basic_read_mode_spi1() {
-        SPI1::regs().ctrl().modify(|_, w| {
-            w.fread_qio().clear_bit();
-            w.fread_quad().clear_bit();
-            w.fread_dual().clear_bit();
-            w.fread_dio().clear_bit()
-        });
-    }
+    // fn psram_set_basic_read_mode_spi1() {
+    //     SPI1::regs().ctrl().modify(|_, w| {
+    //         w.fread_qio().clear_bit();
+    //         w.fread_quad().clear_bit();
+    //         w.fread_dual().clear_bit();
+    //         w.fread_dio().clear_bit()
+    //     });
+    // }
 
     // psram gpio init , different working frequency we have different solutions
     fn psram_gpio_config(psram_io: &PsramIo, mode: PsramCacheSpeed) -> u32 {

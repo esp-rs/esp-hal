@@ -1401,11 +1401,11 @@ where
         }
 
         // Check if the packet in the receive buffer is valid or overrun.
-        if status.miss_st().bit_is_set() {
+        if head_entry_is_overrun(self.regs()) {
             // The FIFO entry is what is left of an overrun, not a frame:
             // release it, or every later call would report it again. The
             // async interrupt handler does the same.
-            release_receive_fifo(self.regs());
+            release_overrun_entry(self.regs());
             return nb::Result::Err(nb::Error::Other(EspTwaiError::EmbeddedHAL(
                 ErrorKind::Overrun,
             )));
@@ -1612,6 +1612,33 @@ pub trait PrivateInstance: crate::private::Sealed {
 /// reading.
 fn release_receive_fifo(register_block: &RegisterBlock) {
     register_block.cmd().write(|w| w.release_buf().set_bit());
+}
+
+/// Returns whether the entry at the head of the receive FIFO is what is left of an
+/// overrun, not a frame.
+fn head_entry_is_overrun(register_block: &RegisterBlock) -> bool {
+    let status = register_block.status().read();
+    cfg_select! {
+        // The ESP32 has no per-entry miss status. The data overrun status is set from
+        // the first entry that the overrun overwrote, until it is cleared.
+        esp32 => status.overrun_st().bit_is_set(),
+        _ => status.miss_st().bit_is_set(),
+    }
+}
+
+/// Releases an overrun entry from the receive FIFO.
+fn release_overrun_entry(register_block: &RegisterBlock) {
+    release_receive_fifo(register_block);
+    #[cfg(esp32)]
+    if register_block
+        .rx_message_cnt()
+        .read()
+        .rx_message_counter()
+        .bits()
+        == 0
+    {
+        register_block.cmd().write(|w| w.clr_overrun().set_bit());
+    }
 }
 
 /// Returns whether the peripheral is in the error-passive state, i.e. one of the
@@ -2059,7 +2086,6 @@ mod asynch {
         }
 
         if int_raw.rx_int_st().bit_is_set() {
-            let status_reg = register_block.status();
             let rx_queue = &async_state.rx_queue;
 
             // Consumme all pending frames in the Rx FIFO
@@ -2070,9 +2096,9 @@ mod asynch {
                 .bits()
                 > 0
             {
-                let msg = if status_reg.read().miss_st().bit_is_set() {
+                let msg = if head_entry_is_overrun(register_block) {
                     // Current frame is incomplete (Rx FIFO has overrun)
-                    release_receive_fifo(register_block);
+                    release_overrun_entry(register_block);
                     Counts::count(&async_state.counts.overrun);
                     Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun))
                 } else {

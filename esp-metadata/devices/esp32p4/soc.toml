@@ -19,7 +19,7 @@ page_size = 0x10000
 entry_num = 1024
 
 [device.flash]
-support_status = "partial"
+support_status = { status = "partial", issue = 6757 }
 
 [device.rom]
 has_crc_le  = true
@@ -43,6 +43,7 @@ cpu_pmp_granularity = 128
 internal_memory_cached = true
 
 has_swd_watchdog = true
+has_bus_clock_update = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4FF4_0000, end = 0x4FFA_DFC0 },
@@ -121,7 +122,8 @@ peripherals = [
     { name = "LEDC", interrupts = { peri = "LEDC" } },
     { name = "MCPWM0", interrupts = { peri = "PWM0" } },
     { name = "MCPWM1", interrupts = { peri = "PWM1" } },
-    { name = "PCNT", interrupts = { peri = "PCNT" } },
+    { name = "PARL_IO", interrupts = { tx = "PARLIO_TX", rx = "PARLIO_RX" }, clock_group = "PARL_IO" },
+    { name = "PCNT", interrupts = { peri = "PCNT" }, clock_group = "PCNT" },
     { name = "APB_SARADC", pac = "ADC" },
     { name = "LP_ADC" },
     { name = "RMT", interrupts = { peri = "RMT" }, clock_group = "RMT" },
@@ -150,7 +152,7 @@ peripherals = [
 # {include clocks.toml}
 
 [device.uart]
-support_status = "supported"
+support_status = { status = "supported", issue = 6782 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "UART0_TXD", rx = "UART0_RXD", cts = "UART0_CTS", rts = "UART0_RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "UART1_TXD", rx = "UART1_RXD", cts = "UART1_CTS", rts = "UART1_RTS" },
@@ -165,9 +167,10 @@ version = 2
 # PAC register names verified: unit_op(n), unit_value(n), target_conf(n),
 # trgt(n), comp_load(n) all match esp-hal systimer module expectations.
 [device.systimer]
+support_status = { status = "partial", issue = 6777 }
 
 [device.timergroup]
-support_status = "partial"
+support_status = { status = "partial", issue = 6779 }
 instances = [
     { name = "timg0" },
     { name = "timg1" },
@@ -177,7 +180,7 @@ timg_has_divcnt_rst = true
 wdt_has_conf_update = true
 
 [device.spi_master]
-support_status = "supported"
+support_status = { status = "supported", issue = 6776 }
 version = 3
 fifo_size = 64
 instances = [
@@ -198,7 +201,7 @@ instances = [
 ]
 
 [device.i2c_master]
-support_status = "supported"
+support_status = { status = "supported", issue = 6760 }
 version = 4
 instances = [
     { name = "i2c0", sys_instance = "I2c0", scl = "I2C0_SCL", sda = "I2C0_SDA" },
@@ -216,7 +219,7 @@ has_arbitration_en = true
 has_pd_en = true
 
 [device.dma]
-support_status = "partial"
+support_status = { status = "partial", issue = 6754 }
 gdma_version = 2
 separate_in_out_interrupts = true
 engines = [
@@ -241,12 +244,12 @@ engines = [
         name = "AXI_GDMA",
         max_priority = 5,
         burst_sizes = [8, 16, 32, 64, 128],
-        drivers = ["aes", "sha", "spi_master", "spi_slave"],
+        drivers = ["aes", "sha", "spi_master", "spi_slave", "parl_io"],
         peripheral_instances = [
             # LCD_CAM
             { name = "SPI2", dma_id = 1 },
             { name = "SPI3", dma_id = 2 },
-            # PARL_IO
+            { name = "PARL_IO", dma_id = 3 },
             { name = "AES",  dma_id = 4 },
             { name = "SHA",  dma_id = 5 },
         ],
@@ -276,7 +279,7 @@ engines = [
 support_status = "not_supported"
 
 [device.adc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6747 }
 line_calibration = true
 curve_calibration = true
 basic_calibration = true
@@ -301,9 +304,10 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.ethernet]
-support_status = "partial"
+support_status = { status = "partial", issue = 6755 }
 mii_via_gpio_matrix = true
 dma_burst_len = 32
+dma_alignment = 4
 rx_store_and_forward = false # RX FIFO is only 256B, too small for a full frame
 rx_checksum_offload = true
 tx_checksum_offload = false # TX FIFO is too small for store-and-forward insertion
@@ -312,7 +316,7 @@ tx_checksum_offload = false # TX FIFO is too small for store-and-forward inserti
 support_status = "not_supported"
 
 [device.mipi_dsi]
-support_status = "partial"
+support_status = { status = "partial", issue = 6769 }
 
 [device.etm]
 support_status = "not_supported"
@@ -322,7 +326,7 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.i2s]
-support_status = "partial"
+support_status = { status = "partial", issue = 6762 }
 version = 3
 clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 9
@@ -381,7 +385,7 @@ channel_count = 8
 support_status = "not_supported"
 
 [device.lp_i2c_master]
-support_status = "partial"
+support_status = { status = "partial", issue = 6766 }
 version = "lp_i2c"
 fifo_size = 16
 
@@ -391,7 +395,7 @@ ram_size = 32  # placeholder; LP UART RAM size on P4 needs verification
 [device.mcpwm]
 support_status = "not_supported"  # 2 instances (MCPWM0/1)
 [device.pcnt]
-support_status = "partial"
+support_status = { status = "partial", issue = 6771 }
 instances = {
     PCNT = {
         sys_instance = "Pcnt",
@@ -422,13 +426,13 @@ has_rx_wrap = true
 has_rx_demodulation = true
 
 [device.parl_io]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6770 }
 version = 2
 max_data_width = 16
 has_tx_cs = true
 
 [device.rng]
-support_status = { status = "partial", issue = 5982 }
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16  # TODO
 
@@ -436,7 +440,7 @@ apb_cycle_wait_num = 16  # TODO
 support_status = "partial"
 
 [device.sdmmc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6774 }
 delay_phase_num = 8
 has_iomux = true
 has_gpio_matrix = true
@@ -474,8 +478,14 @@ support_status = "partial"
 channel_count = 8
 
 [device.sleep]
-support_status = "partial"
+support_status = { status = "partial", issue = 6743 }
 light_sleep = true
+# No idle frequency scaling. With the CPU clock from XTAL_CLK, PSRAM must run at a low speed,
+# because the AXI bus clock must not be slower than the PSRAM clock. The PSRAM speed changes while
+# the L2 cache is frozen. A flash or PSRAM access from the other core then blocks the L1 cache,
+# which also caches HP L2MEM, so the switching core cannot reach its code, stack or data. ESP-IDF
+# stalls the other core. A switch without the stall must run from the uncached view of HP L2MEM,
+# with its stack and data there.
 deep_sleep = true
 ext1_version = 3
 pin_wakeup_version = 3
@@ -500,7 +510,7 @@ cpu_retention_frame = "p4"
 supports_top_power_down = true
 
 [device.spi_slave]
-support_status = "partial"
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",
@@ -532,13 +542,13 @@ support_status = "not_supported"
 [device.touch]
 support_status = "not_supported"
 [device.uhci]
-support_status = "partial"
+support_status = { status = "partial", issue = 6783 }
 combined_uart_selector_field = true
 [device.ulp_riscv]
 support_status = "not_supported"
 
 [device.aes]
-support_status = "partial"
+support_status = { status = "partial", issue = 6748 }
 has_split_text_registers = true
 endianness_configurable = false
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128", "GCM"]
@@ -548,7 +558,7 @@ key_length = { options = [
 ] }
 
 [device.sha]
-support_status = "partial"
+support_status = { status = "partial", issue = 6775 }
 algo = {
     sha1 = 0,
     sha224 = 1,
@@ -561,9 +571,11 @@ algo = {
 }
 
 [device.psram]
+support_status = { status = "partial", issue = 6773 }
 extmem_origin = 0x4800_0000
 hex_spi = true
 octal_spi = true
+has_timing_tuning = true
 
 [device.rsa]
 version = 3
@@ -572,12 +584,15 @@ size_increment = 32
 memory_size_bytes = 512
 
 [device.usb_otg]
+support_status = { status = "partial", issue = 6785 }
 fifo_depth_words = 200
 
 [device.usb_otg_hs]
+support_status = { status = "partial", issue = 6786 }
 fifo_depth_words = 896
 
 [device.usb_serial_jtag]
+support_status = { status = "partial", issue = 6787 }
 
 [device.ecc]
 support_status = "partial"
@@ -604,12 +619,12 @@ has_memory_clock_gate = true
 supports_enhanced_security = true
 
 [device.gpio]
-support_status = "supported"
+support_status = { status = "supported", issue = 6758 }
 # {include gpio.toml}
 
 [device.dedicated_gpio]
 version = "riscv_v2"
-support_status = "partial"
+support_status = { status = "partial", issue = 6753 }
 channels = [
     ["CPU_GPIO_0", "CPU_GPIO_1",  "CPU_GPIO_2",  "CPU_GPIO_3",  "CPU_GPIO_4",  "CPU_GPIO_5",  "CPU_GPIO_6",  "CPU_GPIO_7" ],
     ["CPU_GPIO_8", "CPU_GPIO_9",  "CPU_GPIO_10", "CPU_GPIO_11", "CPU_GPIO_12", "CPU_GPIO_13", "CPU_GPIO_14", "CPU_GPIO_15"],
@@ -634,3 +649,4 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.io_mux]
+support_status = { status = "partial", issue = 6758 }

@@ -1,16 +1,16 @@
 //! Cache tag memory retention through the RTC_CNTL retention DMA.
 
-use core::{
-    cell::UnsafeCell,
-    mem::MaybeUninit,
-    ptr::{self, NonNull},
-};
-
-use portable_atomic::{AtomicPtr, Ordering};
-use static_cell::ConstStaticCell;
+use core::ptr::NonNull;
 
 use crate::{
-    rtc_cntl::{cpu_retention::DMA_LINK_SIZE, sleep::LowPower},
+    rtc_cntl::{
+        RetentionMemory,
+        RetentionMemoryError,
+        RetentionSlot,
+        RetentionStorage,
+        cpu_retention::DMA_LINK_SIZE,
+        sleep::LowPower,
+    },
     soc::{
         CONFIG_DATA_CACHE_LINE_SIZE,
         CONFIG_DATA_CACHE_SIZE,
@@ -20,9 +20,6 @@ use crate::{
         CONFIG_INSTRUCTION_CACHE_SIZE,
     },
 };
-
-const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
-const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
 
 /// Tag block groups the retention hardware moves for one cache.
 ///
@@ -69,47 +66,14 @@ const PAYLOAD_SIZE: usize =
 
 const BUFFER_SIZE: usize = PAYLOAD_SIZE + DMA_LINK_SIZE;
 
-static INSTALLED: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
+static INSTALLED: RetentionSlot<BUFFER_SIZE> = RetentionSlot::new();
 
-/// Memory that light sleep uses to retain the cache tag memory.
+/// Storage for [`CacheTagRetentionMemory`].
 ///
 /// This storage must be placed to `#[ram(reclaimed, unstable(zeroed))]`, then
 /// a static mutable reference to [`CacheTagRetentionMemory`] can be taken out of it.
 #[instability::unstable]
-pub struct CacheTagRetentionStorage {
-    inner: ConstStaticCell<CacheTagRetentionMemory>,
-}
-
-impl CacheTagRetentionStorage {
-    /// Creates storage for the retention memory.
-    #[instability::unstable]
-    pub const fn new() -> Self {
-        Self {
-            inner: ConstStaticCell::new(CacheTagRetentionMemory {
-                storage: UnsafeCell::new(MaybeUninit::uninit()),
-            }),
-        }
-    }
-
-    /// Takes the reference to the retention memory.
-    ///
-    /// Can only be called once.
-    #[instability::unstable]
-    pub fn take(&'static self) -> &'static mut CacheTagRetentionMemory {
-        self.inner.take()
-    }
-}
-
-#[instability::unstable]
-impl Default for CacheTagRetentionStorage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// SAFETY: ConstStaticCell is a `MaybeUninit` buffer, and an AtomicBool strapped together,
-// both are safe to be zero-initialized.
-unsafe impl bytemuck::Zeroable for CacheTagRetentionStorage {}
+pub type CacheTagRetentionStorage = RetentionStorage<BUFFER_SIZE>;
 
 /// Memory that light sleep uses to retain the cache tag memory.
 ///
@@ -127,45 +91,12 @@ unsafe impl bytemuck::Zeroable for CacheTagRetentionStorage {}
 /// does nothing: the tags are lost only when the CPU domain powers down.
 ///
 /// [install]: LowPower::install_cpu_retention_memory
-#[repr(align(16))]
 #[instability::unstable]
-pub struct CacheTagRetentionMemory {
-    storage: UnsafeCell<MaybeUninit<[u8; BUFFER_SIZE]>>,
-}
-
-impl CacheTagRetentionMemory {
-    fn as_mut_ptr(&self) -> *mut u8 {
-        self.storage.get().cast()
-    }
-}
+pub type CacheTagRetentionMemory = RetentionMemory<BUFFER_SIZE>;
 
 /// The reason why [`LowPower::install_cache_tag_retention_memory`] refused a buffer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-#[non_exhaustive]
-pub enum CacheTagRetentionMemoryError {
-    /// The buffer is not inside the range that the retention DMA reaches.
-    OutOfRange,
-    /// The driver holds a tag memory buffer already.
-    AlreadyInstalled,
-}
-
-#[instability::unstable]
-impl core::error::Error for CacheTagRetentionMemoryError {}
-
-#[instability::unstable]
-impl core::fmt::Display for CacheTagRetentionMemoryError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::OutOfRange => write!(
-                f,
-                "the buffer is outside the retention memory range (0x{MEM_START:X}..0x{MEM_END:X})"
-            ),
-            Self::AlreadyInstalled => write!(f, "a tag memory buffer is installed already"),
-        }
-    }
-}
+pub type CacheTagRetentionMemoryError = RetentionMemoryError;
 
 impl LowPower<'_> {
     #[procmacros::doc_replace]
@@ -210,25 +141,13 @@ impl LowPower<'_> {
         &mut self,
         memory: &'static mut CacheTagRetentionMemory,
     ) -> Result<(), CacheTagRetentionMemoryError> {
-        let memory = memory.as_mut_ptr();
-        let start = memory as usize;
-
-        if start < MEM_START || start + BUFFER_SIZE > MEM_END {
-            return Err(CacheTagRetentionMemoryError::OutOfRange);
-        }
-
-        INSTALLED
-            .compare_exchange(ptr::null_mut(), memory, Ordering::AcqRel, Ordering::Acquire)
-            .map(|_| ())
-            .map_err(|_| CacheTagRetentionMemoryError::AlreadyInstalled)
+        INSTALLED.install(memory)
     }
 }
 
 /// The installed buffer, and the payload size the DMA descriptor needs.
 pub(crate) fn installed_buffer_ptr() -> Option<NonNull<u8>> {
-    let memory = INSTALLED.load(Ordering::Acquire);
-
-    NonNull::new(memory)
+    INSTALLED.get()
 }
 
 /// Bytes the DMA moves, not counting the descriptor.

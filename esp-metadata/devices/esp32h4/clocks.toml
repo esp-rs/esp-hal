@@ -38,7 +38,8 @@ system_clocks = { clock_tree = [
     # HP_ROOT_CLK, but that contradicts both.
     { name = "AHB_CLK", type = "generic", params = { divisor = "0..=255" }, output = "CPU_CLK / (divisor + 1)", always_on = true },
     # PCR_APB_DIV_NUM - Set as one within (0,1,3) - pcr_reg.h
-    { name = "APB_CLK", type = "generic", params = { divisor = "0, 1, 3" }, output = "AHB_CLK / (divisor + 1)" },
+    # The hardware lowers APB_CLK while the APB bus is idle. Consumers stop the reduction.
+    { name = "APB_CLK", type = "generic", params = { divisor = "0, 1, 3" }, output = "AHB_CLK / (divisor + 1)", always_on = true, refcounted = true },
 
     # LP clocks
     { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
@@ -117,6 +118,25 @@ system_clocks = { clock_tree = [
           { name = "TX", outputs = "TX_CLK" },
           { name = "RX", outputs = "RX_CLK", default = true },
         ] },
+      ],
+    },
+    # PCR.parl_clk_{rx,tx}_conf.parl_clk_{rx,tx}_sel, see SOC_PARLIO_CLKS. The driver selects
+    # source 3, the clock from the pad.
+    { group = "PARL_IO",
+      presets = {
+        CLK = {
+          type = "mux",
+          wake_locking = true,
+          variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F96M",    outputs = "PLL_F96M_CLK", default = true },
+          ],
+        },
+      },
+      clocks = [
+        { name = "RX_CLOCK", preset = "CLK" },
+        { name = "TX_CLOCK", preset = "CLK" },
       ],
     },
     # PCR.i2cX_sclk_conf.i2cX_sclk_sel: 0 = XTAL, 1 = RC_FAST, see SOC_I2C_CLKS.

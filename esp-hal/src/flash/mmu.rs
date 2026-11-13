@@ -380,7 +380,7 @@ mod indexed {
     fn mmu_page_size_code() -> u32 {
         let ctrl = SPI0::regs().mmu_power_ctrl().read();
         cfg_select! {
-            any(esp32c5, esp32c61, esp32s31) => ctrl.mmu_page_size().bits() as u32,
+            any(esp32c5, esp32c61, esp32h4, esp32s31) => ctrl.mmu_page_size().bits() as u32,
             _ => ctrl.spi_mmu_page_size().bits() as u32,
         }
     }
@@ -522,10 +522,6 @@ mod table {
 /// and the core that waits for the fill then hangs. ESP-IDF turns the cache
 /// off around both operations, see `s_do_mapping()` in
 /// `components/esp_mm/esp_mmu_map.c`.
-///
-/// Everything that runs inside the cache-off window must be reachable without
-/// flash: the `#[ram]` entry points below only call `#[ram]` guard methods and
-/// helpers that are inlined into them.
 #[cfg(esp32)]
 mod esp32_cache {
     use procmacros::ram;
@@ -534,7 +530,7 @@ mod esp32_cache {
     use crate::{flash::cache::CacheGuard, pac::mmu_table::ENTRY};
 
     /// Map `page_paddr` into `entry` and make the new mapping visible.
-    #[ram]
+    #[ram(unstable(checked))]
     pub(super) fn map_entry(entry: &ENTRY, page_paddr: u32) {
         let cache = CacheGuard::suspend();
         table::write_entry(entry, page_paddr);
@@ -542,7 +538,7 @@ mod esp32_cache {
     }
 
     /// Drop the lines of a temporary mapping and invalidate its entry, if we own it.
-    #[ram]
+    #[ram(unstable(checked))]
     pub(super) fn unmap_entry(owned_entry: Option<&ENTRY>) {
         let cache = CacheGuard::suspend();
         if let Some(entry) = owned_entry {
@@ -552,7 +548,7 @@ mod esp32_cache {
     }
 
     /// Drop every cached line.
-    #[ram]
+    #[ram(unstable(checked))]
     pub(super) fn flush_caches() {
         let cache = CacheGuard::suspend();
         cache.flush_while_off();

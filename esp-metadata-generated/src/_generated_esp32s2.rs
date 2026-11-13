@@ -340,6 +340,9 @@ macro_rules! property {
     ("wifi.has_ftm") => {
         true
     };
+    ("wifi.requires_fast_cpu") => {
+        false
+    };
     ("phy.combo_module") => {
         false
     };
@@ -457,6 +460,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         true
     };
+    ("sleep.idle_frequency_scaling") => {
+        false
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -490,11 +496,17 @@ macro_rules! property {
     ("psram.hex_spi") => {
         false
     };
+    ("psram.has_timing_tuning") => {
+        false
+    };
     ("psram.extmem_origin") => {
         1062207488
     };
     ("psram.extmem_origin", str) => {
         stringify!(1062207488)
+    };
+    ("psram.idle_low_speed_switch") => {
+        false
     };
     ("rom.has_crc_le") => {
         true
@@ -523,11 +535,23 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         false
     };
+    ("soc.cpu_pma_needs_core1_setup") => {
+        false
+    };
     ("soc.internal_memory_cached") => {
+        false
+    };
+    ("soc.cpu_powers_down_cache") => {
         false
     };
     ("soc.has_swd_watchdog") => {
         true
+    };
+    ("soc.has_bus_clock_update") => {
+        false
+    };
+    ("soc.has_apb_frequency_reduction") => {
+        false
     };
     ("soc.cpu_mcause_mask") => {
         0
@@ -2035,26 +2059,26 @@ macro_rules! define_clock_tree_types {
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 2],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 2],
-            pll_clk_refcount: u32,
-            apll_clk_refcount: u32,
-            rc_fast_clk_refcount: u32,
-            apb_clk_refcount: u32,
-            ref_tick_refcount: u32,
+            pub(crate) pll_clk_refcount: u32,
+            pub(crate) apll_clk_refcount: u32,
+            pub(crate) rc_fast_clk_refcount: u32,
+            pub(crate) apb_clk_refcount: u32,
+            pub(crate) ref_tick_refcount: u32,
             #[cfg(use_xtal32k)]
-            xtal32k_clk_refcount: u32,
-            rc_fast_div_clk_refcount: u32,
-            rtc_fast_clk_refcount: u32,
-            uart_mem_clk_refcount: u32,
-            timg_calibration_clock_refcount: u32,
-            sdm_function_clock_refcount: [u32; 1],
-            i2c_function_clock_refcount: [u32; 2],
-            i2s_mclk_refcount: [u32; 1],
-            rmt_sclk_refcount: [u32; 1],
-            spi_function_clock_refcount: [u32; 2],
-            timg_function_clock_refcount: [u32; 2],
-            uart_function_clock_refcount: [u32; 2],
-            uart_baud_rate_generator_refcount: [u32; 2],
-            uart_mem_clock_refcount: [u32; 2],
+            pub(crate) xtal32k_clk_refcount: u32,
+            pub(crate) rc_fast_div_clk_refcount: u32,
+            pub(crate) rtc_fast_clk_refcount: u32,
+            pub(crate) uart_mem_clk_refcount: u32,
+            pub(crate) timg_calibration_clock_refcount: u32,
+            pub(crate) sdm_function_clock_refcount: [u32; 1],
+            pub(crate) i2c_function_clock_refcount: [u32; 2],
+            pub(crate) i2s_mclk_refcount: [u32; 1],
+            pub(crate) rmt_sclk_refcount: [u32; 1],
+            pub(crate) spi_function_clock_refcount: [u32; 2],
+            pub(crate) timg_function_clock_refcount: [u32; 2],
+            pub(crate) uart_function_clock_refcount: [u32; 2],
+            pub(crate) uart_baud_rate_generator_refcount: [u32; 2],
+            pub(crate) uart_mem_clock_refcount: [u32; 2],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.

@@ -8,8 +8,6 @@
 //! The module allows precise and flexible control over timer configurations,
 //! duty cycles and frequencies, making it ideal for Pulse-Width Modulation
 //! (PWM) applications and LED lighting control.
-//!
-//! LEDC uses APB as clock source.
 
 #[cfg(ledc_version = "1")]
 use super::HighSpeed;

@@ -958,6 +958,11 @@ impl Channels {
     fn active_count(&self) -> u8 {
         self.mask.count_ones() as u8
     }
+
+    #[cfg(not(i2s_version = "1"))]
+    pub(crate) const fn is_enabled(&self, ch: u8) -> bool {
+        self.mask & (1 << ch) != 0
+    }
 }
 
 /// Internal I2S peripheral configuration (TDM or PDM mode).

@@ -1,0 +1,14 @@
+sdk_version = "0.1.0"
+
+name = "esp-hal"
+description = "Minimal no_std project built against this commit of esp-hal"
+
+plugins = { chip = "0.5.0" }
+
+emit = [
+  # Renamed in the repository, where cargo and rustup would otherwise read them
+  # with their placeholders unrendered.
+  { path = "Cargo.toml.in", as = "Cargo.toml" },
+  { path = "rust-toolchain.toml.in", as = "rust-toolchain.toml" },
+  { path = ".cargo/config.toml.in", as = ".cargo/config.toml" },
+]

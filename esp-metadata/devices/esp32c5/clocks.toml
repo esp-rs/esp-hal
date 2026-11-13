@@ -29,13 +29,14 @@ system_clocks = { clock_tree = [
         { name = "PLL_F240M", outputs = "PLL_F240M" },
     ] },
     # CPU_CLK divider: divider = (CPU_DIV_NUM + 1), n*F_AHB
-    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
     # AHB_CLK divider: divider = (AHB_DIV_NUM + 1), <= 48MHz
-    { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
     # APB_CLK divider: divider = (APB_DIV_NUM + 1)
-    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)" },
+    # The hardware lowers APB_CLK while the APB bus is idle. Consumers stop the reduction.
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)", always_on = true, refcounted = true },
 
     # LP clocks (RTC domain)
     { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
@@ -102,6 +103,10 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SDM", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
+    ] },
+    # The glitch filter counts APB_CLK cycles.
+    { group = "PCNT", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "APB_CLK" },
     ] },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", variants = [

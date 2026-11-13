@@ -1,4 +1,4 @@
-use core::sync::atomic::Ordering;
+use core::{cell::UnsafeCell, sync::atomic::Ordering};
 
 use embassy_sync::lazy_lock::LazyLock;
 use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphoreKind};
@@ -78,6 +78,7 @@ static ACCESS_POINT_STATE: AtomicWifiAccessPointState =
     AtomicWifiAccessPointState::new(WifiAccessPointState::Uninitialized);
 
 /// Get the current state of the access point.
+#[cfg(wifi_softap_support)]
 pub(crate) fn access_point_state() -> WifiAccessPointState {
     ACCESS_POINT_STATE.load(Ordering::Relaxed)
 }
@@ -112,14 +113,36 @@ pub(crate) fn set_station_state(state: WifiStationState) {
     STATION_STATE.store(state, Ordering::Relaxed)
 }
 
-pub(crate) fn locked<R>(f: impl FnOnce() -> R) -> R {
-    static LOCK: LazyLock<SemaphoreHandle> =
-        LazyLock::new(|| SemaphoreHandle::new(SemaphoreKind::Mutex));
+/// Wi-Fi state that only code under [`locked`] accesses.
+pub(crate) struct State {
+    #[cfg(wifi_tx_retry)]
+    pub(super) pending_tx: super::tx_retry::PendingTxFrame,
+}
 
+struct StateCell(UnsafeCell<State>);
+
+// SAFETY: Only `locked` accesses the state, and it holds the mutex while it does.
+unsafe impl Sync for StateCell {}
+
+static LOCK: LazyLock<SemaphoreHandle> =
+    LazyLock::new(|| SemaphoreHandle::new(SemaphoreKind::Mutex));
+static STATE: StateCell = StateCell(UnsafeCell::new(State {
+    #[cfg(wifi_tx_retry)]
+    pending_tx: super::tx_retry::PendingTxFrame::new(),
+}));
+
+#[inline(never)]
+fn acquire_lock() -> &'static SemaphoreHandle {
     let sem = LOCK.get();
-
     sem.take(None);
-    let res = f();
+    sem
+}
+
+pub(crate) fn locked<R>(f: impl FnOnce(&mut State) -> R) -> R {
+    let sem = acquire_lock();
+    // SAFETY: The mutex is held. The mutex is not recursive, so a nested call blocks and does not
+    // create a second reference.
+    let res = f(unsafe { &mut *STATE.0.get() });
     sem.give();
 
     res

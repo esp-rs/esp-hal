@@ -81,6 +81,55 @@ fn write_pms_ctrl_range(base: usize, start: usize, end: usize) {
 
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 
+// The ROM cache function table, up to the freeze functions. See `cache_internal_stub_table` in
+// ESP-IDF `esp_rom/esp32s31/include/esp32s31/rom/cache.h`.
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+#[repr(C)]
+struct CacheInternalStubTable {
+    _unused: [usize; 11],
+    freeze_l1_icache0_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l1_icache0_disable: unsafe extern "C" fn(),
+    freeze_l1_icache1_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l1_icache1_disable: unsafe extern "C" fn(),
+    freeze_l1_dcache_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l1_dcache_disable: unsafe extern "C" fn(),
+}
+
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+unsafe extern "C" {
+    static rom_cache_internal_table_ptr: *const CacheInternalStubTable;
+}
+
+/// Freezes the L1 caches, which cache the external memory. An access to flash or PSRAM stalls
+/// until [`unfreeze_ext_mem_cache`].
+///
+/// The caller must run from RAM. The L1 caches do not cache internal RAM, so the other core can
+/// continue to run.
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+#[inline(always)]
+pub(crate) fn freeze_ext_mem_cache() {
+    // `CACHE_FREEZE_ACK_BUSY`: a cache miss stalls the requester.
+    const ACK_BUSY: u32 = 0;
+    unsafe {
+        let table = &*rom_cache_internal_table_ptr;
+        (table.freeze_l1_icache0_enable)(ACK_BUSY);
+        (table.freeze_l1_icache1_enable)(ACK_BUSY);
+        (table.freeze_l1_dcache_enable)(ACK_BUSY);
+    }
+}
+
+/// Releases the freeze of [`freeze_ext_mem_cache`].
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+#[inline(always)]
+pub(crate) fn unfreeze_ext_mem_cache() {
+    unsafe {
+        let table = &*rom_cache_internal_table_ptr;
+        (table.freeze_l1_dcache_disable)();
+        (table.freeze_l1_icache1_disable)();
+        (table.freeze_l1_icache0_disable)();
+    }
+}
+
 /// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[crate::ram]
@@ -91,6 +140,29 @@ pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_WriteBack_Addr(CACHE_MAP_L1_DCACHE, addr, size);
     });
+}
+
+/// Writes back every dirty line of the data cache.
+///
+/// The write-back runs twice, as in the ESP-IDF patch of the ROM function `Cache_WriteBack_All`.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_rom/patches/esp_rom_cache_writeback_esp32p4_esp32s31.c#L56-L77>.
+#[crate::ram]
+pub(crate) fn cache_writeback_all() {
+    let cache = crate::peripherals::CACHE::regs();
+    cache
+        .sync_map()
+        .write(|w| unsafe { w.bits(CACHE_MAP_L1_DCACHE) });
+    cache.sync_addr().write(|w| unsafe { w.bits(0) });
+    cache.sync_size().write(|w| unsafe { w.bits(0) });
+    for _ in 0..2 {
+        // The register resets with `INVALIDATE_ENA` set, and an invalidate drops the dirty lines.
+        unsafe {
+            cache
+                .sync_ctrl()
+                .write_with_zero(|w| w.writeback_ena().set_bit())
+        };
+        while cache.sync_ctrl().read().sync_done().bit_is_clear() {}
+    }
 }
 
 /// Invalidate a specific range of addresses in the cache.

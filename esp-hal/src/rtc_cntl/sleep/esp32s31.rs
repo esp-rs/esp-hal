@@ -83,7 +83,10 @@ impl AnalogSleepConfig {
             },
         };
 
-        if !pd_flags.pd_xtal() {
+        // Without the reference current, PSRAM loses its data and its mode register settings in
+        // light sleep.
+        // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L223-L229>.
+        if !pd_flags.pd_xtal() || !crate::psram::psram_range().is_empty() {
             this.hp_sys.bias.set_pd_cur(false);
             this.lp_sys_sleep.bias.set_pd_cur(false);
         }
@@ -678,6 +681,14 @@ impl RtcSleepConfig {
 
             DropGuard::new((), move |_| {
                 ClockTree::with(|clocks| {
+                    // Light sleep powers XTAL_CLK down, so the MPLL that clocks PSRAM loses its
+                    // calibration. The MPLL must be calibrated again before the next PSRAM
+                    // access.
+                    clocks::recalibrate_mpll(clocks);
+                    // Light sleep powers XTAL_CLK down, so the CPLL loses its calibration. The
+                    // CPLL must be calibrated again before the CPU or the flash controller runs
+                    // from it.
+                    clocks::recalibrate_cpll(clocks);
                     if let Some(old) = old_cpu_root_clk {
                         clocks::configure_cpu_root_clk(clocks, old);
                     }
@@ -751,5 +762,7 @@ impl RtcSleepConfig {
 
     /// Cleans up after sleep.
     #[inline(always)]
-    pub(crate) fn finish_sleep(&self) {}
+    pub(crate) fn finish_sleep(&self) {
+        super::pmu_common::wait_for_efuse_idle();
+    }
 }

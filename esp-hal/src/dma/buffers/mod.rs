@@ -273,7 +273,7 @@ impl InternalBurstConfig {
     }
 }
 
-const fn max(a: usize, b: usize) -> usize {
+pub(crate) const fn max(a: usize, b: usize) -> usize {
     if a > b { a } else { b }
 }
 
@@ -2040,22 +2040,16 @@ pub(crate) unsafe fn prepare_for_rx(
 
     let descriptors = unsafe { DmaAlignedMut::new_unchecked(descriptors) };
     let mut descriptors = unwrap!(DescriptorSet::new(descriptors));
-    let data_len = if data_in_psram {
+    // The DMA can write a receive buffer in cached memory directly only for the cache lines that
+    // lie wholly inside the buffer. A partial line at either end also holds other data, which the
+    // CPU can load or dirty during the transfer. So the partial first and last lines must go
+    // through the bounce buffers.
+    let bounce = data_in_psram || cfg!(soc_internal_memory_cached);
+    let data_len = if bounce {
         cfg_select! {
             dma_can_access_psram => {
-                // This could use a better API, but right now we'll have to build the descriptor
-                // list by hand.
-                let consumed_bytes =
-                    build_descriptor_list_for_psram(&mut descriptors, align_buffers, data);
-
-                // Invalidate data written by the DMA. As this likely affects more data than we
-                // touched, write back first.
-                unsafe {
-                    crate::soc::cache_writeback_addr(data_addr as u32, consumed_bytes as u32);
-                    crate::soc::cache_invalidate_addr(data_addr as u32, consumed_bytes as u32);
-                }
-
-                consumed_bytes
+                let alignment = bounce_alignment(data_addr, data_in_psram);
+                build_bounced_descriptor_list(&mut descriptors, align_buffers, data, alignment)
             }
             _ => {
                 unreachable!()
@@ -2066,14 +2060,6 @@ pub(crate) unsafe fn prepare_for_rx(
         let data_len = data.len();
         unwrap!(descriptors.link_with_buffer(unsafe { data.as_mut() }, chunk_size));
         unwrap!(descriptors.set_tx_length(data_len, chunk_size));
-
-        #[cfg(soc_internal_memory_cached)]
-        // Invalidate data written by the DMA. As this likely affects more data than we touched,
-        // write back first.
-        unsafe {
-            crate::soc::cache_writeback_addr(data.addr().get() as u32, data_len as u32);
-            crate::soc::cache_invalidate_addr(data.addr().get() as u32, data_len as u32);
-        }
 
         data_len
     };
@@ -2098,16 +2084,52 @@ pub(crate) unsafe fn prepare_for_rx(
     )
 }
 
+/// Returns the alignment of the part of a receive buffer that the DMA writes directly.
+///
+/// The alignment is the DMA's own requirement for the memory, or the cache line where the
+/// memory is cached, whichever is larger.
 #[cfg(dma_can_access_psram)]
-fn build_descriptor_list_for_psram(
+fn bounce_alignment(addr: usize, in_psram: bool) -> usize {
+    let dma = if in_psram {
+        ExternalBurstConfig::DEFAULT.min_psram_alignment(TransferDirection::In)
+    } else {
+        1
+    };
+    dma.max(unwrap!(crate::dma::aligned::region_dma_alignment(addr)))
+}
+
+/// Invalidates the cache lines that lie wholly inside `data`, after a receive transfer.
+///
+/// The DMA does not write the partial lines at either end. The CPU copies their received bytes
+/// from the bounce buffers, and their other bytes can hold the CPU's own writes. The invalidate
+/// must not touch those partial lines.
+#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+pub(crate) fn invalidate_received(data: NonNull<[u8]>) {
+    let addr = data.addr().get();
+    let len = data.len();
+    if !crate::dma::aligned::region_needs_cache_op(addr, len) {
+        return;
+    }
+    let Some(alignment) = crate::dma::aligned::region_dma_alignment(addr) else {
+        return;
+    };
+    let start = addr.next_multiple_of(alignment);
+    let end = (addr + len) & !(alignment - 1);
+    if end > start {
+        unsafe { crate::soc::cache_invalidate_addr(start as u32, (end - start) as u32) };
+    }
+}
+
+#[cfg(dma_can_access_psram)]
+fn build_bounced_descriptor_list(
     descriptors: &mut DescriptorSet<'_>,
     copy_buffers: &mut [Option<ManualWritebackBuffer>; 2],
     data: NonNull<[u8]>,
+    min_alignment: usize,
 ) -> usize {
     let data_len = data.len();
     let data_addr = data.addr().get();
 
-    let min_alignment = ExternalBurstConfig::DEFAULT.min_psram_alignment(TransferDirection::In);
     let chunk_size = 4096 - min_alignment;
 
     let mut descriptor_iter = DescriptorChainingIter::new(&mut descriptors.descriptors);
@@ -2159,6 +2181,22 @@ fn build_descriptor_list_for_psram(
 
     // Chain up descriptors for the main aligned data part.
     let mut aligned_data = get_range(data, head_to_copy..data.len() - tail_to_copy);
+
+    // The DMA writes these lines directly. They must not hold dirty data when the DMA writes
+    // them, and must not be in the cache when the CPU reads them afterwards.
+    if crate::dma::aligned::region_needs_cache_op(aligned_data.addr().get(), aligned_data.len()) {
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                aligned_data.addr().get() as u32,
+                aligned_data.len() as u32,
+            );
+            crate::soc::cache_invalidate_addr(
+                aligned_data.addr().get() as u32,
+                aligned_data.len() as u32,
+            );
+        }
+    }
+
     while !aligned_data.is_empty() {
         let Some(descriptor) = descriptor_iter.next() else {
             return consumed;
@@ -2237,11 +2275,15 @@ impl<'a> DescriptorChainingIter<'a> {
 
 #[cfg(dma_can_access_psram)]
 const MIN_LAST_DMA_LEN: usize = if cfg!(esp32s2) { 5 } else { 1 };
+// A bounce buffer holds the longest partial line the DMA writes, plus the bytes that
+// `MIN_LAST_DMA_LEN` can add to a head and to a tail. The longest line is the PSRAM cache line.
+// A buffer that fits goes into one bounce buffer whole, so every longer buffer leaves a head
+// and a tail that each fit in one.
 #[cfg(dma_can_access_psram)]
-const BUF_LEN: usize = 16 + 2 * (MIN_LAST_DMA_LEN - 1); // 2x makes aligning short buffers simpler
+const BUF_LEN: usize = crate::dma::aligned::PSRAM_CACHE_LINE + 2 * (MIN_LAST_DMA_LEN - 1);
 
-/// PSRAM helper. DMA can write data of any alignment into this buffer, and it can be written by
-/// the CPU back to PSRAM.
+/// Bounce buffer for a partial cache line at either end of a receive buffer. The DMA writes to
+/// it, and then the CPU copies it to the caller's buffer.
 #[cfg(dma_can_access_psram)]
 pub(crate) struct ManualWritebackBuffer {
     buffer: InternalMemory<MaybeUninit<[u8; BUF_LEN]>>,
@@ -2284,5 +2326,15 @@ impl ManualWritebackBuffer {
 
     pub fn mut_buffer_ptr(&mut self) -> *mut u8 {
         self.buffer.get_mut().as_mut_ptr().cast::<u8>()
+    }
+
+    /// Zeroes the buffer. It can hold plaintext.
+    // Only the GCM path zeroes a buffer, so the method is dead code without it.
+    #[cfg(aes_dma_mode_gcm)]
+    pub fn clear(&mut self) {
+        let mut buffer = self.buffer.get_mut();
+        unsafe { core::ptr::write_volatile(buffer.as_mut_ptr(), [0; BUF_LEN]) };
+        #[cfg(soc_internal_memory_cached)]
+        buffer.writeback();
     }
 }

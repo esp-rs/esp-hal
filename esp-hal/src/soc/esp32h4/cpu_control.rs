@@ -62,6 +62,26 @@ pub(crate) fn pre_system_reset() {
     crate::rom::ets_set_appcpu_boot_addr(0);
 }
 
+/// Releases core 1 from reset after a CPU-domain power-down wake.
+///
+/// esp-idf keys this on `core_id == 0` in both the initiator and the helper paths.
+#[cfg(all(
+    cpu_retention = "software",
+    multi_core,
+    supports_cpu_power_down,
+    feature = "rt"
+))]
+#[crate::ram(unstable(checked))]
+pub(crate) fn restart_core1_after_wake() {
+    if Cpu::current() != Cpu::ProCpu {
+        return;
+    }
+    PCR::regs().core1_conf().modify(|_, w| {
+        w.core1_clk_en().set_bit();
+        w.core1_rst_en().clear_bit()
+    });
+}
+
 pub(crate) fn disable_core1() {
     // The reset defaults of the register, which is how ESP-IDF leaves Core 1 in single-core mode:
     // the core is clock gated and held in reset.
@@ -85,14 +105,29 @@ pub(crate) fn enable_core1_interrupt_matrix() {
     });
 }
 
-#[cfg(feature = "unstable")]
+/// Starts Core 1 at `entry_point`. Core 1 stays stalled until the caller unstalls it.
 pub(crate) fn start_core1(entry_point: *const u32) {
+    // The stall holds Core 1 until the ROM can read the new entry point.
+    unsafe { internal_park_core(Cpu::AppCpu, true) };
+
+    // A release from reset does not restart a core that ran before.
+    if PCR::regs()
+        .core1_conf()
+        .read()
+        .core1_rst_en()
+        .bit_is_clear()
+    {
+        LP_AON::regs()
+            .cpucore_cfg()
+            .modify(|_, w| w.cpu_core1_sw_reset().set_bit());
+    }
+
+    // Core 1's ROM waits for this address before handing control to the app.
+    crate::rom::ets_set_appcpu_boot_addr(entry_point as u32);
+
     // cpu_utility_ll_enable_clock_and_reset_app_cpu()
     PCR::regs().core1_conf().modify(|_, w| {
         w.core1_clk_en().set_bit();
         w.core1_rst_en().clear_bit()
     });
-
-    // Core 1's ROM waits for this address before handing control to the app.
-    crate::rom::ets_set_appcpu_boot_addr(entry_point as u32);
 }

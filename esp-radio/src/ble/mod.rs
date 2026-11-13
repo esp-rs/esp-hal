@@ -23,6 +23,7 @@ impl core::error::Error for InvalidConfigError {}
 // Expose chip-specific configuration types
 pub use porting::chip_specific::*;
 
+#[cfg(bt_controller = "npl")]
 pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 /// Returns whether the caller runs in an interrupt handler.
@@ -53,6 +54,7 @@ pub(crate) fn modem_sleep_enabled() -> bool {
 pub(crate) fn modem_phy_release() {
     if !MODEM_PHY_OFF.swap(true, portable_atomic::Ordering::SeqCst) {
         esp_phy::disable_phy();
+        unlock_cpu_frequency();
     }
 }
 
@@ -62,9 +64,22 @@ pub(crate) fn modem_phy_release() {
 pub(crate) fn modem_phy_acquire() -> bool {
     let restore = MODEM_PHY_OFF.swap(false, portable_atomic::Ordering::SeqCst);
     if restore {
+        lock_cpu_frequency();
         core::mem::forget(esp_phy::enable_phy());
     }
     restore
+}
+
+/// Keeps the CPU clock at its configured frequency while the controller uses the PHY.
+pub(crate) fn lock_cpu_frequency() {
+    #[cfg(bt_requires_fast_cpu)]
+    esp_hal::clock::CpuFrequencyLock::acquire();
+}
+
+/// Releases the lock taken by [`lock_cpu_frequency`].
+pub(crate) fn unlock_cpu_frequency() {
+    #[cfg(bt_requires_fast_cpu)]
+    esp_hal::clock::CpuFrequencyLock::release();
 }
 
 unstable_module! {

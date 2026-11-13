@@ -492,7 +492,7 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
 /// ESP-IDF does this when `SOC_GPIO_NEED_SOFT_ISOLATE_DURING_PD` is set. The chip can still hold a
 /// single pad, so a held pad is left alone. The pad list comes from `for_each_gpio_soft_isolate`,
 /// which already omits low-power pads and the flash or PSRAM interface.
-#[cfg(gpio_need_soft_isolate_during_pd)]
+#[cfg(all(gpio_need_soft_isolate_during_pd, feature = "rt"))]
 pub(crate) fn isolate_pads_for_deep_sleep() {
     for_each_gpio_soft_isolate! {
         ($n:literal) => {
@@ -502,7 +502,7 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
 }
 
 /// Disconnects one digital pad so that a powered-down driver does not increase the sleep current.
-#[cfg(gpio_need_soft_isolate_during_pd)]
+#[cfg(all(gpio_need_soft_isolate_during_pd, feature = "rt"))]
 fn isolate_soft_isolate_pad(gpio: u8) {
     use crate::gpio::{AlternateFunction, io_mux_reg, low_level};
 

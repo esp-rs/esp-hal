@@ -18,7 +18,7 @@ page_size = 0x10000
 entry_num = 512
 
 [device.flash]
-support_status = "partial"
+support_status = { status = "partial", issue = 6757 }
 
 [device.rom]
 has_crc_le  = true
@@ -31,13 +31,16 @@ cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x1f
 cpu_pmp_granularity = 128
+cpu_powers_down_cache = true
 
 has_swd_watchdog = true
+has_bus_clock_update = true
+has_apb_frequency_reduction = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
-    # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c61/bootloader.ld#L32
-    { name = "dram2_uninit", start = 0x4083_EA70, end = 0x4084_EA70 },
+    # bootloader_iram_loader_seg_start up to SOC_ROM_STACK_START: https://github.com/espressif/esp-idf/blob/v6.1/components/bootloader/subproject/main/ld/esp32c61/bootloader.memory.ld.in
+    { name = "dram2_uninit", start = 0x4083_E670, end = 0x4084_E670 },
     { name = "irom", start = 0x4200_0000, end = 0x4400_0000 },
     { name = "drom", start = 0x4200_0000, end = 0x4400_0000 },
 ] }
@@ -120,7 +123,7 @@ peripherals = [
 # {include clocks.toml}
 
 [device.adc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6747 }
 controller = "digital"
 channel_count = 4
 pcr_clock = true
@@ -143,23 +146,23 @@ controller = { Riscv = { flavour = "clic", interrupts = 32, priority_levels = 8 
 context_switch_source = "clint"
 
 [device.timergroup]
-support_status = "partial"
+support_status = { status = "partial", issue = 6779 }
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 rc_fast_calibration = { divider = 32, min_rev = 0 }
 wdt_has_conf_update = true
 
 [device.gpio]
-support_status = "supported"
+support_status = { status = "supported", issue = 6758 }
 # {include gpio.toml}
 
 [device.dedicated_gpio]
 version = "riscv_v1"
-support_status = "partial"
+support_status = { status = "partial", issue = 6753 }
 channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
 
 [device.dma]
-support_status = "partial"
+support_status = { status = "partial", issue = 6754 }
 gdma_version = 2
 separate_in_out_interrupts = true
 # TODO: DMA can access flash
@@ -207,7 +210,9 @@ supports_enhanced_security = true
 zero_extend_writes = true
 
 [device.systimer]
+support_status = { status = "partial", issue = 6777 }
 [device.usb_serial_jtag]
+support_status = { status = "partial", issue = 6787 }
 
 [device.ledc]
 version = 3
@@ -220,8 +225,9 @@ support_status = { status = "not_supported", issue = 5419 }
 [device.lp_timer]
 
 [device.sleep]
-support_status = "partial"
+support_status = { status = "partial", issue = 6743 }
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 ext1_version = 2
 pin_wakeup_version = 3
@@ -241,17 +247,18 @@ wakeup_sources = {
 
 [device.sleep.retention]
 cpu_retention = "software"
+modem_retention = "regdma"
 cpu_retention_frame = "clic"
 supports_top_power_down = true
 
 [device.rng]
-support_status = { status = "partial", issue = 5981 }
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = true
 
 [device.uart]
-support_status = "supported"
+support_status = { status = "supported", issue = 6782 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
@@ -263,7 +270,7 @@ peripheral_controls_mem_clk = true
 has_sclk_enable = true
 
 [device.i2c_master]
-support_status = "supported"
+support_status = { status = "supported", issue = 6760 }
 version = 4
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
@@ -286,17 +293,19 @@ has_pd_en = true
 support_status = { status = "not_supported", issue = 1909 }
 
 [device.psram]
+support_status = { status = "partial", issue = 6773 }
 extmem_origin = 0x42000000
+has_timing_tuning = true
 
 [device.sha]
-support_status = "partial"
+support_status = { status = "partial", issue = 6775 }
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.ecdsa]
 support_status = { status = "not_supported", issue = 5444 }
 
 [device.spi_master]
-support_status = "supported"
+support_status = { status = "supported", issue = 6776 }
 dma_can_access_flash = true
 version = 3
 fifo_size = 64
@@ -314,6 +323,7 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",
@@ -326,7 +336,7 @@ instances = [
 ]
 
 [device.assist_debug]
-support_status = "partial"
+support_status = { status = "partial", issue = 6749 }
 has_sp_monitor = true
 has_region_monitor = true
 
@@ -334,8 +344,10 @@ has_region_monitor = true
 support_status = { status = "not_supported", issue = 5423 }
 
 [device.io_mux]
+support_status = { status = "partial", issue = 6758 }
 
 [device.i2s]
+support_status = { status = "partial", issue = 6762 }
 version = 3
 mclk_divider_bit_width = 9
 max_ws_width = 512
@@ -365,16 +377,18 @@ support_status = { status = "not_supported", issue = 5421 }
 
 ## Radio
 [device.wifi]
-support_status = "partial"
+support_status = { status = "partial", issue = 6788 }
 has_wifi6 = true
 mac_version = 3
+requires_fast_cpu = true
 csi_supported = true
 has_nan = true
 has_ftm = true
 
 [device.bt]
-support_status = "partial"
+support_status = { status = "partial", issue = 6750 }
 controller = "npl"
+requires_fast_cpu = true
 
 [device.phy]
 support_status = "partial"

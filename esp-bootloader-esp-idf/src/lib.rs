@@ -138,6 +138,13 @@ pub mod ota_updater;
 #[unsafe(export_name = "bootloader.NAME")]
 static OTA_FEATURE: [u8; 7] = *b"ESP-IDF";
 
+/// The 2nd-stage bootloader loads `.data`, so xtensa-lx-rt must not copy it in `Reset`.
+#[cfg(target_arch = "xtensa")]
+#[unsafe(export_name = "__init_data")]
+extern "C" fn __init_data() -> bool {
+    false
+}
+
 /// ESP-IDF compatible application descriptor.
 ///
 /// This gets populated by the [esp_app_desc] macro.

@@ -2,7 +2,7 @@
 
 use core::{
     ops::Not,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 
 use crate::{
@@ -33,6 +33,7 @@ use crate::{
 
 static USJ_CLOCK_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
 static USJ_PAD_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
+static USJ_CONF0: AtomicU32 = AtomicU32::new(0);
 
 fn usj_module_is_enabled() -> bool {
     let clkrst = HP_SYS_CLKRST::regs();
@@ -93,6 +94,15 @@ fn usj_pad_backup_and_disable() {
         usj_reset_register();
         false
     };
+    // Clearing `usb_pad_enable` alone keeps the D+ pull-up, so the host never sees a
+    // disconnect and USJ stops responding after the sleep.
+    let conf0 = USB_DEVICE::regs().conf0();
+    USJ_CONF0.store(conf0.read().bits(), Ordering::Relaxed);
+    conf0.modify(|_, w| {
+        w.pad_pull_override().set_bit();
+        w.dp_pullup().clear_bit();
+        w.dm_pullup().clear_bit()
+    });
     usj_set_pad_enable(false);
     usj_enable_bus_clock(false);
 
@@ -103,6 +113,9 @@ fn usj_pad_backup_and_disable() {
 /// Restores the USJ pad on wake. esp-idf `sleep_console_usj_pad_restore`.
 fn usj_pad_restore() {
     usj_enable_bus_clock(true);
+    USB_DEVICE::regs()
+        .conf0()
+        .write(|w| unsafe { w.bits(USJ_CONF0.load(Ordering::Relaxed)) });
     usj_set_pad_enable(USJ_PAD_WAS_ENABLED.load(Ordering::Relaxed));
     if !USJ_CLOCK_WAS_ENABLED.load(Ordering::Relaxed) {
         usj_enable_bus_clock(false);
@@ -1062,12 +1075,37 @@ impl RtcSleepConfig {
     /// Cleans up after sleep.
     #[crate::ram]
     pub(crate) fn finish_sleep(&self) {
-        // like esp-idf pmu_sleep_finish(): switch the pad configuration back from
-        // the sleep state to the active state. In deep sleep we never get here.
+        // A rejected deep sleep ran the DCDC -> LDO handover, and the hardware wake that turns
+        // the DCDC back on did not run. Switch back to the DCDC, as the bootloader leaves it.
+        if self.deep {
+            const DCDC_STARTUP_TIME_US: u32 = 950;
+            const HP_CALI_ACTIVE_DCM_VSET: u8 = 27;
 
+            PMU::regs().power_dcdc_switch().modify(|_, w| {
+                w.force_dcdc_switch_pu().clear_bit();
+                w.force_dcdc_switch_pd().clear_bit()
+            });
+            PMU::regs().dcm_ctrl().modify(|_, w| {
+                w.dcdc_done_force().clear_bit();
+                w.dcdc_on_req().set_bit()
+            });
+            PMU::regs()
+                .hp_active_bias()
+                .modify(|_, w| unsafe { w.hp_active_dcm_vset().bits(HP_CALI_ACTIVE_DCM_VSET) });
+
+            crate::rom::ets_delay_us(DCDC_STARTUP_TIME_US);
+
+            PMU::regs()
+                .hp_active_hp_regulator0()
+                .modify(|_, w| w.hp_active_hp_regulator_xpd().clear_bit());
+        }
+
+        // Switch the pad configuration back from the sleep state to the active state.
         PMU::regs()
             .imm_pad_hold_all()
             .write(|w| w.tie_low_pad_slp_sel().set_bit());
+
+        super::pmu_common::wait_for_efuse_idle();
 
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.

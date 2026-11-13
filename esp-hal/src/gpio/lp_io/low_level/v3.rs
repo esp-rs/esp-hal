@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{AlternateFunction, Level, LpPin, lp_io::LpFunction},
+    gpio::{AlternateFunction, GPIO_LOCK, Level, LpPin, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
@@ -39,11 +39,13 @@ for_each_lp_function! {
             }
 
             pub(crate) fn pad_hold(lp: u8, enable: bool) {
-                LPWR::regs().pad_hold().modify(|_, w| {
-                    match lp {
-                        $( $pin => w.[<gpio_pin $pin _hold>]().bit(enable), )*
-                        _ => unreachable!(),
-                    }
+                GPIO_LOCK.lock(|| {
+                    LPWR::regs().pad_hold().modify(|_, w| {
+                        match lp {
+                            $( $pin => w.[<gpio_pin $pin _hold>]().bit(enable), )*
+                            _ => unreachable!(),
+                        }
+                    });
                 });
             }
 
@@ -83,10 +85,12 @@ for_each_lp_function! {
 /// low-power pads have their own register.
 pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
     let mask = 1 << gpio;
-    LPWR::regs().dig_pad_hold().modify(|r, w| unsafe {
-        let bits = r.dig_pad_hold().bits();
-        w.dig_pad_hold()
-            .bits(if enable { bits | mask } else { bits & !mask })
+    GPIO_LOCK.lock(|| {
+        LPWR::regs().dig_pad_hold().modify(|r, w| unsafe {
+            let bits = r.dig_pad_hold().bits();
+            w.dig_pad_hold()
+                .bits(if enable { bits | mask } else { bits & !mask })
+        });
     });
 }
 

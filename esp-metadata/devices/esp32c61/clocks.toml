@@ -25,12 +25,13 @@ system_clocks = { clock_tree = [
         { name = "PLL_F160M", outputs = "PLL_F160M" },
     ] },
 
-    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
     # AHB_CLK divider: divider = (AHB_DIV_NUM + 1), <= 40MHz
-    { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
-    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)" },
+    # The hardware lowers APB_CLK while the APB bus is idle. Consumers stop the reduction.
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)", always_on = true, refcounted = true },
 
     { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
     { name = "LP_FAST_CLK", type = "mux", variants = [

@@ -78,6 +78,11 @@ name              = "parl_io"
 harness           = false
 
 [[bin]]
+name              = "ppa"
+harness           = false
+required-features = ["unstable", "psram", "esp-rtos"]
+
+[[bin]]
 name              = "rmt"
 harness           = false
 required-features = ["embassy", "esp-alloc"]
@@ -110,6 +115,7 @@ embassy-sync       = "0.8.0"
 embassy-time       = "0.5.0"
 embedded-hal       = "1.0.0"
 embedded-io        = "0.7.1"
+embedded-io-06     = { package = "embedded-io", version = "0.6" }
 embedded-io-async  = "0.7.0"
 embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
@@ -123,7 +129,7 @@ esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
 portable-atomic    = "1.11"
 static_cell        = { version = "2.1.1" }
-semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
+semihosting        = { version = "0.1", features= ["stdio"] }
 
 trouble-host = { version = "0.8.0", features = [
     "default-packet-pool-mtu-255",
@@ -131,6 +137,7 @@ trouble-host = { version = "0.8.0", features = [
     "scan",
 ], optional = true }
 
+aes-gcm             = { version = "0.11", default-features = false, features = ["aes"] }
 primeorder          = { version = "0.13.0", default-features = false }
 crypto-bigint       = { version = "0.7.5", default-features = false }
 digest              = { version = "0.11", default-features = false }
@@ -153,12 +160,21 @@ block-device-adapters = "0.2.0"
 embedded-fatfs        = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112", default-features = false }
 embedded-partitions   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
 
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+# Only the build script uses the `links` metadata of `esp-riscv-rt`.
+esp-riscv-rt = { path = "../esp-riscv-rt" }
+
+[target.'cfg(target_arch = "xtensa")'.dependencies]
+# Only the build script uses the `links` metadata of `xtensa-lx-rt`.
+xtensa-lx-rt = { path = "../xtensa-lx-rt" }
+
 [build-dependencies]
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = []
 unstable = ["esp-hal/unstable"]
+esp-rtos = ["dep:esp-rtos"]
 
 # Add the `embedded-test/defmt` feature for more verbose testing
 defmt = ["dep:rtt-target", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt", "esp-radio-rtos-driver?/defmt"]
@@ -279,6 +295,10 @@ incremental      = false
 opt-level        = "z"
 overflow-checks  = true
 
+[profile.dev.package.esp-hal]
+# Light sleep and flash operations need esp-hal at opt-level 2 or 3
+opt-level = 2
+
 [profile.release]
 codegen-units    = 1
 debug-assertions = true
@@ -292,3 +312,6 @@ debug            = 0
 [patch.crates-io]
 block-device-driver   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
 block-device-adapters = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+
+[package.metadata.cargo-machete]
+ignored = ["esp-riscv-rt", "xtensa-lx-rt"]

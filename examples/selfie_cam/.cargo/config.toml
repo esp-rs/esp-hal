@@ -1,0 +1,14 @@
+[target.'cfg(target_arch = "riscv32")']
+# Both cores share the data cache, so slow flash reads on one core stall the scanout
+# interrupt on the other.
+runner = "espflash flash --monitor --flash-freq 80mhz"
+rustflags = [
+  "-C", "link-arg=-Tlinkall.x",
+  "-C", "force-frame-pointers",
+]
+
+[env]
+ESP_LOG = "info"
+
+[unstable]
+build-std = ["alloc", "core"]

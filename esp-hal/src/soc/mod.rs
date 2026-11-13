@@ -24,8 +24,91 @@ mod implementation;
 #[cfg(soc_cpu_has_branch_predictor)]
 pub(crate) mod branch_predictor;
 
+#[cfg(any(feature = "unstable", cpu_retention = "software"))]
+pub(crate) mod cache;
+
 #[cfg(soc_has_xtal32k_pads)]
 pub(crate) mod xtal32k;
+
+#[cfg(soc_has_bus_clock_update)]
+mod bus_clock_update {
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    static DEFERRED: AtomicBool = AtomicBool::new(false);
+
+    /// Applies the new CPU root clock and the new CPU and bus clock dividers.
+    ///
+    /// Inside [`with_single_bus_clock_update`], this function does nothing. The bus can stop if
+    /// the new combination is not valid.
+    pub(crate) fn update_bus_clocks() {
+        if DEFERRED.load(Ordering::Relaxed) {
+            return;
+        }
+
+        cfg_select! {
+            soc_has_hp_sys_clkrst => {
+                use crate::peripherals::HP_SYS_CLKRST;
+
+                HP_SYS_CLKRST::regs()
+                    .root_clk_ctrl0()
+                    .modify(|_, w| w.soc_clk_div_update().set_bit());
+                while HP_SYS_CLKRST::regs()
+                    .root_clk_ctrl0()
+                    .read()
+                    .soc_clk_div_update()
+                    .bit_is_set()
+                {
+                    core::hint::spin_loop();
+                }
+            }
+            _ => {
+                use crate::peripherals::PCR;
+
+                PCR::regs()
+                    .bus_clk_update()
+                    .write(|w| w.bus_clock_update().set_bit());
+                while PCR::regs()
+                    .bus_clk_update()
+                    .read()
+                    .bus_clock_update()
+                    .bit_is_set()
+                {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+
+        // `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+        esp_rom_sys::rom::ets_update_cpu_frequency_rom(
+            super::clocks::cpu_clk_frequency() / 1_000_000,
+        );
+    }
+
+    /// Runs `f`, then applies all clock changes of `f` with one bus clock update.
+    ///
+    /// Separate updates can apply an intermediate combination that overclocks a bus.
+    pub(crate) fn with_single_bus_clock_update(f: impl FnOnce()) {
+        DEFERRED.store(true, Ordering::Relaxed);
+        f();
+        DEFERRED.store(false, Ordering::Relaxed);
+        update_bus_clocks();
+    }
+}
+
+#[cfg(soc_has_bus_clock_update)]
+pub(crate) use bus_clock_update::{update_bus_clocks, with_single_bus_clock_update};
+
+/// Lets the hardware lower APB_CLK while the APB bus is idle.
+#[cfg(soc_has_apb_frequency_reduction)]
+pub(crate) fn enable_apb_frequency_reduction(enable: bool) {
+    const DIVIDER: u16 = esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_APB_FREQUENCY_REDUCTION");
+
+    // The hardware divides AHB_CLK by the field value + 1. The value 0 disables the reduction.
+    let field = if enable { (DIVIDER - 1) as u8 } else { 0 };
+    crate::peripherals::PCR::regs()
+        .apb_freq_conf()
+        .modify(|_, w| unsafe { w.apb_decrease_div_num().bits(field) });
+}
 
 cfg_select! {
     all(feature = "unstable", ulp_riscv_driver_supported) => {
@@ -124,20 +207,26 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
     setup_stack_guard();
 
     unsafe {
+        __esp_bootloader_init();
         main(a0, a1, a2);
     }
 }
 
+#[cfg(feature = "rt")]
+unsafe extern "C" {
+    /// Hardware setup a bootloader support crate needs once `.data` and `.bss` are initialized,
+    /// just before `main`. `hal-defaults.x` maps it to `__esp_bootloader_default_init` unless the
+    /// bootloader support crate defines it.
+    fn __esp_bootloader_init();
+}
+
+#[cfg(feature = "rt")]
+#[unsafe(export_name = "__esp_bootloader_default_init")]
+extern "C" fn esp_bootloader_default_init() {}
+
 #[cfg(all(xtensa, feature = "rt"))]
 mod xtensa {
     use core::arch::{global_asm, naked_asm};
-
-    /// The ESP32 has a first stage bootloader that handles loading program data into the right
-    /// place, so loading is skipped here. Called by xtensa-lx-rt in Reset.
-    #[unsafe(export_name = "__init_data")]
-    extern "C" fn __init_data() -> bool {
-        false
-    }
 
     extern "C" fn __init_persistent() -> bool {
         matches!(
@@ -181,6 +270,8 @@ mod xtensa {
         .literal sym_rtc_slow_bss_end, {_rtc_slow_bss_end}
         .literal sym_rtc_slow_persistent_end, {_rtc_slow_persistent_end}
         .literal sym_rtc_slow_persistent_start, {_rtc_slow_persistent_start}
+
+        .literal sym_esp_bootloader_init, {__esp_bootloader_init}
         ",
         __init_persistent = sym __init_persistent,
         _xtensa_lx_rt_zero_fill = sym _xtensa_lx_rt_zero_fill,
@@ -197,6 +288,8 @@ mod xtensa {
         _rtc_slow_bss_start = sym _rtc_slow_bss_start,
         _rtc_slow_persistent_end = sym _rtc_slow_persistent_end,
         _rtc_slow_persistent_start = sym _rtc_slow_persistent_start,
+
+        __esp_bootloader_init = sym super::__esp_bootloader_init,
     );
 
     #[unsafe(export_name = "__post_init")]
@@ -234,6 +327,8 @@ mod xtensa {
             callx4 a2                                  // Zero-fill
 
         .Lpost_init_return:
+            l32r   a2, sym_esp_bootloader_init         // Let the bootloader support crate finish
+            callx4 a2                                  // its setup
             retw.n
         ",
         )

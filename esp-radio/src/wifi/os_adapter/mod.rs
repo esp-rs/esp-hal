@@ -13,12 +13,13 @@ pub(crate) mod os_adapter_chip_specific;
 use core::ptr::NonNull;
 
 use allocator_api2::boxed::Box;
+use esp_hal::system::Cpu;
 use esp_sync::RawMutex;
 
 use super::event::WifiEvent;
 use crate::{
     compat::{
-        common::{str_from_c, thread_sem_get},
+        common::{str_from_c, task_core, thread_sem_get},
         malloc::{InternalMemory, calloc_internal},
     },
     sys::c_types::*,
@@ -414,7 +415,7 @@ fn common_task_create(
     param: *mut c_void,
     prio: u32,
     task_handle: *mut c_void,
-    core_id: Option<u32>,
+    core_id: u32,
 ) -> i32 {
     let task_name = unsafe { str_from_c(name as _) };
     trace!(
@@ -430,7 +431,7 @@ fn common_task_create(
             task_func,
             param,
             prio,
-            core_id,
+            Some(task_core(core_id)),
             stack_depth as usize,
         );
         *(task_handle as *mut usize) = task.as_ptr() as usize;
@@ -476,7 +477,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
         param,
         prio,
         task_handle,
-        if core_id < 2 { Some(core_id) } else { None },
+        core_id,
     )
 }
 
@@ -507,7 +508,15 @@ pub unsafe extern "C" fn task_create(
     prio: u32,
     task_handle: *mut c_void,
 ) -> i32 {
-    common_task_create(task_func, name, stack_depth, param, prio, task_handle, None)
+    common_task_create(
+        task_func,
+        name,
+        stack_depth,
+        param,
+        prio,
+        task_handle,
+        Cpu::ProCpu as u32,
+    )
 }
 
 /// **************************************************************************
@@ -634,6 +643,11 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut c_void {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn free(p: *mut c_void) {
+    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+    if super::mac_bb::try_free(p) {
+        return;
+    }
+
     unsafe {
         crate::compat::malloc::free(p.cast());
     }
@@ -935,22 +949,32 @@ pub unsafe extern "C" fn wifi_clock_disable() {
 /// Name: wifi_rtc_enable_iso
 ///
 /// Description:
-///   Don't support
+///   The blob saved the MAC and baseband, and they can lose power
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_rtc_enable_iso() {
-    todo!("wifi_rtc_enable_iso")
+    cfg_select! {
+        all(modem_retention = "backup_dma", feature = "unstable") => {
+            crate::modem_power::sleep(crate::modem_power::Radio::Wifi)
+        }
+        _ => todo!("wifi_rtc_enable_iso"),
+    }
 }
 
 /// **************************************************************************
 /// Name: wifi_rtc_disable_iso
 ///
 /// Description:
-///   Don't support
+///   The blob restores the MAC and baseband, and they need power
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_rtc_disable_iso() {
-    todo!("wifi_rtc_disable_iso")
+    cfg_select! {
+        all(modem_retention = "backup_dma", feature = "unstable") => {
+            crate::modem_power::wake(crate::modem_power::Radio::Wifi)
+        }
+        _ => todo!("wifi_rtc_disable_iso"),
+    }
 }
 
 /// **************************************************************************
@@ -1271,6 +1295,19 @@ pub unsafe extern "C" fn log_timestamp() -> u32 {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut c_void {
+    // Wi-Fi has no separate allocation hook for retention, so the blob also allocates its MAC
+    // buffer here. The backup DMA reaches only part of the internal RAM, so that buffer must go to
+    // the retention memory. `malloc_retention` gives the retention memory only to an allocation of
+    // the MAC buffer size while `esp_wifi_internal_set_mac_sleep(true)` runs. It returns null for
+    // every other allocation, and the allocation then goes to the heap.
+    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+    {
+        let memory = super::mac_bb::malloc_retention(size);
+        if !memory.is_null() {
+            return memory;
+        }
+    }
+
     unsafe { crate::compat::malloc::malloc_internal(size).cast() }
 }
 

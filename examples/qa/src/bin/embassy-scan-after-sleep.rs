@@ -1,4 +1,4 @@
-//% FEATURES: esp-radio esp-radio/wifi esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-hal/unstable esp-println/uart
 //% CHIP_FILTER: wifi_driver_supported && sleep_driver_supported
 
 #![no_std]

@@ -76,7 +76,7 @@ impl SleepTimeConfig {
 /// dirty line. The retention frames are among them, because the save writes them through the cache.
 /// esp-idf writes the cache back in `pmu_sleep_start` (`esp32p4/pmu_sleep.c:410`), and it uses the
 /// registers and not the ROM helper, because the return of a call dirties the cache again.
-#[crate::ram]
+#[procmacros::ram(unstable(checked))]
 #[cfg(soc_internal_memory_cached)]
 fn writeback_data_cache() {
     // `CACHE_MAP_L1_DCACHE` of `esp32p4/rom/cache.h`.
@@ -96,7 +96,8 @@ fn writeback_data_cache() {
 ///
 /// The software retention path calls this through a function pointer after the critical frame is
 /// saved.
-#[inline(always)]
+#[cfg_attr(cpu_retention = "software", procmacros::ram(unstable(checked)))]
+#[cfg_attr(not(cpu_retention = "software"), inline(always))]
 pub(crate) fn request_sleep() -> bool {
     #[cfg(soc_internal_memory_cached)]
     writeback_data_cache();
@@ -106,4 +107,22 @@ pub(crate) fn request_sleep() -> bool {
         .write(|w| w.sleep_req().bit(true));
 
     super::wait_for_sleep_result()
+}
+
+/// Waits until the eFuse controller has reloaded the eFuse memory after the sleep request.
+///
+/// An eFuse read before this point can return stale data.
+#[cfg(not(esp32h2))]
+#[inline(always)]
+pub(crate) fn wait_for_efuse_idle() {
+    // `EFUSE_CONTROLLER_STATE_IDLE`
+    const IDLE: u8 = 1;
+
+    while crate::peripherals::EFUSE::regs()
+        .status()
+        .read()
+        .state()
+        .bits()
+        != IDLE
+    {}
 }

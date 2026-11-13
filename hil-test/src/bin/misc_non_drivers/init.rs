@@ -133,6 +133,16 @@ mod tests {
     }
 
     #[test]
+    fn test_rom_delay_matches_cpu_clock() {
+        esp_hal::init(Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()));
+
+        let start = esp_hal::time::Instant::now();
+        esp_hal::rom::ets_delay_us(1000);
+        let elapsed = start.elapsed().as_micros();
+        assert!((900..=1200).contains(&elapsed), "elapsed: {elapsed} us");
+    }
+
+    #[test]
     #[cfg(timergroup_timg0)]
     fn test_timg0_wdt_timeout_is_applied() {
         let p = esp_hal::init(Config::default());

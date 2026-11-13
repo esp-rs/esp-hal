@@ -82,6 +82,7 @@ for_each_mem2mem_channel! {
                     fn set_mem2mem_mode(&mut self, value: bool);
                     fn start_transfer(&mut self) -> Result<(), DmaError>;
                     fn stop_transfer(&mut self);
+                    fn end_transfer(&mut self);
                     unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
                         &mut self,
                         peri: DmaPeripheral,
@@ -127,6 +128,7 @@ for_each_mem2mem_channel! {
                 } {
                     fn start_transfer(&mut self) -> Result<(), DmaError>;
                     fn stop_transfer(&mut self);
+                    fn end_transfer(&mut self);
                     unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
                         &mut self,
                         peri: DmaPeripheral,
@@ -365,7 +367,8 @@ where
     pub fn wait(self) -> (Result<(), DmaError>, Mem2MemRx<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
-        let (m2m, view) = self.release();
+        let (mut m2m, view) = self.release();
+        m2m.channel.end_transfer();
 
         let result = if m2m.channel.has_error() {
             Err(DmaError::DescriptorError)
@@ -516,7 +519,8 @@ where
     pub fn wait(self) -> (Result<(), DmaError>, Mem2MemTx<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
-        let (m2m, view) = self.release();
+        let (mut m2m, view) = self.release();
+        m2m.channel.end_transfer();
 
         let result = if m2m.channel.has_error() {
             Err(DmaError::DescriptorError)

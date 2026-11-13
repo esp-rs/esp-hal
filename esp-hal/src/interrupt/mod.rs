@@ -37,11 +37,11 @@
     doc = "Those signals can also carry cross-core communication."
 )]
 #![cfg_attr(
-    all(feature = "rt", multi_core),
+    multi_core,
     doc = "
 ## Inter-Processor Call (IPC)
 
-The [`ipc`] module posts a function to a CPU, and raises the IPC interrupt of that CPU.
+The [`ipc`] module queues requests on a CPU, and raises the IPC interrupt of that CPU.
 "
 )]
 #![cfg_attr(
@@ -84,7 +84,7 @@ use crate::pac;
 unstable_module! {
     pub mod software;
 
-    #[cfg(all(feature = "rt", multi_core))]
+    #[cfg(multi_core)]
     pub mod ipc;
 
     #[cfg(feature = "rt")]
@@ -313,6 +313,7 @@ pub struct InterruptStatusIterator {
 impl Iterator for InterruptStatusIterator {
     type Item = Interrupt;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         for i in self.idx..STATUS_WORDS {
             if self.status.status[i] != 0 {
@@ -455,6 +456,7 @@ pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> 
 }
 
 #[cfg(feature = "rt")]
+#[crate::ram]
 pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
     let cpu_intr = match cpu {
         Cpu::ProCpu => INTERRUPT_CORE0::regs()

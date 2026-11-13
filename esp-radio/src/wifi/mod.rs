@@ -26,27 +26,55 @@
 //! * Station: 47 - 57k
 //! * Open Access Point: 53 - 63k
 //!
+//! During transfers, the driver holds additional RX and TX buffers, see
+//! [Wi-Fi performance considerations](#wi-fi-performance-considerations).
+//!
 //! ## Wi-Fi performance considerations
 //!
-//! The default configuration is quite conservative to reduce power and memory consumption.
+//! The driver buffer counts and the TX power follow ESP-IDF's defaults. Where ESP-IDF has a
+//! matching setting, the queue sizes do as well.
 //!
-//! There are a number of settings which influence the general performance (at the cost of memory
-//! usage).
+//! TCP throughput is limited by the socket buffers and the round-trip time: download is at most
+//! the socket RX buffer divided by the round-trip time, upload is at most the socket TX buffer
+//! divided by the round-trip time.
 //!
-//! Optimal settings are chip and applications specific. You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
+//! - `ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE` limits the TCP receive window that smoltcp advertises
+//!   to that many segments. The default, 0, advertises the whole socket RX buffer.
+//! - The peer can then send a full window at once. Received frames wait in the RX queue
+//!   (`rx_queue_size` in [ControllerConfig]), and a frame that arrives when the queue is full is
+//!   dropped. Keep the socket RX buffer at or below `rx_queue_size` segments (1452 bytes each with
+//!   the default MTU), or set `ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE` to the RX queue size.
+//! - Each received frame waiting in the queue holds a driver RX buffer, and each frame in flight
+//!   holds a driver TX buffer. Dynamic buffers come from the heap (about 1.6 KB each), so a large
+//!   socket buffer increases the peak heap usage during transfers.
 //!
-//! Please note that the configuration keys are usually named slightly different and not all
-//! configuration keys apply.
+//! The Wi-Fi driver and the network stack run from flash through the instruction cache. On chips
+//! with a small cache, the flash speed can limit the throughput: on an ESP32-C3, QIO mode at 80 MHz
+//! instead of DIO increased the TCP upload rate by 50 to 80 %. Use QIO mode at 80 MHz if the flash
+//! chip and the board support it. The bootloader and the application image must use the same flash
+//! mode.
+//!
+//! Optimal settings are chip and application specific. You can get inspiration from the
+//! [ESP-IDF iperf example](https://github.com/espressif/esp-idf/tree/v6.1/examples/wifi/iperf).
+//! The configuration keys there are named differently, and not all of them apply.
+//!
+//! The Wi-Fi driver copies each TX frame into a buffer from the heap. If the heap has no free
+//! memory, the driver refuses the frame. By default, esp-radio keeps one refused frame and sends
+//! it again when a transmission ends. While Wi-Fi is initialized, this reserves
+//! `ESP_RADIO_CONFIG_WIFI_MTU` bytes on the heap. To save this RAM, set
+//! `ESP_RADIO_CONFIG_WIFI_TX_RETRY` to `false`. esp-radio then drops refused frames, and TCP must
+//! send the data again, which decreases the throughput. Applications with a large heap seldom have
+//! refused frames.
 //!
 //! ## Troubleshooting
 //!
 //! ### Connection failures on boards with a weak antenna or in a poor RF environment
 //!
-//! The default maximum TX power is 20 (5dBm) on the 0.25dBm scale. The optimal value is
-//! board-dependent: if connections are unreliable, try adjusting it via
-//! `WifiController::set_max_tx_power` (requires the `unstable` feature) using a value in the
-//! range [8, 84]. Note that values above roughly 65 (~16dBm) have been reported to cause
-//! authentication failures on some hardware, so setting it to the maximum is not always better.
+//! As in ESP-IDF, the maximum TX power is set by the PHY init data, which allows up to 20 dBm.
+//! The optimal value is board-dependent. Values above roughly 16 dBm have been reported to cause
+//! authentication failures on some hardware. If connections are unreliable, lower the maximum with
+//! `WifiController::set_max_tx_power` (requires the `unstable` feature). Its unit is 0.25 dBm and
+//! the range is [8, 84], so for example 64 is 16 dBm.
 
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
@@ -70,6 +98,9 @@ use procmacros::BuilderLite;
 
 #[cfg(wifi_softap_support)]
 use self::ap::AccessPointConfig;
+#[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use self::mac_bb::{RetentionMemory, RetentionStorage, install_retention_memory};
 pub(crate) use self::os_adapter::*;
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -125,6 +156,8 @@ pub(crate) mod state;
 #[cfg(wifi_ftm_enable)]
 mod ftm_calibration;
 mod internal;
+#[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+mod mac_bb;
 mod weak_overrides;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
@@ -1234,6 +1267,9 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
         #[cfg(soc_has_modem_syscon)]
         crate::radio_clocks::enable_wifi(true);
 
+        #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+        mac_bb::init()?;
+
         Ok(())
     }
 }
@@ -1284,7 +1320,11 @@ fn wifi_deinit() -> Result<(), WifiError> {
         drop(packet);
     }
 
+    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+    mac_bb::stop_power_down()?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+    mac_bb::deinit();
     #[cfg(soc_has_modem_syscon)]
     crate::radio_clocks::enable_wifi(false);
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
@@ -1342,6 +1382,125 @@ fn decrement_inflight_counter() {
             Some(x.saturating_sub(1))
         })
     );
+}
+
+#[cold]
+#[inline(never)]
+fn release_inflight_slot() {
+    decrement_inflight_counter();
+    // Without a frame in flight, no TX done callback wakes the network stack.
+    if WIFI_TX_INFLIGHT.load(Ordering::SeqCst) == 0 {
+        TRANSMIT_WAKER.wake();
+    }
+}
+
+#[cfg(wifi_tx_retry)]
+mod tx_retry {
+    use alloc::boxed::Box;
+
+    use portable_atomic::AtomicBool;
+
+    use super::*;
+
+    /// A frame that `esp_wifi_internal_tx` refused because the driver had no free memory.
+    pub(super) struct PendingTxFrame {
+        mode: InterfaceType,
+        len: usize,
+        data: Option<Box<[u8; MTU]>>,
+    }
+
+    impl PendingTxFrame {
+        pub(super) const fn new() -> Self {
+            Self {
+                mode: InterfaceType::Station,
+                len: 0,
+                data: None,
+            }
+        }
+    }
+
+    pub(super) fn init() -> Result<(), WifiError> {
+        state::locked(|state| {
+            let slot = &mut state.pending_tx.data;
+            if slot.is_none() {
+                let mut buf = Vec::new();
+                buf.try_reserve_exact(MTU)
+                    .map_err(|_| WifiError::OutOfMemory)?;
+                buf.resize(MTU, 0);
+                *slot = buf.try_into().ok();
+            }
+            Ok(())
+        })
+    }
+
+    // True while a refused frame waits in `State::pending_tx`. Only code under `state::locked`
+    // writes it. The driver gets TX memory back when a transmission ends. While a frame waits, the
+    // TX path accepts no new frames, so the network stack keeps its data.
+    static PENDING: AtomicBool = AtomicBool::new(false);
+
+    /// Sends a frame. If the driver has no free memory, keeps the frame in `pending`.
+    ///
+    /// The caller must hold the `state::locked` lock.
+    pub(super) fn send_frame(pending: &mut PendingTxFrame, mode: InterfaceType, data: &mut [u8]) {
+        if send_data_locked(mode, data) {
+            return;
+        }
+
+        if !PENDING.load(Ordering::Relaxed)
+            && let Some(buf) = pending.data.as_deref_mut()
+            && let Some(dst) = buf.get_mut(..data.len())
+        {
+            pending.mode = mode;
+            pending.len = data.len();
+            dst.copy_from_slice(data);
+            PENDING.store(true, Ordering::Relaxed);
+        } else {
+            warn!("Dropping a TX frame, the driver has no free memory");
+        }
+
+        release_inflight_slot();
+    }
+
+    /// Sends the pending frame again. Returns `true` if no frame is pending after the call.
+    #[inline]
+    pub(super) fn send_pending_frame() -> bool {
+        if !PENDING.load(Ordering::Relaxed) {
+            return true;
+        }
+
+        try_send_pending_frame()
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn try_send_pending_frame() -> bool {
+        state::locked(|state| {
+            if !PENDING.load(Ordering::Relaxed) {
+                return true;
+            }
+
+            let frame = &mut state.pending_tx;
+            let Some(buf) = frame.data.as_deref_mut() else {
+                PENDING.store(false, Ordering::Relaxed);
+                return true;
+            };
+
+            WIFI_TX_INFLIGHT.fetch_add(1, Ordering::SeqCst);
+            if send_data_locked(frame.mode, &mut buf[..frame.len.min(MTU)]) {
+                PENDING.store(false, Ordering::Relaxed);
+                true
+            } else {
+                release_inflight_slot();
+                false
+            }
+        })
+    }
+
+    /// The caller must hold the `state::locked` lock.
+    pub(super) fn deinit(pending: &mut PendingTxFrame) {
+        PENDING.store(false, Ordering::Relaxed);
+        pending.data = None;
+    }
 }
 
 #[ram]
@@ -1497,6 +1656,11 @@ impl InterfaceType {
     }
 
     fn can_send(&self) -> bool {
+        #[cfg(wifi_tx_retry)]
+        if !tx_retry::send_pending_frame() {
+            return false;
+        }
+
         WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE.load(Ordering::Relaxed)
     }
 
@@ -2086,7 +2250,7 @@ impl WifiTxToken {
 
         let res = f(buffer);
 
-        esp_wifi_send_data(self.mode.interface(), buffer);
+        esp_wifi_send_data(self.mode, buffer);
 
         res
     }
@@ -2096,32 +2260,48 @@ impl WifiTxToken {
 // requiring a *mut ptr to the buffer Casting const to mut is instant UB, even
 // though in reality `esp_wifi_internal_tx` copies the buffer into its own
 // memory and does not modify
-pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
-    // `esp_wifi_internal_tx` will crash if wifi is uninitialized or de-inited
-
-    state::locked(|| {
-        // even checking for !Uninitialized would be enough to not crash
-        if (interface == wifi_interface_t_WIFI_IF_STA
-            && !matches!(station_state(), WifiStationState::Connected))
-            || (interface == wifi_interface_t_WIFI_IF_AP
-                && !matches!(access_point_state(), WifiAccessPointState::Started))
-        {
-            return;
-        }
-
-        trace!("sending... {} bytes", data.len());
-        dump_packet_info(data);
-
-        let len = data.len() as u16;
-        let ptr = data.as_mut_ptr().cast();
-
-        let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
-
-        if res != include::ESP_OK as i32 {
-            warn!("esp_wifi_internal_tx returned error: {}", res);
-            decrement_inflight_counter();
+fn esp_wifi_send_data(mode: InterfaceType, data: &mut [u8]) {
+    state::locked(|_state| {
+        cfg_select! {
+            wifi_tx_retry => tx_retry::send_frame(&mut _state.pending_tx, mode, data),
+            _ => {
+                send_data_locked(mode, data);
+            }
         }
     })
+}
+
+/// Returns `false` if the driver refused the frame because it has no free memory. The frame then
+/// keeps its in-flight slot.
+///
+/// The caller must hold the `state::locked` lock.
+fn send_data_locked(mode: InterfaceType, data: &mut [u8]) -> bool {
+    // `esp_wifi_internal_tx` will crash if wifi is uninitialized or de-inited
+    if mode.link_state() != LinkState::Up {
+        release_inflight_slot();
+        return true;
+    }
+
+    trace!("sending... {} bytes", data.len());
+    dump_packet_info(data);
+
+    let len = data.len() as u16;
+    let ptr = data.as_mut_ptr().cast();
+
+    let res = unsafe { esp_wifi_internal_tx(mode.interface(), ptr, len) };
+
+    if res == include::ESP_OK as i32 {
+        return true;
+    }
+
+    #[cfg(wifi_tx_retry)]
+    if res == include::ESP_ERR_NO_MEM as i32 {
+        return false;
+    }
+
+    warn!("esp_wifi_internal_tx returned error: {}", res);
+    release_inflight_slot();
+    true
 }
 
 fn dump_packet_info(_buffer: &mut [u8]) {
@@ -2324,7 +2504,7 @@ pub(crate) mod xarxa {
             }
 
             self.mode.increase_in_flight_counter();
-            esp_wifi_send_data(self.mode.interface(), &mut buffer);
+            esp_wifi_send_data(self.mode, &mut buffer);
 
             Ok(())
         }
@@ -2502,9 +2682,17 @@ pub struct ControllerConfig {
     #[builder_lite(unstable)]
     country_info: CountryInfo,
     /// Size of the RX queue in frames.
+    ///
+    /// Received frames wait here until the network stack processes them. A frame that arrives
+    /// when the queue is full is dropped. Each queued frame holds a driver RX buffer, so a queue
+    /// longer than [`Self::dynamic_rx_buf_num`] gains nothing.
     #[builder_lite(unstable)]
     rx_queue_size: usize,
-    /// Size of the TX queue in frames.
+    /// Maximum number of TX frames in flight.
+    ///
+    /// Each frame in flight holds a driver TX buffer. Keep this at or below
+    /// [`Self::dynamic_tx_buf_num`] (or [`Self::static_tx_buf_num`] with static TX buffers),
+    /// otherwise the driver refuses frames and they are dropped.
     #[builder_lite(unstable)]
     tx_queue_size: usize,
 
@@ -2611,8 +2799,8 @@ pub struct ControllerConfig {
 impl Default for ControllerConfig {
     fn default() -> Self {
         Self {
-            rx_queue_size: 5,
-            tx_queue_size: 3,
+            rx_queue_size: 32,
+            tx_queue_size: 32,
 
             static_rx_buf_num: 10,
             dynamic_rx_buf_num: 32,
@@ -2641,11 +2829,21 @@ impl Default for ControllerConfig {
 
 impl ControllerConfig {
     fn validate(&self) {
-        if self.rx_ba_win as u16 >= self.dynamic_rx_buf_num {
-            warn!("RX BA window size should be less than the number of dynamic RX buffers.");
+        if self.rx_ba_win as u16 > self.dynamic_rx_buf_num {
+            warn!("RX BA window size should not be larger than the number of dynamic RX buffers.");
         }
-        if self.rx_ba_win as u16 >= 2 * (self.static_rx_buf_num as u16) {
-            warn!("RX BA window size should be less than twice the number of static RX buffers.");
+        if self.rx_ba_win as u16 > 2 * (self.static_rx_buf_num as u16) {
+            warn!(
+                "RX BA window size should not be larger than twice the number of static RX buffers."
+            );
+        }
+        let tx_buf_num = if crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE == 0 {
+            self.static_tx_buf_num as usize
+        } else {
+            self.dynamic_tx_buf_num as usize
+        };
+        if self.tx_queue_size > tx_buf_num {
+            warn!("TX queue size should not exceed the number of TX buffers.");
         }
         if self.espnow_max_encrypt_num > TOTAL_HW_ENCRYPT_KEYS {
             warn!("ESP-NOW max encrypted peers should be at most the number of hardware keys.");
@@ -2673,9 +2871,11 @@ impl Clone for WifiRefGuard {
 impl Drop for WifiRefGuard {
     fn drop(&mut self) {
         WIFI_REFCOUNT.decrement(|| {
-            state::locked(|| {
+            state::locked(|_state| {
                 set_access_point_state(WifiAccessPointState::Uninitialized);
                 set_station_state(WifiStationState::Uninitialized);
+                #[cfg(wifi_tx_retry)]
+                tx_retry::deinit(&mut _state.pending_tx);
 
                 esp_hal::if_unstable_hal! {
                     sleep::release_wake_source();
@@ -2683,6 +2883,10 @@ impl Drop for WifiRefGuard {
 
                 if let Err(e) = crate::wifi::wifi_deinit() {
                     warn!("Failed to cleanly deinit wifi: {:?}", e);
+                }
+
+                esp_hal::if_unstable_hal! {
+                    sleep::clear_sleep_lock();
                 }
 
                 #[cfg(rng_trng_supported)]
@@ -2805,6 +3009,8 @@ impl<'d> WifiController<'d> {
             #[cfg(wifi_softap_support)]
             DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
             DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+            #[cfg(wifi_tx_retry)]
+            tx_retry::init()?;
 
             TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
 
@@ -2845,9 +3051,6 @@ impl<'d> WifiController<'d> {
         controller.set_power_saving(PowerSaveMode::default())?;
 
         controller.set_config(&config.initial_config)?;
-
-        // Set a default TX power
-        esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(20) })?;
 
         Ok(controller)
     }
@@ -3313,9 +3516,9 @@ ignored."
 
     /// Set maximum transmitting power after WiFi start.
     ///
-    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm. The default is
-    /// 20 (5dBm). Values above roughly 65 (~16dBm) have been reported to cause authentication
-    /// failures on some hardware. See the
+    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm. Without a call, the
+    /// limit comes from the PHY init data (20 dBm), as in ESP-IDF. Values above roughly 65
+    /// (~16dBm) have been reported to cause authentication failures on some hardware. See the
     /// [module-level troubleshooting section](self#troubleshooting) for details.
     #[instability::unstable]
     pub fn set_max_tx_power(&mut self, power: i8) -> Result<(), WifiError> {
