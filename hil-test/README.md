@@ -135,11 +135,11 @@ Our self-hosted runners have the following setup:
     - `GPIO40` and `GPIO41` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S31 (`esp32s31-jtag`):
-  - Devkit: `ESP32-S31_QFN80_Test_Board` connected via UART (`USB-UART` port).
-    - `GPIO6` and `GPIO7` are I2C pins (connected to MCP4725).
+  - Devkit: `ESP32-S31-Function-CoreBoard-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
+    - `GPIO0` and `GPIO1` are I2C pins (connected to MCP4725).
     - `GPIO47` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO3` are connected (LP pads).
-    - `GPIO8` and `GPIO44` are connected (HP pads).
+    - `GPIO43` and `GPIO44` are connected (HP pads).
   - Probe: `ESP-Prog` connected with the [following connections][connection_s31]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32 (`esp32-jtag`):
