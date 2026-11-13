@@ -685,7 +685,11 @@ driver_configs![
         UsbSerialJtagProperties {
             driver: usb_serial_jtag,
             name: "USB Serial/JTAG",
-            properties: {}
+            properties: {
+                /// The analog pad groups that the USB Serial/JTAG controller can use, for example
+                /// `USJ` for the `USJ_DM`/`USJ_DP` pins.
+                phy_pads: Vec<String>,
+            }
         },
     ]
 

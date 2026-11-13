@@ -213,6 +213,7 @@ zero_extend_writes = true
 support_status = { status = "partial", issue = 6777 }
 [device.usb_serial_jtag]
 support_status = { status = "partial", issue = 6787 }
+phy_pads = ["USJ"]
 
 [device.ledc]
 version = 3

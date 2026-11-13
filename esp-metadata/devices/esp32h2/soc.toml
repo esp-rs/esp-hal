@@ -417,6 +417,7 @@ instances = {
 support_status = { status = "partial", issue = 6781 }
 [device.usb_serial_jtag]
 support_status = { status = "partial", issue = 6787 }
+phy_pads = ["USJ"]
 
 ## Miscellaneous
 [device.etm]
