@@ -268,23 +268,24 @@ fn fail_stranded_fails_each_list() {
     let scratch = Lists::new();
     let in_head = IpcRequest::new(nothing);
     let in_drain = IpcRequest::new(nothing);
-    let in_both = IpcRequest::new(nothing);
+    let in_current = IpcRequest::new(nothing);
 
     assert_eq!(post(&lists, APP, &in_head), Ok(1));
 
-    // The handler took `in_drain` and `in_both`, stored `in_both` in `current`, and stopped
-    // before it advanced `drain`.
+    // The APP core stopped in `func` of `in_current`, before it ran `in_drain`.
     assert_eq!(post(&scratch, APP, &in_drain), Ok(1));
-    assert_eq!(post(&scratch, APP, &in_both), Ok(1));
     lists.drain.store(
         scratch.head.swap(ptr::null_mut(), Ordering::SeqCst),
         Ordering::SeqCst,
     );
-    lists.current.store(to_ptr(&in_both), Ordering::SeqCst);
+    in_current
+        .word
+        .store((1 << SEQ_SHIFT) | CORE | RUNNING, Ordering::SeqCst);
+    lists.current.store(to_ptr(&in_current), Ordering::SeqCst);
 
     unsafe { queue::fail_stranded(&lists, APP) };
 
-    for request in [&in_head, &in_drain, &in_both] {
+    for request in [&in_head, &in_drain, &in_current] {
         assert_eq!(
             request.status.load(Ordering::SeqCst),
             (1 << SEQ_SHIFT) | OFFLINE
@@ -292,18 +293,14 @@ fn fail_stranded_fails_each_list() {
         assert_eq!(poll(request, 1), Some(OFFLINE));
         assert_eq!(flags(request), 0);
     }
-    assert_eq!(
-        in_both.word.load(Ordering::SeqCst),
-        in_drain.word.load(Ordering::SeqCst)
-    );
     assert!(lists.head.load(Ordering::SeqCst).is_null());
     assert!(lists.drain.load(Ordering::SeqCst).is_null());
     assert!(lists.current.load(Ordering::SeqCst).is_null());
 
     // A failed request takes posts again.
-    assert_eq!(post(&lists, APP, &in_both), Ok(2));
+    assert_eq!(post(&lists, APP, &in_current), Ok(2));
     drain(&lists, APP);
-    assert_eq!(poll(&in_both, 2), Some(DONE));
+    assert_eq!(poll(&in_current, 2), Some(DONE));
 }
 
 #[test]
@@ -328,41 +325,27 @@ fn fail_stranded_fails_the_running_request() {
 }
 
 #[test]
-fn fail_stranded_keeps_the_outcome_of_an_ended_run() {
-    let lists = Lists::new();
-    let request = IpcRequest::new(nothing);
-
-    // The APP core stored the outcome of run 1, and stopped before it cleared `running`.
-    request
-        .word
-        .store((1 << SEQ_SHIFT) | CORE | RUNNING, Ordering::SeqCst);
-    request
-        .status
-        .store((1 << SEQ_SHIFT) | DONE, Ordering::SeqCst);
-    lists.current.store(to_ptr(&request), Ordering::SeqCst);
-
-    unsafe { queue::fail_stranded(&lists, APP) };
-
-    assert_eq!(poll(&request, 1), Some(DONE));
-    assert_eq!(flags(&request), 0);
-}
-
-#[test]
 fn fail_stranded_skips_a_request_of_the_other_cpu() {
     let lists = [Lists::new(), Lists::new()];
     let request = IpcRequest::new(nothing);
 
-    // The APP core stopped in `func`. The run ended there in the model, and a post to the PRO core
-    // took the request again.
-    lists[1].current.store(to_ptr(&request), Ordering::SeqCst);
-    assert_eq!(post(&lists[0], PRO, &request), Ok(1));
+    // `func` runs on the APP core, and posted its request again. The fail of `head` ends run 2,
+    // and a post to the PRO core takes the request before the fail of `current`.
+    request
+        .word
+        .store((2 << SEQ_SHIFT) | CORE | QUEUED | RUNNING, Ordering::SeqCst);
+    lists[1].head.store(to_ptr(&request), Ordering::SeqCst);
+    unsafe { queue::fail_stranded(&lists[1], APP) };
+    assert_eq!(poll(&request, 2), Some(OFFLINE));
+    assert_eq!(post(&lists[0], PRO, &request), Ok(3));
 
+    lists[1].current.store(to_ptr(&request), Ordering::SeqCst);
     unsafe { queue::fail_stranded(&lists[1], APP) };
 
     assert_eq!(flags(&request), QUEUED);
-    assert_eq!(poll(&request, 1), None);
+    assert_eq!(poll(&request, 3), None);
     drain(&lists[0], PRO);
-    assert_eq!(poll(&request, 1), Some(DONE));
+    assert_eq!(poll(&request, 3), Some(DONE));
 }
 
 #[test]

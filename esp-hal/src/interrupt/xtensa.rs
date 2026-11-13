@@ -276,7 +276,7 @@ impl TryFrom<u8> for ElevatedRunLevel {
     }
 }
 
-pub(super) const DISABLED_CPU_INTERRUPT: u32 = 16;
+pub(crate) const DISABLED_CPU_INTERRUPT: u32 = 16;
 
 // CPU interrupt API. These don't take a core, because the control mechanisms are generally
 // core-local.
@@ -402,7 +402,7 @@ cfg_select! {
 /// # Safety
 ///
 /// Must be called only during core startup.
-#[cfg(any(feature = "rt", multi_core))]
+#[cfg(feature = "rt")]
 pub(crate) unsafe fn init_vectoring() {
     // Enable vectored interrupts. No configuration is needed because these interrupts have
     // fixed priority and trigger mode.
@@ -415,6 +415,8 @@ pub(crate) unsafe fn init_vectoring() {
     ] {
         cpu_int.enable();
     }
+    #[cfg(cache_livelock_workaround)]
+    crate::soc::cache_livelock::enable_cpu_interrupt();
 }
 
 #[cfg(feature = "rt")]
@@ -572,6 +574,10 @@ pub(crate) mod rt {
     #[unsafe(no_mangle)]
     #[ram]
     unsafe fn __level_4_interrupt(save_frame: &mut Context) {
+        #[cfg(cache_livelock_workaround)]
+        if crate::soc::cache_livelock::handle_interrupt() {
+            return;
+        }
         unsafe { level4_interrupt(save_frame) }
     }
 
