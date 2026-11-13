@@ -227,21 +227,14 @@ const REGI2C_RTC_ADDR_SHIFT: u32 = 8;
 const REGI2C_RTC_ADDR_MASK: u32 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_MASK: u32 = 0xFF;
 
-fn regi2c_enable_block(block: u8) -> usize {
-    // Match the S31 bootloader setup explicitly instead of relying on a
-    // previous-stage bootloader to leave the analog-I2C source and force bit
-    // configured for us.
-    MODEM_SYSCON::regs()
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
-    MODEM_LPCON::regs()
-        .clk_conf_force_on()
-        .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
-    MODEM_LPCON::regs()
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
-
-    let bit_mask: u32 = match block {
+/// Returns the slave-select bit of `block`, or 0 for an unknown block.
+///
+/// With a variable `block`, the `match` uses a jump table in flash. Light sleep reaches the analog
+/// I2C with the caches suspended, so this function runs at the call site, where `block` is a
+/// constant.
+#[inline(always)]
+fn block_mask(block: u8) -> u32 {
+    match block {
         v if v == REGI2C_BB.master => REGI2C_BB_MASK,
         v if v == REGI2C_TXRF.master => REGI2C_TXRF_MASK,
         v if v == REGI2C_SDM.master => REGI2C_SDM_MASK,
@@ -256,8 +249,28 @@ fn regi2c_enable_block(block: u8) -> usize {
         v if v == REGI2C_CPLL.master => REGI2C_CPLL_MASK,
         v if v == REGI2C_MPLL.master => REGI2C_MPLL_MASK,
         v if v == REGI2C_DIG_REG.master => REGI2C_DIG_REG_MASK,
-        _ => return 0,
-    };
+        _ => 0,
+    }
+}
+
+#[inline(always)]
+fn regi2c_enable_block(bit_mask: u32) -> usize {
+    // Match the S31 bootloader setup explicitly instead of relying on a
+    // previous-stage bootloader to leave the analog-I2C source and force bit
+    // configured for us.
+    MODEM_SYSCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+    MODEM_LPCON::regs()
+        .clk_conf_force_on()
+        .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
+    MODEM_LPCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
+
+    if bit_mask == 0 {
+        return 0;
+    }
 
     let i2c_ana_mst = unsafe { &*crate::pac::I2C_ANA_MST::PTR };
     let conf2 = i2c_ana_mst.ana_conf2().read().ana_conf2().bits();
@@ -272,7 +285,7 @@ fn regi2c_enable_block(block: u8) -> usize {
     if i2c_sel_set { 0 } else { 1 }
 }
 
-#[inline]
+#[inline(always)]
 fn i2c_ctrl_reg(master: usize) -> u32 {
     if master == 0 {
         I2C_ANA_MST_I2C0_CTRL_REG
@@ -281,7 +294,7 @@ fn i2c_ctrl_reg(master: usize) -> u32 {
     }
 }
 
-#[inline]
+#[inline(always)]
 fn wait_i2c_idle(ctrl: u32) {
     unsafe {
         while (ctrl as *const u32).read_volatile() & REGI2C_RTC_BUSY_BIT != 0 {
@@ -290,8 +303,19 @@ fn wait_i2c_idle(ctrl: u32) {
     }
 }
 
+#[inline(always)]
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
-    let master = regi2c_enable_block(block);
+    read(block_mask(block), block, reg_add)
+}
+
+#[inline(always)]
+pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
+    write(block_mask(block), block, reg_add, data)
+}
+
+#[crate::ram(unstable(cache_suspend_safe))]
+fn read(bit_mask: u32, block: u8, reg_add: u8) -> u8 {
+    let master = regi2c_enable_block(bit_mask);
     let ctrl = i2c_ctrl_reg(master);
 
     wait_i2c_idle(ctrl);
@@ -309,8 +333,9 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     ((val >> REGI2C_RTC_DATA_SHIFT) & REGI2C_RTC_DATA_MASK) as u8
 }
 
-pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
-    let master = regi2c_enable_block(block);
+#[crate::ram(unstable(cache_suspend_safe))]
+fn write(bit_mask: u32, block: u8, reg_add: u8, data: u8) {
+    let master = regi2c_enable_block(bit_mask);
     let ctrl = i2c_ctrl_reg(master);
 
     wait_i2c_idle(ctrl);
