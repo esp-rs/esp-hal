@@ -410,6 +410,7 @@ support_status = { status = "partial", issue = 6781 }
 [device.usb_otg]
 support_status = { status = "partial", issue = 6785 }
 fifo_depth_words = 256
+tx_fifo_count = 5
 
 ## Miscellaneous
 [device.io_mux]

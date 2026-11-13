@@ -586,10 +586,12 @@ memory_size_bytes = 512
 [device.usb_otg]
 support_status = { status = "partial", issue = 6785 }
 fifo_depth_words = 200
+tx_fifo_count = 5
 
 [device.usb_otg_hs]
 support_status = { status = "partial", issue = 6786 }
 fifo_depth_words = 896
+tx_fifo_count = 8
 
 [device.usb_serial_jtag]
 support_status = { status = "partial", issue = 6787 }

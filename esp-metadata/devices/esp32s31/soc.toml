@@ -263,6 +263,7 @@ supports_top_power_down = true
 [device.usb_otg_hs]
 support_status = { status = "partial", issue = 6786 }
 fifo_depth_words = 896
+tx_fifo_count = 8
 
 [device.spi_master]
 version = 3
