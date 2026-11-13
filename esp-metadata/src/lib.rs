@@ -743,7 +743,10 @@ impl Config {
 
         // TODO: repeat for all drivers that have Instance traits
         if let Some(peri) = self.device.peri_config.i2c_master.as_ref() {
-            tokens.extend(cfg::generate_i2c_master_peripherals(peri));
+            tokens.extend(cfg::generate_i2c_master_peripherals(
+                peri,
+                self.peripherals(),
+            ));
         };
         if let Some(peri) = self.device.peri_config.i2s.as_ref() {
             tokens.extend(cfg::generate_i2s_peripherals(peri));

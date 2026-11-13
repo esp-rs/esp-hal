@@ -277,6 +277,9 @@ pub struct Info {
     /// System peripheral marker.
     pub peripheral: crate::system::Peripheral,
 
+    /// Peripheral interrupt of this I2C instance.
+    pub interrupt: crate::peripherals::Interrupt,
+
     /// Interrupt handler for the asynchronous operations of this I2C instance.
     pub async_handler: InterruptHandler,
 
@@ -1917,7 +1920,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 }
 
 for_each_i2c_master!(
-    ($id:literal, $inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
+    ($id:literal, $inst:ident, $peri:ident, $interrupt:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 // `#[ram]` names the section after the function, and the linker keeps or drops
@@ -1939,6 +1942,7 @@ for_each_i2c_master!(
                     id: $id,
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
+                    interrupt: crate::peripherals::Interrupt::$interrupt,
                     async_handler: paste::paste! { [<i2c $id _irq_handler>] },
                     scl_output: OutputSignal::$scl,
                     scl_input: InputSignal::$scl,
@@ -1968,23 +1972,13 @@ impl Instance for AnyI2c<'_> {
     }
 }
 
-impl AnyI2c<'_> {
-    fn bind_peri_interrupt(&self, handler: InterruptHandler) {
-        any::delegate!(self, i2c => { i2c.bind_peri_interrupt(handler) })
-    }
-
-    fn disable_peri_interrupt_on_all_cores(&self) {
-        any::delegate!(self, i2c => { i2c.disable_peri_interrupt_on_all_cores() })
-    }
-}
-
-/// An I2C peripheral with the data of its instance.
+/// An I2C peripheral, represented by the data of its instance.
 pub(super) struct I2cWrapper<'d> {
-    i2c: AnyI2c<'d>,
-    // Read before `degrade()`. `AnyI2c::parts()` refers to the data of every instance, so the
-    // linker could not drop the unused ones.
+    // Read from the concrete type. `AnyI2c::parts()` refers to the data of every instance, so
+    // the linker could not drop the unused ones.
     info: &'static Info,
     state: &'static State,
+    _peripheral: PhantomData<AnyI2c<'d>>,
 }
 
 impl<'d> I2cWrapper<'d> {
@@ -1993,7 +1987,7 @@ impl<'d> I2cWrapper<'d> {
         Self {
             info,
             state,
-            i2c: i2c.degrade(),
+            _peripheral: PhantomData,
         }
     }
 
@@ -2006,28 +2000,30 @@ impl<'d> I2cWrapper<'d> {
     }
 
     pub(super) fn disable_peri_interrupt_on_all_cores(&self) {
-        self.i2c.disable_peri_interrupt_on_all_cores();
+        for core in crate::system::Cpu::all() {
+            crate::interrupt::disable(core, self.info.interrupt);
+        }
     }
 
     pub(super) fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        self.i2c.disable_peri_interrupt_on_all_cores();
+        self.disable_peri_interrupt_on_all_cores();
 
         self.info.enable_listen(EnumSet::all(), false);
         self.info.clear_interrupts(EnumSet::all());
 
-        self.i2c.bind_peri_interrupt(handler);
+        crate::interrupt::bind_handler(self.info.interrupt, handler);
     }
 }
 
 impl core::fmt::Debug for I2cWrapper<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        core::fmt::Debug::fmt(&self.i2c, f)
+        core::fmt::Debug::fmt(&self.info.peripheral, f)
     }
 }
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for I2cWrapper<'_> {
     fn format(&self, f: defmt::Formatter<'_>) {
-        defmt::Format::format(&self.i2c, f)
+        defmt::Format::format(&self.info.peripheral, f)
     }
 }

@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::{cfg::I2cMasterProperties, generate_for_each_macro};
+use crate::{PeripheralDef, cfg::I2cMasterProperties, generate_for_each_macro};
 
 /// Instance configuration, used in [device.i2c_master.instances]
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
@@ -20,7 +20,10 @@ pub(crate) struct I2cMasterInstanceConfig {
 /// Generates `for_each_i2c_master!` which can be used to implement the I2C
 /// master Instance trait for the relevant peripherals. The macro generates code
 /// for each [device.i2c_master.instances[X]] instance.
-pub(crate) fn generate_i2c_master_peripherals(i2c: &I2cMasterProperties) -> TokenStream {
+pub(crate) fn generate_i2c_master_peripherals(
+    i2c: &I2cMasterProperties,
+    peripherals: &[PeripheralDef],
+) -> TokenStream {
     let i2c_master_instance_cfgs = i2c
         .instances
         .iter()
@@ -30,7 +33,15 @@ pub(crate) fn generate_i2c_master_peripherals(i2c: &I2cMasterProperties) -> Toke
 
             let id = crate::number(index);
 
-            let instance = format_ident!("{}", instance.name.to_uppercase());
+            let name = instance.name.to_uppercase();
+            let interrupt = peripherals
+                .iter()
+                .find(|p| p.name == name)
+                .and_then(|p| p.interrupts.get("peri"))
+                .unwrap_or_else(|| panic!("{name} has no `peri` interrupt"));
+
+            let instance = format_ident!("{}", name);
+            let interrupt = format_ident!("{}", interrupt);
 
             let sys = format_ident!("{}", instance_config.sys_instance);
             let sda = format_ident!("{}", instance_config.sda);
@@ -39,7 +50,7 @@ pub(crate) fn generate_i2c_master_peripherals(i2c: &I2cMasterProperties) -> Toke
             // The order and meaning of these tokens must match their use in the
             // `for_each_i2c_master!` call.
             quote! {
-                #id, #instance, #sys, #scl, #sda
+                #id, #instance, #sys, #interrupt, #scl, #sda
             }
         })
         .collect::<Vec<_>>();
@@ -54,15 +65,16 @@ pub(crate) fn generate_i2c_master_peripherals(i2c: &I2cMasterProperties) -> Toke
         ///
         /// This macro has one option for its "Individual matcher" case:
         ///
-        /// Syntax: `($id:literal, $instance:ident, $sys:ident, $scl:ident, $sda:ident)`
+        /// Syntax: `($id:literal, $instance:ident, $sys:ident, $interrupt:ident, $scl:ident, $sda:ident)`
         ///
         /// Macro fragments:
         /// - `$id`: the index of the I2C instance
         /// - `$instance`: the name of the I2C instance
         /// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+        /// - `$interrupt`: the name of the instance's interrupt in the `esp_hal::peripherals::Interrupt` enum.
         /// - `$scl`, `$sda`: peripheral signal names.
         ///
-        /// Example data: `(0, I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA)`
+        /// Example data: `(0, I2C0, I2cExt0, I2C_EXT0, I2CEXT0_SCL, I2CEXT0_SDA)`
         #for_each
     }
 }
