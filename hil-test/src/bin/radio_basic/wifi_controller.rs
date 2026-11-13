@@ -24,6 +24,54 @@ mod tests {
         let _controller = esp_radio::wifi::WifiController::new(p.WIFI, Default::default()).unwrap();
     }
 
+    #[cfg(feature = "esp-radio-unstable")]
+    #[test]
+    fn null_mode_transitions(p: Peripherals) {
+        use esp_radio::wifi::{
+            Config,
+            ControllerConfig,
+            SecondaryChannel,
+            WifiController,
+            WifiError,
+        };
+
+        fn max_tx_power() -> i8 {
+            unsafe extern "C" {
+                fn esp_wifi_get_max_tx_power(power: *mut i8) -> i32;
+            }
+            let mut power = 0;
+            assert_eq!(unsafe { esp_wifi_get_max_tx_power(&mut power) }, 0);
+            power
+        }
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+        let mut controller = WifiController::new(
+            p.WIFI,
+            ControllerConfig::default().with_initial_config(Config::None),
+        )
+        .unwrap();
+        let station = Config::Station(Default::default());
+        assert_eq!(controller.rssi(), Err(WifiError::Unsupported));
+        let sniffer = controller.sniffer();
+        sniffer.set_promiscuous_mode(true).unwrap();
+        controller.set_channel(1, SecondaryChannel::None).unwrap();
+        drop(sniffer);
+        controller.set_config(&station).unwrap();
+        assert_eq!(max_tx_power(), 20);
+        controller.set_max_tx_power(8).unwrap();
+        assert!(max_tx_power() < 20);
+        controller.set_config(&Config::None).unwrap();
+        assert_eq!(controller.rssi(), Err(WifiError::Unsupported));
+        controller.set_max_tx_power(44).unwrap();
+        assert_eq!(
+            controller.set_max_tx_power(85),
+            Err(WifiError::InvalidArguments)
+        );
+        controller.set_config(&station).unwrap();
+        assert_eq!(max_tx_power(), 44);
+    }
+
     // If this turns out to be too flaky or time-consuming,
     // we should consider converting this into a qa-test.
     #[test]
