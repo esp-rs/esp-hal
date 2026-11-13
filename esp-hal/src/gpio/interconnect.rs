@@ -288,7 +288,7 @@ impl<'d> PeripheralOutput<'d> for OutputSignal<'d> {
 }
 
 impl gpio::InputSignal {
-    fn can_use_gpio_matrix(self) -> bool {
+    pub(crate) const fn can_use_gpio_matrix(self) -> bool {
         self as usize <= property!("gpio.input_signal_max")
     }
 
@@ -310,7 +310,7 @@ impl gpio::InputSignal {
 }
 
 impl gpio::OutputSignal {
-    fn can_use_gpio_matrix(self) -> bool {
+    pub(crate) const fn can_use_gpio_matrix(self) -> bool {
         self as usize <= property!("gpio.output_signal_max")
     }
 

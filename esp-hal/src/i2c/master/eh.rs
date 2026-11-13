@@ -36,7 +36,7 @@ impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
-        let _clock_guard = I2cClockGuard::new(self.i2c.reborrow());
+        let _clock_guard = I2cClockGuard::new(self.i2c.info());
         self.driver()
             .transaction_impl(
                 I2cAddress::SevenBit(address),
@@ -52,7 +52,7 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
         address: u8,
         operations: &mut [EhalOperation<'_>],
     ) -> Result<(), Self::Error> {
-        let _clock_guard = I2cClockGuard::new(self.i2c.reborrow());
+        let _clock_guard = I2cClockGuard::new(self.i2c.info());
         self.driver()
             .transaction_impl_async(address.into(), operations.iter_mut().map(Operation::from))
             .await

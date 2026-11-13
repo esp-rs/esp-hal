@@ -47,6 +47,10 @@ pub struct AtomicWaker {
     waker: GenericAtomicWaker<RawMutex>,
 }
 
+// The waker is in a `Cell`, but it is only accessed with the mutex locked, so a panic that unwinds
+// cannot leave it inconsistent.
+impl core::panic::RefUnwindSafe for AtomicWaker {}
+
 impl AtomicWaker {
     /// Creates a new `AtomicWaker`.
     #[allow(clippy::new_without_default)]

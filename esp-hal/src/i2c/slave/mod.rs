@@ -161,7 +161,7 @@ pub enum ReadStatus {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct I2cSlave<'d, Dm: DriverMode> {
-    i2c: AnyI2c<'d>,
+    i2c: I2cWrapper<'d>,
     phantom: PhantomData<Dm>,
     // Release the function clock before disabling peripheral register access.
     clock_guard: I2cClockGuard,
@@ -208,14 +208,15 @@ impl<'d> I2cSlave<'d, Blocking> {
     ///
     /// [`ConfigError::AddressInvalid`] when the address is not a valid 7-bit address.
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
-        let guard = PeripheralGuard::new(i2c.info().peripheral);
-        let clock_guard = I2cClockGuard::new(i2c.info().clock_instance);
+        let i2c = I2cWrapper::new(i2c);
+        let guard = PeripheralGuard::new(i2c.info.peripheral);
+        let clock_guard = I2cClockGuard::new(i2c.info.clock_instance);
 
         let sda_pin = PinGuard::new_unconnected();
         let scl_pin = PinGuard::new_unconnected();
 
         let mut slave = I2cSlave {
-            i2c: i2c.degrade(),
+            i2c,
             phantom: PhantomData,
             clock_guard,
             guard,
@@ -275,7 +276,7 @@ impl<'d> I2cSlave<'d, Async> {
     pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let driver = self.driver();
         let regs = driver.regs();
-        let state = self.i2c.state();
+        let state = driver.state;
 
         driver.start_listen();
 
@@ -317,7 +318,7 @@ impl<'d> I2cSlave<'d, Async> {
     pub async fn respond_to_read_async(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
         let driver = self.driver();
         let regs = driver.regs();
-        let state = self.i2c.state();
+        let state = driver.state;
 
         let mut bytes_written = 1;
         driver.start_read(buffer);
@@ -345,8 +346,10 @@ impl<'d> I2cSlave<'d, Async> {
 
 impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     fn driver(&self) -> Driver<'_> {
-        let (info, state) = self.i2c.parts();
-        Driver { info, state }
+        Driver {
+            info: self.i2c.info,
+            state: self.i2c.state,
+        }
     }
 
     /// Connects a pin to the I2C SDA signal.
@@ -589,6 +592,7 @@ impl core::fmt::Debug for State {
 pub struct Info {
     pub(crate) register_block: *const RegisterBlock,
     pub(crate) peripheral: crate::system::Peripheral,
+    pub(crate) interrupt: crate::peripherals::Interrupt,
     pub(crate) async_handler: InterruptHandler,
     pub(crate) clock_instance: I2cInstance,
     pub(crate) scl_output: OutputSignal,
@@ -605,21 +609,25 @@ impl Info {
 
 unsafe impl Sync for Info {}
 
+// `register_block` points to registers, which are `UnsafeCell`s. `Info` never changes, so a panic
+// that unwinds cannot leave it inconsistent.
+impl core::panic::RefUnwindSafe for Info {}
+
 // Public constructor bound; implementations are sealed.
 #[doc(hidden)]
-pub trait Instance: crate::private::Sealed + any::Degrade {
+pub trait Instance: crate::private::Sealed {
     #[doc(hidden)]
-    fn parts(&self) -> (&Info, &State);
+    fn parts(&self) -> (&'static Info, &'static State);
 
     #[doc(hidden)]
     #[inline(always)]
-    fn info(&self) -> &Info {
+    fn info(&self) -> &'static Info {
         self.parts().0
     }
 
     #[doc(hidden)]
     #[inline(always)]
-    fn state(&self) -> &State {
+    fn state(&self) -> &'static State {
         self.parts().1
     }
 }
@@ -999,10 +1007,12 @@ impl Driver<'_> {
 
 #[cfg(i2c_slave_i2c0)]
 impl crate::i2c::slave::Instance for crate::peripherals::I2C0<'_> {
-    fn parts(&self) -> (&Info, &State) {
+    fn parts(&self) -> (&'static Info, &'static State) {
+        // `#[ram]` names the section after the function, and the linker keeps or drops a section
+        // whole, so each instance needs a handler with a unique name.
         #[handler]
         #[ram]
-        pub(super) fn irq_handler() {
+        pub(super) fn i2c0_irq_handler() {
             async_handler(&PERIPHERAL, &STATE);
         }
 
@@ -1015,7 +1025,8 @@ impl crate::i2c::slave::Instance for crate::peripherals::I2C0<'_> {
         static PERIPHERAL: Info = Info {
             register_block: crate::peripherals::I2C0::ptr(),
             peripheral: crate::system::Peripheral::I2cExt0,
-            async_handler: irq_handler,
+            interrupt: crate::peripherals::Interrupt::I2C_EXT0,
+            async_handler: i2c0_irq_handler,
             clock_instance: I2cInstance::I2c0,
             scl_output: OutputSignal::I2CEXT0_SCL,
             scl_input: InputSignal::I2CEXT0_SCL,
@@ -1028,10 +1039,10 @@ impl crate::i2c::slave::Instance for crate::peripherals::I2C0<'_> {
 
 #[cfg(i2c_slave_i2c1)]
 impl crate::i2c::slave::Instance for crate::peripherals::I2C1<'_> {
-    fn parts(&self) -> (&Info, &State) {
+    fn parts(&self) -> (&'static Info, &'static State) {
         #[handler]
         #[ram]
-        pub(super) fn irq_handler() {
+        pub(super) fn i2c1_irq_handler() {
             async_handler(&PERIPHERAL, &STATE);
         }
 
@@ -1044,7 +1055,8 @@ impl crate::i2c::slave::Instance for crate::peripherals::I2C1<'_> {
         static PERIPHERAL: Info = Info {
             register_block: crate::peripherals::I2C1::ptr(),
             peripheral: crate::system::Peripheral::I2cExt1,
-            async_handler: irq_handler,
+            interrupt: crate::peripherals::Interrupt::I2C_EXT1,
+            async_handler: i2c1_irq_handler,
             clock_instance: I2cInstance::I2c1,
             scl_output: OutputSignal::I2CEXT1_SCL,
             scl_input: InputSignal::I2CEXT1_SCL,
@@ -1066,30 +1078,52 @@ crate::any_peripheral! {
 }
 
 impl crate::i2c::slave::Instance for AnyI2c<'_> {
-    fn parts(&self) -> (&Info, &State) {
+    fn parts(&self) -> (&'static Info, &'static State) {
         any::delegate!(self, i2c => { crate::i2c::slave::Instance::parts(i2c) })
     }
 }
 
-impl AnyI2c<'_> {
-    fn bind_peri_interrupt(&self, handler: InterruptHandler) {
-        any::delegate!(self, i2c => { i2c.bind_peri_interrupt(handler) })
+/// An I2C peripheral, represented by the data of its instance.
+struct I2cWrapper<'d> {
+    // Read from the concrete type. `AnyI2c::parts()` refers to the data of every instance, so
+    // the linker could not drop the unused ones.
+    info: &'static Info,
+    state: &'static State,
+    _peripheral: PhantomData<AnyI2c<'d>>,
+}
+
+impl<'d> I2cWrapper<'d> {
+    fn new(i2c: impl Instance + 'd) -> Self {
+        let (info, state) = i2c.parts();
+        Self {
+            info,
+            state,
+            _peripheral: PhantomData,
+        }
     }
 
     fn disable_peri_interrupt(&self) {
-        any::delegate!(self, i2c => { i2c.disable_peri_interrupt() })
-    }
-
-    fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority) {
-        any::delegate!(self, i2c => { i2c.enable_peri_interrupt(priority) })
+        crate::interrupt::disable(crate::system::Cpu::current(), self.info.interrupt);
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.disable_peri_interrupt();
 
-        self.info().regs().int_ena().write(|w| unsafe { w.bits(0) });
+        self.info.regs().int_ena().write(|w| unsafe { w.bits(0) });
 
-        self.bind_peri_interrupt(handler);
-        self.enable_peri_interrupt(handler.priority());
+        crate::interrupt::bind_handler(self.info.interrupt, handler);
+    }
+}
+
+impl core::fmt::Debug for I2cWrapper<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(&self.info.peripheral, f)
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for I2cWrapper<'_> {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::Format::format(&self.info.peripheral, f)
     }
 }
