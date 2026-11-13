@@ -21,6 +21,10 @@
 //! The phases without CPU retention run first, so that a sleep with CPU retention that never ends
 //! does not hang the test before they run.
 //!
+//! Before the first sleep of each phase, the program writes to UART1 and drops the driver without a
+//! flush. The UART then has bytes in its transmit FIFO and no clocks. The sleep entry must not wait
+//! for that UART.
+//!
 //! In each phase, each core runs these parts:
 //!
 //! - Sleeps of random length check the timer wakeup and the time update after the wake. One sleep
@@ -89,6 +93,7 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
     timer::timg::TimerGroup,
+    uart::{Config as UartConfig, Uart},
 };
 use esp_rtos::{CurrentThreadHandle, thread::ThreadSpawner};
 use portable_atomic::{AtomicBool, AtomicU32, Ordering};
@@ -993,6 +998,10 @@ fn main() -> ! {
             read: [0; SECTOR as usize / 4],
         })
     };
+
+    let mut uart = Uart::new(peripherals.UART1, UartConfig::default()).unwrap();
+    uart.write(&[0x55; 32]).unwrap();
+    drop(uart);
 
     report!("RUN phase {index}: {phase}, seed {seed:#010x}");
     let now = Instant::now();
