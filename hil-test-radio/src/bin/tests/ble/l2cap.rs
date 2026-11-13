@@ -1,6 +1,6 @@
 #[embedded_test::tests(default_timeout = 30, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
-    use embassy_futures::select::select;
+    use embassy_futures::{join::join, select::select};
     use embassy_time::{Duration, Timer, with_timeout};
     use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
     use esp_radio::ble::controller::BleConnector;
@@ -35,11 +35,44 @@ mod tests {
         let _ = select(crate::ble_task(runner), async {
             let conn = crate::connect(&mut central, address).await;
             // The support firmware rejects the channel until it is listening.
-            Timer::after(Duration::from_millis(500)).await;
-            let mut channel =
-                L2capChannel::create(&stack, &conn, hil_test::ble::L2CAP_PSM, &Default::default())
+            let create_channel = async {
+                let mut attempts = 0;
+                loop {
+                    match L2capChannel::create(
+                        &stack,
+                        &conn,
+                        hil_test::ble::L2CAP_PSM,
+                        &Default::default(),
+                    )
                     .await
-                    .expect("L2CAP channel setup failed");
+                    {
+                        Ok(channel) => break channel,
+                        Err(_) if attempts < 20 => {
+                            attempts += 1;
+                            Timer::after(Duration::from_millis(100)).await;
+                        }
+                        Err(_) => panic!("L2CAP channel setup failed"),
+                    }
+                }
+            };
+
+            // Without this length, the controller does not split the ACL packets. The
+            // connection drops new events when its short queue is full, so read them from
+            // the start.
+            let data_length_applied = with_timeout(Duration::from_secs(10), async {
+                loop {
+                    if let ConnectionEvent::DataLengthUpdated { max_rx_octets, .. } =
+                        conn.next().await
+                        && max_rx_octets == hil_test::ble::DATA_LENGTH
+                    {
+                        break;
+                    }
+                }
+            });
+
+            let (mut channel, data_length_applied) =
+                join(create_channel, data_length_applied).await;
+            data_length_applied.expect("LE data length was not applied");
 
             let mut received = 0;
             let mut sdu = [0; 255];
