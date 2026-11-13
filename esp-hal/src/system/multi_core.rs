@@ -470,6 +470,9 @@ where
     // Do not call setup_interrupts as that would disable peripheral interrupts, too.
     unsafe { crate::interrupt::init_vectoring() };
 
+    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
+    crate::soc::cache_livelock::app_core_started();
+
     enable_app_core_interrupts();
 
     // Trampoline to run from the new stack.
