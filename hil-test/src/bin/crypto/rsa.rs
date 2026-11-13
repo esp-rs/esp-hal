@@ -268,6 +268,11 @@ mod tests {
         );
         let r = compute_r(&BIGNUM_3);
         mod_exp
+            .exponentiation(U512::ONE.as_words(), r.as_words(), &mut outbuf)
+            .await;
+        hil_test::assert_eq!(*U512::ONE.as_words(), outbuf);
+
+        mod_exp
             .exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf)
             .await;
         hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
@@ -308,6 +313,43 @@ mod tests {
         multi.start_multiplication(BIGNUM_2.as_words());
         multi.read_results(&mut outbuf);
         hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, outbuf);
+    }
+
+    #[test]
+    async fn test_async_cancellation(ctx: Context<'static>) {
+        let mut rsa = ctx.rsa.into_async();
+        #[cfg(not(rsa_version = "1"))]
+        rsa.apply_config(&esp_hal::rsa::Config::default().with_search_acceleration(true))
+            .unwrap();
+
+        let mut outbuf = [u32::MAX; U512::LIMBS];
+        let r = compute_r(&BIGNUM_3);
+        let mut mod_exp = RsaModularExponentiation::<Op512, _>::new(
+            &mut rsa,
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            compute_mprime(&BIGNUM_3),
+        );
+        let first_poll = embassy_futures::poll_once(mod_exp.exponentiation(
+            BIGNUM_2.as_words(),
+            r.as_words(),
+            &mut outbuf,
+        ));
+
+        hil_test::assert!(first_poll.is_pending());
+        hil_test::assert_eq!(outbuf, [u32::MAX; U512::LIMBS]);
+
+        #[cfg(not(rsa_version = "1"))]
+        {
+            let regs = esp_hal::peripherals::RSA::regs();
+            hil_test::assert!(regs.constant_time().read().constant_time().bit_is_set());
+            hil_test::assert!(regs.search_enable().read().search_enable().bit_is_set());
+        }
+
+        mod_exp
+            .exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf)
+            .await;
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
     }
 
     #[test]
