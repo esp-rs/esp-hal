@@ -119,7 +119,7 @@ impl Psram {
 
             unsafe { set_psram_range(range) };
 
-            #[cfg(all(cache_livelock_workaround, feature = "rt"))]
+            #[cfg(all(esp32, cache_livelock_workaround, feature = "rt"))]
             crate::soc::cache_livelock::psram_mapped();
         }
         Self { _peri: peri }
