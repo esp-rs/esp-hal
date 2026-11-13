@@ -33,15 +33,14 @@ pub mod dbi;
 pub mod dpi;
 pub(crate) mod vdma;
 
-use core::marker::PhantomData;
-
 use dpi::DsiDpi;
 use procmacros::BuilderLite;
 pub use vdma::VdmaDmaChannel;
+use vdma::{OwnedVdmaChannel, take_owned_vdma_channel};
 
 use crate::{
-    peripherals::{MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, PMU},
-    rom,
+    mipi_dphy_power::DphyPower,
+    peripherals::{MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST},
     soc::clocks::{
         ClockTree,
         MipiDsiInstance,
@@ -117,12 +116,14 @@ pub enum ConfigError {
 
 /// Owns the DSI peripheral and one VDMA channel; powers down the D-PHY on drop.
 pub(crate) struct DphyGuard<'d> {
+    /// Dropped first, after the PHY shutdown in `drop`, like the LDO was.
+    pub(crate) _dphy_power: DphyPower,
     pub(crate) _dsi: MIPI_DSI<'d>,
+    pub(crate) _vdma_channel: OwnedVdmaChannel<'d>,
     /// The hardware channel index (0–3) of the VDMA channel in use.
     pub(crate) vdma_channel_id: u8,
     pub(crate) _dsi_guard: GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }>,
     pub(crate) _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
-    pub(crate) _phantom: PhantomData<&'d mut ()>,
 }
 
 impl Drop for DphyGuard<'_> {
@@ -164,9 +165,9 @@ impl<'d> MipiDsi<'d> {
             return Err(ConfigError::InvalidLaneBitRate);
         }
 
-        let vdma_channel_id = vdma_channel.channel_id();
+        let (owned_vdma_channel, vdma_channel_id) = take_owned_vdma_channel(vdma_channel);
 
-        dphy_ldo_power_on();
+        let dphy_power = DphyPower::acquire();
 
         // Enable APB clock and reset bridge (via GenericPeripheralGuard).
         let dsi_guard: GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }> =
@@ -191,11 +192,12 @@ impl<'d> MipiDsi<'d> {
         let ref_freq_mhz = ref_freq_hz as f32 / 1_000_000.0;
 
         let dphy_guard = DphyGuard {
+            _dphy_power: dphy_power,
             _dsi: dsi,
+            _vdma_channel: owned_vdma_channel,
             vdma_channel_id,
             _dsi_guard: dsi_guard,
             _vdma_guard: vdma_guard,
-            _phantom: PhantomData,
         };
 
         let host = MIPI_DSI_HOST::regs();
@@ -336,34 +338,9 @@ impl<'d> MipiDsi<'d> {
 
 // ── D-PHY power ───────────────────────────────────────────────────────────────
 
-/// Powers up the internal LDO that supplies VDD_MIPI_DPHY at 2.5 V.
-///
-/// On ESP32-P4 the DPHY power rail (VDD_MIPI_DPHY) is driven by PMU
-/// internal LDO channel 3 (VO3), which maps to the `ext_ldo_p0_0p2a`
-/// register pair.
-///
-/// Without eFuse calibration the nominal output formula gives:
-///   Vref = 1.0 V  (dref = 9)
-///   Vout = Vref × (1 + 0.25 × mul) = 2.5 V  (mul = 6)
-pub(crate) fn dphy_ldo_power_on() {
-    // force_tieh_sel[7]=1 → SW-owned, xpd[8]=1 → enabled.
-    // target0/target1 kept at reset values (0x80 / 0x40).
-    PMU::regs()
-        .ext_ldo_p0_0p2a()
-        .write(|w| unsafe { w.bits(0x4020_0180) });
-    // dref[31:28]=9, mul[25:23]=6 → 2.5 V.
-    PMU::regs()
-        .ext_ldo_p0_0p2a_ana()
-        .write(|w| unsafe { w.bits((9u32 << 28) | (6u32 << 23)) });
-    // Allow output to settle before the PHY analog circuits start.
-    rom::ets_delay_us(500);
-}
-
-/// Shuts down the D-PHY and disables its LDO.
-///
-/// Mirrors `dphy_ldo_power_on` in reverse: reset the PHY digital and
-/// analog sections, power off the DSI host, then clear the LDO `xpd` bit
-/// so VDD_MIPI_DPHY is no longer driven.
+/// Shuts down the DSI D-PHY: resets the PHY digital and analog sections and
+/// powers off the DSI host. The shared `VDD_MIPI_DPHY` rail is released by
+/// the [`DphyPower`] guard, and stays on while a CSI driver uses it.
 pub(crate) fn dphy_power_down() {
     let host = MIPI_DSI_HOST::regs();
     host.phy_rstz().modify(|_, w| {
@@ -372,10 +349,6 @@ pub(crate) fn dphy_power_down() {
         w.phy_enableclk().clear_bit()
     });
     host.pwr_up().modify(|_, w| w.shutdownz().clear_bit());
-    // Restore LDO to reset state (xpd=0, SW ownership released).
-    PMU::regs()
-        .ext_ldo_p0_0p2a()
-        .write(|w| unsafe { w.bits(0x4020_0000) });
 }
 
 // ── PLL helpers ───────────────────────────────────────────────────────────────

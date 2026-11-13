@@ -113,6 +113,11 @@ peripherals = [
     { name = "ETH", virtual = true, interrupts = { peri = "ETH_MAC" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
     { name = "EMAC_MAC", pac = "GMAC", hidden = true },
+    { name = "MIPI_CSI", virtual = true, interrupts = { csi = "CSI", bridge = "CSI_BRIDGE" }, clock_group = "MIPI_CSI" },
+    { name = "MIPI_CSI_HOST", hidden = true },
+    { name = "MIPI_CSI_BRIDGE", hidden = true },
+    # The CSI driver routes the CSI input through the ISP in bypass mode.
+    { name = "ISP", hidden = true },
     { name = "MIPI_DSI", virtual = true, interrupts = { dsi = "DSI", bridge = "DSI_BRIDGE" }, clock_group = "MIPI_DSI" },
     { name = "VDMA", pac = "DMA", hidden = true },
     { name = "MIPI_DSI_HOST", hidden = true },
@@ -313,7 +318,7 @@ rx_checksum_offload = true
 tx_checksum_offload = false # TX FIFO is too small for store-and-forward insertion
 
 [device.mipi_csi]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.mipi_dsi]
 support_status = { status = "partial", issue = 6769 }
