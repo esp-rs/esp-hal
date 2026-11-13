@@ -3,35 +3,18 @@
 use core::ptr::NonNull;
 
 use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
-use portable_atomic::{AtomicPtr, AtomicU32, Ordering};
+use portable_atomic::{AtomicU32, Ordering};
 
-use super::{IpcRequest, implem::raise, queue};
-use crate::{interrupt::__rtos_implementation::ContextSwitchHandler, system::Cpu};
+use super::{IpcRequest, queue};
+use crate::system::Cpu;
 
 /// The IPC state of one CPU.
-///
-/// Every CPU has its own handler, which reads the fields at constant addresses.
 #[repr(C)]
 pub(super) struct CoreState {
-    /// The context-switch handler that the CPU runs, or null if the CPU has none pending.
-    ///
-    /// [`request_context_switch`] copies `context_switch_handler` here. A posted request alone
-    /// therefore does not make the CPU switch tasks.
-    pub(super) pending_context_switch: AtomicPtr<()>,
-
-    /// The context-switch handler of the CPU, or null if no RTOS registered one.
-    ///
-    /// This field is set once, and holds the only handler that the CPU accepts.
-    pub(super) context_switch_handler: AtomicPtr<()>,
-
-    /// Non-zero while the CPU defers its context switches. The IPC handler then leaves
-    /// `pending_context_switch` for [`resume_context_switch`]. Only the CPU itself writes this
-    /// field while the CPU runs.
-    pub(super) deferral: AtomicU32,
-
-    /// The address of the register that clears the request of this CPU.
-    #[cfg(riscv)]
-    pub(super) request: AtomicPtr<u32>,
+    /// Non-zero while the CPU defers its context switches. The CPU then keeps a pending context
+    /// switch until [`resume_context_switch`]. Only the CPU itself writes this field while the CPU
+    /// runs.
+    deferral: AtomicU32,
 
     /// The requests that [`Ipc::post`][super::Ipc::post] queued for this CPU.
     pub(super) lists: queue::Lists,
@@ -40,11 +23,7 @@ pub(super) struct CoreState {
 impl CoreState {
     const fn new() -> Self {
         Self {
-            pending_context_switch: AtomicPtr::new(core::ptr::null_mut()),
-            context_switch_handler: AtomicPtr::new(core::ptr::null_mut()),
             deferral: AtomicU32::new(0),
-            #[cfg(riscv)]
-            request: AtomicPtr::new(core::ptr::null_mut()),
             lists: queue::Lists::new(),
         }
     }
@@ -88,7 +67,7 @@ pub(super) unsafe extern "C" fn esp_hal_ipc_post(core: u8, request: NonNull<IpcR
     } else {
         unsafe {
             queue::post(&STATE[core as usize].lists, core as u32, request, || {
-                raise(core)
+                super::implem::raise(core)
             })
         }
     };
@@ -97,17 +76,18 @@ pub(super) unsafe extern "C" fn esp_hal_ipc_post(core: u8, request: NonNull<IpcR
     result
 }
 
-cfg_select! {
-    context_switch_source = "software0" => {
-        /// The bits of the deferral that count the active deferrals.
-        const DEFERRAL_COUNT: u32 = u32::MAX >> 1;
-        /// Set when the `Software0` context switch was enabled before the first active deferral.
-        const SOFTWARE0_ENABLED: u32 = !DEFERRAL_COUNT;
-    }
-    _ => {
-        /// The bits of the deferral that count the active deferrals.
-        const DEFERRAL_COUNT: u32 = u32::MAX;
-    }
+/// Raises the IPC interrupt of `core`.
+///
+/// # Panics
+///
+/// In debug builds, panics if `core` is the APP CPU and that CPU is not running.
+#[inline]
+pub(crate) fn raise(core: Cpu) {
+    debug_assert!(
+        core != Cpu::AppCpu || crate::soc::cpu_control::is_running(Cpu::AppCpu),
+        "IPC target APP core is not running"
+    );
+    super::implem::raise(core);
 }
 
 /// Defers the context switches of the current CPU, so that the current thread stays on the CPU.
@@ -119,14 +99,7 @@ pub(crate) fn defer_context_switch() {
     let token = unsafe { SingleCoreInterruptLock.enter() };
     let deferral = &STATE[Cpu::current() as usize].deferral;
     let state = deferral.load(Ordering::Relaxed);
-    debug_assert_ne!(state & DEFERRAL_COUNT, DEFERRAL_COUNT);
-    #[cfg(context_switch_source = "software0")]
-    let state =
-        if state == 0 && crate::interrupt::__rtos_implementation::mask_local_context_switch() {
-            SOFTWARE0_ENABLED
-        } else {
-            state
-        };
+    debug_assert_ne!(state, u32::MAX);
     deferral.store(state + 1, Ordering::Relaxed);
     unsafe { SingleCoreInterruptLock.exit(token) };
 }
@@ -141,92 +114,26 @@ pub(crate) fn defer_context_switch() {
 pub(crate) unsafe fn resume_context_switch() {
     // The active deferral keeps the thread on the current CPU.
     let core = Cpu::current();
-    let state = &STATE[core as usize];
+    let deferral = &STATE[core as usize].deferral;
 
     let token = unsafe { SingleCoreInterruptLock.enter() };
-    let deferral = state.deferral.load(Ordering::Relaxed);
-    debug_assert_ne!(deferral & DEFERRAL_COUNT, 0);
-    let remaining = deferral - 1;
-    let last = remaining & DEFERRAL_COUNT == 0;
-    state
-        .deferral
-        .store(if last { 0 } else { remaining }, Ordering::Relaxed);
-    if last {
-        #[cfg(context_switch_source = "software0")]
-        if deferral & SOFTWARE0_ENABLED != 0 {
-            crate::interrupt::__rtos_implementation::unmask_local_context_switch();
-        }
-        if !state
-            .pending_context_switch
-            .load(Ordering::Acquire)
-            .is_null()
-        {
-            raise(core);
-        }
+    let state = deferral.load(Ordering::Relaxed);
+    debug_assert_ne!(state, 0);
+    deferral.store(state - 1, Ordering::Relaxed);
+    if state == 1 && crate::interrupt::__rtos_implementation::context_switch_pending(core) {
+        // Any interrupt of the minimum priority switches tasks when it exits.
+        raise(core);
     }
     unsafe { SingleCoreInterruptLock.exit(token) };
+}
+
+/// Returns `true` while the current CPU defers its context switches.
+#[inline(always)]
+pub(crate) fn context_switch_deferred() -> bool {
+    STATE[Cpu::current() as usize].deferral.load(Ordering::Relaxed) != 0
 }
 
 /// Clears the deferral of `core` before the CPU starts.
 pub(crate) fn reset_context_switch_deferral(core: Cpu) {
     STATE[core as usize].deferral.store(0, Ordering::Relaxed);
-}
-
-/// Registers the context-switch handler of `core`.
-///
-/// A CPU accepts one context-switch handler. [`request_context_switch`] therefore takes no
-/// handler of its own, and never waits.
-///
-/// # Panics
-///
-/// Panics if `core` already has a context-switch handler.
-///
-/// # Safety
-///
-/// See [`__rtos_implementation::set_context_switch_handler`].
-///
-/// [`__rtos_implementation::set_context_switch_handler`]:
-///     crate::interrupt::__rtos_implementation::set_context_switch_handler
-pub(crate) unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitchHandler) {
-    unwrap!(
-        STATE[core as usize]
-            .context_switch_handler
-            .compare_exchange(
-                core::ptr::null_mut(),
-                handler as *mut (),
-                Ordering::Release,
-                Ordering::Relaxed,
-            ),
-        "A CPU accepts one context switch handler"
-    );
-}
-
-/// Asks `core` to run its context-switch handler.
-///
-/// The handler runs at [`Priority::min`][crate::interrupt::Priority::min], after the requests that
-/// [`Ipc::post`][super::Ipc::post] queued. The call does not wait, not even for a pending request.
-///
-/// # Panics
-///
-/// In debug builds, panics if `core` has no context-switch handler, or if `core` is the APP CPU
-/// and that CPU is not running.
-#[inline]
-pub(crate) fn request_context_switch(core: Cpu) {
-    debug_assert!(
-        core != Cpu::AppCpu || crate::soc::cpu_control::is_running(Cpu::AppCpu),
-        "IPC target APP core is not running"
-    );
-
-    let state = &STATE[core as usize];
-
-    // A CPU accepts one context switch handler, so this needs no read-modify-write: the store
-    // is idempotent, and the IPC handler takes the handler before it runs it, which makes the
-    // handler run at least once after this store.
-    let handler = state.context_switch_handler.load(Ordering::Relaxed);
-    debug_assert!(!handler.is_null(), "The CPU has no context switch handler");
-    state
-        .pending_context_switch
-        .store(handler, Ordering::Release);
-
-    raise(core);
 }
