@@ -1289,8 +1289,13 @@ where
     ///
     /// [`ConfigError`] when bus frequency or timeout passed in config is invalid.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.config.config = *config;
-        self.driver().setup(config)?;
+        let previous = core::mem::replace(&mut self.config.config, *config);
+        if let Err(error) = self.driver().setup(config) {
+            // Write back the registers that `setup` changed before it failed.
+            self.config.config = previous;
+            self.driver().setup(&previous).ok();
+            return Err(error);
+        }
         self.driver().reset_fsm(false);
         Ok(())
     }

@@ -178,6 +178,49 @@ mod tests {
     }
 
     #[test]
+    fn rejected_config_does_not_replace_applied_config(mut ctx: Context) {
+        use esp_hal::i2c::master::{BusTimeout, ConfigError};
+
+        // Long enough for one transaction at 100 kHz, too short at 1 kHz.
+        let applied = Config::default()
+            .with_software_timeout(SoftwareTimeout::Transaction(time::Duration::from_millis(5)));
+        ctx.i2c.apply_config(&applied).unwrap();
+
+        // Too long at 1 kHz: more than 2^24 APB cycles on v1 and v2, more than 2^31 function
+        // clock cycles on v3 and v4.
+        let cycles = cfg_select! {
+            any(i2c_master_version = "3", i2c_master_version = "4") => 3_000_000,
+            _ => 1_000,
+        };
+        let rejected = Config::default()
+            .with_frequency(time::Rate::from_khz(1))
+            .with_timeout(BusTimeout::BusCycles(cycles))
+            .with_software_timeout(SoftwareTimeout::Transaction(time::Duration::from_micros(1)));
+        assert_eq!(
+            ctx.i2c.apply_config(&rejected),
+            Err(ConfigError::TimeoutTooLong)
+        );
+
+        let mut read_data = [0u8; 5];
+        ctx.i2c
+            .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
+            .unwrap();
+        assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
+
+        // A failed transaction resets the controller. On chips where the reset clears the
+        // registers, the driver applies the stored configuration again.
+        ctx.i2c
+            .write(NON_EXISTENT_ADDRESS, &[])
+            .expect_err("Expected error for non-existent address");
+
+        read_data = [0u8; 5];
+        ctx.i2c
+            .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
+            .unwrap();
+        assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
+    }
+
+    #[test]
     async fn async_empty_write_returns_ack_error_for_unknown_address(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
 
