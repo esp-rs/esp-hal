@@ -518,7 +518,22 @@ pub(crate) fn calibrate_rtc_slow_clock() {
         _ => LP_AON::regs().store1(),
     };
 
+    // The RTC time is the boot time plus the ticks since power-up multiplied by this period. The
+    // boot time takes the difference, so a new period does not move the RTC time.
+    #[cfg(lp_timer_driver_supported)]
+    let ticks = crate::rtc_cntl::time_since_boot_raw();
+    #[cfg(lp_timer_driver_supported)]
+    let old_us = rtc_ticks_to_us(ticks);
+
     reg.write(|w| unsafe { w.bits(cal_val) });
+
+    // A period of 0 is not a calibration yet, for example after a power-on reset.
+    #[cfg(lp_timer_driver_supported)]
+    if old_us != 0 {
+        let new_us = rtc_ticks_to_us(ticks);
+        let boot_time_us = crate::rtc_cntl::boot_time_us();
+        crate::rtc_cntl::set_boot_time_us(boot_time_us.wrapping_add(old_us).wrapping_sub(new_us));
+    }
 
     if rc_slow_selected {
         let frequency = ((1_000_000u64 << RtcClock::CAL_FRACT) / cal_val as u64) as u32;
