@@ -593,6 +593,8 @@ impl<'d> AesDmaBackend<'d> {
         self.state = DriverState::WaitingForDma {
             transfer,
             remaining_bytes: 0,
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            written: get_range(item.buffers.output, 0, text_full),
         };
 
         Poll::Pending(false)
@@ -620,8 +622,12 @@ impl<'d> AesDmaBackend<'d> {
         // operation the backend starts reaches this reset.
         transfer.aes_dma.read_tag(&mut tag);
 
-        let DriverState::WaitingForDma { transfer, .. } =
-            core::mem::replace(&mut self.state, DriverState::None)
+        let DriverState::WaitingForDma {
+            transfer,
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            written,
+            ..
+        } = core::mem::replace(&mut self.state, DriverState::None)
         else {
             unreachable!()
         };
@@ -630,14 +636,7 @@ impl<'d> AesDmaBackend<'d> {
 
         // The CPU must not read a stale line of the output the DMA wrote.
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        {
-            let len = item.buffers.output.len();
-            crate::dma::invalidate_received(get_range(
-                item.buffers.output,
-                0,
-                len - len % BLOCK_SIZE,
-            ));
-        }
+        crate::dma::invalidate_received(written);
 
         #[cfg(dma_can_access_psram)]
         for buffer in self.unaligned_data_buffers.iter_mut() {

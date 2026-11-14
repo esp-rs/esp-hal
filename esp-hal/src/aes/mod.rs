@@ -587,12 +587,13 @@ pub mod dma {
                 .block_mode()
                 .modify(|_, w| unsafe { w.block_mode().bits(mode as u8) });
 
-            // FIXME
+            // The whole 128-bit counter block increments, as in the CPU-driven `Ctr`. INC32 would
+            // wrap its low 32 bits without carrying.
             if mode == CipherMode::Ctr {
                 self.aes
                     .regs()
                     .inc_sel()
-                    .modify(|_, w| w.inc_sel().clear_bit());
+                    .modify(|_, w| w.inc_sel().set_bit());
             }
         }
 
@@ -724,6 +725,11 @@ pub mod dma {
         WaitingForDma {
             transfer: AesTransfer<'d, NoBuffer, NoBuffer>,
             remaining_bytes: usize,
+            /// The output this transfer writes. Only its own lines are invalidated: an earlier
+            /// transfer's last partial line, which the CPU wrote from a bounce buffer, can be a
+            /// whole line inside the operation's output.
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            written: NonNull<[u8]>,
         },
     }
 
@@ -969,22 +975,23 @@ pub mod dma {
                     let DriverState::WaitingForDma {
                         transfer,
                         remaining_bytes,
+                        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                        written,
                     } = core::mem::replace(&mut self.state, DriverState::None)
                     else {
                         unreachable!()
                     };
 
+                    // Before `wait`, which resets the peripheral and with it the IV the hardware
+                    // left for the context's next call.
+                    unsafe { item.cipher_mode.as_mut() }.read_state(&transfer.aes_dma);
                     let (driver, _, _) = transfer.wait();
-                    unsafe { item.cipher_mode.as_mut() }.read_state(&driver);
 
                     driver.clear_interrupt();
 
                     // The CPU must not read a stale line of the output the DMA wrote.
                     #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-                    crate::dma::invalidate_received(NonNull::slice_from_raw_parts(
-                        item.buffers.output.cast::<u8>(),
-                        item.buffers.output.len() - remaining_bytes,
-                    ));
+                    crate::dma::invalidate_received(written);
 
                     // Write out PSRAM data if needed:
                     #[cfg(dma_can_access_psram)]
@@ -1088,6 +1095,11 @@ pub mod dma {
             self.state = DriverState::WaitingForDma {
                 transfer,
                 remaining_bytes: input_len - data_len,
+                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                written: NonNull::slice_from_raw_parts(
+                    work_item.buffers.output.cast::<u8>(),
+                    data_len,
+                ),
             };
 
             Ok(())

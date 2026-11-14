@@ -53,11 +53,19 @@ impl UnsafeCryptoBuffers {
         self.input.addr() == self.output.addr()
     }
 
+    /// The buffers without their first `bytes`.
     #[cfg(aes_supports_dma)]
     pub(crate) unsafe fn byte_add(self, bytes: usize) -> Self {
+        let skip = |buffer: NonNull<[u8]>| {
+            NonNull::slice_from_raw_parts(
+                unsafe { buffer.cast::<u8>().byte_add(bytes) },
+                buffer.len() - bytes,
+            )
+        };
+
         UnsafeCryptoBuffers {
-            input: unsafe { self.input.byte_add(bytes) },
-            output: unsafe { self.output.byte_add(bytes) },
+            input: skip(self.input),
+            output: skip(self.output),
         }
     }
 }
