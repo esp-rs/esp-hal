@@ -16,6 +16,41 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
+/// Data burst size for one direction of an AXI-GDMA channel.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum AxiBurstSize {
+    /// 8 bytes, the hardware default.
+    #[default]
+    Bytes8   = 0,
+    /// 16 bytes.
+    #[cfg(dma_axi_data_burst = "16")]
+    Bytes16  = 1,
+    /// 32 bytes.
+    #[cfg(dma_axi_data_burst = "32")]
+    Bytes32  = 2,
+    /// 64 bytes.
+    #[cfg(dma_axi_data_burst = "64")]
+    Bytes64  = 3,
+    /// 128 bytes.
+    #[cfg(dma_axi_data_burst = "128")]
+    Bytes128 = 4,
+}
+
+/// AXI-GDMA data burst settings for receive and transmit transfers.
+///
+/// Both directions default to 8 bytes.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub struct AxiBurstConfig {
+    /// Data burst size for receive transfers.
+    rx: AxiBurstSize,
+    /// Data burst size for transmit transfers.
+    tx: AxiBurstSize,
+}
+
 /// Immutable per-channel metadata owned by each `AXI_DMA_CH*` singleton.
 pub(crate) struct ChannelInfo {
     pub(crate) channel: u8,
@@ -32,10 +67,11 @@ pub(crate) struct ChannelState {
     pub(crate) rx_waker: AtomicWaker,
 }
 
-/// An arbitrary AXI-GDMA channel.
+/// An AXI GDMA channel with independent RX and TX burst settings.
 pub struct AxiGdmaChannel<'d> {
     info: &'static ChannelInfo,
     state: &'static ChannelState,
+    burst: AxiBurstConfig,
     _lifetime: PhantomData<&'d mut ()>,
 }
 
@@ -43,6 +79,7 @@ impl core::fmt::Debug for AxiGdmaChannel<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AxiGdmaChannel")
             .field("channel", &self.info.channel)
+            .field("burst", &self.burst)
             .finish()
     }
 }
@@ -50,11 +87,27 @@ impl core::fmt::Debug for AxiGdmaChannel<'_> {
 #[cfg(feature = "defmt")]
 impl defmt::Format for AxiGdmaChannel<'_> {
     fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "AxiGdmaChannel {{ channel: {} }}", self.info.channel)
+        defmt::write!(
+            fmt,
+            "AxiGdmaChannel {{ channel: {}, burst: {} }}",
+            self.info.channel,
+            self.burst
+        )
     }
 }
 
 impl AxiGdmaChannel<'_> {
+    /// Selects the RX and TX data burst sizes for subsequent transfers.
+    ///
+    /// These sizes apply to both SRAM and PSRAM. They do not change buffer alignment
+    /// or cache maintenance requirements.
+    #[instability::unstable]
+    #[must_use]
+    pub fn with_burst_config(mut self, config: AxiBurstConfig) -> Self {
+        self.burst = config;
+        self
+    }
+
     pub(crate) fn channel_index(&self) -> u8 {
         self.info.channel
     }
@@ -63,6 +116,7 @@ impl AxiGdmaChannel<'_> {
         Self {
             info: self.info,
             state: self.state,
+            burst: self.burst,
             _lifetime: PhantomData,
         }
     }
@@ -81,12 +135,12 @@ impl<'d> DmaChannel for AxiGdmaChannel<'d> {
     }
 }
 
-/// An arbitrary AXI-GDMA RX channel.
+/// The receive half of an AXI GDMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AxiGdmaRxChannel<'d>(AxiGdmaChannel<'d>);
 
-/// An arbitrary AXI-GDMA TX channel.
+/// The transmit half of an AXI GDMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AxiGdmaTxChannel<'d>(AxiGdmaChannel<'d>);
@@ -129,8 +183,11 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, en| w.out_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst_mode(&self, _burst_mode: BurstConfig) {
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| unsafe { w.out_burst_size_sel().bits(self.0.burst.tx as u8) });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
@@ -319,8 +376,11 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, en| w.in_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst_mode(&self, _burst_mode: BurstConfig) {
+        self.ch()
+            .in_conf0()
+            .modify(|_, w| unsafe { w.in_burst_size_sel().bits(self.0.burst.rx as u8) });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
@@ -522,6 +582,7 @@ macro_rules! impl_channel {
                 AxiGdmaChannel {
                     info: $ch::info(),
                     state: $ch::state(),
+                    burst: AxiBurstConfig::default(),
                     _lifetime: core::marker::PhantomData,
                 }
             }
