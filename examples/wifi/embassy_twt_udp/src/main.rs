@@ -50,7 +50,7 @@ use esp_radio::wifi::{
     WifiController,
     WifiError,
     sta::StationConfig,
-    twt::{FlowId, ITwtSetupConfig, ITwtSetupError, TwtConfig, TwtSetupCommand},
+    twt::{FlowId, ITwtConfig, ITwtSetupError, TwtConfig, TwtSetupCommand},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -129,7 +129,7 @@ enum TwtSetup {
 
 /// Requests an iTWT agreement. If the AP answers with its own parameters, retries once with them.
 async fn setup_twt(controller: &WifiController<'_>) -> TwtSetup {
-    let request = ITwtSetupConfig::default()
+    let request = ITwtConfig::default()
         .with_setup_cmd(TwtSetupCommand::Suggest)
         .with_wake_interval(esp_hal::time::Duration::from_millis(FRAME_INTERVAL_MS))
         .with_min_wake_duration(esp_hal::time::Duration::from_micros(2048));
@@ -138,7 +138,7 @@ async fn setup_twt(controller: &WifiController<'_>) -> TwtSetup {
     let error = match controller.itwt_setup(request).await {
         Ok(info) => {
             println!("iTWT setup OK: {:?}", info.config);
-            return TwtSetup::Active(info.config.flow_id);
+            return TwtSetup::Active(info.config.flow_id());
         }
         Err(e) => e,
     };
@@ -153,7 +153,7 @@ async fn setup_twt(controller: &WifiController<'_>) -> TwtSetup {
     };
 
     // The AP may counter-propose. Accept its parameters once.
-    let setup_cmd = match response.setup_cmd {
+    let setup_cmd = match response.setup_cmd() {
         TwtSetupCommand::Alternate => TwtSetupCommand::Suggest,
         TwtSetupCommand::Dictate => TwtSetupCommand::Demand,
         cmd => {
@@ -164,13 +164,13 @@ async fn setup_twt(controller: &WifiController<'_>) -> TwtSetup {
     let retry = response.with_setup_cmd(setup_cmd);
     println!(
         "AP answered {:?}, retrying with its parameters: {:?} (was {:?})",
-        response.setup_cmd, retry, request
+        response.setup_cmd(), retry, request
     );
 
     match controller.itwt_setup(retry).await {
         Ok(info) => {
             println!("iTWT setup OK: {:?}", info.config);
-            TwtSetup::Active(info.config.flow_id)
+            TwtSetup::Active(info.config.flow_id())
         }
         Err(ITwtSetupError::Wifi(WifiError::NotConnected)) => TwtSetup::Disconnected,
         Err(e) => {

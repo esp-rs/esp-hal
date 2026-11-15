@@ -254,8 +254,8 @@ impl IndividualTargetWakeTimeSetup<'_> {
 
     /// Get the negotiated iTWT setup configuration.
     #[cfg(wifi_has_wifi6)]
-    pub fn config(&self) -> crate::wifi::twt::ITwtSetupConfig {
-        crate::wifi::twt::ITwtSetupConfig::from_raw(&self.0.config)
+    pub fn config(&self) -> crate::wifi::twt::ITwtConfig {
+        crate::wifi::twt::ITwtConfig::from_raw(&self.0.config)
     }
 }
 
@@ -1106,7 +1106,7 @@ pub enum EventInfo {
     #[cfg(wifi_has_wifi6)]
     IndividualTargetWakeTimeSetup {
         /// The negotiated iTWT setup configuration.
-        config: crate::wifi::twt::ITwtSetupConfig,
+        config: crate::wifi::twt::ITwtConfig,
         /// Setup status. 1 indicates success, other values indicate failure.
         status: i32,
         /// Setup failure reason code.

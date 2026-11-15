@@ -216,14 +216,14 @@ impl FlowTarget {
 /// Configuration for an individual TWT (iTWT) setup.
 ///
 /// The recommended way to create a configuration is to start from
-/// [`ITwtSetupConfig::default`] and use the builder methods:
+/// [`ITwtConfig::default`] and use the builder methods:
 ///
 /// ```rust,no_run
 /// # {before_snippet}
 /// # use core::default::Default;
 /// # use esp_hal::time::Duration;
 /// # use esp_radio::wifi::twt::*;
-/// let config = ITwtSetupConfig::default()
+/// let config = ITwtConfig::default()
 ///     .with_setup_cmd(TwtSetupCommand::Request)
 ///     .with_trigger(true)
 ///     .with_flow_type(TwtFlowType::Announced)
@@ -234,47 +234,38 @@ impl FlowTarget {
 /// ```
 #[derive(BuilderLite, Clone, Copy, PartialEq, Eq, Hash)]
 #[instability::unstable]
-pub struct ITwtSetupConfig {
+pub struct ITwtConfig {
     /// The type of TWT command.
-    pub setup_cmd: TwtSetupCommand,
+    setup_cmd: TwtSetupCommand,
     /// Whether this is a trigger-enabled TWT.
-    pub trigger: bool,
+    trigger: bool,
     /// The flow type (announced or unannounced).
-    pub flow_type: TwtFlowType,
+    flow_type: TwtFlowType,
     /// The flow ID.
     ///
-    /// The value in the request is typically ignored.
-    /// The actual flow ID assigned by the AP must be obtained from the response.
+    /// In a setup request this is typically ignored; the AP assigns the flow ID,
+    /// which can be read from the negotiated configuration in the response.
     #[builder_lite(skip_setter)]
-    pub flow_id: FlowId,
+    flow_id: FlowId,
     /// Internal correlation ID used to match setup responses to requests.
     ///
     /// Automatically assigned by
     /// [`WifiController::itwt_setup`](crate::wifi::WifiController::itwt_setup).
-    #[builder_lite(skip_setter)]
-    pub twt_id: u16,
-    /// The wake interval exponent (set via
-    /// [`with_wake_interval`](Self::with_wake_interval)).
-    #[builder_lite(skip_setter)]
-    pub wake_interval_exponent: u8,
-    /// The unit for the minimum wake duration (set via
-    /// [`with_min_wake_duration`](Self::with_min_wake_duration)).
-    #[builder_lite(skip_setter)]
-    pub wake_duration_unit: TwtWakeDurationUnit,
-    /// Nominal minimum wake duration in units of
-    /// [`wake_duration_unit`](Self::wake_duration_unit) (set via
-    /// [`with_min_wake_duration`](Self::with_min_wake_duration)).
-    #[builder_lite(skip_setter)]
-    pub min_wake_duration: u8,
-    /// Individual TWT wake interval mantissa (set via
-    /// [`with_wake_interval`](Self::with_wake_interval)).
-    #[builder_lite(skip_setter)]
-    pub wake_interval_mantissa: u16,
+    #[builder_lite(skip_setter, skip_getter)]
+    twt_id: u16,
+    #[builder_lite(skip_setter, skip_getter)]
+    wake_interval_exponent: u8,
+    #[builder_lite(skip_setter, skip_getter)]
+    wake_duration_unit: TwtWakeDurationUnit,
+    #[builder_lite(skip_setter, skip_getter)]
+    min_wake_duration: u8,
+    #[builder_lite(skip_setter, skip_getter)]
+    wake_interval_mantissa: u16,
     /// Timeout for receiving the setup action frame response.
-    pub timeout: Duration,
+    timeout: Duration,
 }
 
-impl Default for ITwtSetupConfig {
+impl Default for ITwtConfig {
     fn default() -> Self {
         Self {
             setup_cmd: TwtSetupCommand::Request,
@@ -291,9 +282,9 @@ impl Default for ITwtSetupConfig {
     }
 }
 
-impl fmt::Debug for ITwtSetupConfig {
+impl fmt::Debug for ITwtConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ITwtSetupConfig")
+        f.debug_struct("ITwtConfig")
             .field("setup_cmd", &self.setup_cmd)
             .field("trigger", &self.trigger)
             .field("flow_type", &self.flow_type)
@@ -306,11 +297,11 @@ impl fmt::Debug for ITwtSetupConfig {
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for ITwtSetupConfig {
+impl defmt::Format for ITwtConfig {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(
             fmt,
-            "ITwtSetupConfig {{ \
+            "ITwtConfig {{ \
             setup_cmd: {}, trigger: {}, flow_type: {}, flow_id: {}, \
             wake_interval: {}, wake_duration: {}, \
             timeout: {} }}",
@@ -325,7 +316,54 @@ impl defmt::Format for ITwtSetupConfig {
     }
 }
 
-impl ITwtSetupConfig {
+impl ITwtConfig {
+    /// Set the raw wake interval as `mantissa * 2^exponent` microseconds.
+    ///
+    /// Prefer [`with_wake_interval`](Self::with_wake_interval). This is an escape
+    /// hatch to work around AP bugs: a given interval can have several raw
+    /// encodings, and some APs only handle particular ones.
+    ///
+    /// `exponent` must be at most 31 and `mantissa` must be nonzero.
+    #[instability::unstable]
+    pub fn with_raw_wake_interval(mut self, exponent: u8, mantissa: u16) -> Self {
+        debug_assert!(exponent <= 31, "wake interval exponent must be <= 31");
+        debug_assert!(mantissa >= 1, "wake interval mantissa must be > 0");
+        self.wake_interval_exponent = exponent;
+        self.wake_interval_mantissa = mantissa;
+        self
+    }
+
+    /// Set the raw nominal minimum wake duration as `value` times `unit`.
+    ///
+    /// Prefer [`with_min_wake_duration`](Self::with_min_wake_duration). This is an
+    /// escape hatch to work around AP bugs, for example APs that mangle the unit.
+    ///
+    /// `value` must be nonzero.
+    #[instability::unstable]
+    pub fn with_raw_min_wake_duration(mut self, unit: TwtWakeDurationUnit, value: u8) -> Self {
+        debug_assert!(value >= 1, "wake duration must be > 0");
+        self.wake_duration_unit = unit;
+        self.min_wake_duration = value;
+        self
+    }
+
+    /// The raw wake interval as `(exponent, mantissa)`; the interval is
+    /// `mantissa * 2^exponent` microseconds.
+    #[instability::unstable]
+    pub fn raw_wake_interval(&self) -> (u8, u16) {
+        (self.wake_interval_exponent, self.wake_interval_mantissa)
+    }
+
+    /// The raw nominal minimum wake duration as `(unit, value)`.
+    #[instability::unstable]
+    pub fn raw_min_wake_duration(&self) -> (TwtWakeDurationUnit, u8) {
+        (self.wake_duration_unit, self.min_wake_duration)
+    }
+
+    pub(crate) fn twt_id(&self) -> u16 {
+        self.twt_id
+    }
+
     /// Set the TWT wake interval.
     ///
     /// This is how often the station wakes up. The protocol encodes this as
@@ -660,7 +698,7 @@ impl core::error::Error for TwtWaitError {}
 #[instability::unstable]
 pub struct ITwtSetupInfo {
     /// The negotiated iTWT setup configuration (may differ from requested).
-    pub config: ITwtSetupConfig,
+    pub config: ITwtConfig,
     /// TWT service period start time.
     pub target_wake_time: u64,
 }
@@ -676,7 +714,7 @@ pub struct ITwtSetupInfo {
 #[instability::unstable]
 pub struct ITwtSetupFailedInfo {
     /// The configuration returned in the failure event.
-    pub config: ITwtSetupConfig,
+    pub config: ITwtConfig,
     /// Setup status code (non-1 value indicates failure).
     pub status: i32,
     /// Failure reason code.
@@ -732,17 +770,17 @@ impl WifiController<'_> {
     /// ```rust,no_run
     /// # {before_snippet}
     /// # use esp_hal::time::Duration;
-    /// # use esp_radio::wifi::twt::ITwtSetupConfig;
+    /// # use esp_radio::wifi::twt::ITwtConfig;
     /// # let controller =
     /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
-    /// let setup = ITwtSetupConfig::default()
+    /// let setup = ITwtConfig::default()
     ///     .with_wake_interval(Duration::from_millis(500))
     ///     .with_min_wake_duration(Duration::from_millis(65));
     ///
     /// let info = controller.itwt_setup(setup).await?;
     /// println!(
     ///     "flow_id={:?}, interval={:?}",
-    ///     info.config.flow_id,
+    ///     info.config.flow_id(),
     ///     info.config.wake_interval()
     /// );
     /// # {after_snippet}
@@ -750,7 +788,7 @@ impl WifiController<'_> {
     #[instability::unstable]
     pub async fn itwt_setup(
         &self,
-        mut config: ITwtSetupConfig,
+        mut config: ITwtConfig,
     ) -> Result<ITwtSetupInfo, ITwtSetupError> {
         use portable_atomic::AtomicU16;
         /// Monotonic counter for assigning unique `twt_id` values to iTWT setup
@@ -785,7 +823,7 @@ impl WifiController<'_> {
                     reason,
                     target_wake_time,
                 } => {
-                    if negotiated_config.twt_id != twt_id {
+                    if negotiated_config.twt_id() != twt_id {
                         continue;
                     }
                     if status == ITWT_SETUP_SUCCESS {
