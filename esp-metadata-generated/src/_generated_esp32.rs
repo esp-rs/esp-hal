@@ -520,6 +520,24 @@ macro_rules! property {
     ("dma.separate_in_out_interrupts") => {
         false
     };
+    ("dma.engine_can_access_psram", SPI_DMA) => {
+        false
+    };
+    ("dma.channel_can_access_psram", DMA_SPI2) => {
+        false
+    };
+    ("dma.channel_can_access_psram", DMA_SPI3) => {
+        false
+    };
+    ("dma.engine_can_access_psram", I2S_DMA) => {
+        false
+    };
+    ("dma.channel_can_access_psram", DMA_I2S0) => {
+        false
+    };
+    ("dma.channel_can_access_psram", DMA_I2S1) => {
+        false
+    };
     ("interrupts.status_registers") => {
         3
     };

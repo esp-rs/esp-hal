@@ -132,7 +132,7 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        false
+        property!("dma.engine_can_access_psram", COPY_DMA)
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
@@ -304,7 +304,7 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        false
+        property!("dma.engine_can_access_psram", COPY_DMA)
     }
 
     fn compatible_peripherals(&self) -> &[u8] {

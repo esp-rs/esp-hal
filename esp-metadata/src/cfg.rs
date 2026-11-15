@@ -1126,6 +1126,7 @@ driver_configs![
         DmaProperties {
             driver: dma,
             name: "DMA",
+            has_computed_properties: true,
             properties: {
                 /// When true, memory-to-memory setup requires a real DMA peripheral (e.g. ESP32-C3/S3).
                 #[serde(default)]
@@ -1134,8 +1135,6 @@ driver_configs![
                 ext_mem_configurable_block_size: bool,
                 #[serde(default)]
                 separate_in_out_interrupts: bool,
-                #[serde(default)]
-                gdma_version: Option<u32>,
                 #[serde(default)]
                 engines: DmaEngines,
             }

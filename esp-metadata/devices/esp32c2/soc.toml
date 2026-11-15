@@ -100,11 +100,11 @@ has_sp_monitor = true
 
 [device.dma]
 support_status = "partial"
-gdma_version = 1
 engines = [
     {
         name = "AHB_GDMA",
-        internal_ram_burst_sizes = [0, 4],
+        version = 1,
+        data_burst_modes = ["single", "incr"],
         max_priority = 9,
         drivers = ["sha", "spi_master", "spi_slave"],
         peripheral_instances = [

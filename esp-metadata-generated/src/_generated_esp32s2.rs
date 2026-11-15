@@ -490,6 +490,30 @@ macro_rules! property {
     ("dma.separate_in_out_interrupts") => {
         false
     };
+    ("dma.channel_can_access_psram", DMA_SPI2) => {
+        true
+    };
+    ("dma.channel_can_access_psram", DMA_SPI3) => {
+        false
+    };
+    ("dma.engine_can_access_psram", I2S_DMA) => {
+        true
+    };
+    ("dma.channel_can_access_psram", DMA_I2S0) => {
+        true
+    };
+    ("dma.engine_can_access_psram", CRYPTO_DMA) => {
+        true
+    };
+    ("dma.channel_can_access_psram", DMA_CRYPTO) => {
+        true
+    };
+    ("dma.engine_can_access_psram", COPY_DMA) => {
+        false
+    };
+    ("dma.channel_can_access_psram", DMA_COPY) => {
+        false
+    };
     ("interrupts.status_registers") => {
         3
     };

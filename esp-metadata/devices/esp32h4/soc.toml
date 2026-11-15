@@ -459,11 +459,12 @@ support_status = "not_supported"
 
 [device.dma]
 support_status = { status = "partial", issue = 6754 }
-gdma_version = 3
 separate_in_out_interrupts = true
 engines = [
     {
         name = "AHB_GDMA",
+        version = 3,
+        data_burst_modes = ["single", "incr4", "incr8", "incr16"],
         max_priority = 5,
         # Mux IDs below include later peripherals; only list HAL drivers that are enabled.
         drivers = ["i2s", "parl_io", "spi_master"],

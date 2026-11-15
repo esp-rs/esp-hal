@@ -517,6 +517,45 @@ macro_rules! property {
     ("dma.separate_in_out_interrupts") => {
         true
     };
+    ("dma.engine_can_access_psram", AHB_GDMA) => {
+        true
+    };
+    ("dma.channel_can_access_psram", DMA_CH0) => {
+        true
+    };
+    ("dma.channel_can_access_psram", DMA_CH1) => {
+        true
+    };
+    ("dma.channel_can_access_psram", DMA_CH2) => {
+        true
+    };
+    ("dma.engine_can_access_psram", AXI_GDMA) => {
+        true
+    };
+    ("dma.channel_can_access_psram", DMA_AXI_CH0) => {
+        true
+    };
+    ("dma.channel_can_access_psram", DMA_AXI_CH1) => {
+        true
+    };
+    ("dma.channel_can_access_psram", DMA_AXI_CH2) => {
+        true
+    };
+    ("dma.engine_can_access_psram", VDMA) => {
+        true
+    };
+    ("dma.channel_can_access_psram", VDMA_CH0) => {
+        true
+    };
+    ("dma.channel_can_access_psram", VDMA_CH1) => {
+        true
+    };
+    ("dma.channel_can_access_psram", VDMA_CH2) => {
+        true
+    };
+    ("dma.channel_can_access_psram", VDMA_CH3) => {
+        true
+    };
     ("dma.gdma_version") => {
         2
     };
