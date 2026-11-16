@@ -335,6 +335,27 @@ impl gpio::OutputSignal {
     }
 }
 
+// The `Debug` impls of the signal enums keep a name table, which can be placed in RAM. Release
+// builds print the signal number instead, so the linker can drop the table. `defmt` keeps the
+// names on the host, so it always prints them.
+macro_rules! assert_gpio_matrix_routable {
+    ($cond:expr, $signal:expr) => {
+        if cfg!(any(debug_assertions, feature = "defmt")) {
+            assert!(
+                $cond,
+                "{:?} cannot be routed through the GPIO matrix",
+                $signal
+            );
+        } else {
+            assert!(
+                $cond,
+                "Signal {} cannot be routed through the GPIO matrix",
+                $signal as usize
+            );
+        }
+    };
+}
+
 enum Signal<'d> {
     Pin(AnyPin<'d>),
     Level(Level),
@@ -393,11 +414,7 @@ impl Signal<'_> {
         };
 
         if !signal.can_use_gpio_matrix() {
-            assert!(
-                !use_gpio_matrix,
-                "{:?} cannot be routed through the GPIO matrix",
-                signal
-            );
+            assert_gpio_matrix_routable!(!use_gpio_matrix, signal);
             // At this point we have set up the AF. The signal does not have a `func_in_sel_cfg`
             // register, and we must not try to write to it.
             return;
@@ -446,11 +463,7 @@ impl Signal<'_> {
 
         let use_gpio_matrix = af == AlternateFunction::GPIO;
 
-        assert!(
-            signal.can_use_gpio_matrix() || !use_gpio_matrix,
-            "{:?} cannot be routed through the GPIO matrix",
-            signal
-        );
+        assert_gpio_matrix_routable!(signal.can_use_gpio_matrix() || !use_gpio_matrix, signal);
 
         GPIO::regs()
             .func_out_sel_cfg(pin.number() as usize)
