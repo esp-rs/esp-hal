@@ -8992,7 +8992,7 @@ macro_rules! gpio_for_signal {
     };
 }
 /// This macro can be used to generate code for each digital GPIO that deep-sleep entry
-/// isolates when `gpio.need_soft_isolate_during_pd` is set.
+/// can isolate.
 ///
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [the crate-level documentation][crate#for_each-macros].

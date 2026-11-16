@@ -447,10 +447,7 @@ fn prepare_pad(pin: &Armed, deep: bool) {
 /// need.
 #[cfg(all(sleep_deep_sleep_needs_gpio_isolation, feature = "rt"))]
 pub(crate) fn isolate_pads_for_deep_sleep() {
-    use crate::{
-        gpio::{AlternateFunction, OutputSignal, io_mux_reg},
-        peripherals::LPWR,
-    };
+    use crate::peripherals::LPWR;
 
     // If the hold is disabled, no pad keeps its level through the sleep. ESP-IDF also skips the
     // isolation in that case.
@@ -459,32 +456,41 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
     if !hold_enabled {
         return;
     }
-    for gpio in 0..PAD_COUNT as u8 {
-        // Only the pads that the digital supply feeds leak current, and those are the pads with no
-        // low-power number. The low-power pads have their own supply, which stays powered, and a
-        // wake pad is always a low-power pad.
-        if lp_number(gpio).is_some() {
-            continue;
-        }
 
-        // A pad that the user holds keeps its level, which is the purpose of the hold. Isolation
-        // would cancel that request.
-        if crate::gpio::lp_io::low_level::is_digital_pad_held(gpio) {
-            continue;
-        }
-
-        GPIO::regs()
-            .func_out_sel_cfg(gpio as usize)
-            .modify(|_, w| unsafe { w.bits(OutputSignal::GPIO as u32) });
-
-        io_mux_reg(gpio).modify(|_, w| unsafe {
-            w.fun_wpu().clear_bit();
-            w.fun_wpd().clear_bit();
-            w.fun_ie().clear_bit();
-            // A pad that keeps a peripheral function increases the deep-sleep current.
-            w.mcu_sel().bits(AlternateFunction::GPIO as u8)
-        });
+    // Only the pads that the digital supply feeds leak current, and the list has no low-power pad.
+    // The low-power pads have their own supply, which stays powered, and a wake pad is always a
+    // low-power pad. The list also has no flash or PSRAM pad: the CPU can still fetch from flash
+    // after this step, and a disconnected flash pad stops the fetch, so the chip hangs.
+    // See <https://github.com/espressif/esp-idf/blob/59c7a639bc7141303dded1bb6b6b2b22021a6ea9/components/esp_hw_support/sleep_gpio.c#L155-L170>.
+    for_each_gpio_soft_isolate! {
+        ($n:literal) => {
+            isolate_digital_pad($n);
+        };
     }
+}
+
+/// Disconnects one digital pad, unless the user holds it.
+#[cfg(all(sleep_deep_sleep_needs_gpio_isolation, feature = "rt"))]
+fn isolate_digital_pad(gpio: u8) {
+    use crate::gpio::{AlternateFunction, OutputSignal, io_mux_reg};
+
+    // A pad that the user holds keeps its level, which is the purpose of the hold. Isolation would
+    // cancel that request.
+    if crate::gpio::lp_io::low_level::is_digital_pad_held(gpio) {
+        return;
+    }
+
+    GPIO::regs()
+        .func_out_sel_cfg(gpio as usize)
+        .modify(|_, w| unsafe { w.bits(OutputSignal::GPIO as u32) });
+
+    io_mux_reg(gpio).modify(|_, w| unsafe {
+        w.fun_wpu().clear_bit();
+        w.fun_wpd().clear_bit();
+        w.fun_ie().clear_bit();
+        // A pad that keeps a peripheral function increases the deep-sleep current.
+        w.mcu_sel().bits(AlternateFunction::GPIO as u8)
+    });
 }
 
 /// Isolates digital pads when a power domain that feeds them is powered down.

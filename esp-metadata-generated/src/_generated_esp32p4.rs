@@ -8527,6 +8527,74 @@ macro_rules! gpio_for_signal {
         $fallback
     };
 }
+/// This macro can be used to generate code for each digital GPIO that deep-sleep entry
+/// can isolate.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// The list excludes low-power pads and pads that interface with flash or PSRAM. Isolating
+/// a memory-interface pad cuts instruction fetch.
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($n:literal)`
+///
+/// Macro fragments:
+///
+/// - `$n`: the number of the GPIO. For `GPIO8`, `$n` is 8.
+///
+/// Example data: `(8)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_gpio_soft_isolate {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_gpio_soft_isolate { $(($pattern) => $code;)* ($other
+        : tt) => {} } _for_each_inner_gpio_soft_isolate!((16));
+        _for_each_inner_gpio_soft_isolate!((17));
+        _for_each_inner_gpio_soft_isolate!((18));
+        _for_each_inner_gpio_soft_isolate!((19));
+        _for_each_inner_gpio_soft_isolate!((20));
+        _for_each_inner_gpio_soft_isolate!((21));
+        _for_each_inner_gpio_soft_isolate!((22));
+        _for_each_inner_gpio_soft_isolate!((23));
+        _for_each_inner_gpio_soft_isolate!((24));
+        _for_each_inner_gpio_soft_isolate!((25));
+        _for_each_inner_gpio_soft_isolate!((26));
+        _for_each_inner_gpio_soft_isolate!((27));
+        _for_each_inner_gpio_soft_isolate!((28));
+        _for_each_inner_gpio_soft_isolate!((29));
+        _for_each_inner_gpio_soft_isolate!((30));
+        _for_each_inner_gpio_soft_isolate!((31));
+        _for_each_inner_gpio_soft_isolate!((32));
+        _for_each_inner_gpio_soft_isolate!((33));
+        _for_each_inner_gpio_soft_isolate!((34));
+        _for_each_inner_gpio_soft_isolate!((35));
+        _for_each_inner_gpio_soft_isolate!((36));
+        _for_each_inner_gpio_soft_isolate!((37));
+        _for_each_inner_gpio_soft_isolate!((38));
+        _for_each_inner_gpio_soft_isolate!((39));
+        _for_each_inner_gpio_soft_isolate!((40));
+        _for_each_inner_gpio_soft_isolate!((41));
+        _for_each_inner_gpio_soft_isolate!((42));
+        _for_each_inner_gpio_soft_isolate!((43));
+        _for_each_inner_gpio_soft_isolate!((44));
+        _for_each_inner_gpio_soft_isolate!((45));
+        _for_each_inner_gpio_soft_isolate!((46));
+        _for_each_inner_gpio_soft_isolate!((47));
+        _for_each_inner_gpio_soft_isolate!((48));
+        _for_each_inner_gpio_soft_isolate!((49));
+        _for_each_inner_gpio_soft_isolate!((50));
+        _for_each_inner_gpio_soft_isolate!((51));
+        _for_each_inner_gpio_soft_isolate!((52));
+        _for_each_inner_gpio_soft_isolate!((53));
+        _for_each_inner_gpio_soft_isolate!((54));
+        _for_each_inner_gpio_soft_isolate!((all(16), (17), (18), (19), (20), (21), (22),
+        (23), (24), (25), (26), (27), (28), (29), (30), (31), (32), (33), (34), (35),
+        (36), (37), (38), (39), (40), (41), (42), (43), (44), (45), (46), (47), (48),
+        (49), (50), (51), (52), (53), (54)));
+    };
+}
 /// Defines the `InputSignal` and `OutputSignal` enums.
 ///
 /// This macro is intended to be called in esp-hal only.

@@ -841,16 +841,12 @@ pub(crate) fn generate_gpios(
     }
 }
 
-/// Lists the digital pads that sleep entry isolates when `need_soft_isolate_during_pd` is set.
+/// Lists the digital pads that deep-sleep entry can isolate.
 ///
 /// The list is separate from `for_each_gpio`: it contains only the pads that software may
 /// disconnect. Low-power pads keep their own supply, and flash or PSRAM pads must keep the memory
 /// interface.
 fn render_gpio_soft_isolate(gpio: &super::GpioProperties) -> TokenStream {
-    if !gpio.need_soft_isolate_during_pd {
-        return quote! {};
-    }
-
     let pins = gpio
         .pins_and_signals
         .pins
@@ -875,7 +871,7 @@ fn render_gpio_soft_isolate(gpio: &super::GpioProperties) -> TokenStream {
 
     quote! {
         /// This macro can be used to generate code for each digital GPIO that deep-sleep entry
-        /// isolates when `gpio.need_soft_isolate_during_pd` is set.
+        /// can isolate.
         ///
         /// For an explanation on the general syntax, as well as usage of individual/repeated
         /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
