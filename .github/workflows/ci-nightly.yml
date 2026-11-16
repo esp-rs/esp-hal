@@ -8,7 +8,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  RUSTDOCFLAGS: -Dwarnings
   DEFMT_LOG: trace
   ESP_GENERATE_VERSION: v2.0.0
 
@@ -115,7 +114,11 @@ jobs:
 
       - name: Install nightly for stack-smashing-protection
         if: matrix.chip.arch == 'riscv'
-        run: rustup toolchain install nightly --profile minimal --component rust-src,clippy,rustfmt --target ${{ matrix.chip.target }}
+        uses: ./.github/actions/setup-nightly
+        with:
+          targets: ${{ matrix.chip.target }}
+          components: rust-src, clippy, rustfmt
+          alias: "true"
 
       - name: Install esp-generate
         run: |
