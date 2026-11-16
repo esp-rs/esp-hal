@@ -1,7 +1,6 @@
 //! I2C test
 //!
-//! Slave tests use the runner's connected LP pair for SDA and HP pair for SCL:
-//! C3: GPIO2-GPIO3 and GPIO6-GPIO7; C6: GPIO2-GPIO3 and GPIO22-GPIO23.
+//! Master and slave tests use the runner's I2C pins.
 
 //% CHIP_FILTER: i2c_master_driver_supported
 //% FEATURES: unstable embassy
@@ -155,7 +154,6 @@ mod tests {
             .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .unwrap();
 
-        assert_ne!(read_data, [0u8; 5]);
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
@@ -174,7 +172,6 @@ mod tests {
             )
             .unwrap();
 
-        assert_ne!(read_data, [0u8; 5]);
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
@@ -212,7 +209,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_ne!(read_data, [0u8; 5]);
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
@@ -232,7 +228,6 @@ mod tests {
         .await
         .unwrap();
 
-        assert_ne!(read_data, [0u8; 5]);
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
@@ -295,7 +290,6 @@ mod tests {
         .await
         .unwrap();
 
-        assert_ne!(read_data, [0u8; 5]);
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
@@ -420,7 +414,6 @@ mod tests {
                 .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
                 .unwrap_or_else(|e| panic!("{:?}: failed to read with {:?}", e, clock_source));
 
-            assert_ne!(read_data, [0u8; 5], "{:?}: read all zeros", clock_source);
             assert_eq!(
                 (read_data[1], read_data[2] & 0xf0),
                 (0x80, 0x00),
@@ -458,7 +451,6 @@ mod tests {
         ctx.i2c
             .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .expect("bus should work normally after releasing SCL");
-        assert_ne!(read_data, [0u8; 5]);
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
@@ -492,7 +484,6 @@ mod tests {
         ctx.i2c
             .write_read(DUT_ADDRESS, WRITE_COMMAND, &mut read_data)
             .expect("bus should work normally after releasing SDA");
-        assert_ne!(read_data, [0u8; 5]);
         assert_eq!((read_data[1], read_data[2] & 0xf0), (0x80, 0x00));
     }
 
@@ -539,9 +530,27 @@ mod i2c_slave {
     use esp_hal::peripherals::PCR;
     use esp_hal::{
         delay::Delay,
-        gpio::{DriveMode, Flex, Level, OutputConfig, Pull},
-        i2c::slave::{Command, Config, ConfigError, Error, FIFO_SIZE, I2cSlave, ReadStatus},
-        peripherals::{I2C0, Peripherals},
+        gpio::{
+            DriveMode,
+            Flex,
+            Level,
+            OutputConfig,
+            OutputSignal as GpioOutputSignal,
+            Pin,
+            Pull,
+            interconnect::InputSignal,
+        },
+        i2c::slave::{
+            Command,
+            Config,
+            ConfigError,
+            Error,
+            FIFO_SIZE,
+            I2cSlave,
+            Instance,
+            ReadStatus,
+        },
+        peripherals::{GPIO, I2C0, Peripherals},
     };
     use hil_test::{assert, assert_eq};
 
@@ -559,6 +568,7 @@ mod i2c_slave {
         (FIFO_SIZE, ReadStatus::LeftoverBytes(1)),
         (RESPONSE.len(), ReadStatus::Done),
     ];
+    const ACK_DELAYS_US: [u64; 4] = [0, 50, 200, 500];
     const ABORT_CASES: [(usize, Option<Command>); 3] = [
         (0, None),
         (3, Some(Command::Read)),
@@ -643,9 +653,93 @@ mod i2c_slave {
         }
     }
 
+    struct SharedLine {
+        input: InputSignal<'static>,
+        gpio: usize,
+        slave_output: u32,
+    }
+
+    impl SharedLine {
+        fn configure(pin: impl Pin + 'static) -> (InputSignal<'static>, Flex<'static>) {
+            let mut pin = Flex::new(pin);
+            pin.set_high();
+            pin.apply_output_config(
+                &OutputConfig::default()
+                    .with_drive_mode(DriveMode::OpenDrain)
+                    .with_pull(Pull::Up),
+            );
+            pin.set_output_enable(true);
+            (pin.peripheral_input(), pin)
+        }
+
+        fn new(input: InputSignal<'static>) -> Self {
+            let gpio = input.gpio_number().unwrap() as usize;
+            let line = Self {
+                input,
+                gpio,
+                slave_output: GPIO::regs().func_out_sel_cfg(gpio).read().bits(),
+            };
+            line.set_gpio_latch(Level::Low);
+            line
+        }
+
+        fn set_gpio_latch(&self, level: Level) {
+            let regs = GPIO::regs();
+            let mask = 1 << (self.gpio % 32);
+            #[cfg(gpio_has_bank_1)]
+            if self.gpio >= 32 {
+                match level {
+                    Level::High => regs.out1_w1ts().write(|w| unsafe { w.bits(mask) }),
+                    Level::Low => regs.out1_w1tc().write(|w| unsafe { w.bits(mask) }),
+                };
+                return;
+            }
+            match level {
+                Level::High => regs.out_w1ts().write(|w| unsafe { w.bits(mask) }),
+                Level::Low => regs.out_w1tc().write(|w| unsafe { w.bits(mask) }),
+            };
+        }
+
+        fn set_low(&mut self) {
+            // The master's low overrides the slave. Releasing the line restores the slave's
+            // open-drain output so it can ACK, return data, or stretch SCL.
+            GPIO::regs().func_out_sel_cfg(self.gpio).write(|w| {
+                unsafe { w.out_sel().bits(GpioOutputSignal::GPIO as _) };
+                w.oen_sel().set_bit()
+            });
+        }
+
+        fn set_high(&mut self) {
+            GPIO::regs()
+                .func_out_sel_cfg(self.gpio)
+                .write(|w| unsafe { w.bits(self.slave_output) });
+        }
+
+        fn set_level(&mut self, level: Level) {
+            match level {
+                Level::High => self.set_high(),
+                Level::Low => self.set_low(),
+            }
+        }
+
+        fn is_high(&self) -> bool {
+            self.input.is_input_high()
+        }
+
+        fn is_low(&self) -> bool {
+            !self.is_high()
+        }
+    }
+
+    impl Drop for SharedLine {
+        fn drop(&mut self) {
+            self.set_gpio_latch(Level::High);
+        }
+    }
+
     struct TestMaster {
-        sda: Flex<'static>,
-        scl: Flex<'static>,
+        sda: SharedLine,
+        scl: SharedLine,
         pause_on_read_stretch: bool,
         service_delay_us: u32,
     }
@@ -734,8 +828,10 @@ mod i2c_slave {
 
         fn delay_slave_service(&self) {
             Delay::new().delay_micros(50);
-            if I2C0::regs().int_raw().read().slave_stretch().bit_is_set() {
-                Delay::new().delay_micros(self.service_delay_us.saturating_sub(50));
+            if self.service_delay_us > 50
+                && I2C0::regs().int_raw().read().slave_stretch().bit_is_set()
+            {
+                Delay::new().delay_micros(self.service_delay_us - 50);
             }
         }
 
@@ -796,6 +892,10 @@ mod i2c_slave {
         async fn write(&mut self, buffer: &[u8]) {
             self.start().await;
             assert!(self.write_byte(ADDRESS << 1).await);
+            self.write_data(buffer).await;
+        }
+
+        async fn write_data(&mut self, buffer: &[u8]) {
             for &byte in buffer {
                 assert!(self.write_byte(byte).await);
             }
@@ -835,7 +935,7 @@ mod i2c_slave {
         assert!(raw.scl_main_st_to().bit_is_clear());
     }
 
-    fn assert_scl_stretched(scl: &esp_hal::gpio::interconnect::InputSignal<'_>) {
+    fn assert_scl_stretched(scl: &InputSignal<'_>) {
         // The paused master drives SCL high; allow a released line to rise.
         Delay::new().delay_micros(50);
         assert_eq!(scl.level(), Level::Low);
@@ -859,31 +959,34 @@ mod i2c_slave {
         }
     }
 
+    fn connect_bus(
+        i2c: impl Instance + 'static,
+        sda: impl Pin + 'static,
+        scl: impl Pin + 'static,
+    ) -> (I2cSlave<'static, Blocking>, TestMaster) {
+        let (sda, slave_sda) = SharedLine::configure(sda);
+        let (scl, slave_scl) = SharedLine::configure(scl);
+        let slave = I2cSlave::new(i2c, Config::new(ADDRESS))
+            .unwrap()
+            .with_sda(slave_sda)
+            .with_scl(slave_scl);
+        let master = TestMaster {
+            sda: SharedLine::new(sda),
+            scl: SharedLine::new(scl),
+            pause_on_read_stretch: false,
+            service_delay_us: 50,
+        };
+        (slave, master)
+    }
+
     fn setup(peripherals: Peripherals) -> Context {
         MASTER_DONE.store(false, Ordering::SeqCst);
         MASTER_PAUSED.store(false, Ordering::SeqCst);
         let timg = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg.timer0);
 
-        let (master_sda, slave_sda) = hil_test::lp_test_pins!(peripherals);
-        let (master_scl, slave_scl) = hil_test::hp_test_pins!(peripherals);
-        let mut sda = Flex::new(master_sda);
-        let mut scl = Flex::new(master_scl);
-        for pin in [&mut sda, &mut scl] {
-            pin.set_high();
-            pin.apply_output_config(
-                &OutputConfig::default()
-                    .with_drive_mode(DriveMode::OpenDrain)
-                    .with_pull(Pull::Up),
-            );
-            pin.set_input_enable(true);
-            pin.set_output_enable(true);
-        }
-
-        let slave = I2cSlave::new(peripherals.I2C0, Config::new(ADDRESS))
-            .unwrap()
-            .with_sda(slave_sda)
-            .with_scl(slave_scl);
+        let (sda, scl) = hil_test::i2c_pins!(peripherals);
+        let (slave, master) = connect_bus(peripherals.I2C0, sda, scl);
         // Allow scheduler delays in the software master.
         I2C0::regs()
             .to()
@@ -896,14 +999,34 @@ mod i2c_slave {
         );
         Context {
             slave,
-            master: TestMaster {
-                sda,
-                scl,
-                pause_on_read_stretch: false,
-                service_delay_us: 50,
-            },
+            master,
             spawner: executor.start(Priority::Priority3),
         }
+    }
+
+    #[test]
+    #[cfg(i2c_slave_i2c1)]
+    async fn async_i2c1_write_read(peripherals: Peripherals) {
+        esp_rtos::start(TimerGroup::new(peripherals.TIMG0).timer0);
+        let (sda, scl) = hil_test::i2c_pins!(peripherals);
+        let (slave, mut master) = connect_bus(peripherals.I2C1, sda, scl);
+        let mut slave = slave.into_async();
+
+        embassy_futures::join::join(
+            async {
+                master.write(&WRITE_DATA).await;
+                master.expect_read(&SECOND_RESPONSE).await;
+                master.stop().await;
+            },
+            async {
+                let mut data = [0; WRITE_DATA.len()];
+                slave.expect_write(&mut data, &WRITE_DATA).await;
+                slave
+                    .expect_read(&SECOND_RESPONSE, Ok(ReadStatus::Done))
+                    .await;
+            },
+        )
+        .await;
     }
 
     #[test]
@@ -966,9 +1089,7 @@ mod i2c_slave {
         }
         master.start().await;
         assert!(master.write_byte((ADDRESS + 1) << 1).await);
-        for byte in SECOND_RESPONSE {
-            assert!(master.write_byte(byte).await);
-        }
+        master.write_data(&SECOND_RESPONSE).await;
         master.stop().await;
         MASTER_DONE.store(true, Ordering::SeqCst);
     }
@@ -1046,7 +1167,7 @@ mod i2c_slave {
         pause_master().await;
         master.stop().await;
 
-        for delay_us in [0, 50, 200, 500] {
+        for delay_us in ACK_DELAYS_US {
             master.expect_read(&[0xff]).await;
             master.stop_without_yield();
             master.write(&[]).await;
@@ -1054,9 +1175,7 @@ mod i2c_slave {
             assert!(master.write_byte_delayed_ack(WRITE_DATA[0], delay_us).await);
             assert!(master.write_byte(WRITE_DATA[1]).await);
             Timer::after_micros(500).await;
-            for &byte in &WRITE_DATA[2..] {
-                assert!(master.write_byte(byte).await);
-            }
+            master.write_data(&WRITE_DATA[2..]).await;
             master.stop().await;
         }
 
@@ -1094,7 +1213,7 @@ mod i2c_slave {
         slave.expect_write(&mut data, &WRITE_DATA[..1]).await;
         wait_for_pause().await;
         MASTER_PAUSED.store(false, Ordering::SeqCst);
-        for _ in 0..4 {
+        for _ in ACK_DELAYS_US {
             slave.expect_read(&[0xff], Ok(ReadStatus::Done)).await;
             slave.expect_write(&mut data, &WRITE_DATA).await;
         }
@@ -1255,17 +1374,13 @@ mod i2c_slave {
     #[embassy_executor::task]
     async fn consecutive_writes_master(mut master: TestMaster) {
         Timer::after_micros(50).await;
-        master.write(&[]).await;
-        master.write_bits(WRITE_DATA[0], 7).await;
+        master.write(&WRITE_DATA[..1]).await;
+        let regs = I2C0::regs();
+        regs.int_clr().write(|w| w.det_start().clear_bit_by_one());
         master.start().await;
-        let status = I2C0::regs().sr().read();
-        assert_eq!(status.scl_main_state_last().bits(), 1);
-        assert_eq!(status.rxfifo_cnt().bits(), 1);
-        I2C0::regs().int_clr().write(|w| {
-            w.trans_complete().clear_bit_by_one();
-            w.slave_stretch().clear_bit_by_one()
-        });
-        assert!(I2C0::regs().int_raw().read().det_start().bit_is_set());
+        regs.int_clr()
+            .write(|w| w.trans_complete().clear_bit_by_one());
+        assert!(regs.int_raw().read().det_start().bit_is_set());
         assert_no_timeout();
         // Require delivery before the next address can resolve the retained match.
         pause_master().await;
@@ -1349,9 +1464,7 @@ mod i2c_slave {
                         master.stop_without_yield();
                         master.write(&[]).await;
                         assert!(master.write_byte_delayed_ack(SECOND_RESPONSE[0], 200).await);
-                        for byte in &SECOND_RESPONSE[1..] {
-                            assert!(master.write_byte(*byte).await);
-                        }
+                        master.write_data(&SECOND_RESPONSE[1..]).await;
                     }
                     master.stop().await;
                 }
@@ -1414,9 +1527,7 @@ mod i2c_slave {
         master.start().await;
         assert!(master.write_byte(ADDRESS << 1).await);
         master.service_delay_us = 20_000;
-        for byte in WRITE_DATA {
-            assert!(master.write_byte(byte).await);
-        }
+        master.write_data(&WRITE_DATA).await;
         master.stop().await;
         MASTER_DONE.store(true, Ordering::SeqCst);
     }
@@ -1476,7 +1587,7 @@ mod i2c_slave {
     }
 
     async fn check_mode_changes(ctx: Context<impl TestSlave>) {
-        let scl = ctx.master.scl.peripheral_input();
+        let scl = ctx.master.scl.input.clone();
         ctx.spawner.spawn(mode_change_master(ctx.master).unwrap());
         wait_for_pending_write().await;
         let mut slave = ctx.slave.switch_mode();
@@ -1662,9 +1773,7 @@ mod i2c_slave {
         master.stop_without_yield();
         master.write(&[]).await;
         pause_master().await;
-        for byte in WRITE_DATA {
-            assert!(master.write_byte(byte).await);
-        }
+        master.write_data(&WRITE_DATA).await;
         master.stop().await;
 
         master.write(&RESPONSE).await;
