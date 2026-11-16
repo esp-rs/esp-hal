@@ -592,8 +592,6 @@ impl<'d> AesDmaBackend<'d> {
 
         self.state = DriverState::WaitingForDma {
             transfer,
-            remaining_bytes: 0,
-            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
             written: get_range(item.buffers.output, 0, text_full),
         };
 

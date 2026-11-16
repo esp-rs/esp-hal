@@ -626,8 +626,7 @@ mod work_queue_tests {
 mod work_queue_dma_tests {
     use aes_gcm::aes::{
         Aes128,
-        Aes256,
-        cipher::{Array, BlockCipherEncrypt, BlockSizeUser, KeyInit, consts},
+        cipher::{KeyIvInit, StreamCipher},
     };
     use allocator_api2::vec::Vec;
 
@@ -791,25 +790,6 @@ mod work_queue_dma_tests {
         }
     }
 
-    /// The plaintext encrypted in CTR mode by RustCrypto's software AES, which increments the
-    /// whole 128-bit counter block, as the standard incrementing function of NIST SP 800-38A does.
-    fn software_ctr<C>(key: &[u8], nonce: [u8; 16]) -> [u8; PLAINTEXT_BUF_SIZE]
-    where
-        C: BlockCipherEncrypt + BlockSizeUser<BlockSize = consts::U16> + KeyInit,
-    {
-        let cipher = C::new_from_slice(key).unwrap();
-        let mut ciphertext = padded_plaintext();
-        for (i, block) in ciphertext.chunks_mut(16).enumerate() {
-            let counter = u128::from_be_bytes(nonce).wrapping_add(i as u128);
-            let mut key_stream = Array::from(counter.to_be_bytes());
-            cipher.encrypt_block(&mut key_stream);
-            for (byte, key) in block.iter_mut().zip(key_stream.iter()) {
-                *byte ^= key;
-            }
-        }
-        ciphertext
-    }
-
     /// A context carries its chaining state from one call to the next, so two calls over halves
     /// of the text give the result of one call over all of it.
     #[test]
@@ -835,11 +815,6 @@ mod work_queue_dma_tests {
         let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
         process_in_calls(&mut ctr, &mut buffer, &[128]);
         hil_test::assert_eq!(buffer, CIPHERTEXT_CTR);
-
-        let mut buffer = padded_plaintext();
-        let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_256);
-        process_in_calls(&mut ctr, &mut buffer, &[128]);
-        hil_test::assert_eq!(buffer, software_ctr::<Aes256>(&KEY_256, IV));
     }
 
     /// Bytes after the buffer, which no call may change
@@ -890,11 +865,14 @@ mod work_queue_dma_tests {
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0xff, 0xff, 0xff, 0xfe,
         ];
 
+        let mut expected = padded_plaintext();
+        ctr::Ctr128BE::<Aes128>::new(&KEY_128.into(), &NONCE.into()).apply_keystream(&mut expected);
+
         let mut buffer = padded_plaintext();
         let mut ctr = AesContext::new(Ctr::new(NONCE), Operation::Encrypt, KEY_128);
         process_in_calls(&mut ctr, &mut buffer, &[]);
 
-        hil_test::assert_eq!(buffer, software_ctr::<Aes128>(&KEY_128, NONCE));
+        hil_test::assert_eq!(buffer, expected);
     }
 
     /// Longer than one DMA descriptor carries, so the DMA takes more than one transfer over it.

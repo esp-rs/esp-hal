@@ -587,8 +587,8 @@ pub mod dma {
                 .block_mode()
                 .modify(|_, w| unsafe { w.block_mode().bits(mode as u8) });
 
-            // The whole 128-bit counter block increments, as in the CPU-driven `Ctr`. INC32 would
-            // wrap its low 32 bits without carrying.
+            // FIXME: users should be able to choose between INC32 and INC128.
+            // The CPU-driven `Ctr` needs to be updated to match if that's added.
             if mode == CipherMode::Ctr {
                 self.aes
                     .regs()
@@ -638,13 +638,24 @@ pub mod dma {
         /// Waits for the transfer to finish and returns the peripheral and
         /// buffers.
         pub fn wait(mut self) -> (AesDma<'d>, RX::Final, TX::Final) {
+            self.wait_for_dma();
+            self.release()
+        }
+
+        /// Waits until the AES block has processed the input and the DMA has written all of the
+        /// output, then stops the DMA. The AES block keeps its registers until [`Self::release`].
+        fn wait_for_dma(&mut self) {
             while !self.is_done() {}
             while !self.aes_dma.channel.rx.is_done() {}
 
             // Stop the DMA as it doesn't know that the aes has stopped.
             self.aes_dma.channel.rx.stop_transfer();
             self.aes_dma.channel.tx.stop_transfer();
+        }
 
+        /// Resets the AES block, which clears its registers, and returns the peripheral and
+        /// buffers.
+        fn release(mut self) -> (AesDma<'d>, RX::Final, TX::Final) {
             self.aes_dma.finish_transform();
 
             unsafe {
@@ -724,11 +735,9 @@ pub mod dma {
         Idle(AesDma<'d>),
         WaitingForDma {
             transfer: AesTransfer<'d, NoBuffer, NoBuffer>,
-            remaining_bytes: usize,
-            /// The output this transfer writes. Only its own lines are invalidated: an earlier
-            /// transfer's last partial line, which the CPU wrote from a bounce buffer, can be a
-            /// whole line inside the operation's output.
-            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            /// The output this transfer writes. The operation continues from its end. Only its own
+            /// lines are invalidated: an earlier transfer's last partial line, which the CPU wrote
+            /// from a bounce buffer, can be a whole line inside the operation's output.
             written: NonNull<[u8]>,
         },
     }
@@ -973,19 +982,18 @@ pub mod dma {
 
                 DriverState::WaitingForDma { .. } => {
                     let DriverState::WaitingForDma {
-                        transfer,
-                        remaining_bytes,
-                        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                        mut transfer,
                         written,
                     } = core::mem::replace(&mut self.state, DriverState::None)
                     else {
                         unreachable!()
                     };
 
-                    // Before `wait`, which resets the peripheral and with it the IV the hardware
-                    // left for the context's next call.
+                    // The IV the hardware left for the context's next call is read after the DMA
+                    // has finished, and before `release` resets the peripheral, which clears it.
+                    transfer.wait_for_dma();
                     unsafe { item.cipher_mode.as_mut() }.read_state(&transfer.aes_dma);
-                    let (driver, _, _) = transfer.wait();
+                    let (driver, _, _) = transfer.release();
 
                     driver.clear_interrupt();
 
@@ -1003,15 +1011,16 @@ pub mod dma {
                         *buffer = None;
                     }
 
+                    // The operation is done up to the end of what this transfer wrote.
+                    let done =
+                        written.addr().get() + written.len() - item.buffers.output.addr().get();
+
                     // Now process the remainder:
-                    if remaining_bytes > 0 {
+                    if done < item.buffers.output.len() {
                         let mut temp_item = AesOperation {
                             mode: item.mode,
                             cipher_mode: item.cipher_mode,
-                            buffers: unsafe {
-                                item.buffers
-                                    .byte_add(item.buffers.input.len() - remaining_bytes)
-                            },
+                            buffers: unsafe { item.buffers.byte_add(done) },
                             key: item.key.copy(),
                             #[cfg(aes_dma_mode_gcm)]
                             gcm: None,
@@ -1042,7 +1051,6 @@ pub mod dma {
             mut driver: AesDma<'d>,
             work_item: &mut AesOperation,
         ) -> Result<(), AesDma<'d>> {
-            let input_len = work_item.buffers.input.len();
             let (input_dscr, output_dscr) =
                 self.descriptors.get_mut().into_inner()[..OUT_DESCR_COUNT + 1].split_at_mut(1);
             let (input_buffer, data_len) = unsafe {
@@ -1094,8 +1102,6 @@ pub mod dma {
 
             self.state = DriverState::WaitingForDma {
                 transfer,
-                remaining_bytes: input_len - data_len,
-                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
                 written: NonNull::slice_from_raw_parts(
                     work_item.buffers.output.cast::<u8>(),
                     data_len,
