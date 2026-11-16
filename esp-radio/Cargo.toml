@@ -76,9 +76,9 @@ esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated"
 esp-rom-sys = { version = "=0.1.5", path = "../esp-rom-sys" }
 esp-sync = { version = "0.3.0", path = "../esp-sync" }
 esp-phy = { version = "0.3.0", path = "../esp-phy/" }
-num-derive = "0.4.2"
-num-traits = { version = "0.2.19", default-features = false }
-portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
+num-derive = { version = "0.4.2", optional = true }
+num-traits = { version = "0.2.19", default-features = false, optional = true }
+portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"], optional = true }
 procmacros = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 xtensa-lx-rt = { version = "0.23.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
@@ -306,6 +306,9 @@ wifi = [
     "dep:enumset",
     "dep:embassy-net-driver-02",
     "dep:xarxa-driver",
+    "dep:num-derive",
+    "dep:num-traits",
+    "dep:portable_atomic_enum",
     "esp-wifi-sys-esp32?/wifi",
     "esp-wifi-sys-esp32c2?/wifi",
     "esp-wifi-sys-esp32c3?/wifi",
