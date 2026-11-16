@@ -74,6 +74,25 @@ pub mod ieee802154 {
     pub const PAYLOAD: &[u8] = b"esp-radio 802.15.4 HIL";
 }
 
+/// Shared parameters for the BLE L2CAP HIL test.
+///
+/// The `ble_peripheral_support` firmware sends the data and the device-under-test
+/// checks it.
+pub mod ble {
+    /// PSM of the L2CAP channel.
+    pub const L2CAP_PSM: u16 = 0x0081;
+    /// LE data length the support firmware sends with. The ESP32-C6 controller
+    /// splits received ACL packets with 189 to 194 data bytes over two mbufs.
+    pub const DATA_LENGTH: u16 = 191;
+    /// Number of bytes the support firmware sends.
+    pub const L2CAP_BYTES: usize = 8 * 1024;
+
+    /// Byte at `index` of the data the support firmware sends.
+    pub fn l2cap_byte(index: usize) -> u8 {
+        index as u8
+    }
+}
+
 #[macro_export]
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
