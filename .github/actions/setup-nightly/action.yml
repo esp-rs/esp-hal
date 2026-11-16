@@ -24,7 +24,7 @@ runs:
     # Set to a specific version to work around a compiler issue.
     - id: version
       shell: bash
-      run: echo "nightly=nightly" >> "$GITHUB_OUTPUT"
+      run: echo "nightly=nightly-2026-11-13" >> "$GITHUB_OUTPUT"
 
     - id: targets
       shell: bash

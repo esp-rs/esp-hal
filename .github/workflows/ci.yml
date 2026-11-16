@@ -501,7 +501,11 @@ jobs:
           riscv: "true"
 
       - name: Install nightly for stack-smashing-protection
-        run: rustup toolchain install nightly --profile minimal --component rust-src,clippy,rustfmt --target riscv32imac-unknown-none-elf
+        uses: ./.github/actions/setup-nightly
+        with:
+          targets: riscv32imac-unknown-none-elf
+          components: rust-src, clippy, rustfmt
+          alias: "true"
 
       - uses: Swatinem/rust-cache@v2
 
