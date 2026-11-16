@@ -958,6 +958,34 @@ fn format_dependency_version(previous: &str, new: &semver::Version) -> String {
     }
 }
 
+/// Collects dependencies recursively, based on a callback that provides direct dependencies.
+///
+/// This is an implementation detail of the `related_crates` function, separate for testing
+/// purposes.
+pub(crate) fn related_crates_cb(
+    package: Package,
+    direct_dependencies: &impl Fn(Package) -> Vec<Package>,
+) -> Vec<Package> {
+    let mut packages = vec![package];
+
+    for dep in direct_dependencies(package) {
+        for dep in related_crates_cb(dep, direct_dependencies) {
+            if !packages.contains(&dep) {
+                packages.push(dep);
+            }
+        }
+    }
+
+    packages
+}
+
+/// The package and its in-repo dependencies, direct or not.
+pub fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
+    related_crates_cb(package, &|p| {
+        CargoToml::new(workspace, p).unwrap().repo_dependencies()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

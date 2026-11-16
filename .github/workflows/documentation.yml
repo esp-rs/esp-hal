@@ -36,6 +36,9 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
+    permissions:
+      actions: read
+      contents: read
     # required for this step, as stdout is captured by `hal-xtask release tag-releases`
     env:
       RUST_LOG: off
@@ -73,11 +76,30 @@ jobs:
           echo "packages=${input}" >> "$GITHUB_OUTPUT"
 
       - id: setup_pr
-        name: Set up [pull request or all packages]
-        if: ${{ github.event_name != 'workflow_dispatch' }}
+        name: Set up [pull request or manual run, all packages]
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.packages == '') }}
         # Release PRs will ignore the tag values and just check out the latest commit
         run: |
           output=$(hal-xtask release tag-releases)
+          echo "packages=${output}" >> "$GITHUB_OUTPUT"
+
+      # Diff against the last successful deploy rather than `github.event.before`: a run cancelled
+      # by a newer push never deployed, so its changes must be carried into the next run.
+      - id: setup_push
+        name: Set up [push, packages changed since the last deploy]
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow documentation.yml \
+            --event push --branch main --status success --limit 1 \
+            --json headSha --jq '.[0].headSha // empty' || true)
+          if [ -n "$BASE" ] && git fetch --depth=1 origin "$BASE"; then
+            output=$(hal-xtask release tag-releases --changed-since "$BASE")
+          else
+            echo "::warning::No previous deploy to diff against, building every package"
+            output=$(hal-xtask release tag-releases)
+          fi
           echo "packages=${output}" >> "$GITHUB_OUTPUT"
 
       - id: deploy_target
@@ -95,13 +117,13 @@ jobs:
           fi
 
     outputs:
-      packages: "${{ steps.setup_manual.outputs.packages || steps.setup_pr.outputs.packages }}"
+      packages: "${{ steps.setup_manual.outputs.packages || steps.setup_pr.outputs.packages || steps.setup_push.outputs.packages }}"
       base_url: ${{ steps.deploy_target.outputs.base_url }}
       channel: ${{ steps.deploy_target.outputs.channel }}
 
   build:
     needs: setup
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
+    if: ${{ needs.setup.outputs.packages != '[]' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs'))) }}
     strategy:
       fail-fast: true
       matrix:
