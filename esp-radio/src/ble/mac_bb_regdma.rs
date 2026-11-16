@@ -164,15 +164,17 @@ pub(crate) fn init(power_down: bool) {
                 .inspect_err(|_| regdma::destroy(Module::BtBb))
         })
     };
-    if created.is_err() {
+    if let Err(error) = created {
         warn!(
-            "The BLE MAC and baseband do not fit the retention memory, they stay powered in sleep"
+            "The BLE MAC and baseband stay powered in sleep: {:?}",
+            error
         );
         return;
     }
     CREATED.store(true, Ordering::Relaxed);
-    regdma::attach(Module::BtBb);
-    regdma::attach(Module::BleMac);
+    // The modules exist now, so `attach` cannot fail.
+    let _ = regdma::attach(Module::BtBb);
+    let _ = regdma::attach(Module::BleMac);
     modem_power::enable_power_down(Radio::Ble);
 }
 
@@ -194,19 +196,26 @@ static SAVED: AtomicBool = AtomicBool::new(false);
 
 /// Saves the MAC and baseband before light sleep.
 ///
-/// Call this only when the chip enters light sleep, while the controller sleeps.
+/// Call this only when the chip enters light sleep, while the controller sleeps. On an error, the
+/// MAC and baseband must stay powered, because memory has no complete copy of them.
 #[cfg(regdma_bt_needs_pll)]
-pub(crate) fn power_down() {
+pub(crate) fn power_down() -> Result<(), regdma::Error> {
     if CREATED.load(Ordering::Relaxed) {
-        regdma::run_extra_link(true);
+        regdma::run_extra_link(true)?;
         SAVED.store(true, Ordering::Relaxed);
     }
+    Ok(())
 }
 
 /// Restores the MAC and baseband after light sleep, if [`power_down`] saved them.
 #[cfg(regdma_bt_needs_pll)]
 pub(crate) fn power_up() {
-    if SAVED.swap(false, Ordering::Relaxed) {
-        regdma::run_extra_link(false);
+    if SAVED.swap(false, Ordering::Relaxed)
+        && let Err(error) = regdma::run_extra_link(false)
+    {
+        warn!(
+            "The REGDMA did not restore the BLE MAC and baseband: {:?}",
+            error
+        );
     }
 }

@@ -104,8 +104,8 @@ impl State {
         if created.is_err() {
             return false;
         }
-        regdma::attach(Module::ClockModem);
-        regdma::attach(Module::PhyFe);
+        let _ = regdma::attach(Module::ClockModem);
+        let _ = regdma::attach(Module::PhyFe);
         self.memory = Some(memory);
         true
     }

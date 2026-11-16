@@ -137,9 +137,10 @@ pub(super) fn init() -> Result<(), WifiError> {
                 .inspect_err(|_| regdma::destroy(Module::WifiBb))
         })
     };
-    if created.is_err() {
+    if let Err(error) = created {
         warn!(
-            "The Wi-Fi MAC and baseband do not fit the retention memory, they stay powered in sleep"
+            "The Wi-Fi MAC and baseband stay powered in sleep: {:?}",
+            error
         );
         return Ok(());
     }
@@ -187,10 +188,9 @@ const NOT_RETAINED: i32 = 1;
 
 /// The blob calls this when Wi-Fi starts.
 pub(super) unsafe extern "C" fn bb_sleep_retention_attach() -> i32 {
-    if !CREATED.load(Ordering::Relaxed) {
+    if regdma::attach(Module::WifiBb).is_err() {
         return NOT_RETAINED;
     }
-    regdma::attach(Module::WifiBb);
     0
 }
 
@@ -205,10 +205,9 @@ pub(super) unsafe extern "C" fn bb_sleep_retention_detach() -> i32 {
 
 /// The blob calls this when Wi-Fi starts, after [`bb_sleep_retention_attach`].
 pub(super) unsafe extern "C" fn mac_sleep_retention_attach() -> i32 {
-    if !CREATED.load(Ordering::Relaxed) {
+    if regdma::attach(Module::WifiMac).is_err() {
         return NOT_RETAINED;
     }
-    regdma::attach(Module::WifiMac);
     // The blob looks up the node of the MAC state now, so the node must exist.
     let result = unsafe { esp_wifi_internal_set_mac_sleep(true) };
     if result != 0 {

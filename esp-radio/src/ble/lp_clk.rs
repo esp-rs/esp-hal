@@ -130,7 +130,10 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
                 return;
             }
             #[cfg(regdma_bt_needs_pll)]
-            super::mac_bb::power_down();
+            if super::mac_bb::power_down().is_err() {
+                config.reject_sleep();
+                return;
+            }
         }
         // The BLE timer wakes the chip through the `Bt` source.
         _ => {}
