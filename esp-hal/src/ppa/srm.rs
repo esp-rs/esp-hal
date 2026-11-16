@@ -62,11 +62,11 @@ use core::marker::PhantomData;
 use crate::{
     Blocking,
     DriverMode,
+    dma::aligned::PSRAM_CACHE_LINE,
     dma2d::{
         AnyDma2dRxChannel,
         AnyDma2dTxChannel,
         BURST_128_BYTES,
-        CACHE_LINE_SIZE,
         Channels,
         MACRO_BLOCK_NONE,
         writeback,
@@ -456,8 +456,8 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
             return Err(Error::UnsupportedMemoryRegion);
         }
         if is_slice_in_psram(output.data)
-            && (!(output.data.as_ptr() as usize).is_multiple_of(CACHE_LINE_SIZE)
-                || !output.data.len().is_multiple_of(CACHE_LINE_SIZE))
+            && (!(output.data.as_ptr() as usize).is_multiple_of(PSRAM_CACHE_LINE)
+                || !output.data.len().is_multiple_of(PSRAM_CACHE_LINE))
         {
             return Err(Error::UnalignedBuffer);
         }

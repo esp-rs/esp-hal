@@ -7,17 +7,21 @@ use core::{
     sync::atomic::{Ordering, compiler_fence},
 };
 
+use procmacros::doc_replace;
+
 use crate::{
+    dma::aligned::{PSRAM_CACHE_LINE, region_dma_alignment},
     dma2d::{
         AnyDma2dRxChannel,
         BURST_128_BYTES,
-        CACHE_LINE_SIZE,
         Channels,
         MACRO_BLOCK_NONE,
+        invalidate,
         writeback,
     },
-    peripherals::{DMA2D, DMA2D_TX_CH0, HP_SYS, JPEG},
-    soc::{cache_invalidate_addr, is_slice_in_dram, is_slice_in_psram},
+    pac::jpeg::int_raw::R as InterruptStatus,
+    peripherals::{DMA2D, DMA2D_TX_CH0, JPEG},
+    soc::{is_slice_in_dram, is_slice_in_psram},
     system::{GenericPeripheralGuard, Peripheral, PeripheralClockControl},
     time::{Duration, Instant},
 };
@@ -31,7 +35,7 @@ const DMA_FIELD_MASK: u32 = (1 << DMA_FIELD_BITS) - 1;
 const MAX_DIMENSION: usize = DMA_FIELD_MASK as usize;
 const MAX_PAYLOAD: usize = (1 << (2 * DMA_FIELD_BITS)) - 1;
 
-const _: () = core::assert!(header::LEN.is_multiple_of(CACHE_LINE_SIZE));
+const _: () = core::assert!(header::LEN.is_multiple_of(PSRAM_CACHE_LINE));
 
 /// A JPEG encoder error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -83,9 +87,9 @@ pub struct JpegProperties {
 #[instability::unstable]
 pub struct Encoder<'d> {
     _peripheral: JPEG<'d>,
+    _memory: MemoryPower,
     channels: Channels<'d>,
     _guard: GenericPeripheralGuard<{ Peripheral::Jpeg as u8 }>,
-    memory_low_power: (bool, bool),
     timeout: Option<Duration>,
 }
 
@@ -101,23 +105,12 @@ impl<'d> Encoder<'d> {
         tx: DMA2D_TX_CH0<'d>,
         rx: impl Into<AnyDma2dRxChannel<'d>>,
     ) -> Self {
-        let channels = Channels::new(tx, rx);
-        let guard = GenericPeripheralGuard::new();
-        let memory = HP_SYS::regs().jpeg_mem_lp_ctrl();
-        let previous = memory.read();
-        memory.modify(|_, w| {
-            w.jpeg_mem_force_ctrl().set_bit();
-            w.jpeg_mem_lp_en().clear_bit()
-        });
         Self {
             _peripheral: peripheral,
-            channels,
-            _guard: guard,
+            channels: Channels::new(tx, rx),
+            _guard: GenericPeripheralGuard::new(),
+            _memory: MemoryPower::force_on(),
             timeout: None,
-            memory_low_power: (
-                previous.jpeg_mem_force_ctrl().bit(),
-                previous.jpeg_mem_lp_en().bit(),
-            ),
         }
     }
 
@@ -130,6 +123,16 @@ impl<'d> Encoder<'d> {
         self.timeout = timeout;
     }
 
+    #[doc_replace(
+        "sram_alignment" => {
+            cfg(soc_internal_memory_cached) => "64",
+            _ => "4"
+        },
+        "psram_alignment" => {
+            cfg(soc_internal_memory_cached) => "128",
+            _ => "64"
+        }
+    )]
     /// Encodes a tightly packed little-endian RGB565 image as a YCbCr 4:2:0 JPEG.
     ///
     /// Returns the JPEG length in bytes. Width and height must be in the range 1 to
@@ -137,8 +140,8 @@ impl<'d> Encoder<'d> {
     /// SRAM or initialized PSRAM and aligned to two bytes. Partial 16x16 blocks
     /// require no input padding.
     ///
-    /// The output address and length must be aligned to four bytes in SRAM or
-    /// 64 bytes in PSRAM. PSRAM configurations that require strictly aligned
+    /// The output address and length must be aligned to __sram_alignment__ bytes in SRAM or
+    /// __psram_alignment__ bytes in PSRAM. PSRAM configurations that require strictly aligned
     /// memory transactions, such as encryption or ECC, are unsupported.
     /// Output contents are unspecified on error.
     ///
@@ -176,14 +179,11 @@ impl<'d> Encoder<'d> {
         if output.len() <= header::LEN {
             return Err(Error::OutputTooSmall);
         }
-        let output_in_psram = is_slice_in_psram(output);
-        let output_alignment = if output_in_psram {
-            CACHE_LINE_SIZE
-        } else {
-            RX_BUFFER_ALIGNMENT
-        };
+        let output_alignment = region_dma_alignment(output.as_ptr() as usize)
+            .ok_or(Error::InvalidBuffer)?
+            .max(RX_BUFFER_ALIGNMENT);
         if !(is_slice_in_dram(input) || is_slice_in_psram(input))
-            || !(output_in_psram || is_slice_in_dram(output))
+            || !(is_slice_in_dram(output) || is_slice_in_psram(output))
             || !(input.as_ptr() as usize).is_multiple_of(2)
             || !(output.as_ptr() as usize).is_multiple_of(output_alignment)
             || !output.len().is_multiple_of(output_alignment)
@@ -303,8 +303,12 @@ impl<'d> Encoder<'d> {
             PeripheralClockControl::reset(Peripheral::Jpeg);
         }
         // RX can write the payload and descriptor before reporting an error.
-        invalidate(payload);
-        invalidate(core::slice::from_ref(&rx));
+        // SAFETY: The payload covers whole cache lines because of the output alignment and the
+        // header length, and the descriptor alignment gives it its own lines.
+        unsafe {
+            invalidate(payload);
+            invalidate(core::slice::from_ref(&rx));
+        }
         result?;
 
         compiler_fence(Ordering::SeqCst);
@@ -334,7 +338,7 @@ impl<'d> Encoder<'d> {
                 || tx.outfifo_ro_udf_ch_int_raw().bit()
                 || jpeg.rle_parallel_err().bit()
                 || jpeg.en_frame_eof_err().bit()
-                || jpeg.encode_timeout().bit()
+                || encode_timeout(&jpeg)
             {
                 return Err(Error::Hardware);
             }
@@ -352,26 +356,64 @@ impl<'d> Encoder<'d> {
     }
 }
 
-impl Drop for Encoder<'_> {
-    fn drop(&mut self) {
-        HP_SYS::regs().jpeg_mem_lp_ctrl().modify(|_, w| {
-            w.jpeg_mem_force_ctrl().bit(self.memory_low_power.0);
-            w.jpeg_mem_lp_en().bit(self.memory_low_power.1)
-        });
+cfg_select! {
+    esp32s31 => {
+        use crate::peripherals::HP_SYS;
+
+        /// Forces the JPEG memory on, and restores its low-power control when dropped.
+        #[derive(Debug)]
+        struct MemoryPower {
+            force_ctrl: bool,
+            low_power: bool,
+        }
+
+        impl MemoryPower {
+            fn force_on() -> Self {
+                let memory = HP_SYS::regs().jpeg_mem_lp_ctrl();
+                let previous = memory.read();
+                memory.modify(|_, w| {
+                    w.jpeg_mem_force_ctrl().set_bit();
+                    w.jpeg_mem_lp_en().clear_bit()
+                });
+                Self {
+                    force_ctrl: previous.jpeg_mem_force_ctrl().bit(),
+                    low_power: previous.jpeg_mem_lp_en().bit(),
+                }
+            }
+        }
+
+        impl Drop for MemoryPower {
+            fn drop(&mut self) {
+                HP_SYS::regs().jpeg_mem_lp_ctrl().modify(|_, w| {
+                    w.jpeg_mem_force_ctrl().bit(self.force_ctrl);
+                    w.jpeg_mem_lp_en().bit(self.low_power)
+                });
+            }
+        }
+
+        fn encode_timeout(status: &InterruptStatus) -> bool {
+            status.encode_timeout().bit()
+        }
+    }
+    _ => {
+        // The JPEG memory has no software low-power control.
+        #[derive(Debug)]
+        struct MemoryPower;
+
+        impl MemoryPower {
+            fn force_on() -> Self {
+                Self
+            }
+        }
+
+        // The JPEG peripheral has no encode timeout.
+        fn encode_timeout(_status: &InterruptStatus) -> bool {
+            false
+        }
     }
 }
 
-// RX writes back the descriptor. Keep it on its own cache line on a PSRAM stack.
-#[repr(C, align(64))]
+// RX writes back the descriptor. Keep it on its own cache line on a cached stack.
+#[cfg_attr(soc_internal_memory_cached, repr(C, align(128)))]
+#[cfg_attr(not(soc_internal_memory_cached), repr(C, align(64)))]
 struct Descriptor([u32; 6]);
-
-fn invalidate<T>(buffer: &[T]) {
-    if is_slice_in_psram(buffer) {
-        unsafe {
-            cache_invalidate_addr(
-                buffer.as_ptr() as u32,
-                core::mem::size_of_val(buffer) as u32,
-            )
-        };
-    }
-}
