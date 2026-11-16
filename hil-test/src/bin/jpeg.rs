@@ -9,7 +9,7 @@
 use allocator_api2::boxed::Box;
 use esp_alloc::ExternalMemory;
 use esp_hal::{
-    jpeg::{Encoder, Error},
+    jpeg::{Encoder, Error, JpegProperties},
     peripherals::{DMA2D, HP_SYS, HP_SYS_CLKRST},
     ppa::srm::Srm,
 };
@@ -75,10 +75,15 @@ mod tests {
             state = state.wrapping_mul(1664525).wrapping_add(1013904223);
             *pixel = ((state >> 16) as u16).to_le_bytes();
         }
+        let properties = JpegProperties {
+            width: WIDTH,
+            height: HEIGHT,
+            quality: 90,
+        };
         // Exercise SRAM output with only four-byte alignment.
         let mut reference = Buffer([0xa5; 4096]);
         let (guard, sram) = reference.0.split_at_mut(4);
-        let size = jpeg.encode(&input.0, sram, WIDTH, HEIGHT, 90).unwrap();
+        let size = jpeg.encode(&input.0, sram, properties).unwrap();
         assert_eq!(guard, &[0xa5; 4]);
         let jpeg_bytes = &sram[..size];
 
@@ -87,7 +92,7 @@ mod tests {
         let psram_input = &mut source.0[2..];
         psram_input.copy_from_slice(&input.0);
         let capacity = size.next_multiple_of(64);
-        let mut encode = |output: &mut [u8]| jpeg.encode(psram_input, output, WIDTH, HEIGHT, 90);
+        let mut encode = |output: &mut [u8]| jpeg.encode(psram_input, output, properties);
         assert_eq!(
             encode(&mut output.0[..capacity - 64]),
             Err(Error::OutputTooSmall)

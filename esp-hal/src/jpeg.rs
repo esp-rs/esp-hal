@@ -65,6 +65,19 @@ impl core::fmt::Display for Error {
     }
 }
 
+/// Image dimensions and compression quality for a JPEG encode operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub struct JpegProperties {
+    /// Image width in pixels, from 1 to 16383.
+    pub width: u16,
+    /// Image height in pixels, from 1 to 16383.
+    pub height: u16,
+    /// Compression quality, from 1 to 100.
+    pub quality: u8,
+}
+
 /// A blocking RGB565 to baseline JPEG encoder.
 #[derive(Debug)]
 #[instability::unstable]
@@ -142,10 +155,13 @@ impl<'d> Encoder<'d> {
         &mut self,
         input: &[u8],
         output: &mut [u8],
-        width: u16,
-        height: u16,
-        quality: u8,
+        properties: JpegProperties,
     ) -> Result<usize, Error> {
+        let JpegProperties {
+            width,
+            height,
+            quality,
+        } = properties;
         let width_usize = usize::from(width);
         let height_usize = usize::from(height);
         if !(1..=MAX_DIMENSION).contains(&width_usize)
