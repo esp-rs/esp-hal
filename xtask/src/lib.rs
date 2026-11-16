@@ -936,26 +936,73 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     }
 
     for config in configs {
-        let mut cmd = CargoArgsBuilder::default();
         if config.miri {
             log::info!("Running miri host tests for package: {}", package);
-            cmd = cmd.toolchain("nightly").subcommand("miri");
         }
-        cmd = cmd.subcommand("test");
-        for arg in &config.cargo_args {
-            cmd = cmd.arg(arg);
-        }
-        cmd = cmd.features(&config.features);
-        if !config.test_args.is_empty() {
-            cmd = cmd.arg("--");
-            for arg in &config.test_args {
-                cmd = cmd.arg(arg);
-            }
-        }
-        cargo::run(&cmd.build(), &package_path)?;
+        cargo::run(&host_test_command(&config), &package_path)?;
     }
 
     Ok(())
+}
+
+fn host_test_command(config: &HostTestConfig) -> Vec<String> {
+    let mut cmd = CargoArgsBuilder::default();
+    if config.miri {
+        cmd = cmd.toolchain("nightly").subcommand("miri").arg("test");
+    } else {
+        cmd = cmd.subcommand("test");
+    }
+    if !config.features.is_empty() {
+        cmd = cmd.arg(format!("--features={}", config.features.join(",")));
+    }
+    for arg in &config.cargo_args {
+        cmd = cmd.arg(arg);
+    }
+    if !config.test_args.is_empty() {
+        cmd = cmd.arg("--");
+        for arg in &config.test_args {
+            cmd = cmd.arg(arg);
+        }
+    }
+    cmd.build()
+}
+
+#[cfg(test)]
+mod host_test_command_tests {
+    use super::*;
+
+    #[test]
+    fn miri_subcommand_is_preserved() {
+        let config = HostTestConfig {
+            miri: true,
+            ..Default::default()
+        };
+        assert_eq!(host_test_command(&config), ["+nightly", "miri", "test"]);
+        assert_eq!(host_test_command(&HostTestConfig::default()), ["test"]);
+    }
+
+    #[test]
+    fn miri_keeps_cargo_and_test_arguments_on_the_correct_side() {
+        let config = HostTestConfig {
+            miri: true,
+            features: vec!["feature-a".into()],
+            cargo_args: vec!["--lib".into()],
+            test_args: vec!["sdio_slave".into(), "--test-threads=1".into()],
+        };
+        assert_eq!(
+            host_test_command(&config),
+            [
+                "+nightly",
+                "miri",
+                "test",
+                "--features=feature-a",
+                "--lib",
+                "--",
+                "sdio_slave",
+                "--test-threads=1"
+            ]
+        );
+    }
 }
 
 /// How many times an operation that writes source files is attempted before
