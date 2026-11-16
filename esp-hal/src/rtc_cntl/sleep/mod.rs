@@ -368,6 +368,17 @@ impl<'d> LowPower<'d> {
         let mut config = config;
         config.set_sleep_kind(kind);
 
+        // The slow clock drifts after the calibration at boot, and a deep sleep can be long. The
+        // calibration comes before the entry hooks, because a wakeup source that limits the sleep
+        // converts the limit to slow clock ticks.
+        if kind == SleepKind::Deep {
+            #[cfg(sleep_has_wakeup_source_timer)]
+            let old_period = crate::clock::rtc_slow_cal_period();
+            crate::clock::calibrate_rtc_slow_clock();
+            #[cfg(sleep_has_wakeup_source_timer)]
+            timer::rescale_deadline(old_period);
+        }
+
         // Retention serves light sleep only. Deep sleep resets the chip, so it has no CPU state to
         // bring back, and an armed descriptor would outlive the sleep in the RTC domain. esp-idf
         // arms retention from its light sleep path alone.
