@@ -582,6 +582,16 @@ pub enum MwdtStage {
 }
 
 /// Watchdog timer
+#[cfg_attr(
+    esp32,
+    doc = r#"
+
+<section class="warning">
+The cache live lock workaround (<code>ESP_HAL_CONFIG_CACHE_LIVELOCK_WORKAROUND</code>) uses the
+TIMG1 watchdog. Do not use the TIMG1 watchdog while the workaround is enabled.
+</section>
+"#
+)]
 pub struct Wdt<TG> {
     phantom: PhantomData<TG>,
 }
