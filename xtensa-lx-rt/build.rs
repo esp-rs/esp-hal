@@ -116,8 +116,10 @@ fn handle_esp32() -> Result<()> {
             })
     }
 
-    // Do not check target when building documentation, but do check for doc-tests
-    let chip = if std::env::var("RUSTDOCFLAGS").is_err() || std::env::var("ESP_HAL_DOCTEST").is_ok()
+    // Documentation can be built for a non-Xtensa target, e.g. on docs.rs.
+    let target = std::env::var("TARGET").unwrap_or_default();
+    let chip = if std::env::var("RUSTDOCFLAGS").is_err()
+        || Chip::TARGET_TO_CHIP.iter().any(|(t, _)| *t == target)
     {
         // Based on the build target, determine which chip to use.
         let target = std::env::var("TARGET");
