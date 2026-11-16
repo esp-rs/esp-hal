@@ -176,7 +176,7 @@ where
     }
 
     fn regs(&self) -> &RegisterBlock {
-        self.peripheral.register_block()
+        USB_DEVICE::regs()
     }
 
     /// Writes data to the serial output in chunks of up to 64 bytes.
@@ -283,7 +283,7 @@ where
     }
 
     fn regs(&self) -> &RegisterBlock {
-        self.peripheral.register_block()
+        USB_DEVICE::regs()
     }
 
     /// Returns whether the input FIFO holds data from the host.
@@ -396,8 +396,15 @@ where
             PeripheralClockControl::disable(Peripheral::UsbDevice);
         }
 
-        usb_device.disable_tx_interrupts();
-        usb_device.disable_rx_interrupts();
+        let regs = USB_DEVICE::regs();
+        regs.int_ena().modify(|_, w| {
+            w.serial_in_empty().clear_bit();
+            w.serial_out_recv_pkt().clear_bit()
+        });
+        regs.int_clr().write(|w| {
+            w.serial_in_empty().clear_bit_by_one();
+            w.serial_out_recv_pkt().clear_bit_by_one()
+        });
 
         #[cfg(any(esp32c3, esp32s3))]
         {
@@ -406,7 +413,7 @@ where
             // On the esp32c3, and esp32s3 the USB_EXCHG_PINS efuse is bugged and
             // doesn't swap the pullups too, this works around that.
             if crate::efuse::read_bit(USB_EXCHG_PINS) {
-                usb_device.register_block().conf0().modify(|_, w| {
+                regs.conf0().modify(|_, w| {
                     w.pad_pull_override().set_bit();
                     w.dm_pullup().clear_bit();
                     w.dp_pullup().set_bit()
@@ -498,42 +505,6 @@ where
     }
 }
 
-/// USB Serial/JTAG peripheral instance
-#[doc(hidden)]
-pub trait Instance: crate::private::Sealed {
-    /// Returns a reference to the peripheral's underlying register block.
-    fn register_block(&self) -> &RegisterBlock;
-
-    /// Disables all transmit interrupts for the peripheral.
-    fn disable_tx_interrupts(&self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.serial_in_empty().clear_bit());
-
-        self.register_block()
-            .int_clr()
-            .write(|w| w.serial_in_empty().clear_bit_by_one());
-    }
-
-    /// Disables all receive interrupts for the peripheral.
-    fn disable_rx_interrupts(&self) {
-        self.register_block()
-            .int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt().clear_bit());
-
-        self.register_block()
-            .int_clr()
-            .write(|w| w.serial_out_recv_pkt().clear_bit_by_one());
-    }
-}
-
-impl Instance for USB_DEVICE<'_> {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        USB_DEVICE::regs()
-    }
-}
-
 // Static instance of the waker for each component of the peripheral:
 static WAKER_TX: AtomicWaker = AtomicWaker::new();
 static WAKER_RX: AtomicWaker = AtomicWaker::new();
@@ -544,7 +515,7 @@ static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagWriteFuture<'d> {
-    peripheral: USB_DEVICE<'d>,
+    _peripheral: USB_DEVICE<'d>,
 }
 
 impl<'d> UsbSerialJtagWriteFuture<'d> {
@@ -552,18 +523,18 @@ impl<'d> UsbSerialJtagWriteFuture<'d> {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
         // interrupt
         INT_ENA_LOCK.lock(|| {
-            peripheral
-                .register_block()
+            USB_DEVICE::regs()
                 .int_ena()
                 .modify(|_, w| w.serial_in_empty().set_bit());
         });
 
-        Self { peripheral }
+        Self {
+            _peripheral: peripheral,
+        }
     }
 
     fn event_bit_is_clear(&self) -> bool {
-        self.peripheral
-            .register_block()
+        USB_DEVICE::regs()
             .int_ena()
             .read()
             .serial_in_empty()
@@ -589,7 +560,7 @@ impl core::future::Future for UsbSerialJtagWriteFuture<'_> {
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagReadFuture<'d> {
-    peripheral: USB_DEVICE<'d>,
+    _peripheral: USB_DEVICE<'d>,
 }
 
 impl<'d> UsbSerialJtagReadFuture<'d> {
@@ -597,18 +568,18 @@ impl<'d> UsbSerialJtagReadFuture<'d> {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_OUT_RECV_PKT
         // interrupt
         INT_ENA_LOCK.lock(|| {
-            peripheral
-                .register_block()
+            USB_DEVICE::regs()
                 .int_ena()
                 .modify(|_, w| w.serial_out_recv_pkt().set_bit());
         });
 
-        Self { peripheral }
+        Self {
+            _peripheral: peripheral,
+        }
     }
 
     fn event_bit_is_clear(&self) -> bool {
-        self.peripheral
-            .register_block()
+        USB_DEVICE::regs()
             .int_ena()
             .read()
             .serial_out_recv_pkt()
