@@ -849,6 +849,8 @@ cfg_select! {
 
 Note: This chip does not support automatic light sleep. On this chip, `WakeLock` does nothing."
 )]
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 #[non_exhaustive]
 pub struct WakeLock;
