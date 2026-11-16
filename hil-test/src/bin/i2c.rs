@@ -1796,7 +1796,13 @@ mod i2c_slave {
 
     async fn expect_cancel(operation: impl Future, until: impl Future<Output = ()>) {
         assert!(matches!(select(operation, until).await, Either::Second(())));
-        assert_eq!(I2C0::regs().int_ena().read().bits(), 0);
+        const TRANS_COMPLETE_INT: u32 = 1 << 7;
+        let mut enabled = I2C0::regs().int_ena().read().bits();
+        // The driver keeps the STOP interrupt enabled to accept the next request.
+        if cfg!(i2c_slave_needs_trans_start_after_stop) {
+            enabled &= !TRANS_COMPLETE_INT;
+        }
+        assert_eq!(enabled, 0);
     }
 
     #[test]
