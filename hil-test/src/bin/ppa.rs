@@ -34,7 +34,18 @@ const ROTATIONS: [Rotation; 4] = [
     Rotation::Degrees270,
 ];
 
-#[repr(C, align(64))]
+const SRAM_ALIGNMENT: usize = if cfg!(soc_internal_memory_cached) {
+    64
+} else {
+    1
+};
+const PSRAM_ALIGNMENT: usize = if cfg!(soc_internal_memory_cached) {
+    128
+} else {
+    64
+};
+
+#[repr(C, align(128))]
 struct Buffer<const N: usize>([u8; N]);
 
 struct Context {
@@ -507,22 +518,27 @@ mod tests {
             ctx.destination.fill(0xa5);
             let source = &mut ctx.source[source_start..source_start + bytes + padding];
             fill_source(source, size, PixelFormat::Rgb565);
-            srm.run(
+            let result = srm.run(
                 Input {
                     data: source,
                     size,
                     format: PixelFormat::Rgb565,
                 },
                 Output {
-                    data: &mut ctx.destination
-                        [destination_start..destination_start + bytes + padding],
+                    data: &mut ctx.destination[destination_start
+                        ..destination_start + (bytes + padding).next_multiple_of(SRAM_ALIGNMENT)],
                     size,
                     format: PixelFormat::Rgb565,
                     offset: Offset::default(),
                 },
                 Config::default(),
-            )
-            .unwrap();
+            );
+            if !destination_start.is_multiple_of(SRAM_ALIGNMENT) {
+                assert_eq!(result, Err(Error::UnalignedBuffer));
+                assert!(ctx.destination.iter().all(|&byte| byte == 0xa5));
+                continue;
+            }
+            result.unwrap();
             assert_eq!(
                 &ctx.destination[destination_start..destination_start + bytes],
                 &source[..bytes],
@@ -553,7 +569,7 @@ mod tests {
 
         const DMA_MAX: usize = 0x3fff;
         const SRM_MAX: usize = 0x1fff;
-        const CAPACITY: usize = (DMA_MAX * 3).next_multiple_of(64);
+        const CAPACITY: usize = (DMA_MAX * 3).next_multiple_of(PSRAM_ALIGNMENT);
         let dimensions = |long, vertical| {
             if vertical {
                 Size {
@@ -573,9 +589,13 @@ mod tests {
             *byte = ((17 * i) ^ (i >> 8)) as u8;
         }
         let mut storage = Vec::new_in(ExternalMemory);
-        storage.resize(CAPACITY + 3 * 64 - 1, 0xa5);
-        let start = storage.as_ptr().align_offset(64) + 64;
-        for range in [start - 64..start, start + CAPACITY..start + CAPACITY + 64] {
+        storage.resize(CAPACITY + 3 * PSRAM_ALIGNMENT - 1, 0xa5);
+        let start = storage.as_ptr().align_offset(PSRAM_ALIGNMENT) + PSRAM_ALIGNMENT;
+        let guards = [
+            start - PSRAM_ALIGNMENT..start,
+            start + CAPACITY..start + CAPACITY + PSRAM_ALIGNMENT,
+        ];
+        for range in guards.clone() {
             DmaAlignedMut::new(&mut storage[range]).unwrap().writeback();
         }
         let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.tx0.reborrow(), ctx.rx0.reborrow());
@@ -654,7 +674,7 @@ mod tests {
                             .iter()
                             .all(|&b| b == 0xa5)
                     );
-                    for range in [start - 64..start, start + CAPACITY..start + CAPACITY + 64] {
+                    for range in guards.clone() {
                         let guard = DmaAlignedMut::new(&mut storage[range]).unwrap();
                         guard.invalidate();
                         assert!(guard.iter().all(|&byte| byte == 0xa5));
@@ -871,10 +891,13 @@ mod tests {
     #[test]
     fn test_psram(mut ctx: Context) {
         let mut source = Box::new_in(Buffer([0x5a; SOURCE_BYTES + 128]), ExternalMemory);
-        let mut destination = Box::new_in(Buffer([0xa5; DESTINATION_BYTES + 128]), ExternalMemory);
+        let mut destination = Box::new_in(
+            Buffer([0xa5; DESTINATION_BYTES + 2 * PSRAM_ALIGNMENT]),
+            ExternalMemory,
+        );
         // Seed guard bytes in RAM before dirtying the source image.
         DmaAlignedMut::new(&mut source.0).unwrap().writeback();
-        DmaAlignedMut::new(&mut destination.0[..64])
+        DmaAlignedMut::new(&mut destination.0[..PSRAM_ALIGNMENT])
             .unwrap()
             .writeback();
         fill_source(
@@ -920,16 +943,20 @@ mod tests {
                 check_unscaled(
                     &mut srm,
                     Input { data, ..input },
-                    &mut destination.0[64..],
+                    &mut destination.0[PSRAM_ALIGNMENT..],
                     OFFSET,
                     Config::default().with_rotation(rotation),
                 );
-                DmaAlignedMut::new(&mut destination.0[..64])
+                DmaAlignedMut::new(&mut destination.0[..PSRAM_ALIGNMENT])
                     .unwrap()
                     .invalidate();
-                assert!(destination.0[..64].iter().all(|&byte| byte == 0xa5));
                 assert!(
-                    destination.0[64 + DESTINATION_BYTES..]
+                    destination.0[..PSRAM_ALIGNMENT]
+                        .iter()
+                        .all(|&byte| byte == 0xa5)
+                );
+                assert!(
+                    destination.0[PSRAM_ALIGNMENT + DESTINATION_BYTES..]
                         .iter()
                         .all(|&byte| byte == 0xa5)
                 );
@@ -954,7 +981,7 @@ mod tests {
 
         ThreadSpawner::from_static(Box::leak(stack))
             .spawn(move || {
-                let mut guard = core::hint::black_box(Buffer([0x5a; 64]));
+                let mut guard = core::hint::black_box(Buffer([0x5a; PSRAM_ALIGNMENT]));
                 assert!(stack_range.contains(&(guard.0.as_ptr() as usize)));
                 let mut guard = DmaAlignedMut::new(&mut guard.0).unwrap();
                 guard.writeback();
@@ -1039,9 +1066,13 @@ mod tests {
         let bytes = size.width * size.height * 2;
         let mut storage = Vec::new_in(ExternalMemory);
         // Own complete cache lines for both guards.
-        storage.resize(bytes + 3 * 64 - 1, 0xa5);
-        let start = storage.as_ptr().align_offset(64) + 64;
-        for range in [start - 64..start, start + bytes..start + bytes + 64] {
+        storage.resize(bytes + 3 * PSRAM_ALIGNMENT - 1, 0xa5);
+        let start = storage.as_ptr().align_offset(PSRAM_ALIGNMENT) + PSRAM_ALIGNMENT;
+        let guards = [
+            start - PSRAM_ALIGNMENT..start,
+            start + bytes..start + bytes + PSRAM_ALIGNMENT,
+        ];
+        for range in guards.clone() {
             DmaAlignedMut::new(&mut storage[range]).unwrap().writeback();
         }
         fill_source(ctx.source, SOURCE_SIZE, PixelFormat::Rgb565);
@@ -1071,7 +1102,7 @@ mod tests {
             );
             assert!(INJECTED.load(Ordering::Relaxed));
             assert_eq!(result, Err(Error::Hardware));
-            for range in [start - 64..start, start + bytes..start + bytes + 64] {
+            for range in guards.clone() {
                 let guard = DmaAlignedMut::new(&mut storage[range]).unwrap();
                 guard.invalidate();
                 assert!(guard.iter().all(|&byte| byte == 0xa5));

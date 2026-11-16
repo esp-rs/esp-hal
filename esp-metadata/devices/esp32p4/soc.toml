@@ -111,6 +111,7 @@ peripherals = [
     { name = "AXI_GDMA", pac = "AXI_DMA" },
     { name = "DMA2D" },
     { name = "JPEG", interrupts = { peri = "JPEG" } },
+    { name = "PPA" },
 
     { name = "ETH", virtual = true, interrupts = { peri = "ETH_MAC" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
@@ -648,7 +649,7 @@ tx_channel_count = 4
 rx_channel_count = 3
 
 [device.pixel_accelerator]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.jpeg]
 support_status = "partial"

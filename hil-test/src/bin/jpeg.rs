@@ -37,22 +37,36 @@ mod tests {
     #[cfg(pixel_accelerator_driver_supported)]
     fn dma2d_stays_enabled_while_a_driver_owns_channels() {
         use esp_hal::{
-            peripherals::{DMA2D, HP_SYS, HP_SYS_CLKRST},
+            peripherals::{DMA2D, HP_SYS_CLKRST},
             ppa::srm::Srm,
         };
 
+        let clock_enabled = || {
+            let clock = HP_SYS_CLKRST::regs();
+            cfg_select! {
+                esp32s31 => clock.dma2d_ctrl0().read().sys_clk_en().bit(),
+                _ => clock.soc_clk_ctrl1().read().dma2d_sys_clk_en().bit(),
+            }
+        };
+
         let mut p = esp_hal::init(esp_hal::Config::default());
-        let memory = HP_SYS::regs().dma2d_mem_lp_ctrl();
-        let initial = memory.read();
-        let clock = HP_SYS_CLKRST::regs().dma2d_ctrl0();
+        #[cfg(esp32s31)]
+        let initial = esp_hal::peripherals::HP_SYS::regs()
+            .dma2d_mem_lp_ctrl()
+            .read();
         let jpeg = Encoder::new(p.JPEG, p.DMA2D_TX_CH0, p.DMA2D_RX_CH0);
-        let powered = memory.read();
-        assert!(clock.read().sys_clk_en().bit());
-        assert_eq!(
-            powered._2ddma_mem_force_ctrl().bit(),
-            initial._2ddma_mem_force_ctrl().bit()
-        );
-        assert!(!powered._2ddma_mem_lp_en().bit());
+        assert!(clock_enabled());
+        #[cfg(esp32s31)]
+        {
+            let powered = esp_hal::peripherals::HP_SYS::regs()
+                .dma2d_mem_lp_ctrl()
+                .read();
+            assert_eq!(
+                powered._2ddma_mem_force_ctrl().bit(),
+                initial._2ddma_mem_force_ctrl().bit()
+            );
+            assert!(!powered._2ddma_mem_lp_en().bit());
+        }
         let dma = DMA2D::regs();
         let jpeg_link = dma.out_link_addr_ch(0);
         jpeg_link.write(|w| unsafe { w.outlink_addr_ch().bits(0x100) });
@@ -63,17 +77,17 @@ mod tests {
         );
         assert_eq!(jpeg_link.read().outlink_addr_ch().bits(), 0x100);
         drop(srm);
-        assert!(clock.read().sys_clk_en().bit());
+        assert!(clock_enabled());
         assert_eq!(jpeg_link.read().outlink_addr_ch().bits(), 0x100);
 
         let srm = Srm::new(p.PPA, p.DMA2D_TX_CH1, p.DMA2D_RX_CH2);
         let srm_link = dma.out_link_addr_ch(1);
         srm_link.write(|w| unsafe { w.outlink_addr_ch().bits(0x200) });
         drop(jpeg);
-        assert!(clock.read().sys_clk_en().bit());
+        assert!(clock_enabled());
         assert_eq!(srm_link.read().outlink_addr_ch().bits(), 0x200);
         drop(srm);
-        assert!(!clock.read().sys_clk_en().bit());
+        assert!(!clock_enabled());
     }
 
     #[test]
