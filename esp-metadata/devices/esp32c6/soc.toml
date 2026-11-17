@@ -95,6 +95,7 @@ peripherals = [
     { name = "RNG", pac = "LP_PERI" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SLC", interrupts = { ch0 = "SLC0", ch1 = "SLC1" } },
     { name = "SLCHOST" },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "SPI0" },

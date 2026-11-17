@@ -3,3 +3,4 @@
 #![cfg(test)]
 
 mod ipc;
+mod sdio_slave;
