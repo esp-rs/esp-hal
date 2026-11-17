@@ -15,7 +15,7 @@
 //!
 //! When using AES-DMA, the peripheral can be configured to use different block
 //! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128. On chips with GCM in
-//! hardware, `aes::dma::AesGcmContext` runs AES-GCM.
+//! hardware, `aes::gcm::AesGcmContext` runs AES-GCM.
 //!
 //! ## Examples
 //!
@@ -55,6 +55,8 @@ use crate::{
 };
 
 pub mod cipher_modes;
+#[cfg(aes_dma_mode_gcm)]
+pub mod gcm;
 
 for_each_aes_key_length! {
     ($len:literal) => {
@@ -359,7 +361,7 @@ pub enum Endianness {
 /// This module enhances the AES capabilities by utilizing DMA to handle data
 /// transfer, which can significantly speed up operations when dealing with
 /// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
-/// CTR, CFB8, and CFB128, and AES-GCM through `AesGcmContext` on chips with GCM in
+/// CTR, CFB8, and CFB128, and runs `aes::gcm::AesGcmContext` on chips with GCM in
 /// hardware.
 #[cfg(aes_supports_dma)]
 pub mod dma {
@@ -402,8 +404,6 @@ pub mod dma {
 
     #[cfg(aes_dma_mode_gcm)]
     pub(super) mod gcm;
-    #[cfg(aes_dma_mode_gcm)]
-    pub use gcm::{AesGcmContext, AesGcmHandle, GcmError};
 
     /// Specifies the block cipher modes available for AES operations.
     #[derive(Clone, Copy, PartialEq, Eq)]
@@ -426,8 +426,8 @@ pub mod dma {
         /// Cipher Feedback Mode with 128-bit shifting.
         #[cfg(aes_dma_mode_cfb128)]
         Cfb128 = 5,
-        /// Galois/Counter Mode. [`AesGcmContext`] runs it, and [`AesDma::process`] does not take
-        /// it.
+        /// Galois/Counter Mode. [`AesGcmContext`](crate::aes::gcm::AesGcmContext) runs it, and
+        /// [`AesDma::process`] does not take it.
         #[cfg(aes_dma_mode_gcm)]
         Gcm    = 6,
     }
@@ -1402,7 +1402,7 @@ struct AesOperation {
     key: Key,
     // Set for an AES-GCM operation, which uses this instead of `cipher_mode`.
     #[cfg(aes_dma_mode_gcm)]
-    gcm: Option<NonNull<dma::gcm::GcmState>>,
+    gcm: Option<NonNull<gcm::GcmState>>,
 }
 
 impl Clone for AesOperation {

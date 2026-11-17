@@ -1131,7 +1131,7 @@ mod gcm {
         aes::{
             Error,
             Key,
-            dma::{AesGcmContext, GcmError},
+            gcm::{AesGcmContext, GcmError},
         },
         rng::Rng,
     };
@@ -1536,7 +1536,8 @@ mod gcm_tests {
     use esp_hal::{
         aes::{
             Error,
-            dma::{AesDmaBackend, AesGcmContext, GcmError},
+            dma::AesDmaBackend,
+            gcm::{AesGcmContext, GcmError},
         },
         rng::Rng,
     };
@@ -2237,7 +2238,7 @@ mod gcm_tests {
 #[cfg(aes_dma_mode_gcm)]
 #[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
 mod gcm_cpu_backend_tests {
-    use esp_hal::aes::dma::{AesGcmContext, GcmError};
+    use esp_hal::aes::gcm::{AesGcmContext, GcmError};
 
     use super::{gcm::*, *};
 
@@ -2277,7 +2278,7 @@ mod gcm_cpu_backend_tests {
 #[embedded_test::tests(default_timeout = 30, executor = hil_test::Executor::new())]
 mod work_queue_concurrency_tests {
     use esp_hal::{
-        aes::dma::{AesDmaBackend, AesGcmContext},
+        aes::{dma::AesDmaBackend, gcm::AesGcmContext},
         interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt},
         peripherals::{FROM_CPU_INTR3, Peripherals},
         time::{Duration, Instant},

@@ -44,7 +44,7 @@ const _: () = {
     #[cfg(aes_driver_supported)]
     send_sync::<esp_hal::aes::AesContext>();
     #[cfg(aes_dma_mode_gcm)]
-    send_sync::<esp_hal::aes::dma::AesGcmContext>();
+    send_sync::<esp_hal::aes::gcm::AesGcmContext>();
     #[cfg(rsa_driver_supported)]
     send_sync::<esp_hal::rsa::RsaContext>();
     #[cfg(sha_driver_supported)]
