@@ -460,7 +460,7 @@ impl RtcClock {
 }
 
 #[cfg(not(soc_has_clock_node_timg_calibration_clock))]
-fn calibrate_rtc_slow_clock() {
+pub(crate) fn calibrate_rtc_slow_clock() {
     // Do nothing until TIMG_CALIBRATION_CLOCK is added to device metadata.
 }
 

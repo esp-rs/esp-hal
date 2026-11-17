@@ -43,6 +43,33 @@ pub(crate) fn clear_deadline() {
     disarm();
 }
 
+/// Moves the armed deadline to the slow clock period that a calibration just stored.
+///
+/// The comparator holds the deadline in ticks of `old_period`. The time until the deadline stays
+/// the same. A deadline that has passed keeps its value, because arming clears the status that
+/// reports it.
+pub(crate) fn rescale_deadline(old_period: u32) {
+    if !super::enabled_sources().contains(WakeupSource::Timer) {
+        return;
+    }
+
+    let target = target_ticks();
+    let now = crate::rtc_cntl::time_since_boot_raw();
+    if target <= now {
+        return;
+    }
+
+    // `remaining * old_period` can overflow, so the division comes first. The remainder is less
+    // than the period, so `r * old_period` does not overflow either.
+    let remaining = target - now;
+    let old_period = u64::from(old_period);
+    let new_period = u64::from(crate::clock::rtc_slow_cal_period());
+    let (q, r) = (remaining / new_period, remaining % new_period);
+    let scaled = q * old_period + r * old_period / new_period;
+
+    arm(now.saturating_add(scaled));
+}
+
 /// Returns whether the armed deadline is too near for the sleep transition to catch it.
 ///
 /// A deep sleep that misses the alarm does not wake. The transition is not rejected, and the
