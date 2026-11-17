@@ -1,6 +1,6 @@
 use alloc::collections::VecDeque as Queue;
 
-use esp_hal::{handler, interrupt::Priority, peripherals::IEEE802154};
+use esp_hal::{clock::CpuFrequencyLock, handler, interrupt::Priority, peripherals::IEEE802154};
 use esp_phy::{PhyClockGuard, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
 
@@ -49,15 +49,36 @@ struct IeeeState {
     /// isr_handle_ack_rx_done and stop_rx_ack). Cleared at the start of
     /// each transmit.
     ack_frame: Option<RawReceived>,
+    /// A received frame whose ACK is being sent. It is copied out of the single RX buffer as soon
+    /// as it is received, but, only delivered (queued and notified) once the
+    /// ACK is sent or aborted - see [`deliver_pending_rx`].
+    pending_rx: Option<RawReceived>,
+    /// Whether the PHY reference is given back while asleep (`Config::modem_sleep`).
+    modem_sleep: bool,
+    /// The driver's PHY reference. `None` while it is given back - the C driver's `s_rf_closed`.
+    phy: Option<PhyInitGuard<'static>>,
+    /// Keeps the CPU clock at its configured frequency, which the modem needs, while the radio is
+    /// awake. `None` while asleep.
+    cpu_frequency_lock: Option<CpuFrequencyLock>,
 }
 
-static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
-    state: Ieee802154State::Idle,
-    rx_queue: Queue::new(),
-    rx_queue_size: 10,
-    pending_tx: None,
-    ack_frame: None,
-});
+impl IeeeState {
+    const fn new() -> Self {
+        Self {
+            state: Ieee802154State::Idle,
+            rx_queue: Queue::new(),
+            rx_queue_size: 10,
+            pending_tx: None,
+            ack_frame: None,
+            pending_rx: None,
+            modem_sleep: false,
+            phy: None,
+            cpu_frequency_lock: None,
+        }
+    }
+}
+
+static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState::new());
 
 unsafe extern "C" {
     fn bt_bb_set_zb_tx_on_delay(time: u16); // from libbtbb.a
@@ -72,6 +93,7 @@ unsafe extern "C" {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Ieee802154State {
     Idle,
+    Sleep,
     Receive,
     Transmit,
     TxAck,
@@ -120,7 +142,7 @@ impl Drop for RadioClockGuard {
 
 /// Counts the radio as a TRNG entropy source while the PHY is enabled.
 ///
-/// Must be dropped before the PHY guards: the count must fall before the entropy source is
+/// Must be dropped before [`RadioStopGuard`]: the count must fall before the entropy source is
 /// disabled.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -146,12 +168,39 @@ impl Drop for EntropySourceGuard {
     }
 }
 
-pub(crate) fn esp_ieee802154_enable(
-    radio: IEEE802154<'_>,
+/// Stops the radio and gives the PHY reference back when dropped - the C driver's
+/// `esp_ieee802154_disable`.
+///
+/// The interrupt is disabled first, so that the handler cannot run `next_operation` on a radio
+/// that is being stopped. The PHY reference has one owner, the driver state, and is given back
+/// exactly once, whatever happened before.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct RadioStopGuard<'a> {
+    radio: IEEE802154<'a>,
+}
+
+impl Drop for RadioStopGuard<'_> {
+    fn drop(&mut self) {
+        // The driver may be dropped on another core than the one it was created on.
+        self.radio.disable_mac_interrupt_on_all_cores();
+
+        let phy = STATE.with(|state| {
+            sleep_inner(state);
+            // Nothing handles these any more, and the next driver instance should not find them.
+            clear_events(Event::mask());
+            state.phy.take()
+        });
+        drop(phy);
+    }
+}
+
+pub(crate) fn esp_ieee802154_enable<'a>(
+    radio: IEEE802154<'a>,
 ) -> (
     EntropySourceGuard,
-    PhyClockGuard<'_>,
-    PhyInitGuard<'_>,
+    RadioStopGuard<'a>,
+    PhyClockGuard<'a>,
     RadioClockGuard,
 ) {
     // The modem power domain (and, with it, the modem reset) and the BT baseband are shared with
@@ -161,22 +210,29 @@ pub(crate) fn esp_ieee802154_enable(
     let phy_clock_guard = esp_phy::enable_phy_clock();
     enable_ieee802154(true);
 
-    let phy_init_guard = esp_phy::enable_phy();
+    let phy = esp_phy::enable_phy();
+    // Whatever a previous driver instance left behind is of no use: start over, holding the PHY.
+    STATE.with(|state| {
+        *state = IeeeState::new();
+        state.phy = Some(phy);
+        // The radio starts out idle, not asleep.
+        wake(state);
+    });
     let entropy_source_guard = EntropySourceGuard::new();
 
     crate::btbb_enable();
-    ieee802154_mac_init(radio);
+    ieee802154_mac_init(&radio);
 
     info!("date={:x}", mac_date());
     (
         entropy_source_guard,
+        RadioStopGuard { radio },
         phy_clock_guard,
-        phy_init_guard,
         RadioClockGuard,
     )
 }
 
-fn ieee802154_mac_init(radio: IEEE802154<'_>) {
+fn ieee802154_mac_init(radio: &IEEE802154<'_>) {
     #[cfg(soc_has_wifi)]
     unsafe {
         unsafe extern "C" {
@@ -260,6 +316,8 @@ static mut TX_FRAME: *const u8 = core::ptr::null();
 
 pub fn ieee802154_transmit(frame: *const u8, cca: bool) -> i32 {
     STATE.with(|state| {
+        wake(state);
+
         // TX deferral: don't abort in-flight frame reception or ACK transmission.
         // Matches the C driver's ieee802154_transmit() which defers to pending_tx.
         if state.state == Ieee802154State::TxAck
@@ -297,6 +355,8 @@ fn transmit_internal(state: &mut IeeeState, frame: *const u8, cca: bool) {
 
 pub fn ieee802154_receive() -> i32 {
     STATE.with(|state| {
+        wake(state);
+
         if state.state == Ieee802154State::Receive || state.state == Ieee802154State::TxAck {
             // already in rx or tx_ack state, don't abort current operation
             return;
@@ -309,6 +369,61 @@ pub fn ieee802154_receive() -> i32 {
     });
 
     0 // ESP-OK
+}
+
+/// Stops the current operation, whatever it is, and puts the radio to sleep - the C driver's
+/// `ieee802154_sleep`.
+///
+/// As there, the operation is stopped even with a frame on the air: a frame being received is
+/// lost, the ACK of a received frame is aborted (the frame itself is delivered), and a
+/// transmission fails. The CPU frequency lock is released. With modem sleep on, the PHY reference
+/// is given back too, so the RF is closed unless another radio still uses it.
+pub fn ieee802154_sleep() -> i32 {
+    STATE.with(sleep_inner);
+
+    0 // ESP-OK
+}
+
+fn sleep_inner(state: &mut IeeeState) {
+    if state.state == Ieee802154State::Sleep {
+        return;
+    }
+
+    stop_current_operation_inner(state);
+
+    if state.pending_tx.take().is_some() {
+        restore_rx_abort_events();
+        super::tx_failed();
+    }
+
+    state.state = Ieee802154State::Sleep;
+    state.cpu_frequency_lock = None;
+
+    if state.modem_sleep {
+        rf_disable(state);
+    }
+}
+
+/// Takes back what the radio gives up while asleep: the CPU frequency lock, and the PHY reference
+/// if modem sleep gave it back.
+fn wake(state: &mut IeeeState) {
+    rf_enable(state);
+
+    if cfg!(ieee802154_requires_fast_cpu) && state.cpu_frequency_lock.is_none() {
+        state.cpu_frequency_lock = Some(CpuFrequencyLock::new());
+    }
+}
+
+/// Takes the PHY reference back - the C driver's `ieee802154_rf_enable`.
+fn rf_enable(state: &mut IeeeState) {
+    if state.phy.is_none() {
+        state.phy = Some(esp_phy::enable_phy());
+    }
+}
+
+/// Gives the PHY reference back - the C driver's `ieee802154_rf_disable`.
+fn rf_disable(state: &mut IeeeState) {
+    state.phy = None;
 }
 
 pub fn ieee802154_poll() -> Option<RawReceived> {
@@ -343,11 +458,14 @@ fn stop_current_operation_inner(state: &mut IeeeState) {
         Ieee802154State::Idle => {
             set_cmd(Command::Stop);
         }
+        Ieee802154State::Sleep => {
+            // Do nothing
+        }
         Ieee802154State::Receive => {
             stop_rx(state);
         }
         Ieee802154State::TxAck => {
-            stop_tx_ack();
+            stop_tx_ack(state);
         }
         Ieee802154State::Transmit | Ieee802154State::TxEnhAck => {
             stop_tx(state);
@@ -369,11 +487,11 @@ fn stop_rx(state: &mut IeeeState) {
     clear_events(Event::RxDone | Event::RxAbort | Event::RxSfdDone);
 }
 
-fn stop_tx_ack() {
+fn stop_tx_ack(state: &mut IeeeState) {
     set_cmd(Command::Stop);
 
-    // Frame was already copied to queue in isr_handle_rx_done.
-    // Don't call receive_done again (that caused the "Receive queue full" bug).
+    // The ACK is aborted, but the frame it acknowledges was received: deliver it.
+    deliver_pending_rx(state);
 
     clear_events(Event::AckTxDone | Event::RxAbort | Event::TxSfdDone);
 }
@@ -384,7 +502,8 @@ fn stop_tx(state: &mut IeeeState) {
     let evts = events();
 
     if state.state == Ieee802154State::TxEnhAck {
-        // Frame was already copied in isr_handle_rx_done, no need to call receive_done
+        // If the current operation is sending an Enh-Ack, deliver the frame it acknowledges.
+        deliver_pending_rx(state);
         clear_events(Event::AckTxDone as u16);
     } else if (evts & Event::TxDone != 0)
         && (!frame_is_ack_required(unsafe {
@@ -422,18 +541,38 @@ fn stop_rx_ack(state: &mut IeeeState) {
     clear_events(Event::AckRxDone | Event::RxSfdDone | Event::TxAbort);
 }
 
-fn receive_done(state: &mut IeeeState) {
-    unsafe {
-        if state.rx_queue.len() < state.rx_queue_size {
-            let item = RawReceived {
-                data: RX_BUFFER,
-                channel: freq_to_channel(freq()),
-            };
-            state.rx_queue.push_back(item);
-        } else {
-            warn!("Receive queue full");
-        }
+/// Copies the frame out of the RX buffer.
+fn rx_buffer_frame() -> RawReceived {
+    RawReceived {
+        data: unsafe { RX_BUFFER },
+        channel: freq_to_channel(freq()),
     }
+}
+
+/// Delivers the frame in the RX buffer - the C driver's `ieee802154_receive_done`.
+fn receive_done(state: &mut IeeeState) {
+    deliver(state, rx_buffer_frame());
+}
+
+/// Delivers the frame whose ACK was being sent, if any, once that ACK is sent or aborted.
+fn deliver_pending_rx(state: &mut IeeeState) {
+    if let Some(frame) = state.pending_rx.take() {
+        deliver(state, frame);
+    }
+}
+
+/// Queues a received frame, and notifies the upper layer.
+///
+/// A frame is visible to [`ieee802154_poll`] only from here on,
+/// so the upper layer never sees a frame whose ACK is still being sent.
+fn deliver(state: &mut IeeeState, frame: RawReceived) {
+    if state.rx_queue.len() < state.rx_queue_size {
+        state.rx_queue.push_back(frame);
+    } else {
+        warn!("Receive queue full");
+    }
+
+    super::rx_available();
 }
 
 fn set_next_rx_buffer() {
@@ -462,6 +601,22 @@ pub fn set_coordinator(enable: bool) {
 
 pub fn set_rx_when_idle(enable: bool) {
     ieee802154_pib_set_rx_when_idle(enable);
+}
+
+/// Sets whether the PHY reference is given back while asleep. Applies at once if the radio is
+/// asleep.
+pub fn set_modem_sleep(enable: bool) {
+    STATE.with(|state| {
+        state.modem_sleep = enable;
+
+        if state.state == Ieee802154State::Sleep {
+            if enable {
+                rf_disable(state);
+            } else {
+                rf_enable(state);
+            }
+        }
+    });
 }
 
 pub fn set_tx_power(power: i8) {
@@ -514,22 +669,27 @@ fn event_end_process() {
 fn next_operation_inner(state: &mut IeeeState) {
     // Set state to Idle before dispatching the next operation.
     // This prevents stop_current_operation_inner (called from tx_init)
-    // from seeing a stale TxAck state and calling stop_tx_ack, which
-    // would duplicate-queue the already-delivered received frame.
+    // from seeing a stale TxAck state and stopping an ACK that is
+    // already done.
     state.state = Ieee802154State::Idle;
 
     if let Some(pending) = state.pending_tx.take() {
-        // Restore RX abort events to normal (matching C driver's next_operation)
-        disable_rx_abort_events(RxAbortReason::all());
-        enable_rx_abort_events(RxAbortReason::TxAckTimeout | RxAbortReason::TxAckCoexBreak);
-        // Clear any stale RX abort events created during deferral
-        clear_events(Event::RxAbort as u16);
+        restore_rx_abort_events();
         transmit_internal(state, pending.frame, pending.cca);
     } else if ieee802154_pib_get_rx_when_idle() {
         enable_rx();
         state.state = Ieee802154State::Receive;
+    } else {
+        sleep_inner(state);
     }
-    // else state stays Idle
+}
+
+/// Restores the RX abort events that a deferred transmission enabled.
+fn restore_rx_abort_events() {
+    disable_rx_abort_events(RxAbortReason::all());
+    enable_rx_abort_events(RxAbortReason::TxAckTimeout | RxAbortReason::TxAckCoexBreak);
+    // Clear any stale RX abort events created during deferral
+    clear_events(Event::RxAbort as u16);
 }
 
 fn next_operation() {
@@ -661,23 +821,24 @@ fn isr_handle_rx_done(needs_next_op: &mut bool) {
             // and the hardware may overwrite it during auto-ACK or later RX.
             // The C driver can defer because it has multiple RX buffers and
             // advances the index in isr_handle_rx_done via next_rx_buffer().
-            receive_done(state);
+            let frame = rx_buffer_frame();
 
             if will_auto_send_ack(frm) {
                 // auto tx ack for frame version 0b00 and 0b01
-                // Frame data already copied above. Defer rx_available()
-                // notification until ACK completes (isr_handle_ack_tx_done).
+                // Like the C driver, deliver the frame only once the ACK is
+                // sent or aborted (isr_handle_ack_tx_done and friends).
                 ack_config_pending_bit(frm);
+                stage_pending_rx(state, frame);
                 state.state = Ieee802154State::TxAck;
                 *needs_next_op = false;
             } else if should_send_enhanced_ack(frm) {
                 // Enhanced ACK for frame version 0b10 - TODO: full enh-ack support
-                // Frame data already copied above.
+                stage_pending_rx(state, frame);
                 state.state = Ieee802154State::TxEnhAck;
                 *needs_next_op = false;
             } else {
-                // No ACK needed, notify immediately (data already copied above)
-                super::rx_available();
+                // No ACK needed, deliver immediately
+                deliver(state, frame);
                 *needs_next_op = true;
             }
         });
@@ -686,10 +847,16 @@ fn isr_handle_rx_done(needs_next_op: &mut bool) {
 
 /// Handle ACK TX done in ISR - matches C driver's isr_handle_ack_tx_done
 fn isr_handle_ack_tx_done(needs_next_op: &mut bool) {
-    // Frame was already copied to queue in isr_handle_rx_done (we must copy
-    // immediately because we only have one RX buffer). Now notify upper layer.
-    super::rx_available();
+    STATE.with(deliver_pending_rx);
     *needs_next_op = true;
+}
+
+/// Holds a received frame back until its ACK is sent or aborted.
+fn stage_pending_rx(state: &mut IeeeState, frame: RawReceived) {
+    // Every way out of the ACK states delivers the staged frame, so there is none left here.
+    // Should one be, deliver it rather than lose it.
+    deliver_pending_rx(state);
+    state.pending_rx = Some(frame);
 }
 
 /// Handle ACK RX done in ISR - matches C driver's isr_handle_ack_rx_done
@@ -767,14 +934,12 @@ fn isr_handle_tx_ack_phase_rx_abort(rx_abort_reason: u32, needs_next_op: &mut bo
         r if r == RxAbortReason::TxAckTimeout as u32
             || r == RxAbortReason::TxAckCoexBreak as u32 =>
         {
-            // Frame was already copied in isr_handle_rx_done, just notify
-            super::rx_available();
+            STATE.with(deliver_pending_rx);
             *needs_next_op = true;
         }
         // Enhanced ACK security error - notify upper layer
         r if r == RxAbortReason::EnhackSecurityError as u32 => {
-            // Frame was already copied in isr_handle_rx_done, just notify
-            super::rx_available();
+            STATE.with(deliver_pending_rx);
             *needs_next_op = true;
         }
         _ => {
