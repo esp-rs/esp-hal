@@ -35,7 +35,11 @@
 //!     height: 4,
 //! };
 //! let config = Config::default().with_rotation(Rotation::Degrees90);
-//! let mut srm = Srm::new(peripherals.PPA, peripherals.DMA2D);
+//! let mut srm = Srm::new(
+//!     peripherals.PPA,
+//!     peripherals.DMA2D_TX_CH0,
+//!     peripherals.DMA2D_RX_CH0,
+//! );
 //! srm.run(
 //!     Input {
 //!         data: &source,
@@ -53,26 +57,29 @@
 //! # {after_snippet}
 //! ```
 
-use core::{
-    marker::PhantomData,
-    sync::atomic::{Ordering, compiler_fence},
-};
+use core::marker::PhantomData;
 
 use crate::{
     Blocking,
     DriverMode,
+    dma2d::{
+        AnyDma2dRxChannel,
+        AnyDma2dTxChannel,
+        BURST_128_BYTES,
+        CACHE_LINE_SIZE,
+        Channels,
+        MACRO_BLOCK_NONE,
+        writeback,
+    },
     peripherals::{DMA2D, HP_SYS, PPA},
     soc::{is_slice_in_dram, is_slice_in_psram},
     system::{GenericPeripheralGuard, Peripheral, PeripheralClockControl},
 };
 
-const DMA_CHANNEL: usize = 0;
-const ALIGNMENT: usize = 64;
 const MAX_DIMENSION: usize = 0x3fff;
 // SRM output dimensions are limited to 13 bits.
 const MAX_SRM_DIMENSION: usize = 0x1fff;
-const DMA_BURST_128_BYTES: u8 = 4;
-const DMA_MACRO_BLOCK_NONE: u8 = 3;
+const SRM_TRIGGER: u8 = 1;
 const INPUT_BLOCK_HEIGHT: u16 = 34;
 const OUTPUT_BLOCK_SIZE: Size = Size {
     width: 2,
@@ -169,8 +176,9 @@ impl PixelFormat {
     }
 
     fn input_block_width(self) -> u16 {
-        // SRM input padding for 32x32 blocks:
-        // https://github.com/espressif/esp-idf/blob/ce2100de51a4d9a372f26578fd2ee763ca4b1279/components/esp_hal_ppa/esp32s31/include/hal/ppa_ll.h#L586-L604
+        // A 32-pixel SRM block uses an input block width of 34 pixels,
+        // or 36 for packed YUV422.
+        // See <https://github.com/espressif/esp-idf/blob/ce2100de51a4d9a372f26578fd2ee763ca4b1279/components/esp_hal_ppa/esp32s31/include/hal/ppa_ll.h#L586-L605>.
         match self {
             Self::Uyvy422 => 36,
             Self::Rgb565 | Self::Rgb888 | Self::Argb8888 | Self::Gray8 => 34,
@@ -350,62 +358,42 @@ impl core::fmt::Display for Error {
 
 /// PPA SRM driver.
 ///
-/// The driver owns the PPA and the entire 2D-DMA controller.
+/// The driver owns the PPA and one DMA2D channel in each direction.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct Srm<'d, Dm: DriverMode> {
     _ppa: PPA<'d>,
-    _dma: DMA2D<'d>,
+    channels: Channels<'d>,
     ppa_mem_lp: (bool, bool),
-    dma_mem_lp: (bool, bool),
     _ppa_guard: GenericPeripheralGuard<{ Peripheral::Ppa as u8 }>,
-    _dma_guard: GenericPeripheralGuard<{ Peripheral::Dma2d as u8 }>,
     _mode: PhantomData<Dm>,
 }
 
 impl<'d> Srm<'d, Blocking> {
-    /// Creates a new SRM driver in [`Blocking`] mode.
+    /// Creates a blocking SRM driver with a transmit and receive DMA2D channel.
     #[instability::unstable]
-    pub fn new(ppa: PPA<'d>, dma: DMA2D<'d>) -> Self {
+    pub fn new(
+        ppa: PPA<'d>,
+        tx: impl Into<AnyDma2dTxChannel<'d>>,
+        rx: impl Into<AnyDma2dRxChannel<'d>>,
+    ) -> Self {
+        let channels = Channels::new(tx, rx);
         let ppa_guard = GenericPeripheralGuard::new();
-        let dma_guard = GenericPeripheralGuard::new();
-        let system = HP_SYS::regs();
-        let ppa_mem_lp = system.ppa_mem_lp_ctrl().read();
-        let ppa_mem_lp = (
-            ppa_mem_lp.ppa_sprf_mem_force_ctrl().bit(),
-            ppa_mem_lp.ppa_sprf_mem_lp_en().bit(),
-        );
-        let dma_mem_lp = system.dma2d_mem_lp_ctrl().read();
-        let dma_mem_lp = (
-            dma_mem_lp._2ddma_mem_force_ctrl().bit(),
-            dma_mem_lp._2ddma_mem_lp_en().bit(),
-        );
-        system.ppa_mem_lp_ctrl().modify(|_, w| {
+        let memory = HP_SYS::regs().ppa_mem_lp_ctrl();
+        let previous = memory.read();
+        memory.modify(|_, w| {
             w.ppa_sprf_mem_force_ctrl().set_bit();
             w.ppa_sprf_mem_lp_en().clear_bit()
         });
-        system.dma2d_mem_lp_ctrl().modify(|_, w| {
-            w._2ddma_mem_force_ctrl().set_bit();
-            w._2ddma_mem_lp_en().clear_bit()
-        });
-        let dma_regs = DMA2D::regs();
-        dma_regs.rst_conf().modify(|_, w| w.clk_en().set_bit());
-        dma_regs.rst_conf().modify(|_, w| w.axim_rd_rst().set_bit());
-        dma_regs
-            .rst_conf()
-            .modify(|_, w| w.axim_rd_rst().clear_bit());
-        dma_regs.rst_conf().modify(|_, w| w.axim_wr_rst().set_bit());
-        dma_regs
-            .rst_conf()
-            .modify(|_, w| w.axim_wr_rst().clear_bit());
         Self {
             _ppa: ppa,
-            _dma: dma,
-            ppa_mem_lp,
-            dma_mem_lp,
+            channels,
+            ppa_mem_lp: (
+                previous.ppa_sprf_mem_force_ctrl().bit(),
+                previous.ppa_sprf_mem_lp_en().bit(),
+            ),
             _ppa_guard: ppa_guard,
-            _dma_guard: dma_guard,
             _mode: PhantomData,
         }
     }
@@ -468,8 +456,8 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
             return Err(Error::UnsupportedMemoryRegion);
         }
         if is_slice_in_psram(output.data)
-            && (!(output.data.as_ptr() as usize).is_multiple_of(ALIGNMENT)
-                || !output.data.len().is_multiple_of(ALIGNMENT))
+            && (!(output.data.as_ptr() as usize).is_multiple_of(CACHE_LINE_SIZE)
+                || !output.data.len().is_multiple_of(CACHE_LINE_SIZE))
         {
             return Err(Error::UnalignedBuffer);
         }
@@ -488,41 +476,32 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
             output.offset,
             output.format,
         );
-        let tx_address = (&raw mut tx) as u32;
-        let rx_address = (&raw mut rx) as u32;
         let dma = DMA2D::regs();
+        let (tx_channel, rx_channel) = self.channels.indices();
         let ppa = PPA::regs();
 
-        self.reset_channels();
+        self.reset_for_transfer();
 
-        dma.out_peri_sel_ch(DMA_CHANNEL)
-            .modify(|_, w| unsafe { w.out_peri_sel_ch().bits(1) });
-        dma.in_peri_sel_ch(DMA_CHANNEL)
-            .modify(|_, w| unsafe { w.in_peri_sel_ch().bits(1) });
-        dma.out_conf0_ch(DMA_CHANNEL).modify(|_, w| unsafe {
+        self.channels.connect(SRM_TRIGGER);
+        dma.out_conf0_ch(tx_channel).modify(|_, w| unsafe {
             w.out_dscr_port_en_ch().set_bit();
             w.out_page_bound_en_ch().set_bit();
-            w.out_mem_burst_length_ch().bits(DMA_BURST_128_BYTES);
-            w.out_macro_block_size_ch().bits(DMA_MACRO_BLOCK_NONE);
+            w.out_mem_burst_length_ch().bits(BURST_128_BYTES);
+            w.out_macro_block_size_ch().bits(MACRO_BLOCK_NONE);
             w.outdscr_burst_en_ch().set_bit()
         });
-        dma.in_conf0_ch(DMA_CHANNEL).modify(|_, w| unsafe {
+        dma.in_conf0_ch(rx_channel).modify(|_, w| unsafe {
             w.in_dscr_port_en_ch().set_bit();
             w.in_page_bound_en_ch().set_bit();
-            w.in_mem_burst_length_ch().bits(DMA_BURST_128_BYTES);
-            w.in_macro_block_size_ch().bits(DMA_MACRO_BLOCK_NONE);
+            w.in_mem_burst_length_ch().bits(BURST_128_BYTES);
+            w.in_macro_block_size_ch().bits(MACRO_BLOCK_NONE);
             w.indscr_burst_en_ch().set_bit()
         });
-        dma.out_dscr_port_blk_ch(DMA_CHANNEL).write(|w| unsafe {
+        dma.out_dscr_port_blk_ch(tx_channel).write(|w| unsafe {
             w.out_dscr_port_blk_h_ch()
                 .bits(input.format.input_block_width());
             w.out_dscr_port_blk_v_ch().bits(INPUT_BLOCK_HEIGHT)
         });
-        dma.out_int_clr_ch(DMA_CHANNEL)
-            .write(|w| unsafe { w.bits(u32::MAX) });
-        dma.in_int_clr_ch(DMA_CHANNEL)
-            .write(|w| unsafe { w.bits(u32::MAX) });
-
         ppa.srm_byte_order()
             .write(|w| w.srm_bk_size_sel().clear_bit());
         ppa.srm_color_mode().write(|w| unsafe {
@@ -550,22 +529,22 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
 
         writeback(input.data);
         writeback(output.data);
-        // The caller's stack may be in PSRAM.
         writeback(core::slice::from_ref(&tx));
         writeback(core::slice::from_ref(&rx));
-        compiler_fence(Ordering::SeqCst);
-        dma.out_link_addr_ch(DMA_CHANNEL)
-            .write(|w| unsafe { w.outlink_addr_ch().bits(tx_address) });
-        dma.in_link_addr_ch(DMA_CHANNEL)
-            .write(|w| unsafe { w.inlink_addr_ch().bits(rx_address) });
-        dma.out_link_conf_ch(DMA_CHANNEL)
-            .modify(|_, w| w.outlink_start_ch().set_bit());
-        dma.in_link_conf_ch(DMA_CHANNEL)
-            .modify(|_, w| w.inlink_start_ch().set_bit());
+        // SAFETY: The descriptors and buffers stay live through channel cleanup.
+        unsafe {
+            self.channels
+                .start((&raw mut tx) as u32, (&raw mut rx) as u32)
+        };
         ppa.srm_scal_rotate()
             .modify(|_, w| w.scal_rotate_start().set_bit());
 
-        self.wait_for_completion()?;
+        let result = self.wait_for_completion();
+        self.channels.reset();
+        if result.is_err() {
+            PeripheralClockControl::reset(Peripheral::Ppa);
+        }
+        result?;
         if is_slice_in_psram(output.data) {
             unsafe {
                 crate::soc::cache_invalidate_addr(
@@ -577,119 +556,56 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
         Ok(())
     }
 
-    fn stop_channels(&mut self) {
-        let dma = DMA2D::regs();
-        dma.out_link_conf_ch(DMA_CHANNEL)
-            .modify(|_, w| w.outlink_stop_ch().set_bit());
-        dma.in_link_conf_ch(DMA_CHANNEL)
-            .modify(|_, w| w.inlink_stop_ch().set_bit());
-        dma.out_conf0_ch(DMA_CHANNEL)
-            .modify(|_, w| w.out_cmd_disable_ch().set_bit());
-        dma.in_conf0_ch(DMA_CHANNEL)
-            .modify(|_, w| w.in_cmd_disable_ch().set_bit());
-        // Drain in-flight memory transactions before resetting either peripheral.
-        while !dma
-            .out_state_ch(DMA_CHANNEL)
-            .read()
-            .out_reset_avail_ch()
-            .bit()
-            || !dma
-                .in_state_ch(DMA_CHANNEL)
-                .read()
-                .in_reset_avail_ch()
-                .bit()
-        {
-            core::hint::spin_loop();
-        }
-    }
-
-    fn reset_channels(&mut self) {
-        self.stop_channels();
-        let dma = DMA2D::regs();
+    fn reset_for_transfer(&mut self) {
+        self.channels.reset();
         let ppa = PPA::regs();
-        dma.out_conf0_ch(DMA_CHANNEL)
-            .modify(|_, w| w.out_rst_ch().set_bit());
-        dma.out_conf0_ch(DMA_CHANNEL)
-            .modify(|_, w| w.out_rst_ch().clear_bit());
-        dma.in_conf0_ch(DMA_CHANNEL)
-            .modify(|_, w| w.in_rst_ch().set_bit());
-        dma.in_conf0_ch(DMA_CHANNEL)
-            .modify(|_, w| w.in_rst_ch().clear_bit());
-        dma.out_conf0_ch(DMA_CHANNEL)
-            .modify(|_, w| w.out_cmd_disable_ch().clear_bit());
-        dma.in_conf0_ch(DMA_CHANNEL)
-            .modify(|_, w| w.in_cmd_disable_ch().clear_bit());
         ppa.srm_scal_rotate()
             .modify(|_, w| w.scal_rotate_rst().set_bit());
         ppa.srm_scal_rotate()
             .modify(|_, w| w.scal_rotate_rst().clear_bit());
     }
 
-    fn wait_for_completion(&mut self) -> Result<(), Error> {
+    fn wait_for_completion(&self) -> Result<(), Error> {
         let dma = DMA2D::regs();
+        let (tx_channel, rx_channel) = self.channels.indices();
         let ppa = PPA::regs();
         loop {
-            let input_status = dma.in_int_raw_ch(DMA_CHANNEL).read();
-            let output_status = dma.out_int_raw_ch(DMA_CHANNEL).read();
+            let rx_status = dma.in_int_raw_ch(rx_channel).read();
+            let tx_status = dma.out_int_raw_ch(tx_channel).read();
             let parameter_status = ppa.srm_param_err_st().read().bits();
-            if input_status.in_dscr_err_ch_int_raw().bit()
-                || input_status.in_err_eof_ch_int_raw().bit()
-                || input_status.in_dscr_empty_ch_int_raw().bit()
-                || output_status.out_dscr_err_ch_int_raw().bit()
+            if rx_status.in_dscr_err_ch_int_raw().bit()
+                || rx_status.in_err_eof_ch_int_raw().bit()
+                || rx_status.in_dscr_empty_ch_int_raw().bit()
+                || tx_status.out_dscr_err_ch_int_raw().bit()
                 || parameter_status != 0
             {
                 debug!(
-                    "SRM failed: DMA input={:#x}, DMA output={:#x}, PPA={:#x}, parameter={:#x}",
-                    input_status.bits(),
-                    output_status.bits(),
+                    "SRM failed: DMA RX={:#x}, DMA TX={:#x}, PPA={:#x}, parameter={:#x}",
+                    rx_status.bits(),
+                    tx_status.bits(),
                     ppa.srm_status().read().bits(),
                     parameter_status,
                 );
-                self.abort();
                 return Err(Error::Hardware);
             }
-            if input_status.in_suc_eof_ch_int_raw().bit() {
+            if rx_status.in_suc_eof_ch_int_raw().bit() {
                 return Ok(());
             }
         }
-    }
-
-    fn abort(&mut self) {
-        self.stop_channels();
-        let dma = DMA2D::regs();
-        PeripheralClockControl::reset(Peripheral::Ppa);
-        PeripheralClockControl::reset(Peripheral::Dma2d);
-        dma.rst_conf().modify(|_, w| w.clk_en().set_bit());
     }
 }
 
 impl<Dm: DriverMode> Drop for Srm<'_, Dm> {
     fn drop(&mut self) {
-        self.abort();
-        let system = HP_SYS::regs();
-        system.ppa_mem_lp_ctrl().modify(|_, w| {
+        HP_SYS::regs().ppa_mem_lp_ctrl().modify(|_, w| {
             w.ppa_sprf_mem_force_ctrl().bit(self.ppa_mem_lp.0);
             w.ppa_sprf_mem_lp_en().bit(self.ppa_mem_lp.1)
         });
-        system.dma2d_mem_lp_ctrl().modify(|_, w| {
-            w._2ddma_mem_force_ctrl().bit(self.dma_mem_lp.0);
-            w._2ddma_mem_lp_en().bit(self.dma_mem_lp.1)
-        });
     }
 }
 
-fn writeback<T>(data: &[T]) {
-    if is_slice_in_psram(data) {
-        let start = data.as_ptr() as usize & !(ALIGNMENT - 1);
-        let end = (data.as_ptr_range().end as usize).next_multiple_of(ALIGNMENT);
-        unsafe {
-            crate::soc::cache_writeback_addr(start as u32, (end - start) as u32);
-        }
-    }
-}
-
-// Descriptor layout and pixel-size encoding:
-// https://github.com/espressif/esp-idf/blob/ce2100de51a4d9a372f26578fd2ee763ca4b1279/components/esp_hal_dma/include/hal/dma2d_types.h#L22-L76
+// DMA2D uses 24-byte descriptors aligned to 8 bytes. Word 1 encodes the pixel size in bits 28–31.
+// See <https://github.com/espressif/esp-idf/blob/ce2100de51a4d9a372f26578fd2ee763ca4b1279/components/esp_hal_dma/include/hal/dma2d_types.h#L22-L76>.
 #[repr(C, align(8))]
 struct Descriptor([u32; 6]);
 
