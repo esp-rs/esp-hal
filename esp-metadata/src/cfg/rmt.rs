@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 
 use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 
@@ -14,7 +14,7 @@ pub(crate) enum RmtChannelCapability {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub(crate) struct RmtChannelConfig(
     /// The capability of each channel
-    Vec<RmtChannelCapability>,
+    pub(crate) Vec<RmtChannelCapability>,
 );
 
 /// Generates `for_each_rmt_channel!` which can be used to implement channel creators and the main
@@ -58,12 +58,32 @@ impl GenericProperty for RmtChannelConfig {
             matches!(cap, RmtChannelCapability::Rx | RmtChannelCapability::RxTx)
         });
 
+        // A TX channel can use the RAM blocks of the channels that follow it, whatever their
+        // direction.
+        let channel_count = self.0.len();
+        let tx_tuple_cfgs = self
+            .0
+            .iter()
+            .enumerate()
+            .filter(|&(_, &cap)| cap != RmtChannelCapability::Rx)
+            .flat_map(|(first, _)| {
+                (2..=channel_count - first).map(move |blocks| {
+                    let channels = (first..first + blocks).map(|ch| format_ident!("RMT_CH{ch}"));
+                    let blocks = number(blocks);
+                    quote! {
+                        #blocks, (#(#channels),*)
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+
         let for_each = generate_for_each_macro(
             "rmt_channel",
             &[
                 ("all", &channel_cfgs),
                 ("tx", &tx_channel_cfgs),
                 ("rx", &rx_channel_cfgs),
+                ("tx_tuples", &tx_tuple_cfgs),
             ],
         );
 
@@ -73,22 +93,27 @@ impl GenericProperty for RmtChannelConfig {
             /// For an explanation on the general syntax, as well as usage of individual/repeated
             /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
             ///
-            /// This macro has three options for its "Individual matcher" case:
+            /// This macro has four options for its "Individual matcher" case:
             ///
             /// - `all`: `($num:literal)`
             /// - `tx`: `($num:literal, $idx:literal)`
             /// - `rx`: `($num:literal, $idx:literal)`
+            /// - `tx_tuples`: `($blocks:literal, ($($peri:ident),+))`
             ///
             /// Macro fragments:
             ///
             /// - `$num`: number of the channel, e.g. `0`
             /// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
+            /// - `$blocks`: number of RAM blocks of a TX channel that uses the RAM of the
+            ///   channels that follow it, e.g. `2`
+            /// - `$peri`: the singletons of these channels, the TX channel first, e.g. `RMT_CH1`
             ///
             /// Example data:
             ///
             /// - `all`: `(0)`
             /// - `tx`: `(1, 1)`
             /// - `rx`: `(2, 0)`
+            /// - `tx_tuples`: `(2, (RMT_CH1, RMT_CH2))`
             #for_each
         })
     }

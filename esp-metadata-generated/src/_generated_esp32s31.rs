@@ -943,22 +943,27 @@ macro_rules! define_lp_io_signals {
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
 ///
-/// This macro has three options for its "Individual matcher" case:
+/// This macro has four options for its "Individual matcher" case:
 ///
 /// - `all`: `($num:literal)`
 /// - `tx`: `($num:literal, $idx:literal)`
 /// - `rx`: `($num:literal, $idx:literal)`
+/// - `tx_tuples`: `($blocks:literal, ($($peri:ident),+))`
 ///
 /// Macro fragments:
 ///
 /// - `$num`: number of the channel, e.g. `0`
 /// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
+/// - `$blocks`: number of RAM blocks of a TX channel that uses the RAM of the channels that follow
+///   it, e.g. `2`
+/// - `$peri`: the singletons of these channels, the TX channel first, e.g. `RMT_CH1`
 ///
 /// Example data:
 ///
 /// - `all`: `(0)`
 /// - `tx`: `(1, 1)`
 /// - `rx`: `(2, 0)`
+/// - `tx_tuples`: `(2, (RMT_CH1, RMT_CH2))`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_rmt_channel {
@@ -972,9 +977,46 @@ macro_rules! for_each_rmt_channel {
         _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
         _for_each_inner_rmt_channel!((4, 0)); _for_each_inner_rmt_channel!((5, 1));
         _for_each_inner_rmt_channel!((6, 2)); _for_each_inner_rmt_channel!((7, 3));
+        _for_each_inner_rmt_channel!((2, (RMT_CH0, RMT_CH1)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH0, RMT_CH1, RMT_CH2)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3)));
+        _for_each_inner_rmt_channel!((5, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4)));
+        _for_each_inner_rmt_channel!((6, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4,
+        RMT_CH5))); _for_each_inner_rmt_channel!((7, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3,
+        RMT_CH4, RMT_CH5, RMT_CH6))); _for_each_inner_rmt_channel!((8, (RMT_CH0, RMT_CH1,
+        RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH1, RMT_CH2)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH1, RMT_CH2, RMT_CH3)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4)));
+        _for_each_inner_rmt_channel!((5, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5)));
+        _for_each_inner_rmt_channel!((6, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5,
+        RMT_CH6))); _for_each_inner_rmt_channel!((7, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4,
+        RMT_CH5, RMT_CH6, RMT_CH7))); _for_each_inner_rmt_channel!((2, (RMT_CH2,
+        RMT_CH3))); _for_each_inner_rmt_channel!((3, (RMT_CH2, RMT_CH3, RMT_CH4)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5)));
+        _for_each_inner_rmt_channel!((5, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)));
+        _for_each_inner_rmt_channel!((6, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6,
+        RMT_CH7))); _for_each_inner_rmt_channel!((2, (RMT_CH3, RMT_CH4)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH3, RMT_CH4, RMT_CH5)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)));
+        _for_each_inner_rmt_channel!((5, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)));
         _for_each_inner_rmt_channel!((all(0), (1), (2), (3), (4), (5), (6), (7)));
         _for_each_inner_rmt_channel!((tx(0, 0), (1, 1), (2, 2), (3, 3)));
         _for_each_inner_rmt_channel!((rx(4, 0), (5, 1), (6, 2), (7, 3)));
+        _for_each_inner_rmt_channel!((tx_tuples(2, (RMT_CH0, RMT_CH1)), (3, (RMT_CH0,
+        RMT_CH1, RMT_CH2)), (4, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3)), (5, (RMT_CH0,
+        RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4)), (6, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3,
+        RMT_CH4, RMT_CH5)), (7, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5,
+        RMT_CH6)), (8, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6,
+        RMT_CH7)), (2, (RMT_CH1, RMT_CH2)), (3, (RMT_CH1, RMT_CH2, RMT_CH3)), (4,
+        (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4)), (5, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4,
+        RMT_CH5)), (6, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)), (7,
+        (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)), (2, (RMT_CH2,
+        RMT_CH3)), (3, (RMT_CH2, RMT_CH3, RMT_CH4)), (4, (RMT_CH2, RMT_CH3, RMT_CH4,
+        RMT_CH5)), (5, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)), (6, (RMT_CH2,
+        RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)), (2, (RMT_CH3, RMT_CH4)), (3,
+        (RMT_CH3, RMT_CH4, RMT_CH5)), (4, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)), (5,
+        (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7))));
     };
 }
 /// This macro can be used to generate code for each slot of the SDMMC/SDIO host driver.
@@ -7205,6 +7247,18 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "DAC1 peripheral singleton"]
         DAC1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "DAC2 peripheral singleton"] DAC2 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RMT channel 0. Transmit only."]
+        RMT_CH0 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "RMT channel 1. Transmit only."] RMT_CH1 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RMT channel 2. Transmit only."]
+        RMT_CH2 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "RMT channel 3. Transmit only."] RMT_CH3 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RMT channel 4. Receive only."]
+        RMT_CH4 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "RMT channel 5. Receive only."] RMT_CH5 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RMT channel 6. Receive only."]
+        RMT_CH6 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "RMT channel 7. Receive only."] RMT_CH7 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SDM_CH0 peripheral singleton"]
         SDM_CH0 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "SDM_CH1 peripheral singleton"] SDM_CH1 <= virtual() (unstable)));
@@ -7454,6 +7508,14 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PCNT1_UNIT3(unstable)));
         _for_each_inner_peripheral!((DAC1(unstable)));
         _for_each_inner_peripheral!((DAC2(unstable)));
+        _for_each_inner_peripheral!((RMT_CH0(unstable)));
+        _for_each_inner_peripheral!((RMT_CH1(unstable)));
+        _for_each_inner_peripheral!((RMT_CH2(unstable)));
+        _for_each_inner_peripheral!((RMT_CH3(unstable)));
+        _for_each_inner_peripheral!((RMT_CH4(unstable)));
+        _for_each_inner_peripheral!((RMT_CH5(unstable)));
+        _for_each_inner_peripheral!((RMT_CH6(unstable)));
+        _for_each_inner_peripheral!((RMT_CH7(unstable)));
         _for_each_inner_peripheral!((SDM_CH0(unstable)));
         _for_each_inner_peripheral!((SDM_CH1(unstable)));
         _for_each_inner_peripheral!((SDM_CH2(unstable)));
@@ -7772,24 +7834,34 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type #[doc = "PCNT1_UNIT3 peripheral singleton"] PCNT1_UNIT3
         <= virtual() (unstable)), (@ peri_type #[doc = "DAC1 peripheral singleton"] DAC1
         <= virtual() (unstable)), (@ peri_type #[doc = "DAC2 peripheral singleton"] DAC2
-        <= virtual() (unstable)), (@ peri_type #[doc = "SDM_CH0 peripheral singleton"]
-        SDM_CH0 <= virtual() (unstable)), (@ peri_type #[doc =
-        "SDM_CH1 peripheral singleton"] SDM_CH1 <= virtual() (unstable)), (@ peri_type
-        #[doc = "SDM_CH2 peripheral singleton"] SDM_CH2 <= virtual() (unstable)), (@
-        peri_type #[doc = "SDM_CH3 peripheral singleton"] SDM_CH3 <= virtual()
-        (unstable)), (@ peri_type #[doc = "SDM_CH4 peripheral singleton"] SDM_CH4 <=
-        virtual() (unstable)), (@ peri_type #[doc = "SDM_CH5 peripheral singleton"]
-        SDM_CH5 <= virtual() (unstable)), (@ peri_type #[doc =
-        "SDM_CH6 peripheral singleton"] SDM_CH6 <= virtual() (unstable)), (@ peri_type
-        #[doc = "SDM_CH7 peripheral singleton"] SDM_CH7 <= virtual() (unstable)), (@
-        peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "APB_SARADC peripheral singleton"] APB_SARADC
-        <= ADC() (unstable)), (@ peri_type #[doc = "ASSIST_DEBUG peripheral singleton"]
-        ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (@ peri_type #[doc =
-        "CACHE peripheral singleton"] CACHE <= CACHE() (unstable)), (@ peri_type #[doc =
-        "CLIC peripheral singleton"] CLIC <= CLIC() (unstable)), (@ peri_type #[doc =
-        "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)), (@ peri_type #[doc =
+        <= virtual() (unstable)), (@ peri_type #[doc = "RMT channel 0. Transmit only."]
+        RMT_CH0 <= virtual() (unstable)), (@ peri_type #[doc =
+        "RMT channel 1. Transmit only."] RMT_CH1 <= virtual() (unstable)), (@ peri_type
+        #[doc = "RMT channel 2. Transmit only."] RMT_CH2 <= virtual() (unstable)), (@
+        peri_type #[doc = "RMT channel 3. Transmit only."] RMT_CH3 <= virtual()
+        (unstable)), (@ peri_type #[doc = "RMT channel 4. Receive only."] RMT_CH4 <=
+        virtual() (unstable)), (@ peri_type #[doc = "RMT channel 5. Receive only."]
+        RMT_CH5 <= virtual() (unstable)), (@ peri_type #[doc =
+        "RMT channel 6. Receive only."] RMT_CH6 <= virtual() (unstable)), (@ peri_type
+        #[doc = "RMT channel 7. Receive only."] RMT_CH7 <= virtual() (unstable)), (@
+        peri_type #[doc = "SDM_CH0 peripheral singleton"] SDM_CH0 <= virtual()
+        (unstable)), (@ peri_type #[doc = "SDM_CH1 peripheral singleton"] SDM_CH1 <=
+        virtual() (unstable)), (@ peri_type #[doc = "SDM_CH2 peripheral singleton"]
+        SDM_CH2 <= virtual() (unstable)), (@ peri_type #[doc =
+        "SDM_CH3 peripheral singleton"] SDM_CH3 <= virtual() (unstable)), (@ peri_type
+        #[doc = "SDM_CH4 peripheral singleton"] SDM_CH4 <= virtual() (unstable)), (@
+        peri_type #[doc = "SDM_CH5 peripheral singleton"] SDM_CH5 <= virtual()
+        (unstable)), (@ peri_type #[doc = "SDM_CH6 peripheral singleton"] SDM_CH6 <=
+        virtual() (unstable)), (@ peri_type #[doc = "SDM_CH7 peripheral singleton"]
+        SDM_CH7 <= virtual() (unstable)), (@ peri_type #[doc =
+        "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "APB_SARADC peripheral singleton"] APB_SARADC <= ADC() (unstable)), (@
+        peri_type #[doc = "ASSIST_DEBUG peripheral singleton"] ASSIST_DEBUG <=
+        ASSIST_DEBUG() (unstable)), (@ peri_type #[doc = "CACHE peripheral singleton"]
+        CACHE <= CACHE() (unstable)), (@ peri_type #[doc = "CLIC peripheral singleton"]
+        CLIC <= CLIC() (unstable)), (@ peri_type #[doc = "CLINT peripheral singleton"]
+        CLINT <= CLINT() (unstable)), (@ peri_type #[doc =
         "CLINT_OTHER_CORE peripheral singleton"] CLINT_OTHER_CORE <= CLINT_OTHER_CORE()
         (unstable)), (@ peri_type #[doc = "CNNT_SYS peripheral singleton"] CNNT_SYS <=
         CNNT_SYS() (unstable)), (@ peri_type #[doc = "CNNT_IO_MUX peripheral singleton"]
@@ -7939,38 +8011,40 @@ macro_rules! for_each_peripheral {
         (DMA2D_RX_CH1(unstable)), (DMA2D_RX_CH2(unstable)), (PCNT0_UNIT0(unstable)),
         (PCNT0_UNIT1(unstable)), (PCNT0_UNIT2(unstable)), (PCNT0_UNIT3(unstable)),
         (PCNT1_UNIT0(unstable)), (PCNT1_UNIT1(unstable)), (PCNT1_UNIT2(unstable)),
-        (PCNT1_UNIT3(unstable)), (DAC1(unstable)), (DAC2(unstable)), (SDM_CH0(unstable)),
-        (SDM_CH1(unstable)), (SDM_CH2(unstable)), (SDM_CH3(unstable)),
-        (SDM_CH4(unstable)), (SDM_CH5(unstable)), (SDM_CH6(unstable)),
-        (SDM_CH7(unstable)), (AES(unstable)), (APB_SARADC(unstable)),
-        (ASSIST_DEBUG(unstable)), (CACHE(unstable)), (CLIC(unstable)), (CLINT(unstable)),
-        (CLINT_OTHER_CORE(unstable)), (CORDIC(unstable)), (DMA2D(unstable)),
-        (ETH(unstable)), (ECC(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)),
-        (HP_APM(unstable)), (HP_MEM_APM(unstable)), (HP_SYS(unstable)),
-        (HP_ALIVE_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0), (I2C1),
-        (I2S0(unstable)), (I2S1(unstable)), (IEEE802154(unstable)),
-        (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)), (IO_MUX(unstable)),
-        (JPEG(unstable)), (LCD_CAM(unstable)), (LP_AON_CLK_RST(unstable)),
-        (LP_APM(unstable)), (LP_GPIO(unstable)), (LP_IO_MUX(unstable)),
-        (LP_PERI(unstable)), (LP_SYS(unstable)), (LP_TEE(unstable)), (LP_WDT(unstable)),
-        (LPWR(unstable)), (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)),
-        (MODEM_SYSCON(unstable)), (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)),
-        (PCNT1(unstable)), (PMU(unstable)), (PPA(unstable)), (RTC_TIMER(unstable)),
-        (RNG(unstable)), (RMT(unstable)), (RSA(unstable)), (SPI0(unstable)),
-        (SPI1(unstable)), (SPI2), (SPI3), (AXI_GDMA(unstable)), (DMA(unstable)),
-        (SHA(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (SDHOST(unstable)),
-        (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TSENS(unstable)),
-        (UART0), (UART1), (UART2), (UART3), (UHCI0(unstable)), (USB_DEVICE(unstable)),
-        (USB_HS(unstable)), (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)),
-        (FLASH(unstable)), (PSRAM(unstable)), (GPIO_DEDICATED(unstable)), (WIFI),
-        (CPU_CTRL(unstable)), (IPC(unstable)), (FROM_CPU_INTR0(unstable)),
-        (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
-        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(UHCI0,
-        Uhci0, 0, AhbGdmaChannel), (LCD_CAM, LcdCam, 0, AxiGdmaChannel), (I2S0, I2s0, 1,
-        AhbGdmaChannel), (SPI2, Spi2, 1, AxiGdmaChannel), (SPI3, Spi3, 2,
-        AxiGdmaChannel), (PARL_IO, ParlIo, 3, AxiGdmaChannel), (AES, Aes, 4,
-        AxiGdmaChannel), (I2S1, I2s1, 5, AhbGdmaChannel), (SHA, Sha, 5,
-        AxiGdmaChannel)));
+        (PCNT1_UNIT3(unstable)), (DAC1(unstable)), (DAC2(unstable)), (RMT_CH0(unstable)),
+        (RMT_CH1(unstable)), (RMT_CH2(unstable)), (RMT_CH3(unstable)),
+        (RMT_CH4(unstable)), (RMT_CH5(unstable)), (RMT_CH6(unstable)),
+        (RMT_CH7(unstable)), (SDM_CH0(unstable)), (SDM_CH1(unstable)),
+        (SDM_CH2(unstable)), (SDM_CH3(unstable)), (SDM_CH4(unstable)),
+        (SDM_CH5(unstable)), (SDM_CH6(unstable)), (SDM_CH7(unstable)), (AES(unstable)),
+        (APB_SARADC(unstable)), (ASSIST_DEBUG(unstable)), (CACHE(unstable)),
+        (CLIC(unstable)), (CLINT(unstable)), (CLINT_OTHER_CORE(unstable)),
+        (CORDIC(unstable)), (DMA2D(unstable)), (ETH(unstable)), (ECC(unstable)),
+        (GPIO(unstable)), (GPIO_SD(unstable)), (HP_APM(unstable)),
+        (HP_MEM_APM(unstable)), (HP_SYS(unstable)), (HP_ALIVE_SYS(unstable)),
+        (HP_SYS_CLKRST(unstable)), (I2C0), (I2C1), (I2S0(unstable)), (I2S1(unstable)),
+        (IEEE802154(unstable)), (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
+        (IO_MUX(unstable)), (JPEG(unstable)), (LCD_CAM(unstable)),
+        (LP_AON_CLK_RST(unstable)), (LP_APM(unstable)), (LP_GPIO(unstable)),
+        (LP_IO_MUX(unstable)), (LP_PERI(unstable)), (LP_SYS(unstable)),
+        (LP_TEE(unstable)), (LP_WDT(unstable)), (LPWR(unstable)),
+        (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
+        (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)), (PCNT1(unstable)),
+        (PMU(unstable)), (PPA(unstable)), (RTC_TIMER(unstable)), (RNG(unstable)),
+        (RMT(unstable)), (RSA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2),
+        (SPI3), (AXI_GDMA(unstable)), (DMA(unstable)), (SHA(unstable)),
+        (SYSTEM(unstable)), (SYSTIMER(unstable)), (SDHOST(unstable)), (TEE(unstable)),
+        (TIMG0(unstable)), (TIMG1(unstable)), (TSENS(unstable)), (UART0), (UART1),
+        (UART2), (UART3), (UHCI0(unstable)), (USB_DEVICE(unstable)), (USB_HS(unstable)),
+        (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)), (FLASH(unstable)),
+        (PSRAM(unstable)), (GPIO_DEDICATED(unstable)), (WIFI), (CPU_CTRL(unstable)),
+        (IPC(unstable)), (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
+        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(UHCI0, Uhci0, 0, AhbGdmaChannel),
+        (LCD_CAM, LcdCam, 0, AxiGdmaChannel), (I2S0, I2s0, 1, AhbGdmaChannel), (SPI2,
+        Spi2, 1, AxiGdmaChannel), (SPI3, Spi3, 2, AxiGdmaChannel), (PARL_IO, ParlIo, 3,
+        AxiGdmaChannel), (AES, Aes, 4, AxiGdmaChannel), (I2S1, I2s1, 5, AhbGdmaChannel),
+        (SHA, Sha, 5, AxiGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

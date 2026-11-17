@@ -914,6 +914,94 @@ impl ChannelIndex {
     }
 }
 
+/// Immutable data of a transmit channel.
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct Info {
+    #[expect(
+        dead_code,
+        reason = "the channel driver that replaces ChannelCreator reads it"
+    )]
+    ch_idx: ChannelIndex,
+}
+
+/// A transmit channel, alone or with the RAM blocks of the channels that follow it.
+///
+/// A tuple of adjacent channel singletons, such as `(RMT_CH0, RMT_CH1)`, gives the first channel
+/// the RAM blocks of the others. Each block holds [`CHANNEL_RAM_SIZE`] pulse codes. The
+/// channels that lend their RAM cannot be used while the tuple is in use, also if they are
+/// receive channels.
+///
+/// The implementations list the singletons and tuples that this chip supports.
+pub trait TxInstance: crate::private::Sealed {
+    /// Number of RAM blocks that the channel uses.
+    // Hidden, so that the RAM size is not part of the type in the public API.
+    #[doc(hidden)]
+    const BLOCKS: u8;
+
+    // Public, because the generic channel constructor reads it.
+    #[doc(hidden)]
+    fn info(&self) -> &'static Info;
+}
+
+for_each_rmt_channel!(
+    (tx $(($num:literal, $idx:literal)),+) => {
+        paste::paste! {
+            $(
+                #[doc = concat!("`RMT_CH", $num, "` with 1 RAM block.")]
+                impl TxInstance for crate::peripherals::[<RMT_CH $num>]<'_> {
+                    const BLOCKS: u8 = 1;
+
+                    fn info(&self) -> &'static Info {
+                        static INFO: Info = Info {
+                            ch_idx: ChannelIndex::[<Ch $idx>],
+                        };
+                        &INFO
+                    }
+                }
+            )+
+
+            crate::any_peripheral! {
+                /// Any RMT channel that can transmit.
+                pub peripheral AnyRmtTxChannel<'d> {
+                    $(
+                        [<RmtCh $num>](crate::peripherals::[<RMT_CH $num>]<'d>),
+                    )+
+                }
+            }
+        }
+    };
+
+    ($blocks:literal, ($first:ident $(, $peri:ident)+)) => {
+        impl crate::private::Sealed for (
+            crate::peripherals::$first<'_>,
+            $(crate::peripherals::$peri<'_>,)+
+        ) {}
+
+        #[doc = concat!("`", stringify!($first), "` with ", $blocks, " RAM blocks.")]
+        impl TxInstance for (
+            crate::peripherals::$first<'_>,
+            $(crate::peripherals::$peri<'_>,)+
+        ) {
+            const BLOCKS: u8 = $blocks;
+
+            fn info(&self) -> &'static Info {
+                self.0.info()
+            }
+        }
+    };
+);
+
+/// A type-erased channel uses one RAM block: its type cannot show that the channels of a tuple
+/// are adjacent.
+impl TxInstance for AnyRmtTxChannel<'_> {
+    const BLOCKS: u8 = 1;
+
+    fn info(&self) -> &'static Info {
+        any::delegate!(self, channel => { channel.info() })
+    }
+}
+
 impl<'rmt> Rmt<'rmt, Blocking> {
     /// Creates a new RMT instance.
     ///

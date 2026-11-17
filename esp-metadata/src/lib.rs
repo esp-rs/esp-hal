@@ -941,6 +941,25 @@ This pin may be available with certain limitations. Check your hardware to make 
             }
         }
 
+        if let Some(rmt) = self.device.peri_config.rmt.as_ref()
+            && rmt.support_status.is_supported()
+        {
+            for (channel, capability) in rmt.channels.0.iter().enumerate() {
+                let name = format_ident!("RMT_CH{channel}");
+                let direction = match capability {
+                    cfg::RmtChannelCapability::Tx => "Transmit only.",
+                    cfg::RmtChannelCapability::Rx => "Receive only.",
+                    cfg::RmtChannelCapability::RxTx => "Transmit or receive.",
+                };
+                let singleton_doc = format!("RMT channel {channel}. {direction}");
+                let tokens = quote! {
+                    #[doc = #singleton_doc] #name <= virtual ()
+                };
+                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
+            }
+        }
+
         if let Some(sdm) = self.device.peri_config.sdm.as_ref()
             && sdm.support_status.is_supported()
         {
