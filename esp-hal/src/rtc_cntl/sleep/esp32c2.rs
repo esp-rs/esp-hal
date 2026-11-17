@@ -124,7 +124,6 @@ impl Default for RtcConfig {
         cfg.set_pwrctl_init(true);
         cfg.set_rtc_dboost_fpd(true);
         cfg.set_cpu_waiti_clk_gate(true);
-        cfg.set_bbpll_fpu(true);
         cfg
     }
 }
@@ -310,8 +309,13 @@ fn rtc_sleep_pu(val: bool) {
 
 impl RtcSleepConfig {
     /// Configures the RTC for deep sleep mode.
+    ///
+    /// The RTC regulator is off in this mode, for the lowest current.
     pub fn deep() -> Self {
-        // Set up for ultra-low power sleep. Wakeup sources may modify these settings.
+        // Set up for ultra-low power sleep. Wakeup sources may modify these settings. ESP-IDF
+        // uses this mode only on request, and does not support RTC IO inputs in it:
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/sleep_modes.c#L3083-L3085
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32c2/rtc_sleep.c#L91-L101
         let mut cfg = Self::default();
 
         cfg.set_lslp_mem_inf_fpu(false);
@@ -577,8 +581,12 @@ impl RtcSleepConfig {
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call.
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
+    #[crate::ram]
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        let cpu_clk = super::SleepCpuClock::switch_to_xtal();
+
         // set bits for what can wake us up
         LPWR::regs()
             .wakeup_state()
@@ -589,6 +597,8 @@ impl RtcSleepConfig {
         LPWR::regs()
             .slp_reject_conf()
             .modify(|_, w| unsafe { w.sleep_reject_ena().bits(reject_mask) });
+
+        SavedState { cpu_clk }
     }
 
     /// Requests the sleep.
@@ -612,5 +622,18 @@ impl RtcSleepConfig {
         if self.lslp_mem_inf_fpu() {
             rtc_sleep_pu(true);
         }
+    }
+}
+
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    cpu_clk: super::SleepCpuClock,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        self.cpu_clk.restore();
     }
 }

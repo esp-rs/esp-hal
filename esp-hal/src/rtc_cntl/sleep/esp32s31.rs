@@ -3,7 +3,6 @@ use core::ops::Not;
 
 use crate::{
     peripherals::{LP_SYS as LP_AON, PMU},
-    private::DropGuard,
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
@@ -669,31 +668,14 @@ impl RtcSleepConfig {
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
-    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
-    /// sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
-        let restore_clock_config = ClockTree::with(|clocks| {
-            let old_cpu_root_clk = clocks.cpu_root_clk();
-
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        let cpu_root_clk = ClockTree::with(|clocks| {
+            let old = clocks.cpu_root_clk();
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
-
-            DropGuard::new((), move |_| {
-                ClockTree::with(|clocks| {
-                    // Light sleep powers XTAL_CLK down, so the MPLL that clocks PSRAM loses its
-                    // calibration. The MPLL must be calibrated again before the next PSRAM
-                    // access.
-                    clocks::recalibrate_mpll(clocks);
-                    // Light sleep powers XTAL_CLK down, so the CPLL loses its calibration. The
-                    // CPLL must be calibrated again before the CPU or the flash controller runs
-                    // from it.
-                    clocks::recalibrate_cpll(clocks);
-                    if let Some(old) = old_cpu_root_clk {
-                        clocks::configure_cpu_root_clk(clocks, old);
-                    }
-                });
-            })
+            old
         });
 
         let power = PowerSleepConfig::defaults(self.pd_flags);
@@ -749,7 +731,7 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl0()
             .write(|w| w.slp_reject_en().bit(reject_mask != 0));
 
-        restore_clock_config
+        SavedState { cpu_root_clk }
     }
 
     /// Requests the sleep.
@@ -764,5 +746,28 @@ impl RtcSleepConfig {
     #[inline(always)]
     pub(crate) fn finish_sleep(&self) {
         super::pmu_common::wait_for_efuse_idle();
+    }
+}
+
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    cpu_root_clk: Option<CpuRootClkConfig>,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        ClockTree::with(|clocks| {
+            // Light sleep powers XTAL_CLK down, so the MPLL that clocks PSRAM loses its
+            // calibration. The MPLL must be calibrated again before the next PSRAM access.
+            clocks::recalibrate_mpll(clocks);
+            // Light sleep powers XTAL_CLK down, so the CPLL loses its calibration. The CPLL must
+            // be calibrated again before the CPU or the flash controller runs from it.
+            clocks::recalibrate_cpll(clocks);
+            if let Some(cpu_root_clk) = self.cpu_root_clk {
+                clocks::configure_cpu_root_clk(clocks, cpu_root_clk);
+            }
+        });
     }
 }

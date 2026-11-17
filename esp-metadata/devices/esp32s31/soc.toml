@@ -65,6 +65,7 @@ peripherals = [
     { name = "ETH", virtual = true, interrupts = { peri = "SBD" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
     { name = "EMAC_MAC", pac = "GMAC", hidden = true },
+    { name = "DAC", hidden = true },
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
@@ -435,7 +436,10 @@ support_status = "not_supported"
 [device.bit_scrambler]
 support_status = "not_supported"
 [device.dac]
-support_status = "not_supported"
+support_status = "partial"
+version = 2
+channel_count = 2
+resolution = 12
 [device.ethernet]
 support_status = { status = "partial", issue = 6755 }
 mii_via_gpio_matrix = true
@@ -447,7 +451,11 @@ tx_checksum_offload = false # TX FIFO is too small for store-and-forward inserti
 [device.etm]
 support_status = "not_supported"
 [device.i2c_slave]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6761 }
+instances = [
+    { name = "i2c0" },
+    { name = "i2c1" },
+]
 [device.i2s]
 support_status = { status = "partial", issue = 6762 }
 version = 3

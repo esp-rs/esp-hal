@@ -6,6 +6,9 @@
 //!
 //! On chips with an IEEE 802.15.4 radio, it also checks that BLE still works when
 //! the 802.15.4 driver was brought up first.
+//!
+//! It also checks that L2CAP data arrives intact when the controller splits ACL
+//! packets over a chain of mbufs.
 
 //% CHIP_FILTER(has_wifi_ble): esp32c6 || esp32s3
 //% HARNESS-FIRMWARE(has_wifi_ble): ble_peripheral_support
@@ -42,5 +45,52 @@ fn init_heap() {
 }
 
 #[cfg(soc_has_bt)]
+async fn connect<'d, C: trouble_host::Controller>(
+    central: &mut trouble_host::central::Central<'d, C, trouble_host::prelude::DefaultPacketPool>,
+    address: trouble_host::Address,
+) -> trouble_host::connection::Connection<'d, trouble_host::prelude::DefaultPacketPool> {
+    use embassy_time::{Duration, with_timeout};
+    use trouble_host::prelude::*;
+
+    let accept_list = [address];
+    let connect_config = ConnectConfig {
+        scan_config: ScanConfig {
+            filter_accept_list: &accept_list,
+            active: true,
+            phys: PhySet::M1,
+            interval: Duration::from_millis(100),
+            window: Duration::from_millis(100),
+            timeout: Duration::from_secs(10),
+            ..Default::default()
+        },
+        connect_params: RequestedConnParams::default(),
+    };
+
+    let conn = with_timeout(Duration::from_secs(15), central.connect(&connect_config))
+        .await
+        .expect("BLE connect timed out")
+        .expect("BLE connect failed");
+
+    assert_eq!(conn.peer_address(), address);
+    assert!(conn.is_connected());
+    conn
+}
+
+#[cfg(soc_has_bt)]
+async fn ble_task<C: trouble_host::Controller, P: trouble_host::PacketPool>(
+    mut runner: trouble_host::prelude::Runner<'_, C, P>,
+) {
+    loop {
+        if runner.run().await.is_err() {
+            embassy_time::Timer::after(embassy_time::Duration::from_millis(100)).await;
+        }
+    }
+}
+
+#[cfg(soc_has_bt)]
 #[path = "ble/gatt.rs"]
 mod ble_gatt;
+
+#[cfg(soc_has_bt)]
+#[path = "ble/l2cap.rs"]
+mod ble_l2cap;

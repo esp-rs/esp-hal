@@ -1,13 +1,9 @@
 //! Light- and deep-sleep support for the ESP32-P4.
 
-use core::{
-    ops::Not,
-    sync::atomic::{AtomicBool, AtomicU32, Ordering},
-};
+use core::ops::Not;
 
 use crate::{
     peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST, PMU, USB_DEVICE},
-    private::DropGuard,
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
@@ -31,9 +27,11 @@ use crate::{
 // support keeping USJ alive across light sleep, so this is unconditional.
 // ----------------------------------------------------------------------------
 
-static USJ_CLOCK_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
-static USJ_PAD_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
-static USJ_CONF0: AtomicU32 = AtomicU32::new(0);
+/// The USJ state that light sleep changes.
+struct UsjPadBackup {
+    clock_was_enabled: bool,
+    conf0: u32,
+}
 
 fn usj_module_is_enabled() -> bool {
     let clkrst = HP_SYS_CLKRST::regs();
@@ -74,30 +72,21 @@ fn usj_set_pad_enable(enable: bool) {
         .modify(|_, w| w.usb_pad_enable().bit(enable));
 }
 
-fn usj_pad_is_enabled() -> bool {
-    USB_DEVICE::regs()
-        .conf0()
-        .read()
-        .usb_pad_enable()
-        .bit_is_set()
-}
-
 /// Backup and disable the USJ pad on light-sleep entry. esp-idf
 /// `sleep_console_usj_pad_backup_and_disable`.
-fn usj_pad_backup_and_disable() {
-    let clock_enabled = usj_module_is_enabled();
-    let pad_enabled = if clock_enabled {
-        usj_pad_is_enabled()
-    } else {
+fn usj_pad_backup_and_disable() -> UsjPadBackup {
+    let clock_was_enabled = usj_module_is_enabled();
+    if !clock_was_enabled {
         // Bring the register block up so we can touch the pad enable.
         usj_enable_bus_clock(true);
         usj_reset_register();
-        false
-    };
+        // The register reset enables the pad, but the pad was off before the sleep.
+        usj_set_pad_enable(false);
+    }
     // Clearing `usb_pad_enable` alone keeps the D+ pull-up, so the host never sees a
     // disconnect and USJ stops responding after the sleep.
     let conf0 = USB_DEVICE::regs().conf0();
-    USJ_CONF0.store(conf0.read().bits(), Ordering::Relaxed);
+    let saved_conf0 = conf0.read().bits();
     conf0.modify(|_, w| {
         w.pad_pull_override().set_bit();
         w.dp_pullup().clear_bit();
@@ -106,18 +95,19 @@ fn usj_pad_backup_and_disable() {
     usj_set_pad_enable(false);
     usj_enable_bus_clock(false);
 
-    USJ_CLOCK_WAS_ENABLED.store(clock_enabled, Ordering::Relaxed);
-    USJ_PAD_WAS_ENABLED.store(pad_enabled, Ordering::Relaxed);
+    UsjPadBackup {
+        clock_was_enabled,
+        conf0: saved_conf0,
+    }
 }
 
 /// Restores the USJ pad on wake. esp-idf `sleep_console_usj_pad_restore`.
-fn usj_pad_restore() {
+fn usj_pad_restore(backup: UsjPadBackup) {
     usj_enable_bus_clock(true);
     USB_DEVICE::regs()
         .conf0()
-        .write(|w| unsafe { w.bits(USJ_CONF0.load(Ordering::Relaxed)) });
-    usj_set_pad_enable(USJ_PAD_WAS_ENABLED.load(Ordering::Relaxed));
-    if !USJ_CLOCK_WAS_ENABLED.load(Ordering::Relaxed) {
+        .write(|w| unsafe { w.bits(backup.conf0) });
+    if !backup.clock_was_enabled {
         usj_enable_bus_clock(false);
     }
 }
@@ -931,25 +921,14 @@ impl RtcSleepConfig {
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
-    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
-    /// sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
-        // Switch the CPU root clock to XTAL for the duration of sleep.
-        let restore_clock_config = ClockTree::with(|clocks| {
-            let old_cpu_root_clk = clocks.cpu_root_clk();
-
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        let cpu_root_clk = ClockTree::with(|clocks| {
+            let old = clocks.cpu_root_clk();
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
-
-            // Restore the old clock settings when we return
-            DropGuard::new((), move |_| {
-                ClockTree::with(|clocks| {
-                    if let Some(old) = old_cpu_root_clk {
-                        clocks::configure_cpu_root_clk(clocks, old);
-                    }
-                });
-            })
+            old
         });
 
         let power = PowerSleepConfig::defaults(self.pd_flags);
@@ -984,20 +963,11 @@ impl RtcSleepConfig {
         // ESP32-P4 rev 3.0 (ECO5) "MSPI crash after power up" deep-sleep
         // erratum: redirect the wake reset vector to a stub in LP RAM that
         // recovers MSPI before the first flash fetch (esp-idf pmu_sleep.c).
-        let mspi_workaround = self.deep && is_rev3_mspi_workaround_needed();
-        if mspi_workaround {
+        let boot_from_lp_ram = self.deep && is_rev3_mspi_workaround_needed();
+        if boot_from_lp_ram {
             install_mspi_workaround_stub();
             set_boot_from_lp_ram(true);
         }
-
-        // The wake stub itself restores the vector on a real wake, so this guard runs only if the
-        // hardware rejects the sleep. It points the vector back at the HP ROM, so that a later
-        // reset boots normally.
-        let restore_boot_vector = DropGuard::new((), move |_| {
-            if mspi_workaround {
-                set_boot_from_lp_ram(false);
-            }
-        });
 
         // like esp-idf pmu_sleep_start()
 
@@ -1043,11 +1013,9 @@ impl RtcSleepConfig {
         }
 
         // Light sleep keeps the HP domain (and thus the USJ PHY) powered, so
-        // de-enumerate USB-Serial-JTAG cleanly before sleeping and restore it
-        // in `finish_sleep`. Deep sleep powers the PHY off on its own.
-        if !self.deep {
-            usj_pad_backup_and_disable();
-        }
+        // de-enumerate USB-Serial-JTAG cleanly before sleeping. Deep sleep powers
+        // the PHY off on its own.
+        let usj = (!self.deep).then(usj_pad_backup_and_disable);
 
         // The PMU FSM switches the pads to their sleep setting and holds IOs
         // at the same stage; trigger the pad sleep selection first so the IOs
@@ -1061,7 +1029,11 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode.
 
-        (restore_clock_config, restore_boot_vector)
+        SavedState {
+            usj,
+            cpu_root_clk,
+            boot_from_lp_ram,
+        }
     }
 
     /// Requests the sleep.
@@ -1109,11 +1081,32 @@ impl RtcSleepConfig {
 
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
+    }
+}
 
-        // Re-enumerate USB-Serial-JTAG (only disabled for light sleep; in deep
-        // sleep we never reach here).
-        if !self.deep {
-            usj_pad_restore();
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    usj: Option<UsjPadBackup>,
+    cpu_root_clk: Option<CpuRootClkConfig>,
+    boot_from_lp_ram: bool,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        if let Some(usj) = self.usj {
+            usj_pad_restore(usj);
+        }
+        ClockTree::with(|clocks| {
+            if let Some(cpu_root_clk) = self.cpu_root_clk {
+                clocks::configure_cpu_root_clk(clocks, cpu_root_clk);
+            }
+        });
+        // The wake stub restores the vector on a real wake, so this runs only after a rejected
+        // sleep. A later reset must boot from the HP ROM.
+        if self.boot_from_lp_ram {
+            set_boot_from_lp_ram(false);
         }
     }
 }

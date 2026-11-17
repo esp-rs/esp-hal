@@ -1413,13 +1413,26 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
 unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i32 {
     trace!("ble_hs_rx_data {:?} {:?}", om, arg);
 
-    let data_ptr = unsafe { (*om).om_data };
-    let len = unsafe { (*om).om_len };
-    let data_slice = unsafe { core::slice::from_raw_parts(data_ptr, len as usize) };
+    // The controller may split one ACL packet over a chain of mbufs.
+    let chain = || {
+        core::iter::successors(unsafe { om.as_ref() }, |mbuf| unsafe { mbuf.next.as_ref() })
+            .map(|mbuf| unsafe { core::slice::from_raw_parts(mbuf.om_data, mbuf.om_len as usize) })
+    };
 
-    let mut data = Vec::with_capacity(data_slice.len() + 1);
+    let len = 1 + chain().map(<[u8]>::len).sum::<usize>();
+    let mut data = Vec::new();
+    if data.try_reserve_exact(len).is_err() {
+        warn!(
+            "Out of memory, dropping a received ACL packet of {} bytes",
+            len
+        );
+        unsafe {
+            r_os_mbuf_free_chain(om as *mut _);
+        }
+        return ESP_ERR_NO_MEM as i32;
+    }
     data.push(0x02); // ACL
-    data.extend_from_slice(data_slice);
+    chain().for_each(|data_slice| data.extend_from_slice(data_slice));
 
     super::dump_packet_info(&data);
 

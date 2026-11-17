@@ -35,6 +35,7 @@ use crate::{
         UartBaudRateGeneratorConfig as BaudRateConfig,
         UartFunctionClockConfig as ClockConfig,
     },
+    system::PeripheralGuard,
 };
 
 #[cfg_attr(uart_version = "1", path = "v1.rs")]
@@ -833,15 +834,41 @@ impl Info {
         Ok(to_read)
     }
 
+    fn in_use(&self, clocks: &mut ClockTree) -> bool {
+        let clock = self.clock_instance;
+        // A console can use UART0 without a driver. The UART0 bus clock stays on, and UART0
+        // stays out of reset.
+        (clock == clocks::UartInstance::Uart0
+            && clocks::UartInstance::uart0_function_clock_enabled())
+            || clocks.uart_function_clock_refcount[clock as usize] > 0
+    }
+
+    /// Stops the transmitter for a sleep and waits until the transmitter is idle.
+    ///
+    /// Returns `false` and does nothing if the function clock is off. Without the clock, the
+    /// transmitter never stops.
     #[cfg(sleep_driver_supported)]
-    pub(crate) fn suspend_for_sleep(&self) {
-        version::suspend(self, true);
-        version::wait_for_suspended(self);
+    pub(crate) fn suspend_for_sleep(&self) -> bool {
+        ClockTree::with(|clocks| {
+            let used = self.in_use(clocks);
+
+            if used {
+                version::suspend(self, true);
+                version::wait_for_suspended(self);
+            }
+
+            used
+        })
     }
 
     #[cfg(sleep_driver_supported)]
     pub(crate) fn resume_from_sleep(&self) {
-        version::suspend(self, false);
+        ClockTree::with(|clocks| {
+            let used = self.in_use(clocks);
+            if used {
+                version::suspend(self, false);
+            }
+        });
     }
 
     /// Lets this instance wake the chip from light sleep.
@@ -940,6 +967,8 @@ for_each_uart! {
 
 pub(super) struct UartClockGuard<'t> {
     uart: AnyUart<'t>,
+    // The function clock must stop before the bus clock stops. `drop` runs before the fields drop.
+    _bus: PeripheralGuard,
 }
 
 impl<'t> UartClockGuard<'t> {
@@ -950,6 +979,7 @@ impl<'t> UartClockGuard<'t> {
     }
 
     pub(super) fn new_inner(uart: AnyUart<'t>, clone: bool) -> Self {
+        let bus = PeripheralGuard::new(uart.info().peripheral);
         ClockTree::with(|clocks| {
             let clock = uart.info().clock_instance;
 
@@ -968,7 +998,7 @@ impl<'t> UartClockGuard<'t> {
             clock.request_mem_clock(clocks);
         });
 
-        Self { uart }
+        Self { uart, _bus: bus }
     }
 }
 

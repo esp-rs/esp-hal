@@ -997,63 +997,40 @@ impl Driver<'_> {
     }
 }
 
-#[cfg(i2c_slave_i2c0)]
-impl crate::i2c::slave::Instance for crate::peripherals::I2C0<'_> {
-    fn parts(&self) -> (&Info, &State) {
-        #[handler]
-        #[ram]
-        pub(super) fn irq_handler() {
-            async_handler(&PERIPHERAL, &STATE);
+for_each_i2c_master!(
+    ($id:literal, $inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
+        paste::paste! {
+            #[cfg([<i2c_slave_ $inst:lower>])]
+            impl Instance for crate::peripherals::$inst<'_> {
+                fn parts(&self) -> (&Info, &State) {
+                    #[handler]
+                    #[ram]
+                    pub(super) fn irq_handler() {
+                        async_handler(&PERIPHERAL, &STATE);
+                    }
+
+                    static STATE: State = State {
+                        waker: AtomicWaker::new(),
+                        rx_start_pending: AtomicBool::new(false),
+                        rx_stop_pending: AtomicBool::new(false),
+                    };
+
+                    static PERIPHERAL: Info = Info {
+                        register_block: crate::peripherals::$inst::ptr(),
+                        peripheral: crate::system::Peripheral::$peri,
+                        async_handler: irq_handler,
+                        clock_instance: I2cInstance::[<I2c $id>],
+                        scl_output: OutputSignal::$scl,
+                        scl_input: InputSignal::$scl,
+                        sda_output: OutputSignal::$sda,
+                        sda_input: InputSignal::$sda,
+                    };
+                    (&PERIPHERAL, &STATE)
+                }
+            }
         }
-
-        static STATE: State = State {
-            waker: AtomicWaker::new(),
-            rx_start_pending: AtomicBool::new(false),
-            rx_stop_pending: AtomicBool::new(false),
-        };
-
-        static PERIPHERAL: Info = Info {
-            register_block: crate::peripherals::I2C0::ptr(),
-            peripheral: crate::system::Peripheral::I2cExt0,
-            async_handler: irq_handler,
-            clock_instance: I2cInstance::I2c0,
-            scl_output: OutputSignal::I2CEXT0_SCL,
-            scl_input: InputSignal::I2CEXT0_SCL,
-            sda_output: OutputSignal::I2CEXT0_SDA,
-            sda_input: InputSignal::I2CEXT0_SDA,
-        };
-        (&PERIPHERAL, &STATE)
-    }
-}
-
-#[cfg(i2c_slave_i2c1)]
-impl crate::i2c::slave::Instance for crate::peripherals::I2C1<'_> {
-    fn parts(&self) -> (&Info, &State) {
-        #[handler]
-        #[ram]
-        pub(super) fn irq_handler() {
-            async_handler(&PERIPHERAL, &STATE);
-        }
-
-        static STATE: State = State {
-            waker: AtomicWaker::new(),
-            rx_start_pending: AtomicBool::new(false),
-            rx_stop_pending: AtomicBool::new(false),
-        };
-
-        static PERIPHERAL: Info = Info {
-            register_block: crate::peripherals::I2C1::ptr(),
-            peripheral: crate::system::Peripheral::I2cExt1,
-            async_handler: irq_handler,
-            clock_instance: I2cInstance::I2c1,
-            scl_output: OutputSignal::I2CEXT1_SCL,
-            scl_input: InputSignal::I2CEXT1_SCL,
-            sda_output: OutputSignal::I2CEXT1_SDA,
-            sda_input: InputSignal::I2CEXT1_SDA,
-        };
-        (&PERIPHERAL, &STATE)
-    }
-}
+    };
+);
 
 crate::any_peripheral! {
     /// Any I2C peripheral in slave mode.

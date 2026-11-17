@@ -2,7 +2,13 @@
 include = ["esp-config.toml"]
 
 [target.{{ chip.rust_target }}]
-runner = "espflash flash --monitor --chip {{ chip.name }}"
+#%if option("probe-rs")
+runner = "probe-rs run --chip={{ chip.name }} --preverify --always-print-stacktrace --no-location"
+#%else if option("defmt")
+#+runner = "espflash flash --monitor --chip {{ chip.name }} --log-format defmt"
+#%else
+#+runner = "espflash flash --monitor --chip {{ chip.name }}"
+#%endif
 
 [build]
 rustflags = [
@@ -12,6 +18,9 @@ rustflags = [
   # Required to obtain backtraces (e.g. when using the "esp-backtrace" crate.)
   # NOTE: May negatively impact performance of produced code
   "-C", "force-frame-pointers",
+#%endif
+#%if option("stack-smashing-protection")
+  "-Z", "stack-protector=all",
 #%endif
 ]
 

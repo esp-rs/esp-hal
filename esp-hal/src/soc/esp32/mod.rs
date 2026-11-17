@@ -11,6 +11,8 @@ crate::unstable_module! {
     // The light sleep path stalls the other core, and it is not gated on the feature.
     pub mod cpu_control;
 }
+#[cfg(all(cache_livelock_workaround, feature = "rt"))]
+pub(crate) mod cache_livelock;
 pub mod gpio;
 pub(crate) mod regi2c;
 
