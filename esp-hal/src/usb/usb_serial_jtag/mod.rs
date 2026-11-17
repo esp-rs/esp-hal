@@ -144,12 +144,16 @@ type Error = Infallible;
 const MAX_PACKET_SIZE: usize = 64;
 
 /// USB Serial/JTAG (Full-duplex)
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct UsbSerialJtag<'d, Dm: DriverMode> {
     rx: UsbSerialJtagRx<'d, Dm>,
     tx: UsbSerialJtagTx<'d, Dm>,
 }
 
 /// USB Serial/JTAG (Transmit)
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct UsbSerialJtagTx<'d, Dm: DriverMode> {
     peripheral: USB_DEVICE<'d>,
     phantom: PhantomData<Dm>,
@@ -157,6 +161,8 @@ pub struct UsbSerialJtagTx<'d, Dm: DriverMode> {
 }
 
 /// USB Serial/JTAG (Receive)
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct UsbSerialJtagRx<'d, Dm: DriverMode> {
     peripheral: USB_DEVICE<'d>,
     phantom: PhantomData<Dm>,
@@ -323,23 +329,24 @@ where
         }
         count
     }
+}
 
-    /// Listens for RX-PACKET-RECV interrupts.
+impl UsbSerialJtagRx<'_, Blocking> {
+    /// Enables the interrupt for a packet received from the host.
+    #[instability::unstable]
     pub fn listen_rx_packet_recv_interrupt(&mut self) {
-        self.regs()
-            .int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt().set_bit());
+        Event::RxPacketReceived.set_enabled(self.regs(), true);
     }
 
-    /// Stops listening for RX-PACKET-RECV interrupts.
+    /// Disables the interrupt for a packet received from the host.
+    #[instability::unstable]
     pub fn unlisten_rx_packet_recv_interrupt(&mut self) {
-        self.regs()
-            .int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt().clear_bit());
+        Event::RxPacketReceived.set_enabled(self.regs(), false);
     }
 
-    /// Returns whether RX-PACKET-RECV interrupt is set.
-    pub fn rx_packet_recv_interrupt_set(&mut self) -> bool {
+    /// Returns whether the interrupt for a packet received from the host is pending.
+    #[instability::unstable]
+    pub fn rx_packet_recv_interrupt_set(&self) -> bool {
         self.regs()
             .int_st()
             .read()
@@ -347,11 +354,10 @@ where
             .bit_is_set()
     }
 
-    /// Resets RX-PACKET-RECV interrupt.
+    /// Clears the interrupt for a packet received from the host.
+    #[instability::unstable]
     pub fn reset_rx_packet_recv_interrupt(&mut self) {
-        self.regs()
-            .int_clr()
-            .write(|w| w.serial_out_recv_pkt().clear_bit_by_one());
+        Event::RxPacketReceived.clear(self.regs());
     }
 }
 
@@ -379,6 +385,39 @@ impl<'d> UsbSerialJtag<'d, Blocking> {
             },
         }
     }
+
+    /// Registers an interrupt handler for the peripheral.
+    ///
+    /// Replaces the interrupt handler that was registered before.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.rx.peripheral.disable_peri_interrupt_on_all_cores();
+        self.rx.peripheral.bind_peri_interrupt(handler);
+    }
+
+    /// Enables the interrupt for a packet received from the host.
+    #[instability::unstable]
+    pub fn listen_rx_packet_recv_interrupt(&mut self) {
+        self.rx.listen_rx_packet_recv_interrupt()
+    }
+
+    /// Disables the interrupt for a packet received from the host.
+    #[instability::unstable]
+    pub fn unlisten_rx_packet_recv_interrupt(&mut self) {
+        self.rx.unlisten_rx_packet_recv_interrupt()
+    }
+
+    /// Returns whether the interrupt for a packet received from the host is pending.
+    #[instability::unstable]
+    pub fn rx_packet_recv_interrupt_set(&self) -> bool {
+        self.rx.rx_packet_recv_interrupt_set()
+    }
+
+    /// Clears the interrupt for a packet received from the host.
+    #[instability::unstable]
+    pub fn reset_rx_packet_recv_interrupt(&mut self) {
+        self.rx.reset_rx_packet_recv_interrupt()
+    }
 }
 
 impl<'d, Dm> UsbSerialJtag<'d, Dm>
@@ -386,32 +425,27 @@ where
     Dm: DriverMode,
 {
     fn new_inner(usb_device: USB_DEVICE<'d>) -> Self {
-        // Do NOT reset the peripheral. Doing so will result in a broken USB JTAG
-        // connection.
+        // A reset breaks the USB-JTAG connection. `UsbDevice` is in `Peripheral::KEEP_ENABLED`, so
+        // `enable` returns `false` and the reset does not run.
         if PeripheralClockControl::enable(Peripheral::UsbDevice) {
             PeripheralClockControl::reset(Peripheral::UsbDevice);
         } else {
-            // Refcount was more than 0. Decrement to avoid overflow because we don't handle
-            // dropping the driver.
+            // The driver has no `Drop`, so undo the count increment to prevent an overflow.
             PeripheralClockControl::disable(Peripheral::UsbDevice);
         }
 
         let regs = USB_DEVICE::regs();
-        regs.int_ena().modify(|_, w| {
-            w.serial_in_empty().clear_bit();
-            w.serial_out_recv_pkt().clear_bit()
-        });
-        regs.int_clr().write(|w| {
-            w.serial_in_empty().clear_bit_by_one();
-            w.serial_out_recv_pkt().clear_bit_by_one()
-        });
+        for event in [Event::TxPacketSent, Event::RxPacketReceived] {
+            event.set_enabled(regs, false);
+            event.clear(regs);
+        }
 
         #[cfg(any(esp32c3, esp32s3))]
         {
             use crate::efuse::USB_EXCHG_PINS;
 
-            // On the esp32c3, and esp32s3 the USB_EXCHG_PINS efuse is bugged and
-            // doesn't swap the pullups too, this works around that.
+            // On ESP32-C3 and ESP32-S3, the USB_EXCHG_PINS eFuse swaps the data lines, but not
+            // their pull-up resistors.
             if crate::efuse::read_bit(USB_EXCHG_PINS) {
                 regs.conf0().modify(|_, w| {
                     w.pad_pull_override().set_bit();
@@ -474,35 +508,6 @@ where
     pub fn read_ready(&self) -> bool {
         self.rx.read_ready()
     }
-
-    /// Listens for RX-PACKET-RECV interrupts.
-    pub fn listen_rx_packet_recv_interrupt(&mut self) {
-        self.rx.listen_rx_packet_recv_interrupt()
-    }
-
-    /// Stops listening for RX-PACKET-RECV interrupts.
-    pub fn unlisten_rx_packet_recv_interrupt(&mut self) {
-        self.rx.unlisten_rx_packet_recv_interrupt()
-    }
-
-    /// Returns whether RX-PACKET-RECV interrupt is set.
-    pub fn rx_packet_recv_interrupt_set(&mut self) -> bool {
-        self.rx.rx_packet_recv_interrupt_set()
-    }
-
-    /// Resets RX-PACKET-RECV interrupt.
-    pub fn reset_rx_packet_recv_interrupt(&mut self) {
-        self.rx.reset_rx_packet_recv_interrupt()
-    }
-
-    /// Registers an interrupt handler for the USB Serial JTAG peripheral.
-    ///
-    /// Replaces any previously registered interrupt handlers.
-    #[instability::unstable]
-    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        self.rx.peripheral.disable_peri_interrupt_on_all_cores();
-        self.rx.peripheral.bind_peri_interrupt(handler);
-    }
 }
 
 // Static instance of the waker for each component of the peripheral:
@@ -513,44 +518,87 @@ static WAKER_RX: AtomicWaker = AtomicWaker::new();
 // stale enable bits to be restored. Serialize all INT_ENA updates.
 static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-struct UsbSerialJtagWriteFuture<'d> {
-    _peripheral: USB_DEVICE<'d>,
+#[derive(Clone, Copy)]
+enum Event {
+    /// `SERIAL_IN_EMPTY`: the host took a packet from the output FIFO.
+    TxPacketSent,
+    /// `SERIAL_OUT_RECV_PKT`: the host put a packet into the input FIFO.
+    RxPacketReceived,
 }
 
-impl<'d> UsbSerialJtagWriteFuture<'d> {
-    fn new(peripheral: USB_DEVICE<'d>) -> Self {
-        // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
-        // interrupt
-        INT_ENA_LOCK.lock(|| {
-            USB_DEVICE::regs()
-                .int_ena()
-                .modify(|_, w| w.serial_in_empty().set_bit());
-        });
-
-        Self {
-            _peripheral: peripheral,
+impl Event {
+    fn waker(self) -> &'static AtomicWaker {
+        match self {
+            Event::TxPacketSent => &WAKER_TX,
+            Event::RxPacketReceived => &WAKER_RX,
         }
     }
 
-    fn event_bit_is_clear(&self) -> bool {
-        USB_DEVICE::regs()
-            .int_ena()
-            .read()
-            .serial_in_empty()
-            .bit_is_clear()
+    fn ready(self, regs: &RegisterBlock) -> bool {
+        let ep1_conf = regs.ep1_conf().read();
+        match self {
+            Event::TxPacketSent => ep1_conf.serial_in_ep_data_free().bit_is_set(),
+            Event::RxPacketReceived => ep1_conf.serial_out_ep_data_avail().bit_is_set(),
+        }
+    }
+
+    fn set_enabled(self, regs: &RegisterBlock, enable: bool) {
+        INT_ENA_LOCK.lock(|| {
+            regs.int_ena().modify(|_, w| match self {
+                Event::TxPacketSent => w.serial_in_empty().bit(enable),
+                Event::RxPacketReceived => w.serial_out_recv_pkt().bit(enable),
+            });
+        });
+    }
+
+    fn enabled(self, regs: &RegisterBlock) -> bool {
+        let int_ena = regs.int_ena().read();
+        match self {
+            Event::TxPacketSent => int_ena.serial_in_empty().bit_is_set(),
+            Event::RxPacketReceived => int_ena.serial_out_recv_pkt().bit_is_set(),
+        }
+    }
+
+    fn clear(self, regs: &RegisterBlock) {
+        regs.int_clr().write(|w| match self {
+            Event::TxPacketSent => w.serial_in_empty().clear_bit_by_one(),
+            Event::RxPacketReceived => w.serial_out_recv_pkt().clear_bit_by_one(),
+        });
     }
 }
 
-impl core::future::Future for UsbSerialJtagWriteFuture<'_> {
+/// Resolves when the FIFO is ready for `event`'s direction.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+struct UsbSerialJtagFuture<'d> {
+    _peripheral: USB_DEVICE<'d>,
+    event: Event,
+}
+
+impl<'d> UsbSerialJtagFuture<'d> {
+    fn new(peripheral: USB_DEVICE<'d>, event: Event) -> Self {
+        let regs = USB_DEVICE::regs();
+        // A raw event from an earlier packet (`SERIAL_IN_EMPTY` resets to 1) wakes the future at
+        // once. `poll` checks the FIFO after the clear, so no event is lost.
+        event.clear(regs);
+        event.set_enabled(regs, true);
+
+        Self {
+            _peripheral: peripheral,
+            event,
+        }
+    }
+}
+
+impl core::future::Future for UsbSerialJtagFuture<'_> {
     type Output = ();
 
     fn poll(
         self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> core::task::Poll<Self::Output> {
-        WAKER_TX.register(cx.waker());
-        if self.event_bit_is_clear() {
+        self.event.waker().register(cx.waker());
+        let regs = USB_DEVICE::regs();
+        if self.event.ready(regs) || !self.event.enabled(regs) {
             Poll::Ready(())
         } else {
             Poll::Pending
@@ -558,48 +606,9 @@ impl core::future::Future for UsbSerialJtagWriteFuture<'_> {
     }
 }
 
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-struct UsbSerialJtagReadFuture<'d> {
-    _peripheral: USB_DEVICE<'d>,
-}
-
-impl<'d> UsbSerialJtagReadFuture<'d> {
-    fn new(peripheral: USB_DEVICE<'d>) -> Self {
-        // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_OUT_RECV_PKT
-        // interrupt
-        INT_ENA_LOCK.lock(|| {
-            USB_DEVICE::regs()
-                .int_ena()
-                .modify(|_, w| w.serial_out_recv_pkt().set_bit());
-        });
-
-        Self {
-            _peripheral: peripheral,
-        }
-    }
-
-    fn event_bit_is_clear(&self) -> bool {
-        USB_DEVICE::regs()
-            .int_ena()
-            .read()
-            .serial_out_recv_pkt()
-            .bit_is_clear()
-    }
-}
-
-impl core::future::Future for UsbSerialJtagReadFuture<'_> {
-    type Output = ();
-
-    fn poll(
-        self: core::pin::Pin<&mut Self>,
-        cx: &mut core::task::Context<'_>,
-    ) -> core::task::Poll<Self::Output> {
-        WAKER_RX.register(cx.waker());
-        if self.event_bit_is_clear() {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
-        }
+impl Drop for UsbSerialJtagFuture<'_> {
+    fn drop(&mut self) {
+        self.event.set_enabled(USB_DEVICE::regs(), false);
     }
 }
 
@@ -625,22 +634,8 @@ impl<'d> UsbSerialJtag<'d, Async> {
 
 impl UsbSerialJtagTx<'_, Async> {
     async fn wait_tx_ready(&mut self) {
-        loop {
-            // Immediately after WR_DONE, DATA_FREE may still reflect the previous
-            // transfer's ready state. Wait for a new IN_EMPTY event before trusting it.
-            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
-
-            // A pending or early interrupt can wake the future before the FIFO is
-            // actually ready. Keep waiting until the hardware confirms readiness.
-            if self
-                .regs()
-                .ep1_conf()
-                .read()
-                .serial_in_ep_data_free()
-                .bit_is_set()
-            {
-                break;
-            }
+        while !self.write_ready() {
+            UsbSerialJtagFuture::new(self.peripheral.reborrow(), Event::TxPacketSent).await;
         }
     }
 
@@ -684,7 +679,7 @@ impl UsbSerialJtagRx<'_, Async> {
             if read > 0 {
                 return Ok(read);
             }
-            UsbSerialJtagReadFuture::new(self.peripheral.reborrow()).await;
+            UsbSerialJtagFuture::new(self.peripheral.reborrow(), Event::RxPacketReceived).await;
         }
     }
 }
