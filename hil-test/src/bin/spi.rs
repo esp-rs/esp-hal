@@ -13,11 +13,8 @@ use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
     Blocking,
-    spi::{
-        Mode,
-        master::{Config, Spi},
-    },
-    time::{Duration, Instant, Rate},
+    spi::master::{Config, Spi},
+    time::Rate,
 };
 use hil_test as _;
 
@@ -27,6 +24,8 @@ cfg_select! {
         use allocator_api2::vec::Vec;
         #[cfg(all(spi_master_supports_dma, pcnt_driver_supported))]
         use esp_hal::Async;
+        #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
+        use esp_hal::spi::master::ClockSource;
         #[cfg(spi_master_supports_dma)]
         use esp_hal::{
             dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, aligned::DmaAlignedMut},
@@ -43,15 +42,17 @@ cfg_select! {
         };
         use esp_hal::{
             peripherals::SPI2,
-            spi::master::{Address, Command, DataMode},
+            spi::{
+                Mode,
+                master::{Address, Command, DataMode},
+            },
+            time::{Duration, Instant},
         };
     }
     _ => {}
 }
 
-#[cfg(soc_clock_node_spi_function_clock_is_configurable)]
-use esp_hal::spi::master::ClockSource;
-
+#[cfg(feature = "unstable")]
 fn half_duplex_config() -> Config {
     let config = Config::default()
         .with_frequency(Rate::from_khz(100))
@@ -76,6 +77,7 @@ type DmaChannel<'a> = cfg_select! {
     },
 };
 
+#[cfg(feature = "unstable")]
 struct Context {
     spi: Spi<'static, Blocking>,
 
@@ -311,6 +313,7 @@ macro_rules! dma_alloc_tx_buffer {
     }};
 }
 
+#[cfg(feature = "unstable")]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use hil_test::assert_eq;
@@ -396,42 +399,7 @@ mod tests {
         }
     }
 
-    #[test]
-    fn max_output_frequency_is_attainable_by_default(mut ctx: Context) {
-        let max_mhz = cfg_select! {
-            any(esp32, esp32c2) => 40,
-            any(esp32h2, esp32h4) => 48, // and H21
-            any(
-                esp32c3, esp32c5, esp32c6, esp32c61, esp32p4, esp32s2, esp32s3, esp32s31
-            ) => 80,
-        };
-        ctx.spi
-            .apply_config(&Config::default().with_frequency(Rate::from_mhz(max_mhz)))
-            .unwrap();
-    }
-
-    #[test]
-    fn test_symmetric_transfer(mut ctx: Context) {
-        let write = [0xde, 0xad, 0xbe, 0xef];
-        let mut read: [u8; 4] = [0x00u8; 4];
-
-        SpiBus::transfer(&mut ctx.spi, &mut read[..], &write[..])
-            .expect("Symmetric transfer failed");
-        assert_eq!(write, read);
-    }
-
-    #[test]
-    async fn test_async_symmetric_transfer(ctx: Context) {
-        let write = [0xde, 0xad, 0xbe, 0xef];
-        let mut read: [u8; 4] = [0x00u8; 4];
-
-        let mut spi = ctx.spi.into_async();
-        SpiBusAsync::transfer(&mut spi, &mut read[..], &write[..])
-            .await
-            .expect("Symmetric transfer failed");
-        assert_eq!(write, read);
-    }
-
+    // Move the asymmetric transfer tests to the `stable` module once PCNT is stable.
     #[test]
     fn test_asymmetric_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
@@ -588,66 +556,6 @@ mod tests {
             .expect("Asymmetric transfer failed");
 
         assert_eq!(miso_pulse_counter.value(), 9);
-    }
-
-    #[test]
-    fn test_symmetric_transfer_huge_buffer(mut ctx: Context) {
-        let write = &mut ctx.tx_buffer[0..4096];
-        for byte in 0..write.len() {
-            write[byte] = byte as u8;
-        }
-        let read = &mut ctx.rx_buffer[0..4096];
-
-        SpiBus::transfer(&mut ctx.spi, &mut read[..], &write[..]).expect("Huge transfer failed");
-        assert_eq!(write, read);
-    }
-
-    #[test]
-    async fn test_async_symmetric_transfer_huge_buffer(ctx: Context) {
-        let write = &mut ctx.tx_buffer[0..4096];
-        for byte in 0..write.len() {
-            write[byte] = byte as u8;
-        }
-        let read = &mut ctx.rx_buffer[0..4096];
-
-        let mut spi = ctx.spi.into_async();
-        SpiBusAsync::transfer(&mut spi, &mut read[..], &write[..])
-            .await
-            .expect("Huge transfer failed");
-        for idx in 0..write.len() {
-            assert_eq!(write[idx], read[idx], "Mismatch at index {}", idx);
-        }
-    }
-
-    #[test]
-    fn test_symmetric_transfer_huge_buffer_in_place(mut ctx: Context) {
-        let write = &mut ctx.tx_buffer[0..4096];
-        for byte in 0..write.len() {
-            write[byte] = byte as u8;
-        }
-
-        ctx.spi
-            .transfer_in_place(&mut write[..])
-            .expect("Huge transfer failed");
-        for byte in 0..write.len() {
-            assert_eq!(write[byte], byte as u8);
-        }
-    }
-
-    #[test]
-    async fn test_async_symmetric_transfer_huge_buffer_in_place(ctx: Context) {
-        let write = &mut ctx.tx_buffer[0..4096];
-        for byte in 0..write.len() {
-            write[byte] = byte as u8;
-        }
-
-        let mut spi = ctx.spi.into_async();
-        SpiBusAsync::transfer_in_place(&mut spi, &mut write[..])
-            .await
-            .expect("Huge transfer failed");
-        for byte in 0..write.len() {
-            assert_eq!(write[byte], byte as u8);
-        }
     }
 
     #[test]
@@ -1029,6 +937,8 @@ mod tests {
         assert_eq!(&[0xff, 0xff, 0xff, 0xff], dma_rx_buf.as_slice());
     }
 
+    // Move the `cancel_stops_basic_async_spi_*` tests to the `stable` module once
+    // `Config::with_clock_source` is stable.
     async fn check_cancel_stops_basic_async_spi(
         mut ctx: Context,
         op: impl AsyncFnOnce(&mut Spi<'static, esp_hal::Async>, &mut [u8], &mut [u8]),
@@ -1710,6 +1620,7 @@ mod half_duplex_write_psram {
     }
 }
 
+#[cfg(feature = "unstable")]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod read {
     #[cfg(spi_master_supports_dma)]
@@ -2029,7 +1940,7 @@ mod read {
     }
 }
 
-#[cfg(pcnt_driver_supported)]
+#[cfg(all(pcnt_driver_supported, feature = "unstable"))]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod write {
     #[cfg(spi_master_supports_dma)]
@@ -2482,8 +2393,7 @@ mod write {
 }
 
 #[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
-#[cfg(any(feature = "unstable", spi_slave_driver_supported))]
-#[cfg(spi_slave_supports_dma)]
+#[cfg(all(spi_slave_supports_dma, feature = "unstable"))]
 mod spi_slave {
     #[cfg(spi_slave_supports_dma)]
     use esp_hal::{dma_rx_buffer, dma_tx_buffer};
@@ -2658,7 +2568,7 @@ mod spi_slave {
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
-#[cfg(spi_master_supports_dma)]
+#[cfg(all(spi_master_supports_dma, feature = "unstable"))]
 mod qspi_dma {
     #[cfg(pcnt_driver_supported)]
     use esp_hal::gpio::Flex;
@@ -3452,5 +3362,148 @@ mod qspi_dma {
 
         let spi = set_pin(spi, sio_n).with_sio0(mosi);
         execute_write_with_cpu(unit0, unit1, spi, write, true);
+    }
+}
+
+/// Tests that use only stable API. The `unstable` configuration runs the rest.
+#[cfg(not(feature = "unstable"))]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod stable {
+    use hil_test::assert_eq;
+
+    use super::*;
+
+    struct Context {
+        spi: Spi<'static, Blocking>,
+        rx_buffer: &'static mut [u8],
+        tx_buffer: &'static mut [u8],
+    }
+
+    #[init]
+    fn init() -> Context {
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
+
+        let (mosi, miso) = hil_test::common_test_pins!(peripherals);
+        let sclk = hil_test::unconnected_pin!(peripherals);
+
+        static mut TX_BUFFER: [u8; 4096] = [0; 4096];
+        static mut RX_BUFFER: [u8; 4096] = [0; 4096];
+
+        let tx_buffer = unsafe { (&raw mut TX_BUFFER).as_mut().unwrap() };
+        let rx_buffer = unsafe { (&raw mut RX_BUFFER).as_mut().unwrap() };
+
+        // Need to set miso first so that mosi can overwrite the
+        // output connection (because we are using the same pin to loop back)
+        let spi = Spi::new(
+            peripherals.SPI2,
+            Config::default().with_frequency(Rate::from_mhz(10)),
+        )
+        .unwrap()
+        .with_sck(sclk)
+        .with_miso(miso)
+        .with_mosi(mosi);
+
+        Context {
+            spi,
+            rx_buffer,
+            tx_buffer,
+        }
+    }
+    #[test]
+    fn max_output_frequency_is_attainable_by_default(mut ctx: Context) {
+        let max_mhz = cfg_select! {
+            any(esp32, esp32c2) => 40,
+            any(esp32h2, esp32h4) => 48, // and H21
+            any(
+                esp32c3, esp32c5, esp32c6, esp32c61, esp32p4, esp32s2, esp32s3, esp32s31
+            ) => 80,
+        };
+        ctx.spi
+            .apply_config(&Config::default().with_frequency(Rate::from_mhz(max_mhz)))
+            .unwrap();
+    }
+
+    #[test]
+    fn test_symmetric_transfer(mut ctx: Context) {
+        let write = [0xde, 0xad, 0xbe, 0xef];
+        let mut read: [u8; 4] = [0x00u8; 4];
+
+        SpiBus::transfer(&mut ctx.spi, &mut read[..], &write[..])
+            .expect("Symmetric transfer failed");
+        assert_eq!(write, read);
+    }
+
+    #[test]
+    async fn test_async_symmetric_transfer(ctx: Context) {
+        let write = [0xde, 0xad, 0xbe, 0xef];
+        let mut read: [u8; 4] = [0x00u8; 4];
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::transfer(&mut spi, &mut read[..], &write[..])
+            .await
+            .expect("Symmetric transfer failed");
+        assert_eq!(write, read);
+    }
+
+    #[test]
+    fn test_symmetric_transfer_huge_buffer(mut ctx: Context) {
+        let write = &mut ctx.tx_buffer[0..4096];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+        let read = &mut ctx.rx_buffer[0..4096];
+
+        SpiBus::transfer(&mut ctx.spi, &mut read[..], &write[..]).expect("Huge transfer failed");
+        assert_eq!(write, read);
+    }
+
+    #[test]
+    async fn test_async_symmetric_transfer_huge_buffer(ctx: Context) {
+        let write = &mut ctx.tx_buffer[0..4096];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+        let read = &mut ctx.rx_buffer[0..4096];
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::transfer(&mut spi, &mut read[..], &write[..])
+            .await
+            .expect("Huge transfer failed");
+        for idx in 0..write.len() {
+            assert_eq!(write[idx], read[idx], "Mismatch at index {}", idx);
+        }
+    }
+
+    #[test]
+    fn test_symmetric_transfer_huge_buffer_in_place(mut ctx: Context) {
+        let write = &mut ctx.tx_buffer[0..4096];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+
+        ctx.spi
+            .transfer_in_place(&mut write[..])
+            .expect("Huge transfer failed");
+        for byte in 0..write.len() {
+            assert_eq!(write[byte], byte as u8);
+        }
+    }
+
+    #[test]
+    async fn test_async_symmetric_transfer_huge_buffer_in_place(ctx: Context) {
+        let write = &mut ctx.tx_buffer[0..4096];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::transfer_in_place(&mut spi, &mut write[..])
+            .await
+            .expect("Huge transfer failed");
+        for byte in 0..write.len() {
+            assert_eq!(write[byte], byte as u8);
+        }
     }
 }
