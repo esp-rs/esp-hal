@@ -848,27 +848,22 @@ impl Info {
     /// Returns `false` and does nothing if the function clock is off. Without the clock, the
     /// transmitter never stops.
     #[cfg(sleep_driver_supported)]
-    pub(crate) fn suspend_for_sleep(&self) -> bool {
-        ClockTree::with(|clocks| {
-            let used = self.in_use(clocks);
+    pub(crate) fn suspend_for_sleep(&self, clocks: &mut ClockTree) -> bool {
+        let used = self.in_use(clocks);
 
-            if used {
-                version::suspend(self, true);
-                version::wait_for_suspended(self);
-            }
+        if used {
+            version::suspend(self, true);
+            version::wait_for_suspended(self);
+        }
 
-            used
-        })
+        used
     }
 
     #[cfg(sleep_driver_supported)]
-    pub(crate) fn resume_from_sleep(&self) {
-        ClockTree::with(|clocks| {
-            let used = self.in_use(clocks);
-            if used {
-                version::suspend(self, false);
-            }
-        });
+    pub(crate) fn resume_from_sleep(&self, clocks: &mut ClockTree) {
+        if self.in_use(clocks) {
+            version::suspend(self, false);
+        }
     }
 
     /// Lets this instance wake the chip from light sleep.
