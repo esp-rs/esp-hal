@@ -316,7 +316,6 @@ impl<'d> LowPower<'d> {
     /// refusal. A deep sleep whose limit the transition cannot catch panics when the caller cannot
     /// accept a rejection.
     #[cfg(sleep_driver_supported)]
-    #[crate::ram]
     #[cfg(feature = "rt")]
     pub(crate) fn sleep(
         &mut self,
@@ -355,7 +354,6 @@ impl<'d> LowPower<'d> {
     }
 
     #[cfg(sleep_driver_supported)]
-    #[crate::ram]
     #[cfg(feature = "rt")]
     fn sleep_with_interrupts_disabled(
         &mut self,
@@ -478,83 +476,14 @@ impl<'d> LowPower<'d> {
 
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
 
-        #[cfg(multi_core)]
-        let parked = match kind {
-            SleepKind::Light => park_other_cores(),
-            // A deep sleep resets the chip, so the other core needs no stall, and nothing thaws
-            // it afterwards.
-            SleepKind::Deep => 0,
-        };
-
-        // After the light-sleep stall, so that the other core cannot force the SAR on again.
-        let sar_power = SarPower::for_sleep(kind).replace();
-
-        let rejected = {
-            // ESP-IDF arms RTC_CNTL retention in `misc_modules_sleep_prepare`, before it arms the
-            // wakeup sources.
-
-            #[cfg(cpu_retention = "rtc_cntl")]
-            cpu_retention::prepare_cpu_retention(retention_buffer);
-
-            let saved = config.start_sleep(wakeup_mask, reject_mask);
-
-            // Last, because this step takes the pads away from the peripherals that drove them. The
-            // wakeup sources have their holds now, and no later step needs a pad.
-            #[cfg(any(
-                sleep_deep_sleep_needs_gpio_isolation,
-                gpio_need_soft_isolate_during_pd
-            ))]
-            if kind == SleepKind::Deep {
-                gpio::wakeup::isolate_pads_for_deep_sleep();
-            }
-
-            // A CPU power-down loses the dirty cache lines, and with them the writes to PSRAM.
-            // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L55-L72>.
-            #[cfg(soc_cpu_powers_down_cache)]
-            if retention_buffer.is_some()
-                && config.pd_flags.pd_cpu()
-                && !crate::psram::psram_range().is_empty()
-            {
-                crate::soc::cache_writeback_all();
-            }
-
-            let rejected = cfg_select! {
-                cpu_retention = "software" => {
-                    // The software chips save the CPU inside the request, so the request belongs to
-                    // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
-                    cpu_retention::enter_sleep_with_retention(&config, retention_buffer)
-                }
-                _ => config.enter_sleep(),
-            };
-
-            if config.is_deep_sleep() && !rejected {
-                // The chip is entering deep sleep, and the wake resets it. Because RTC is in a
-                // slower clock domain than the CPU, the power-down can take several CPU cycles.
-                loop {
-                    core::hint::spin_loop();
-                }
-            }
-
-            config.finish_sleep();
-            saved.restore();
-
-            rejected
-        };
-
-        #[cfg(supports_cpu_power_down)]
-        if kind == SleepKind::Light && retention_buffer.is_some() {
-            // First, because the other core comes back through the wake stub that the next call
-            // disarms.
-            #[cfg(all(cpu_retention = "software", multi_core))]
-            cpu_retention::rendezvous::finish();
-
-            cpu_retention::finish_cpu_retention(rejected);
-        }
-
-        sar_power.replace();
-
-        #[cfg(multi_core)]
-        unpark_cores(parked);
+        let rejected = sleep_transition(
+            &config,
+            kind,
+            wakeup_mask,
+            reject_mask,
+            #[cfg(supports_cpu_power_down)]
+            retention_buffer,
+        );
 
         let after = rtc.time_since_boot_raw();
 
@@ -587,6 +516,101 @@ impl<'d> LowPower<'d> {
 
         false
     }
+}
+
+/// Stalls the other cores, requests the sleep, and returns whether the hardware rejected the
+/// request.
+///
+/// This part switches the CPU clock, and it can suspend the caches or power down the CPU. The code
+/// before and after it can run from flash.
+#[cfg(all(sleep_driver_supported, feature = "rt"))]
+#[crate::ram]
+fn sleep_transition(
+    config: &RtcSleepConfig,
+    kind: SleepKind,
+    wakeup_mask: u32,
+    reject_mask: u32,
+    #[cfg(supports_cpu_power_down)] retention_buffer: Option<core::ptr::NonNull<u8>>,
+) -> bool {
+    #[cfg(multi_core)]
+    let parked = match kind {
+        SleepKind::Light => park_other_cores(),
+        // A deep sleep resets the chip, so the other core needs no stall, and nothing thaws
+        // it afterwards.
+        SleepKind::Deep => 0,
+    };
+
+    // After the light-sleep stall, so that the other core cannot force the SAR on again.
+    let sar_power = SarPower::for_sleep(kind).replace();
+
+    let rejected = {
+        // ESP-IDF arms RTC_CNTL retention in `misc_modules_sleep_prepare`, before it arms the
+        // wakeup sources.
+
+        #[cfg(cpu_retention = "rtc_cntl")]
+        cpu_retention::prepare_cpu_retention(retention_buffer);
+
+        let saved = config.start_sleep(wakeup_mask, reject_mask);
+
+        // Last, because this step takes the pads away from the peripherals that drove them. The
+        // wakeup sources have their holds now, and no later step needs a pad.
+        #[cfg(any(
+            sleep_deep_sleep_needs_gpio_isolation,
+            gpio_need_soft_isolate_during_pd
+        ))]
+        if kind == SleepKind::Deep {
+            gpio::wakeup::isolate_pads_for_deep_sleep();
+        }
+
+        // A CPU power-down loses the dirty cache lines, and with them the writes to PSRAM.
+        // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L55-L72>.
+        #[cfg(soc_cpu_powers_down_cache)]
+        if retention_buffer.is_some()
+            && config.pd_flags.pd_cpu()
+            && !crate::psram::psram_range().is_empty()
+        {
+            crate::soc::cache_writeback_all();
+        }
+
+        let rejected = cfg_select! {
+            cpu_retention = "software" => {
+                // The software chips save the CPU inside the request, so the request belongs to
+                // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
+                cpu_retention::enter_sleep_with_retention(config, retention_buffer)
+            }
+            _ => config.enter_sleep(),
+        };
+
+        if config.is_deep_sleep() && !rejected {
+            // The chip is entering deep sleep, and the wake resets it. Because RTC is in a
+            // slower clock domain than the CPU, the power-down can take several CPU cycles.
+            loop {
+                core::hint::spin_loop();
+            }
+        }
+
+        config.finish_sleep();
+        saved.restore();
+
+        rejected
+    };
+
+    #[cfg(supports_cpu_power_down)]
+    if kind == SleepKind::Light && retention_buffer.is_some() {
+        // First, because the other core comes back through the wake stub that the next call
+        // disarms.
+        #[cfg(all(cpu_retention = "software", multi_core))]
+        cpu_retention::rendezvous::finish();
+
+        cpu_retention::finish_cpu_retention(rejected);
+    }
+
+    sar_power.replace();
+
+    #[cfg(multi_core)]
+    unpark_cores(parked);
+
+    rejected
 }
 
 /// Hardware-stalls the other running cores for the length of a light sleep, or thaws them.
@@ -682,16 +706,18 @@ pub(crate) fn wait_for_sleep_result() -> bool {
 /// See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_sleep/sleep_uart.c#L95-L131>.
 #[cfg(sleep_driver_supported)]
 fn sleep_uart_prepare() -> u32 {
-    use crate::uart::Instance;
-    let mut suspended = 0;
-    for_each_uart! {
-        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
-            if unsafe { crate::peripherals::$inst::steal() }.info().suspend_for_sleep() {
-                suspended |= 1 << $id;
-            }
-        };
-    }
-    suspended
+    use crate::{soc::clocks::ClockTree, uart::Instance};
+    ClockTree::with(|clocks| {
+        let mut suspended = 0;
+        for_each_uart! {
+            ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
+                if unsafe { crate::peripherals::$inst::steal() }.info().suspend_for_sleep(clocks) {
+                    suspended |= 1 << $id;
+                }
+            };
+        }
+        suspended
+    })
 }
 
 /// The SAR ADC power override, as one 2-bit `force_xpd_sar` mode per SAR unit.
@@ -812,12 +838,14 @@ impl SarPower {
 /// Resumes the UARTs that [`sleep_uart_prepare`] suspended.
 #[cfg(sleep_driver_supported)]
 fn sleep_uart_resume(suspended: u32) {
-    use crate::uart::Instance;
-    for_each_uart! {
-        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
-            if suspended & (1 << $id) != 0 {
-                unsafe { crate::peripherals::$inst::steal() }.info().resume_from_sleep();
-            }
-        };
-    }
+    use crate::{soc::clocks::ClockTree, uart::Instance};
+    ClockTree::with(|clocks| {
+        for_each_uart! {
+            ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
+                if suspended & (1 << $id) != 0 {
+                    unsafe { crate::peripherals::$inst::steal() }.info().resume_from_sleep(clocks);
+                }
+            };
+        }
+    });
 }
