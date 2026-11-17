@@ -277,6 +277,9 @@ pub struct Info {
     /// System peripheral marker.
     pub peripheral: crate::system::Peripheral,
 
+    /// Peripheral interrupt of this I2C instance.
+    pub interrupt: crate::peripherals::Interrupt,
+
     /// Interrupt handler for the asynchronous operations of this I2C instance.
     pub async_handler: InterruptHandler,
 
@@ -364,13 +367,17 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
+// `register_block` points to registers, which are `UnsafeCell`s. `Info` never changes, so a panic
+// that unwinds cannot leave it inconsistent.
+impl core::panic::RefUnwindSafe for Info {}
+
 pub(super) struct I2cClockGuard {
     clock: crate::clock::ll::I2cInstance,
 }
 
 impl I2cClockGuard {
-    pub(super) fn new(i2c: AnyI2c<'_>) -> Self {
-        let clock = i2c.info().clock_instance;
+    pub(super) fn new(info: &Info) -> Self {
+        let clock = info.clock_instance;
         ClockTree::with(|clocks| clock.request_function_clock(clocks));
         Self { clock }
     }
@@ -418,6 +425,13 @@ impl Driver<'_> {
         output: OutputSignal,
         guard: &mut PinGuard,
     ) {
+        // SAFETY: each `Instance` impl checks at compile time that its signals can use the GPIO
+        // matrix. This lets the compiler remove the routing panic of the GPIO driver.
+        unsafe {
+            core::hint::assert_unchecked(input.can_use_gpio_matrix());
+            core::hint::assert_unchecked(output.can_use_gpio_matrix());
+        }
+
         // avoid the pin going low during configuration
         pin.set_output_high(true);
 
@@ -1844,22 +1858,22 @@ pub struct State {
 }
 
 /// A peripheral singleton compatible with the I2C master driver.
-pub trait Instance: crate::private::Sealed + any::Degrade {
+pub trait Instance: crate::private::Sealed {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
-    fn parts(&self) -> (&Info, &State);
+    fn parts(&self) -> (&'static Info, &'static State);
 
     /// Returns the peripheral data describing this instance.
     #[doc(hidden)]
     #[inline(always)]
-    fn info(&self) -> &Info {
+    fn info(&self) -> &'static Info {
         self.parts().0
     }
 
     /// Returns the peripheral state for this instance.
     #[doc(hidden)]
     #[inline(always)]
-    fn state(&self) -> &State {
+    fn state(&self) -> &'static State {
         self.parts().1
     }
 }
@@ -1917,25 +1931,38 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 }
 
 for_each_i2c_master!(
-    ($id:literal, $inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
+    ($id:literal, $inst:ident, $peri:ident, $interrupt:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
-            fn parts(&self) -> (&Info, &State) {
-                #[handler]
-                #[ram]
-                pub(super) fn irq_handler() {
-                    async_handler(&PERIPHERAL, &STATE);
+            fn parts(&self) -> (&'static Info, &'static State) {
+                // `#[ram]` names the section after the function, and the linker keeps or drops
+                // a section whole, so each instance needs a handler with a unique name.
+                paste::paste! {
+                    #[handler]
+                    #[ram]
+                    pub(super) fn [<i2c $id _irq_handler>]() {
+                        async_handler(&PERIPHERAL, &STATE);
+                    }
                 }
 
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
                 };
 
+                // `Driver::connect_pin` relies on this.
+                const _: () = ::core::assert!(
+                    InputSignal::$scl.can_use_gpio_matrix()
+                        && InputSignal::$sda.can_use_gpio_matrix()
+                        && OutputSignal::$scl.can_use_gpio_matrix()
+                        && OutputSignal::$sda.can_use_gpio_matrix()
+                );
+
                 static PERIPHERAL: Info = Info {
                     #[cfg(soc_has_i2c1)]
                     id: $id,
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
-                    async_handler: irq_handler,
+                    interrupt: crate::peripherals::Interrupt::$interrupt,
+                    async_handler: paste::paste! { [<i2c $id _irq_handler>] },
                     scl_output: OutputSignal::$scl,
                     scl_input: InputSignal::$scl,
                     sda_output: OutputSignal::$sda,
@@ -1959,26 +1986,63 @@ crate::any_peripheral! {
 }
 
 impl Instance for AnyI2c<'_> {
-    fn parts(&self) -> (&Info, &State) {
+    fn parts(&self) -> (&'static Info, &'static State) {
         any::delegate!(self, i2c => { i2c.parts() })
     }
 }
 
-impl AnyI2c<'_> {
-    fn bind_peri_interrupt(&self, handler: InterruptHandler) {
-        any::delegate!(self, i2c => { i2c.bind_peri_interrupt(handler) })
+/// An I2C peripheral, represented by the data of its instance.
+pub(super) struct I2cWrapper<'d> {
+    // Read from the concrete type. `AnyI2c::parts()` refers to the data of every instance, so
+    // the linker could not drop the unused ones.
+    info: &'static Info,
+    state: &'static State,
+    _peripheral: PhantomData<AnyI2c<'d>>,
+}
+
+impl<'d> I2cWrapper<'d> {
+    pub(super) fn new(i2c: impl Instance + 'd) -> Self {
+        let (info, state) = i2c.parts();
+        Self {
+            info,
+            state,
+            _peripheral: PhantomData,
+        }
+    }
+
+    pub(super) fn info(&self) -> &'static Info {
+        self.info
+    }
+
+    pub(super) fn state(&self) -> &'static State {
+        self.state
     }
 
     pub(super) fn disable_peri_interrupt_on_all_cores(&self) {
-        any::delegate!(self, i2c => { i2c.disable_peri_interrupt_on_all_cores() })
+        for core in crate::system::Cpu::all() {
+            crate::interrupt::disable(core, self.info.interrupt);
+        }
     }
 
     pub(super) fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.disable_peri_interrupt_on_all_cores();
 
-        self.info().enable_listen(EnumSet::all(), false);
-        self.info().clear_interrupts(EnumSet::all());
+        self.info.enable_listen(EnumSet::all(), false);
+        self.info.clear_interrupts(EnumSet::all());
 
-        self.bind_peri_interrupt(handler);
+        crate::interrupt::bind_handler(self.info.interrupt, handler);
+    }
+}
+
+impl core::fmt::Debug for I2cWrapper<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(&self.info.peripheral, f)
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for I2cWrapper<'_> {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::Format::format(&self.info.peripheral, f)
     }
 }
