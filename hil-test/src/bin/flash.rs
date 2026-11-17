@@ -378,6 +378,54 @@ mod tests {
 
     #[cfg(multi_core)]
     #[test]
+    fn test_auto_park_from_both_cores_at_the_same_time() {
+        use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
+        use esp_hal::system::{CpuControl, Stack};
+        use hil_test::mk_static;
+
+        const ROUNDS: u32 = 1000;
+
+        static START: AtomicBool = AtomicBool::new(false);
+        static APP_CORE_GOOD_READS: AtomicU32 = AtomicU32::new(0);
+        static APP_CORE_DONE: AtomicBool = AtomicBool::new(false);
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let app_core_flash = unsafe { peripherals.FLASH.clone_unchecked() };
+        let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, move || {
+                let mut flash = Flash::new(app_core_flash, Config::default()).unwrap();
+                let mut words = [0u32; 64];
+                while !START.load(Ordering::Acquire) {}
+                for _ in 0..ROUNDS {
+                    if flash.read(APP_DESC_OFFSET, &mut words).is_ok()
+                        && as_bytes(&words) == expected_app_desc()
+                    {
+                        APP_CORE_GOOD_READS.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+                APP_CORE_DONE.store(true, Ordering::Release);
+                loop {}
+            })
+            .unwrap();
+
+        let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
+        let mut words = [0u32; 64];
+
+        START.store(true, Ordering::Release);
+        for _ in 0..ROUNDS {
+            flash.read(APP_DESC_OFFSET, &mut words).unwrap();
+            assert_eq!(as_bytes(&words), expected_app_desc());
+        }
+
+        while !APP_CORE_DONE.load(Ordering::Acquire) {}
+        assert_eq!(APP_CORE_GOOD_READS.load(Ordering::Relaxed), ROUNDS);
+    }
+
+    #[cfg(multi_core)]
+    #[test]
     fn test_error_if_other_core_running() {
         use core::sync::atomic::{AtomicBool, Ordering};
 

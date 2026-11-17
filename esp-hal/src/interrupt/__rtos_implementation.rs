@@ -89,7 +89,8 @@ pub unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitchHandle
 /// In debug builds, panics if `core` has no context-switch handler.
 #[cfg_attr(
     multi_core,
-    doc = "\nIn debug builds, panics if `core` is the APP CPU and that CPU is not running."
+    doc = "\nIn debug builds, panics if `core` is the APP CPU and that CPU is stopped or not
+    started."
 )]
 #[inline]
 pub fn request_context_switch(core: Cpu) {

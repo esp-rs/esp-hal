@@ -57,10 +57,23 @@ pub(super) static STATE: [CoreState; Cpu::COUNT] = [const { CoreState::new() }; 
 ///
 /// # Safety
 ///
-/// `core` does not run, and posts to `core` return [`IpcError::Offline`][super::IpcError::Offline].
+/// `core` does not run its IPC handler again before a restart, and
+/// [`app_core_takes_ipc`][crate::system::multi_core::app_core_takes_ipc] returns `false` for it.
 pub(crate) unsafe fn fail_stranded(core: Cpu) {
+    // A post that read `true` from `app_core_takes_ipc` can push until it leaves `APP_POSTS`.
+    if core == Cpu::AppCpu {
+        // This load and the load in `esp_hal_ipc_post` must be `SeqCst`. Otherwise each side can
+        // miss the store of the other side.
+        while APP_POSTS.load(Ordering::SeqCst) != 0 {
+            core::hint::spin_loop();
+        }
+    }
     unsafe { queue::fail_stranded(&STATE[core as usize].lists, core as u32) };
 }
+
+/// The number of posts to the APP CPU between their check of
+/// [`app_core_takes_ipc`][crate::system::multi_core::app_core_takes_ipc] and their push.
+static APP_POSTS: AtomicU32 = AtomicU32::new(0);
 
 /// Queues a run of `request` on the CPU `core`.
 ///
@@ -83,7 +96,12 @@ pub(super) unsafe extern "C" fn esp_hal_ipc_post(core: u8, request: NonNull<IpcR
 
     // A context switch must not stop the post between the push and the raise.
     let token = unsafe { SingleCoreInterruptLock.enter() };
-    let result = if core == Cpu::AppCpu && !crate::system::multi_core::app_core_takes_ipc() {
+    // A stop of the APP CPU clears `app_core_takes_ipc`, then waits until `APP_POSTS` is 0.
+    let counted = core == Cpu::AppCpu;
+    if counted {
+        APP_POSTS.fetch_add(1, Ordering::SeqCst);
+    }
+    let result = if counted && !crate::system::multi_core::app_core_takes_ipc() {
         queue::POST_OFFLINE
     } else {
         unsafe {
@@ -92,6 +110,9 @@ pub(super) unsafe extern "C" fn esp_hal_ipc_post(core: u8, request: NonNull<IpcR
             })
         }
     };
+    if counted {
+        APP_POSTS.fetch_sub(1, Ordering::Release);
+    }
     unsafe { SingleCoreInterruptLock.exit(token) };
 
     result
@@ -209,12 +230,12 @@ pub(crate) unsafe fn set_context_switch_handler(core: Cpu, handler: ContextSwitc
 /// # Panics
 ///
 /// In debug builds, panics if `core` has no context-switch handler, or if `core` is the APP CPU
-/// and that CPU is not running.
+/// and that CPU is stopped or not started. A parked CPU runs the handler after the park ends.
 #[inline]
 pub(crate) fn request_context_switch(core: Cpu) {
     debug_assert!(
-        core != Cpu::AppCpu || crate::soc::cpu_control::is_running(Cpu::AppCpu),
-        "IPC target APP core is not running"
+        core != Cpu::AppCpu || crate::system::multi_core::app_core_takes_ipc(),
+        "IPC target APP core is stopped or not started"
     );
 
     let state = &STATE[core as usize];
