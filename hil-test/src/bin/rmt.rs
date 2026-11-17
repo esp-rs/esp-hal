@@ -774,10 +774,10 @@ mod tests {
         let mut live_count = 0;
         loop {
             tx_transaction.poll();
-            let count = rx_transaction.fetch();
-            if rx_transaction.poll() {
+            if rx_transaction.fetch() {
                 break;
             }
+            let count = rx_transaction.received().len();
             if count > live_count {
                 live_count = count;
                 for (idx, (&code_tx, &code_rx)) in

@@ -1886,27 +1886,25 @@ impl<'ch> RxTransaction<'ch, '_> {
         status
     }
 
-    /// Copies the pulse codes received so far into the buffer and returns their number.
+    /// Copies the pulse codes received so far into the buffer and checks the receive status.
     ///
-    /// The reception continues. Use [`Self::received`] to read the codes.
+    /// Returns whether the reception has ended (whether successfully or with an error), like
+    /// [`Self::poll`]. Use [`Self::received`] to read the codes.
     ///
     /// The hardware makes a [`PulseCode`] available only when both of its pulses are complete.
-    /// Thus, the last pulse can be missing until the next edge on the input.
-    ///
-    /// This method also does the work of [`Self::poll`]. When the reception has ended, the buffer
-    /// contains all codes, including the end marker.
+    /// Thus, the last pulse can be missing until the next edge on the input. When the reception
+    /// has ended, the buffer contains all codes, including the end marker.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     #[instability::unstable]
-    pub fn fetch(&mut self) -> usize {
+    pub fn fetch(&mut self) -> bool {
         let status = self.poll_internal();
+        let ended = matches!(status, Some(Event::End | Event::Error));
 
-        if !matches!(status, Some(Event::End | Event::Error))
-            && self.reader.state == ReaderState::Active
-        {
+        if !ended && self.reader.state == ReaderState::Active {
             self.read(false);
         }
 
-        self.reader.total
+        ended
     }
 
     /// Returns the pulse codes in the buffer.
