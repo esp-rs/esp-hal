@@ -1233,26 +1233,33 @@ mod tests {
 
     #[test]
     #[cfg(feature = "unstable")]
-    fn transfer_works_after_half_duplex_operation(ctx: Context) {
-        let mut spi = ctx.spi;
-
+    fn transfer_works_after_half_duplex_operation(mut ctx: Context) {
         let mut buffer = [0u8; 4];
-        spi.half_duplex_read(
-            DataMode::Dual,
-            Command::_8Bit(0x92, DataMode::SingleTwoDataLines),
-            Address::_32Bit(0x000000_00, DataMode::Dual),
-            0,
-            &mut buffer,
-        )
-        .unwrap();
+        ctx.spi
+            .half_duplex_read(
+                DataMode::Dual,
+                Command::_8Bit(0x92, DataMode::SingleTwoDataLines),
+                Address::_32Bit(0x000000_00, DataMode::Dual),
+                0,
+                &mut buffer,
+            )
+            .unwrap();
+
+        #[cfg(pcnt_driver_supported)]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         const DATA: &[u8] = &[0xde, 0xad, 0xbe, 0xef];
         let mut buffer: [u8; 4] = [0x00u8; 4];
         buffer.copy_from_slice(DATA);
 
-        spi.transfer(&mut buffer)
+        ctx.spi
+            .transfer(&mut buffer)
             .expect("Symmetric transfer failed");
         assert_eq!(buffer, DATA);
+
+        // The received data cannot show leftover command and address phases, the clock count can.
+        #[cfg(pcnt_driver_supported)]
+        assert_eq!(sclk_counter.value(), 32);
     }
 
     #[test]
@@ -1383,23 +1390,26 @@ mod tests {
 
     #[test]
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
-    fn dma_transfer_works_after_half_duplex_operation(ctx: Context) {
-        let mut spi = ctx.spi;
-
+    fn dma_transfer_works_after_half_duplex_operation(mut ctx: Context) {
         let mut buffer = [0u8; 4];
-        spi.half_duplex_read(
-            DataMode::Dual,
-            Command::_8Bit(0x92, DataMode::SingleTwoDataLines),
-            Address::_32Bit(0x000000_00, DataMode::Dual),
-            0,
-            &mut buffer,
-        )
-        .unwrap();
+        ctx.spi
+            .half_duplex_read(
+                DataMode::Dual,
+                Command::_8Bit(0x92, DataMode::SingleTwoDataLines),
+                Address::_32Bit(0x000000_00, DataMode::Dual),
+                0,
+                &mut buffer,
+            )
+            .unwrap();
+
+        #[cfg(pcnt_driver_supported)]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         let dma_rx_buf = dma_rx_buffer!(4).unwrap();
         let dma_tx_buf = dma_tx_buffer!(4).unwrap();
 
-        let mut spi = spi
+        let mut spi = ctx
+            .spi
             .with_dma(ctx.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
@@ -1407,6 +1417,9 @@ mod tests {
         let mut rx_buf = [0; 4];
         spi.transfer(&mut rx_buf, &tx_buf).unwrap();
         assert_eq!(tx_buf, rx_buf);
+
+        #[cfg(pcnt_driver_supported)]
+        assert_eq!(sclk_counter.value(), 32);
     }
 
     #[test]
@@ -2048,6 +2061,7 @@ mod write {
         pcnt_source: InputSignal<'static>,
         cs_unit: Unit<'static>,
         cs_source: InputSignal<'static>,
+        sclk_unit: Unit<'static>,
 
         #[cfg(spi_master_supports_dma)]
         dma_channel: DmaChannel<'static>,
@@ -2077,6 +2091,18 @@ mod write {
         cs.set_output_enable(true);
         let cs_loopback = cs.peripheral_input();
 
+        let mut sclk = Flex::new(sclk);
+        sclk.set_input_enable(true);
+        sclk.set_output_enable(true);
+
+        // Connecting an input through the GPIO matrix selects the GPIO function of the pin. Where
+        // the pin has SCLK as IO MUX function, this must happen before the SPI driver selects it.
+        let sclk_unit = Unit::new(peripherals.PCNT0_UNIT2);
+        sclk_unit.channel0.set_edge_signal(sclk.peripheral_input());
+        sclk_unit
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
         let spi = Spi::new(peripherals.SPI2, half_duplex_config())
             .unwrap()
             .with_sck(sclk)
@@ -2089,8 +2115,143 @@ mod write {
             pcnt_source: mosi_loopback,
             cs_unit: Unit::new(peripherals.PCNT0_UNIT1),
             cs_source: cs_loopback,
+            sclk_unit,
             #[cfg(spi_master_supports_dma)]
             dma_channel,
+        }
+    }
+
+    const PATTERN: u8 = 0b0110_1010;
+    const PATTERN_EDGES: usize = 3;
+    const COMMAND_ADDRESS_BYTES: usize = 4;
+
+    fn command(mode: DataMode) -> Command {
+        Command::_8Bit(PATTERN as u16, mode)
+    }
+
+    fn address(mode: DataMode) -> Address {
+        Address::_24Bit(u32::from_be_bytes([0, PATTERN, PATTERN, PATTERN]), mode)
+    }
+
+    struct BusCounters {
+        mosi: Unit<'static>,
+        cs: Unit<'static>,
+        sclk: Unit<'static>,
+    }
+
+    impl BusCounters {
+        fn clear(&self) {
+            self.mosi.clear();
+            self.cs.clear();
+            self.sclk.clear();
+        }
+
+        #[track_caller]
+        fn assert_command_address_write(&self, data_bytes: usize) {
+            let bytes = COMMAND_ADDRESS_BYTES + data_bytes;
+            assert_eq!(self.sclk.value(), (8 * bytes) as _);
+            assert_eq!(self.mosi.value(), (PATTERN_EDGES * bytes) as _);
+            assert_eq!(self.cs.value(), 1);
+        }
+    }
+
+    struct Parts {
+        spi: Spi<'static, Blocking>,
+        counters: BusCounters,
+        #[cfg(spi_master_supports_dma)]
+        dma_channel: DmaChannel<'static>,
+    }
+
+    impl Context {
+        fn into_parts(self) -> Parts {
+            for (unit, source) in [
+                (&self.pcnt_unit, self.pcnt_source),
+                (&self.cs_unit, self.cs_source),
+            ] {
+                unit.channel0.set_edge_signal(source);
+                unit.channel0
+                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+            }
+
+            Parts {
+                spi: self.spi,
+                counters: BusCounters {
+                    mosi: self.pcnt_unit,
+                    cs: self.cs_unit,
+                    sclk: self.sclk_unit,
+                },
+                #[cfg(spi_master_supports_dma)]
+                dma_channel: self.dma_channel,
+            }
+        }
+    }
+
+    fn perform_spi_command_address_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
+        let Parts {
+            mut spi, counters, ..
+        } = ctx.into_parts();
+        let tx_buf = [PATTERN; 145];
+
+        for data_bytes in [0, 1, tx_buf.len()] {
+            counters.clear();
+            spi.half_duplex_write(mode, command(mode), address(mode), 0, &tx_buf[..data_bytes])
+                .unwrap();
+            counters.assert_command_address_write(data_bytes);
+        }
+    }
+
+    async fn perform_spi_command_address_writes_are_correctly_by_pcnt_async(
+        ctx: Context,
+        mode: DataMode,
+    ) {
+        let Parts { spi, counters, .. } = ctx.into_parts();
+        let mut spi = spi.into_async();
+        let tx_buf = [PATTERN; 145];
+
+        for data_bytes in [0, 1, tx_buf.len()] {
+            counters.clear();
+            spi.half_duplex_write_async(
+                mode,
+                command(mode),
+                address(mode),
+                0,
+                &tx_buf[..data_bytes],
+            )
+            .await
+            .unwrap();
+            counters.assert_command_address_write(data_bytes);
+        }
+    }
+
+    #[cfg(spi_master_supports_dma)]
+    fn perform_spidma_command_address_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
+        const DMA_BUFFER_SIZE: usize = 4;
+
+        let Parts {
+            spi,
+            counters,
+            dma_channel,
+        } = ctx.into_parts();
+        let mut spi = spi.with_dma(dma_channel);
+        let mut dma_tx_buf = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        dma_tx_buf.fill(&[PATTERN; DMA_BUFFER_SIZE]);
+
+        for data_bytes in [0, 1, DMA_BUFFER_SIZE] {
+            dma_tx_buf.set_length(data_bytes);
+            counters.clear();
+            let transfer = spi
+                .half_duplex_write_buffer(
+                    mode,
+                    command(mode),
+                    address(mode),
+                    0,
+                    data_bytes,
+                    dma_tx_buf,
+                )
+                .map_err(|e| e.0)
+                .unwrap();
+            (spi, dma_tx_buf) = transfer.wait();
+            counters.assert_command_address_write(data_bytes);
         }
     }
 
@@ -2278,6 +2439,45 @@ mod write {
     #[cfg(spi_master_supports_dma)]
     fn test_spidmabus_writes_are_correctly_by_pcnt_four_wire(ctx: Context) {
         perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
+    }
+
+    #[test]
+    fn test_spi_command_address_writes_are_correctly_by_pcnt(ctx: Context) {
+        perform_spi_command_address_writes_are_correctly_by_pcnt(ctx, DataMode::SingleTwoDataLines);
+    }
+
+    #[test]
+    fn test_spi_command_address_writes_are_correctly_by_pcnt_single(ctx: Context) {
+        perform_spi_command_address_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
+    }
+
+    #[test]
+    async fn test_spi_command_address_writes_are_correctly_by_pcnt_async(ctx: Context) {
+        perform_spi_command_address_writes_are_correctly_by_pcnt_async(
+            ctx,
+            DataMode::SingleTwoDataLines,
+        )
+        .await;
+    }
+
+    #[test]
+    async fn test_spi_command_address_writes_are_correctly_by_pcnt_single_async(ctx: Context) {
+        perform_spi_command_address_writes_are_correctly_by_pcnt_async(ctx, DataMode::Single).await;
+    }
+
+    #[test]
+    #[cfg(spi_master_supports_dma)]
+    fn test_spidma_command_address_writes_are_correctly_by_pcnt(ctx: Context) {
+        perform_spidma_command_address_writes_are_correctly_by_pcnt(
+            ctx,
+            DataMode::SingleTwoDataLines,
+        );
+    }
+
+    #[test]
+    #[cfg(spi_master_supports_dma)]
+    fn test_spidma_command_address_writes_are_correctly_by_pcnt_single(ctx: Context) {
+        perform_spidma_command_address_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
     }
 }
 

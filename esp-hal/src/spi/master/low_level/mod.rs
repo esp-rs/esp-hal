@@ -838,6 +838,8 @@ impl Driver {
             w.usr_miso().set_bit();
             w.usr_mosi().set_bit();
             w.doutdin().set_bit();
+            w.usr_command().clear_bit();
+            w.usr_addr().clear_bit();
             w.usr_dummy().clear_bit();
             w.sio().clear_bit()
         });
