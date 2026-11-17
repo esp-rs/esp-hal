@@ -14,8 +14,9 @@
 //! different encryption/decryption modes.
 //!
 //! When using AES-DMA, the peripheral can be configured to use different block
-//! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128. On chips with GCM in
-//! hardware, `aes::gcm::AesGcmContext` runs AES-GCM.
+//! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128.
+//!
+//! `aes::gcm::AesGcmContext` runs AES-GCM.
 //!
 //! ## Examples
 //!
@@ -55,7 +56,7 @@ use crate::{
 };
 
 pub mod cipher_modes;
-#[cfg(aes_dma_mode_gcm)]
+#[cfg(aes_supports_dma)]
 pub mod gcm;
 
 for_each_aes_key_length! {
@@ -361,8 +362,7 @@ pub enum Endianness {
 /// This module enhances the AES capabilities by utilizing DMA to handle data
 /// transfer, which can significantly speed up operations when dealing with
 /// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
-/// CTR, CFB8, and CFB128, and runs `aes::gcm::AesGcmContext` on chips with GCM in
-/// hardware.
+/// CTR, CFB8, and CFB128. It also runs `aes::gcm::AesGcmContext`.
 #[cfg(aes_supports_dma)]
 pub mod dma {
     use core::{mem::ManuallyDrop, ptr::NonNull};
@@ -1542,10 +1542,11 @@ impl<'d> AesBackend<'d> {
     }
 
     fn process(&mut self, item: &mut AesOperation) -> Poll {
-        // This backend cannot run GCM. It refuses the item before any key reaches the registers.
+        // This backend cannot run the hardware GCM item. It refuses the item before any key
+        // reaches the registers, and the operation runs as AES-CTR steps instead.
         #[cfg(aes_dma_mode_gcm)]
         if let Some(mut gcm) = item.gcm {
-            unsafe { gcm.as_mut() }.set_unsupported();
+            unsafe { gcm.as_mut() }.refuse();
             return Poll::Ready(Status::Completed);
         }
 
@@ -1574,14 +1575,6 @@ pub enum Error {
 
     /// The buffer length is not appropriate for the current cipher mode.
     IncorrectBufferLength,
-
-    /// The additional authenticated data is in memory that the DMA cannot read, such as flash.
-    #[cfg(aes_dma_mode_gcm)]
-    AadNotInRam,
-
-    /// The output is in PSRAM. The ESP32-S2 does not support a PSRAM output for AES-GCM.
-    #[cfg(esp32s2)]
-    OutputInPsram,
 }
 
 /// An active work queue driver.

@@ -433,7 +433,7 @@ impl UnsafeCryptoBuffers {
     }
 
     #[cfg(aes_supports_dma)]
-    fn first_n(self, n: usize) -> UnsafeCryptoBuffers {
+    pub(super) fn first_n(self, n: usize) -> UnsafeCryptoBuffers {
         let len = n.min(self.input.len());
         Self {
             input: NonNull::slice_from_raw_parts(self.input.cast(), len),

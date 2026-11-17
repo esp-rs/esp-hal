@@ -43,7 +43,7 @@ const _: () = {
     const fn send_sync<T: Send + Sync>() {}
     #[cfg(aes_driver_supported)]
     send_sync::<esp_hal::aes::AesContext>();
-    #[cfg(aes_dma_mode_gcm)]
+    #[cfg(aes_supports_dma)]
     send_sync::<esp_hal::aes::gcm::AesGcmContext>();
     #[cfg(rsa_driver_supported)]
     send_sync::<esp_hal::rsa::RsaContext>();

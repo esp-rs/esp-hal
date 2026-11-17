@@ -4,9 +4,10 @@
 //! the text, its zero padding and the length block. The hardware hashes them in that order.
 //! The hardware writes whole blocks, so the last partial block of output goes to a bounce block.
 //!
-//! The DMA of the ESP32-S2 fails to write a RAM descriptor that follows a PSRAM descriptor. The
-//! last bytes of an AES-GCM output are written to the bounce block in RAM, so the ESP32-S2 must
-//! refuse an output in PSRAM.
+//! The backend refuses an item whose text or additional data the DMA cannot read, for example in
+//! flash. The DMA of the ESP32-S2 fails to write a RAM descriptor that follows a PSRAM descriptor.
+//! The last bytes of an AES-GCM output are written to the bounce block in RAM, so the ESP32-S2
+//! also refuses an output in PSRAM. A refused operation runs as AES-CTR steps.
 //!
 //! See <https://github.com/espressif/esp-idf/blob/ab95e70748f2eddac6f87217b0cf62533684a6ba/components/mbedtls/port/aes/esp_aes_gcm.c#L690-L789>
 //! and <https://github.com/espressif/esp-idf/blob/ab95e70748f2eddac6f87217b0cf62533684a6ba/components/mbedtls/port/aes/dma/esp_aes_dma_core.c#L1366-L1600>.
@@ -178,26 +179,34 @@ impl<'d> AesDma<'d> {
     }
 }
 
+/// Whether the hardware can run the item: the DMA reads the text and the additional data, and on
+/// the ESP32-S2 writes the output outside PSRAM.
+fn hardware_takes(item: &AesOperation, state: &GcmState) -> bool {
+    let aad = state.aad;
+    let readable = crate::soc::is_valid_memory_address(item.buffers.input.addr().get())
+        && (aad.is_empty() || crate::soc::is_valid_memory_address(aad.addr().get()));
+    cfg_select! {
+        esp32s2 => {
+            readable && !crate::psram::psram_range().contains(&item.buffers.output.addr().get())
+        }
+        _ => readable,
+    }
+}
+
 impl<'d> AesDmaBackend<'d> {
-    /// Starts a GCM operation on the DMA.
+    /// Starts a GCM operation on the DMA, or refuses it.
     pub(super) fn start_gcm(
         &mut self,
         driver: AesDma<'d>,
         item: &mut AesOperation,
-        state: NonNull<GcmState>,
+        mut state: NonNull<GcmState>,
     ) -> Poll {
         let len = item.buffers.input.len();
 
-        if !crate::soc::is_valid_memory_address(item.buffers.input.addr().get()) {
-            // The DMA cannot read the input, so the text is copied to the output in RAM and
-            // processed in place.
-            unsafe {
-                item.buffers
-                    .output
-                    .cast::<u8>()
-                    .copy_from_nonoverlapping(item.buffers.input.cast::<u8>(), len);
-            }
-            item.buffers.input = item.buffers.output;
+        if !hardware_takes(item, unsafe { state.as_ref() }) {
+            unsafe { state.as_mut() }.refuse();
+            self.state = DriverState::Idle(driver);
+            return Poll::Ready(Status::Completed);
         }
 
         let state = unsafe { state.as_ref() };
