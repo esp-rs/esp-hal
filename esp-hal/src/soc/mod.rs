@@ -388,8 +388,22 @@ mod xtensa {
 }
 
 #[cfg(feature = "rt")]
+#[ram(unstable(checked))]
 #[unsafe(export_name = "__stack_chk_fail")]
-unsafe extern "C" fn stack_chk_fail() {
+unsafe extern "C" fn stack_chk_fail() -> ! {
+    // Instrumented code in `.rwtext.checked` calls this function, so it lives there too, and the
+    // link fails if it calls the panic machinery in flash directly. The link check cannot see a
+    // call through a pointer, and the volatile read keeps the compiler from turning it back into a
+    // direct call. While the caches are suspended, the call cannot fetch its code and the core
+    // locks up.
+    #[ram]
+    static PANIC: fn() -> ! = stack_chk_panic;
+    let panic = unsafe { (&raw const PANIC).read_volatile() };
+    panic()
+}
+
+#[cfg(feature = "rt")]
+fn stack_chk_panic() -> ! {
     panic!("Stack corruption detected");
 }
 

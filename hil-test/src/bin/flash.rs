@@ -5,6 +5,8 @@
 //% FEATURES: unstable
 //% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "--cfg=__test_flash" ]
 //% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "--cfg=__test_flash" ]
+//% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = ["-Z", "stack-protector=all"]
+//% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = ["-Z", "stack-protector=all"]
 
 #![no_std]
 #![no_main]
