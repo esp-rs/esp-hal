@@ -64,68 +64,69 @@ struct Context {
 
 struct PulseDebug(PulseCode);
 
-impl core::fmt::Debug for PulseDebug {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl defmt::Format for PulseDebug {
+    fn format(&self, f: defmt::Formatter<'_>) {
         let code = self.0;
-        let level1 = if code.level1() == Level::High {
-            'H'
-        } else {
-            'L'
-        };
-        let level2 = if code.level2() == Level::High {
-            'H'
-        } else {
-            'L'
-        };
+        let level = |level| if level == Level::High { 'H' } else { 'L' };
 
-        write!(f, "{level1}{}/{level2}{}", code.length1(), code.length2())
+        defmt::write!(
+            f,
+            "{=char}{=u16}/{=char}{=u16}",
+            level(code.level1()),
+            code.length1(),
+            level(code.level2()),
+            code.length2()
+        );
     }
 }
 
 struct PulseCodesDebug<'a>(&'a [PulseCode]);
 
-impl core::fmt::Debug for PulseCodesDebug<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut list = f.debug_list();
+impl defmt::Format for PulseCodesDebug<'_> {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::write!(f, "[");
 
-        for code in self.0 {
-            list.entry(&PulseDebug(*code));
+        for (i, code) in self.0.iter().enumerate() {
+            if i > 0 {
+                defmt::write!(f, ", ");
+            }
+            defmt::write!(f, "{}", PulseDebug(*code));
         }
 
-        list.finish()
+        defmt::write!(f, "]");
     }
 }
 
 struct PulseWaveDebug<'a>(&'a [PulseCode]);
 
-impl core::fmt::Display for PulseWaveDebug<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl defmt::Format for PulseWaveDebug<'_> {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        let mut wave = [0; DEBUG_WAVE_MAX_CHARS];
         let mut written = 0;
+        let mut truncated = false;
 
-        for code in self.0 {
+        'codes: for code in self.0 {
             for (level, length) in [
                 (code.level1(), code.length1()),
                 (code.level2(), code.length2()),
             ] {
-                if length == 0 {
-                    continue;
-                }
+                let symbol = if level == Level::High { b'^' } else { b'_' };
 
-                let symbol = if level == Level::High { '^' } else { '_' };
-                let width = usize::from(length);
-
-                for _ in 0..width {
-                    if written >= DEBUG_WAVE_MAX_CHARS {
-                        return f.write_str("...");
+                for _ in 0..length {
+                    if written == wave.len() {
+                        truncated = true;
+                        break 'codes;
                     }
 
+                    wave[written] = symbol;
                     written += 1;
-                    write!(f, "{symbol}")?;
                 }
             }
         }
 
-        Ok(())
+        let wave = core::str::from_utf8(&wave[..written]).unwrap();
+        let ellipsis = if truncated { "..." } else { "" };
+        defmt::write!(f, "{=str}{=str}", wave, ellipsis);
     }
 }
 

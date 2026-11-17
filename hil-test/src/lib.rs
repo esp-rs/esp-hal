@@ -1,14 +1,19 @@
 #![no_std]
 
-// By default, we don't want probe-rs to interfere with test timings by halting
-// cores and polling RTT. The tests don't produce output most of the time
-// anyway. The only cases where output can be interesting are: during
-// development, and when a test fails. In these cases, you can enable
-// the `defmt` feature to get the output.
+// By default, the tests log through esp-println on the serial port that probe-rs reads, because
+// polling RTT halts the cores. The tests that use UART0 or the USB-Serial-JTAG port for themselves
+// log over RTT.
+
+#[cfg(all(feature = "log-serial", feature = "log-rtt"))]
+compile_error!(
+    "Enable only one of `log-serial` and `log-rtt`. Add `//% DEFAULT-FEATURES: false` to use `log-rtt`."
+);
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 use esp_hal as _;
+#[cfg(feature = "log-serial")]
+use esp_println as _;
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
@@ -259,14 +264,15 @@ pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
 
-/// Starts the RTT logger and disables every watchdog timer with raw register writes.
+/// Starts the RTT logger if `log-rtt` is enabled, and disables every watchdog timer with raw
+/// register writes.
 ///
 /// Disabling the watchdogs prevents the firmware reset loop if no debugger is attached. The
 /// function must not depend on esp-hal drivers, because a driver that is broken or half-initialized
 /// must not stop the tests from running.
 #[embedded_test::setup]
 fn init_rtt_and_disable_watchdogs() {
-    #[cfg(feature = "defmt")]
+    #[cfg(feature = "log-rtt")]
     {
         let channels = cfg_select! {
             esp32p4 => rtt_target::rtt_init! {

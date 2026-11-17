@@ -252,7 +252,7 @@ fn check_data_eq(
                 _msg
             );
         } else {
-            defmt::info!(
+            defmt::debug!(
                 "loopback @ idx {}: {:?} (tx) -> {:?} (rx)",
                 idx,
                 code_tx,
