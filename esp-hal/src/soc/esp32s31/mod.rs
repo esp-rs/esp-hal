@@ -83,7 +83,6 @@ const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 
 // The ROM cache function table, up to the freeze functions. See `cache_internal_stub_table` in
 // ESP-IDF `esp_rom/esp32s31/include/esp32s31/rom/cache.h`.
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
 #[repr(C)]
 struct CacheInternalStubTable {
     _unused: [usize; 11],
@@ -95,7 +94,6 @@ struct CacheInternalStubTable {
     freeze_l1_dcache_disable: unsafe extern "C" fn(),
 }
 
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
 unsafe extern "C" {
     static rom_cache_internal_table_ptr: *const CacheInternalStubTable;
 }
@@ -105,7 +103,6 @@ unsafe extern "C" {
 ///
 /// The caller must run from RAM. The L1 caches do not cache internal RAM, so the other core can
 /// continue to run.
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
 #[inline(always)]
 pub(crate) fn freeze_ext_mem_cache() {
     // `CACHE_FREEZE_ACK_BUSY`: a cache miss stalls the requester.
@@ -119,7 +116,6 @@ pub(crate) fn freeze_ext_mem_cache() {
 }
 
 /// Releases the freeze of [`freeze_ext_mem_cache`].
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
 #[inline(always)]
 pub(crate) fn unfreeze_ext_mem_cache() {
     unsafe {
