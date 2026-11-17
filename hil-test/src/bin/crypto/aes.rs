@@ -532,6 +532,89 @@ mod tests {
     }
 }
 
+#[cfg(aes_supports_dma)]
+use esp_hal::aes::dma::AesDmaWorkQueueDriver;
+use esp_hal::{aes::AesWorkQueueDriver, peripherals::AES};
+
+#[cfg(aes_supports_dma)]
+type AesDmaChannel<'a> = cfg_select! {
+    aes_dma_engine = "CRYPTO_DMA" => { esp_hal::peripherals::DMA_CRYPTO<'a> },
+    aes_dma_engine = "AXI_GDMA" => { esp_hal::peripherals::DMA_AXI_CH0<'a> },
+    _ => { esp_hal::peripherals::DMA_CH0<'a> },
+};
+
+#[derive(Clone, Copy)]
+enum BackendKind {
+    Cpu,
+    #[cfg(aes_supports_dma)]
+    Dma,
+}
+
+impl BackendKind {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Cpu => "CPU",
+            #[cfg(aes_supports_dma)]
+            Self::Dma => "DMA",
+        }
+    }
+}
+
+const BACKENDS: &[BackendKind] = &[
+    BackendKind::Cpu,
+    #[cfg(aes_supports_dma)]
+    BackendKind::Dma,
+];
+
+enum Backend<'d> {
+    Cpu(AesBackend<'d>),
+    #[cfg(aes_supports_dma)]
+    Dma(AesDmaBackend<'d>),
+}
+
+/// Keeps the backend processing the queue until it is dropped.
+enum RunningBackend<'t, 'd> {
+    Cpu {
+        _driver: AesWorkQueueDriver<'t, 'd>,
+    },
+    #[cfg(aes_supports_dma)]
+    Dma {
+        _driver: AesDmaWorkQueueDriver<'t, 'd>,
+    },
+}
+
+impl<'d> Backend<'d> {
+    fn start(&mut self) -> RunningBackend<'_, 'd> {
+        match self {
+            Self::Cpu(aes) => RunningBackend::Cpu {
+                _driver: aes.start(),
+            },
+            #[cfg(aes_supports_dma)]
+            Self::Dma(aes) => RunningBackend::Dma {
+                _driver: aes.start(),
+            },
+        }
+    }
+}
+
+struct Context {
+    aes: AES<'static>,
+    #[cfg(aes_supports_dma)]
+    dma: AesDmaChannel<'static>,
+}
+
+impl Context {
+    fn backend(&mut self, kind: BackendKind) -> Backend<'_> {
+        match kind {
+            BackendKind::Cpu => Backend::Cpu(AesBackend::new(self.aes.reborrow())),
+            #[cfg(aes_supports_dma)]
+            BackendKind::Dma => {
+                Backend::Dma(AesDmaBackend::new(self.aes.reborrow(), self.dma.reborrow()))
+            }
+        }
+    }
+}
+
 /// Each test runs its steps on every work-queue backend of the chip, one backend after the other.
 #[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
 mod work_queue_tests {
@@ -540,90 +623,8 @@ mod work_queue_tests {
         cipher::{KeyIvInit, StreamCipher},
     };
     use allocator_api2::vec::Vec;
-    #[cfg(aes_supports_dma)]
-    use esp_hal::aes::dma::AesDmaWorkQueueDriver;
-    use esp_hal::{aes::AesWorkQueueDriver, peripherals::AES};
 
     use super::*;
-
-    #[cfg(aes_supports_dma)]
-    type AesDmaChannel<'a> = cfg_select! {
-        aes_dma_engine = "CRYPTO_DMA" => { esp_hal::peripherals::DMA_CRYPTO<'a> },
-        aes_dma_engine = "AXI_GDMA" => { esp_hal::peripherals::DMA_AXI_CH0<'a> },
-        _ => { esp_hal::peripherals::DMA_CH0<'a> },
-    };
-
-    #[derive(Clone, Copy)]
-    enum BackendKind {
-        Cpu,
-        #[cfg(aes_supports_dma)]
-        Dma,
-    }
-
-    impl BackendKind {
-        fn name(self) -> &'static str {
-            match self {
-                Self::Cpu => "CPU",
-                #[cfg(aes_supports_dma)]
-                Self::Dma => "DMA",
-            }
-        }
-    }
-
-    const BACKENDS: &[BackendKind] = &[
-        BackendKind::Cpu,
-        #[cfg(aes_supports_dma)]
-        BackendKind::Dma,
-    ];
-
-    enum Backend<'d> {
-        Cpu(AesBackend<'d>),
-        #[cfg(aes_supports_dma)]
-        Dma(AesDmaBackend<'d>),
-    }
-
-    /// Keeps the backend processing the queue until it is dropped.
-    enum RunningBackend<'t, 'd> {
-        Cpu {
-            _driver: AesWorkQueueDriver<'t, 'd>,
-        },
-        #[cfg(aes_supports_dma)]
-        Dma {
-            _driver: AesDmaWorkQueueDriver<'t, 'd>,
-        },
-    }
-
-    impl<'d> Backend<'d> {
-        fn start(&mut self) -> RunningBackend<'_, 'd> {
-            match self {
-                Self::Cpu(aes) => RunningBackend::Cpu {
-                    _driver: aes.start(),
-                },
-                #[cfg(aes_supports_dma)]
-                Self::Dma(aes) => RunningBackend::Dma {
-                    _driver: aes.start(),
-                },
-            }
-        }
-    }
-
-    struct Context {
-        aes: AES<'static>,
-        #[cfg(aes_supports_dma)]
-        dma: AesDmaChannel<'static>,
-    }
-
-    impl Context {
-        fn backend(&mut self, kind: BackendKind) -> Backend<'_> {
-            match kind {
-                BackendKind::Cpu => Backend::Cpu(AesBackend::new(self.aes.reborrow())),
-                #[cfg(aes_supports_dma)]
-                BackendKind::Dma => {
-                    Backend::Dma(AesDmaBackend::new(self.aes.reborrow(), self.dma.reborrow()))
-                }
-            }
-        }
-    }
 
     #[init]
     fn init() -> Context {
