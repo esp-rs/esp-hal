@@ -140,6 +140,7 @@ trouble-host = { version = "0.8.0", features = [
 aes-gcm             = { version = "0.11", default-features = false, features = ["aes"] }
 primeorder          = { version = "0.13.0", default-features = false }
 crypto-bigint       = { version = "0.7.5", default-features = false }
+ctr                 = "0.10.1"
 digest              = { version = "0.11", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }

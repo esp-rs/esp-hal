@@ -624,6 +624,10 @@ mod work_queue_tests {
 #[cfg(aes_supports_dma)]
 #[embedded_test::tests(default_timeout = 10)]
 mod work_queue_dma_tests {
+    use aes_gcm::aes::{
+        Aes128,
+        cipher::{KeyIvInit, StreamCipher},
+    };
     use allocator_api2::vec::Vec;
 
     use super::*;
@@ -766,6 +770,158 @@ mod work_queue_dma_tests {
         external_memory.resize(SHARED_LINE_MEMORY_LEN, 0);
 
         run_output_shares_cache_lines(&mut external_memory);
+    }
+
+    fn padded_plaintext() -> [u8; PLAINTEXT_BUF_SIZE] {
+        let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
+        fill_with_plaintext(&mut plaintext);
+        plaintext
+    }
+
+    /// Processes `buffer` in place with `context`, in one call for each piece between `splits`
+    fn process_in_calls(context: &mut AesContext, buffer: &mut [u8], splits: &[usize]) {
+        let mut start = 0;
+        for &end in splits.iter().chain([buffer.len()].iter()) {
+            context
+                .process_in_place(&mut buffer[start..end])
+                .unwrap()
+                .wait_blocking();
+            start = end;
+        }
+    }
+
+    /// A context carries its chaining state from one call to the next, so two calls over halves
+    /// of the text give the result of one call over all of it.
+    #[test]
+    fn test_aes_dma_cbc_iv_carries_between_calls(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let mut buffer = padded_plaintext();
+        let mut cbc = AesContext::new(Cbc::new(IV), Operation::Encrypt, KEY_128);
+        process_in_calls(&mut cbc, &mut buffer, &[128]);
+        hil_test::assert_eq!(buffer, CIPHERTEXT_CBC_128);
+
+        let mut buffer = CIPHERTEXT_CBC_256;
+        let mut cbc = AesContext::new(Cbc::new(IV), Operation::Decrypt, KEY_256);
+        process_in_calls(&mut cbc, &mut buffer, &[128]);
+        hil_test::assert_eq!(buffer, padded_plaintext());
+    }
+
+    #[test]
+    fn test_aes_dma_ctr_counter_carries_between_calls(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let mut buffer = padded_plaintext();
+        let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
+        process_in_calls(&mut ctr, &mut buffer, &[128]);
+        hil_test::assert_eq!(buffer, CIPHERTEXT_CTR);
+    }
+
+    /// Bytes after the buffer, which no call may change
+    const GUARD: [u8; 16] = [0xa5; 16];
+
+    /// A stream mode also processes a partial last block.
+    #[test]
+    fn test_aes_dma_ctr_partial_last_block(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        const LEN: usize = 250;
+        let mut memory = [0; LEN + GUARD.len()];
+        memory[..LEN].copy_from_slice(&padded_plaintext()[..LEN]);
+        memory[LEN..].copy_from_slice(&GUARD);
+
+        let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
+        process_in_calls(&mut ctr, &mut memory[..LEN], &[]);
+
+        hil_test::assert_eq!(memory[..LEN], CIPHERTEXT_CTR[..LEN]);
+        hil_test::assert_eq!(memory[LEN..], GUARD);
+    }
+
+    /// A call that ends part way through a block leaves the rest of that block's key stream to
+    /// the next call, which starts with it.
+    #[test]
+    fn test_aes_dma_ctr_partial_blocks_between_calls(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let mut memory = [0; PLAINTEXT_BUF_SIZE + GUARD.len()];
+        memory[..PLAINTEXT_BUF_SIZE].copy_from_slice(&padded_plaintext());
+        memory[PLAINTEXT_BUF_SIZE..].copy_from_slice(&GUARD);
+
+        let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
+        process_in_calls(&mut ctr, &mut memory[..PLAINTEXT_BUF_SIZE], &[100, 200]);
+
+        hil_test::assert_eq!(memory[..PLAINTEXT_BUF_SIZE], CIPHERTEXT_CTR);
+        hil_test::assert_eq!(memory[PLAINTEXT_BUF_SIZE..], GUARD);
+    }
+
+    /// The counter block increments as one 128-bit number, so a carry out of its low 32 bits
+    /// reaches the bits above them.
+    #[test]
+    fn test_aes_dma_ctr_counter_carries_past_32_bits(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        // The low 32 bits wrap after the second block
+        const NONCE: [u8; 16] = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0xff, 0xff, 0xff, 0xfe,
+        ];
+
+        let mut expected = padded_plaintext();
+        ctr::Ctr128BE::<Aes128>::new(&KEY_128.into(), &NONCE.into()).apply_keystream(&mut expected);
+
+        let mut buffer = padded_plaintext();
+        let mut ctr = AesContext::new(Ctr::new(NONCE), Operation::Encrypt, KEY_128);
+        process_in_calls(&mut ctr, &mut buffer, &[]);
+
+        hil_test::assert_eq!(buffer, expected);
+    }
+
+    /// Longer than one DMA descriptor carries, so the DMA takes more than one transfer over it.
+    const LONG_LEN: usize = 32 * PLAINTEXT_BUF_SIZE;
+
+    /// Encrypts the plaintext, repeated to `LONG_LEN` bytes, in one ECB call, in place at
+    /// `offset` into `memory`. ECB has no chaining state, so each repeat must come out as the
+    /// known ciphertext.
+    fn run_long_call(memory: &mut [u8], offset: usize) {
+        let buffer = &mut memory[offset..][..LONG_LEN];
+        let plaintext = padded_plaintext();
+        for repeat in buffer.chunks_mut(PLAINTEXT_BUF_SIZE) {
+            repeat.copy_from_slice(&plaintext);
+        }
+
+        let mut ecb = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+        process_in_calls(&mut ecb, buffer, &[]);
+
+        for (i, repeat) in buffer.chunks(PLAINTEXT_BUF_SIZE).enumerate() {
+            hil_test::assert_eq!(repeat, &CIPHERTEXT_ECB_128[..], "repeat {}", i);
+        }
+    }
+
+    #[test]
+    fn test_aes_dma_long_call(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let mut internal_memory = Vec::with_capacity_in(LONG_LEN, esp_alloc::InternalMemory);
+        internal_memory.resize(LONG_LEN, 0);
+
+        run_long_call(&mut internal_memory, 0);
+    }
+
+    /// In external memory, each transfer hands its partial last cache line to the CPU through a
+    /// bounce buffer, and the next transfer starts in that same line.
+    #[test]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
+    fn test_aes_dma_long_call_psram(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        let len = LONG_LEN + SHARED_LINE + 16;
+        let mut external_memory = Vec::with_capacity_in(len, esp_alloc::ExternalMemory);
+        external_memory.resize(len, 0);
+
+        // 8 bytes into a cache line, so that the first transfer ends part way through one
+        let addr = external_memory.as_ptr().addr();
+        let offset = addr.next_multiple_of(SHARED_LINE) - addr + 8;
+
+        run_long_call(&mut external_memory, offset);
     }
 }
 
