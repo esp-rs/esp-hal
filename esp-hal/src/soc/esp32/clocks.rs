@@ -714,17 +714,8 @@ fn configure_rtc_fast_clk_impl(
 fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // TODO: these functions (peripheral bus clock control) should be generated,
     // replacing current PeripheralClockControl code.
-    // Enabling clock should probably not reset the peripheral.
-    let regs = SYSTEM::regs();
-
-    if en {
-        regs.perip_rst_en()
-            .modify(|_, w| w.uart_mem_rst().bit(true));
-        regs.perip_rst_en()
-            .modify(|_, w| w.uart_mem_rst().bit(false));
-    }
-
-    regs.perip_clk_en()
+    SYSTEM::regs()
+        .perip_clk_en()
         .modify(|_, w| w.uart_mem_clk_en().bit(en));
 }
 
