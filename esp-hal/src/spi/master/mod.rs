@@ -1210,6 +1210,12 @@ where
         self.driver().apply_config(config)
     }
 
+    /// Returns the SCK frequency from the applied clock configuration, rounded down to whole hertz.
+    #[instability::unstable]
+    pub fn frequency(&self) -> Rate {
+        self.driver().frequency()
+    }
+
     #[procmacros::doc_replace]
     /// Writes bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
