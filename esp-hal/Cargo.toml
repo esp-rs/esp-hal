@@ -225,6 +225,7 @@ esp32   = [
     "esp-metadata-generated/esp32",
     "dep:sha1",
     "dep:sha2",
+    "dep:ghash",
 ]
 ##
 esp32c2 = [

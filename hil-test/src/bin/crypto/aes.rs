@@ -1118,7 +1118,6 @@ mod work_queue_tests {
     }
 }
 
-#[cfg(aes_supports_dma)]
 mod gcm {
     use aes_gcm::{
         AeadInOut,
@@ -1572,7 +1571,6 @@ mod gcm {
 }
 
 /// Each test runs its steps on every work-queue backend of the chip, one backend after the other.
-#[cfg(aes_supports_dma)]
 #[embedded_test::tests(default_timeout = 30, executor = hil_test::Executor::new())]
 mod gcm_tests {
     #[cfg(all(soc_has_psram, dma_can_access_psram))]
@@ -1598,6 +1596,7 @@ mod gcm_tests {
 
         Context {
             aes: p.AES,
+            #[cfg(aes_supports_dma)]
             dma: cfg_select! {
                 aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
                 aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
@@ -2252,6 +2251,7 @@ mod gcm_tests {
         }
     }]
     #[test]
+    #[cfg(aes_supports_dma)]
     fn test_gcm_backend_dropped_during_operation(mut ctx: Context) {
         let key = random::<16>();
         let nonce = random::<12>();

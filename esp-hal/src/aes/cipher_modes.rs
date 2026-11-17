@@ -54,7 +54,6 @@ impl UnsafeCryptoBuffers {
     }
 
     /// The buffers without their first `bytes`.
-    #[cfg(aes_supports_dma)]
     pub(crate) unsafe fn byte_add(self, bytes: usize) -> Self {
         let skip = |buffer: NonNull<[u8]>| {
             NonNull::slice_from_raw_parts(
@@ -432,7 +431,6 @@ impl UnsafeCryptoBuffers {
         }
     }
 
-    #[cfg(aes_supports_dma)]
     pub(super) fn first_n(self, n: usize) -> UnsafeCryptoBuffers {
         let len = n.min(self.input.len());
         Self {

@@ -56,7 +56,6 @@ use crate::{
 };
 
 pub mod cipher_modes;
-#[cfg(aes_supports_dma)]
 pub mod gcm;
 
 for_each_aes_key_length! {
