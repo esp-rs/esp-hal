@@ -711,8 +711,7 @@ pub mod dma {
     const AES_DMA_VTABLE: VTable<super::AesOperation> = VTable {
         post: |driver, item| {
             let driver = unsafe { AesDmaBackend::from_raw(driver) };
-            driver.start_processing(item);
-            Some(Poll::Pending(false))
+            Some(driver.start_processing(item))
         },
         poll: |driver, item| {
             let driver = unsafe { AesDmaBackend::from_raw(driver) };

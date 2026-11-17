@@ -248,6 +248,7 @@ where
 }
 
 fn aes_roundtrip<const K: usize>(
+    backend: &str,
     tag: &'static str,
     block_ctx: impl Into<CipherState>,
     plaintext: &[u8],
@@ -264,24 +265,33 @@ fn aes_roundtrip<const K: usize>(
     hil_test::assert_eq!(
         buffer,
         ciphertext,
-        "Failed to encrypt with {}, K={}",
+        "Failed to encrypt with {}, K={}, {} backend",
         tag,
-        K
+        K,
+        backend
     );
 
     let mut ecb_decrypt = AesContext::new(block_ctx, Operation::Decrypt, pad_to::<K>(KEY));
     let handle = ecb_decrypt.process_in_place(buffer).unwrap();
     handle.wait_blocking();
-    hil_test::assert_eq!(buffer, plaintext, "Failed to encrypt with {}, K={}", tag, K);
+    hil_test::assert_eq!(
+        buffer,
+        plaintext,
+        "Failed to decrypt with {}, K={}, {} backend",
+        tag,
+        K,
+        backend
+    );
 }
 
-fn run_cipher_tests(buffer: &mut [u8]) {
+fn run_cipher_tests(backend: &str, buffer: &mut [u8]) {
     let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
     fill_with_plaintext(&mut plaintext);
 
     // Let's use ECB as a test case for short unaligned DMA transfers.
     let short_len = 16;
     aes_roundtrip::<16>(
+        backend,
         "Short ECB",
         Ecb,
         &plaintext[0..short_len],
@@ -289,20 +299,50 @@ fn run_cipher_tests(buffer: &mut [u8]) {
         &mut buffer[0..short_len],
     );
 
-    aes_roundtrip::<16>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_128, buffer);
+    let b = backend;
+    aes_roundtrip::<16>(b, "ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_128, buffer);
     #[cfg(aes_key_length_192)]
-    aes_roundtrip::<24>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_192, buffer);
-    aes_roundtrip::<32>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_256, buffer);
+    aes_roundtrip::<24>(b, "ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_192, buffer);
+    aes_roundtrip::<32>(b, "ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_256, buffer);
 
-    aes_roundtrip::<16>("CBC", Cbc::new(IV), &plaintext, &CIPHERTEXT_CBC_128, buffer);
-    #[cfg(aes_key_length_192)]
-    aes_roundtrip::<24>("CBC", Cbc::new(IV), &plaintext, &CIPHERTEXT_CBC_192, buffer);
-    aes_roundtrip::<32>("CBC", Cbc::new(IV), &plaintext, &CIPHERTEXT_CBC_256, buffer);
-
-    aes_roundtrip::<16>("OFB", Ofb::new(IV), &plaintext, &CIPHERTEXT_OFB, buffer);
-    aes_roundtrip::<16>("CTR", Ctr::new(IV), &plaintext, &CIPHERTEXT_CTR, buffer);
-    aes_roundtrip::<16>("CFB-8", Cfb8::new(IV), &plaintext, &CIPHERTEXT_CFB8, buffer);
     aes_roundtrip::<16>(
+        b,
+        "CBC",
+        Cbc::new(IV),
+        &plaintext,
+        &CIPHERTEXT_CBC_128,
+        buffer,
+    );
+    #[cfg(aes_key_length_192)]
+    aes_roundtrip::<24>(
+        b,
+        "CBC",
+        Cbc::new(IV),
+        &plaintext,
+        &CIPHERTEXT_CBC_192,
+        buffer,
+    );
+    aes_roundtrip::<32>(
+        b,
+        "CBC",
+        Cbc::new(IV),
+        &plaintext,
+        &CIPHERTEXT_CBC_256,
+        buffer,
+    );
+
+    aes_roundtrip::<16>(b, "OFB", Ofb::new(IV), &plaintext, &CIPHERTEXT_OFB, buffer);
+    aes_roundtrip::<16>(b, "CTR", Ctr::new(IV), &plaintext, &CIPHERTEXT_CTR, buffer);
+    aes_roundtrip::<16>(
+        b,
+        "CFB-8",
+        Cfb8::new(IV),
+        &plaintext,
+        &CIPHERTEXT_CFB8,
+        buffer,
+    );
+    aes_roundtrip::<16>(
+        b,
         "CFB-128",
         Cfb128::new(IV),
         &plaintext,
@@ -311,20 +351,19 @@ fn run_cipher_tests(buffer: &mut [u8]) {
     );
 }
 
-#[cfg(aes_supports_dma)]
-fn run_unaligned_dma_tests<const MAX_SHIFT: usize>(memory: &mut [u8]) {
+fn run_unaligned_tests<const MAX_SHIFT: usize>(backend: &str, memory: &mut [u8]) {
     let zeros = [0; MAX_SHIFT];
 
-    // Different alignments in internal memory
     for shift in 0..MAX_SHIFT {
         memory.fill(0);
         let buffer = &mut memory[shift..][..PLAINTEXT_BUF_SIZE];
-        run_cipher_tests(buffer);
+        run_cipher_tests(backend, buffer);
         hil_test::assert_eq!(
             memory[..shift],
             zeros[..shift],
-            "Out of bounds write with shift {}",
-            shift
+            "Out of bounds write with shift {}, {} backend",
+            shift,
+            backend
         );
     }
 }
@@ -493,51 +532,183 @@ mod tests {
     }
 }
 
+/// Each test runs its steps on every work-queue backend of the chip, one backend after the other.
 #[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
 mod work_queue_tests {
+    use aes_gcm::aes::{
+        Aes128,
+        cipher::{KeyIvInit, StreamCipher},
+    };
+    use allocator_api2::vec::Vec;
+    #[cfg(aes_supports_dma)]
+    use esp_hal::aes::dma::AesDmaWorkQueueDriver;
+    use esp_hal::{aes::AesWorkQueueDriver, peripherals::AES};
+
     use super::*;
 
+    #[cfg(aes_supports_dma)]
+    type AesDmaChannel<'a> = cfg_select! {
+        aes_dma_engine = "CRYPTO_DMA" => { esp_hal::peripherals::DMA_CRYPTO<'a> },
+        aes_dma_engine = "AXI_GDMA" => { esp_hal::peripherals::DMA_AXI_CH0<'a> },
+        _ => { esp_hal::peripherals::DMA_CH0<'a> },
+    };
+
+    #[derive(Clone, Copy)]
+    enum BackendKind {
+        Cpu,
+        #[cfg(aes_supports_dma)]
+        Dma,
+    }
+
+    impl BackendKind {
+        fn name(self) -> &'static str {
+            match self {
+                Self::Cpu => "CPU",
+                #[cfg(aes_supports_dma)]
+                Self::Dma => "DMA",
+            }
+        }
+    }
+
+    const BACKENDS: &[BackendKind] = &[
+        BackendKind::Cpu,
+        #[cfg(aes_supports_dma)]
+        BackendKind::Dma,
+    ];
+
+    enum Backend<'d> {
+        Cpu(AesBackend<'d>),
+        #[cfg(aes_supports_dma)]
+        Dma(AesDmaBackend<'d>),
+    }
+
+    /// Keeps the backend processing the queue until it is dropped.
+    enum RunningBackend<'t, 'd> {
+        Cpu {
+            _driver: AesWorkQueueDriver<'t, 'd>,
+        },
+        #[cfg(aes_supports_dma)]
+        Dma {
+            _driver: AesDmaWorkQueueDriver<'t, 'd>,
+        },
+    }
+
+    impl<'d> Backend<'d> {
+        fn start(&mut self) -> RunningBackend<'_, 'd> {
+            match self {
+                Self::Cpu(aes) => RunningBackend::Cpu {
+                    _driver: aes.start(),
+                },
+                #[cfg(aes_supports_dma)]
+                Self::Dma(aes) => RunningBackend::Dma {
+                    _driver: aes.start(),
+                },
+            }
+        }
+    }
+
     struct Context {
-        aes: AesBackend<'static>,
+        aes: AES<'static>,
+        #[cfg(aes_supports_dma)]
+        dma: AesDmaChannel<'static>,
+    }
+
+    impl Context {
+        fn backend(&mut self, kind: BackendKind) -> Backend<'_> {
+            match kind {
+                BackendKind::Cpu => Backend::Cpu(AesBackend::new(self.aes.reborrow())),
+                #[cfg(aes_supports_dma)]
+                BackendKind::Dma => {
+                    Backend::Dma(AesDmaBackend::new(self.aes.reborrow(), self.dma.reborrow()))
+                }
+            }
+        }
     }
 
     #[init]
     fn init() -> Context {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+
+        esp_alloc::heap_allocator!(size: 32 * 1024);
+
+        #[cfg(all(soc_has_psram, dma_can_access_psram))]
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+
         Context {
-            aes: AesBackend::new(p.AES),
+            aes: p.AES,
+            #[cfg(aes_supports_dma)]
+            dma: cfg_select! {
+                aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
+                aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
+                _ => p.DMA_CH0,
+            },
         }
     }
 
     #[test]
-    fn test_aes_work_queue_cpu(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+    fn test_aes_work_queue(mut ctx: Context) {
+        const MAX_SHIFT: usize = 15;
 
-        let mut buffer = [0; PLAINTEXT_BUF_SIZE];
-        run_cipher_tests(&mut buffer);
+        let mut internal_memory =
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::InternalMemory);
+        internal_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
+
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            // Different alignments in internal memory
+            run_unaligned_tests::<MAX_SHIFT>(kind.name(), &mut internal_memory);
+        }
+    }
+
+    #[test]
+    #[cfg(all(soc_has_psram, dma_can_access_psram))]
+    fn test_aes_work_queue_psram(mut ctx: Context) {
+        const MAX_SHIFT: usize = 15;
+
+        let mut external_memory =
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::ExternalMemory);
+        external_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
+
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            // Different alignments in external memory
+            run_unaligned_tests::<MAX_SHIFT>(kind.name(), &mut external_memory);
+        }
     }
 
     #[test]
     fn test_aes_work_queue_work_posted_before_queue_started(mut ctx: Context) {
-        let mut output = [0; PLAINTEXT_BUF_SIZE];
-
         let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
         fill_with_plaintext(&mut plaintext);
 
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
-        let handle = ecb_encrypt.process(&plaintext, &mut output).unwrap();
+        for &kind in BACKENDS {
+            let mut output = [0; PLAINTEXT_BUF_SIZE];
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let handle = ecb_encrypt.process(&plaintext, &mut output).unwrap();
 
-        let _backend = ctx.aes.start();
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        handle.wait_blocking();
+            handle.wait_blocking();
 
-        hil_test::assert_eq!(output, CIPHERTEXT_ECB_128);
+            hil_test::assert_eq!(output, CIPHERTEXT_ECB_128, "{} backend", kind.name());
+        }
     }
 
     #[test]
     async fn test_aes_work_queue_work_posted_before_queue_started_async(mut ctx: Context) {
-        #[embassy_executor::task]
-        async fn aes_task(signal: &'static Signal<CriticalSectionRawMutex, ()>) {
+        // One for each backend. The operation can complete in the task's last poll and wake the
+        // task, which then holds its slot until the executor polls it once more, after the next
+        // spawn.
+        #[embassy_executor::task(pool_size = 2)]
+        async fn aes_task(
+            signal: &'static Signal<CriticalSectionRawMutex, ()>,
+            backend: &'static str,
+        ) {
             let mut output = [0; PLAINTEXT_BUF_SIZE];
             let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
             fill_with_plaintext(&mut plaintext);
@@ -551,38 +722,44 @@ mod work_queue_tests {
             handle.wait().await;
             core::mem::drop(handle);
 
-            hil_test::assert_eq!(output, CIPHERTEXT_ECB_128);
+            hil_test::assert_eq!(output, CIPHERTEXT_ECB_128, "{} backend", backend);
 
             // Test can end now
             signal.signal(());
         }
 
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
-
-        // Start task before we'd start the AES operation
         let spawner = SendSpawner::for_current_executor().await;
-        spawner.spawn(aes_task(signal).unwrap());
 
-        signal.wait().await;
+        for &kind in BACKENDS {
+            // Start task before we'd start the AES operation
+            spawner.spawn(aes_task(signal, kind.name()).unwrap());
 
-        let _backend = ctx.aes.start();
+            signal.wait().await;
 
-        signal.wait().await;
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            signal.wait().await;
+        }
     }
 
     #[test]
     fn test_aes_work_queue_in_place(mut ctx: Context) {
-        let mut buffer = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut buffer);
+        for &kind in BACKENDS {
+            let mut buffer = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut buffer);
 
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
-        let handle = ecb_encrypt.process_in_place(&mut buffer).unwrap();
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let handle = ecb_encrypt.process_in_place(&mut buffer).unwrap();
 
-        let _backend = ctx.aes.start();
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        handle.wait_blocking();
+            handle.wait_blocking();
 
-        hil_test::assert_eq!(buffer, CIPHERTEXT_ECB_128);
+            hil_test::assert_eq!(buffer, CIPHERTEXT_ECB_128, "{} backend", kind.name());
+        }
     }
 
     #[test]
@@ -593,96 +770,40 @@ mod work_queue_tests {
         // Note that this result is not guaranteed. The cancellation can come later than the work
         // item has finished processing. We can only reliably test it because we start the backend
         // after cancelling the operation.
-        let mut buffer1 = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut buffer1);
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
-        let handle1 = ecb_encrypt.process_in_place(&mut buffer1).unwrap();
+        for &kind in BACKENDS {
+            let mut buffer1 = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut buffer1);
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let handle1 = ecb_encrypt.process_in_place(&mut buffer1).unwrap();
 
-        let mut buffer2 = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut buffer2);
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_256);
-        let handle2 = ecb_encrypt.process_in_place(&mut buffer2).unwrap();
+            let mut buffer2 = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut buffer2);
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_256);
+            let handle2 = ecb_encrypt.process_in_place(&mut buffer2).unwrap();
 
-        let mut buffer3 = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut buffer3);
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
-        let handle3 = ecb_encrypt.process_in_place(&mut buffer3).unwrap();
+            let mut buffer3 = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut buffer3);
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let handle3 = ecb_encrypt.process_in_place(&mut buffer3).unwrap();
 
-        core::mem::drop(handle1);
+            core::mem::drop(handle1);
 
-        let _backend = ctx.aes.start();
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        handle3.wait_blocking();
-        handle2.wait_blocking();
+            handle3.wait_blocking();
+            handle2.wait_blocking();
 
-        hil_test::assert_eq!(&buffer1[..PLAINTEXT.len()], PLAINTEXT);
-        hil_test::assert_eq!(buffer2, CIPHERTEXT_ECB_256);
-        hil_test::assert_eq!(buffer3, CIPHERTEXT_ECB_128);
-    }
-}
-
-#[cfg(aes_supports_dma)]
-#[embedded_test::tests(default_timeout = 10)]
-mod work_queue_dma_tests {
-    use aes_gcm::aes::{
-        Aes128,
-        cipher::{KeyIvInit, StreamCipher},
-    };
-    use allocator_api2::vec::Vec;
-
-    use super::*;
-
-    struct Context {
-        aes: AesDmaBackend<'static>,
-    }
-
-    #[init]
-    fn init() -> Context {
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-
-        esp_alloc::heap_allocator!(size: 32 * 1024);
-
-        #[cfg(all(soc_has_psram, dma_can_access_psram))]
-        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
-
-        let dma = cfg_select! {
-            aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
-            aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
-            _ => p.DMA_CH0,
-        };
-
-        Context {
-            aes: AesDmaBackend::new(p.AES, dma),
+            let backend = kind.name();
+            hil_test::assert_eq!(
+                &buffer1[..PLAINTEXT.len()],
+                PLAINTEXT,
+                "{} backend",
+                backend
+            );
+            hil_test::assert_eq!(buffer2, CIPHERTEXT_ECB_256, "{} backend", backend);
+            hil_test::assert_eq!(buffer3, CIPHERTEXT_ECB_128, "{} backend", backend);
         }
-    }
-
-    #[test]
-    fn test_aes_dma_work_queue(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
-        const MAX_SHIFT: usize = 15;
-
-        let mut internal_memory =
-            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::InternalMemory);
-        internal_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
-
-        // Different alignments in internal memory
-        run_unaligned_dma_tests::<MAX_SHIFT>(&mut internal_memory);
-    }
-
-    #[test]
-    #[cfg(all(soc_has_psram, dma_can_access_psram))]
-    fn test_aes_dma_work_queue_psram(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
-        const MAX_SHIFT: usize = 15;
-
-        let mut external_memory =
-            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::ExternalMemory);
-        external_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
-
-        // Different alignments in external memory
-        run_unaligned_dma_tests::<MAX_SHIFT>(&mut external_memory);
     }
 
     // 128 bytes is the longest data cache line in front of memory that the DMA writes.
@@ -698,7 +819,7 @@ mod work_queue_dma_tests {
     ///
     /// The output starts 16 bytes into a cache line, which meets the DMA's block alignment, and
     /// ends partway into another line.
-    fn run_output_shares_cache_lines(memory: &mut [u8]) {
+    fn run_output_shares_cache_lines(backend: &str, memory: &mut [u8]) {
         let addr = memory.as_ptr().addr();
         let line_start = addr.next_multiple_of(SHARED_LINE) - addr;
         let (before, rest) = memory[line_start..].split_at_mut(16);
@@ -736,40 +857,54 @@ mod work_queue_dma_tests {
         core::mem::drop(handle);
 
         let expected = &expected[..];
-        hil_test::assert_eq!(&output[..], expected, "output, {} polls", count);
+        hil_test::assert_eq!(
+            &output[..],
+            expected,
+            "output, {} polls, {} backend",
+            count,
+            backend
+        );
         hil_test::assert!(
             before.iter().all(|&b| b == last),
-            "bytes before the output, {} polls",
-            count
+            "bytes before the output, {} polls, {} backend",
+            count,
+            backend
         );
         hil_test::assert!(
             after.iter().all(|&b| b == last),
-            "bytes after the output, {} polls",
-            count
+            "bytes after the output, {} polls, {} backend",
+            count,
+            backend
         );
     }
 
     #[test]
-    fn test_aes_dma_output_shares_cache_lines(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
+    fn test_aes_output_shares_cache_lines(mut ctx: Context) {
         let mut internal_memory =
             Vec::with_capacity_in(SHARED_LINE_MEMORY_LEN, esp_alloc::InternalMemory);
         internal_memory.resize(SHARED_LINE_MEMORY_LEN, 0);
 
-        run_output_shares_cache_lines(&mut internal_memory);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_output_shares_cache_lines(kind.name(), &mut internal_memory);
+        }
     }
 
     #[test]
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
-    fn test_aes_dma_psram_output_shares_cache_lines(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
+    fn test_aes_psram_output_shares_cache_lines(mut ctx: Context) {
         let mut external_memory =
             Vec::with_capacity_in(SHARED_LINE_MEMORY_LEN, esp_alloc::ExternalMemory);
         external_memory.resize(SHARED_LINE_MEMORY_LEN, 0);
 
-        run_output_shares_cache_lines(&mut external_memory);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_output_shares_cache_lines(kind.name(), &mut external_memory);
+        }
     }
 
     fn padded_plaintext() -> [u8; PLAINTEXT_BUF_SIZE] {
@@ -793,28 +928,34 @@ mod work_queue_dma_tests {
     /// A context carries its chaining state from one call to the next, so two calls over halves
     /// of the text give the result of one call over all of it.
     #[test]
-    fn test_aes_dma_cbc_iv_carries_between_calls(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+    fn test_aes_cbc_iv_carries_between_calls(mut ctx: Context) {
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        let mut buffer = padded_plaintext();
-        let mut cbc = AesContext::new(Cbc::new(IV), Operation::Encrypt, KEY_128);
-        process_in_calls(&mut cbc, &mut buffer, &[128]);
-        hil_test::assert_eq!(buffer, CIPHERTEXT_CBC_128);
+            let mut buffer = padded_plaintext();
+            let mut cbc = AesContext::new(Cbc::new(IV), Operation::Encrypt, KEY_128);
+            process_in_calls(&mut cbc, &mut buffer, &[128]);
+            hil_test::assert_eq!(buffer, CIPHERTEXT_CBC_128, "{} backend", kind.name());
 
-        let mut buffer = CIPHERTEXT_CBC_256;
-        let mut cbc = AesContext::new(Cbc::new(IV), Operation::Decrypt, KEY_256);
-        process_in_calls(&mut cbc, &mut buffer, &[128]);
-        hil_test::assert_eq!(buffer, padded_plaintext());
+            let mut buffer = CIPHERTEXT_CBC_256;
+            let mut cbc = AesContext::new(Cbc::new(IV), Operation::Decrypt, KEY_256);
+            process_in_calls(&mut cbc, &mut buffer, &[128]);
+            hil_test::assert_eq!(buffer, padded_plaintext(), "{} backend", kind.name());
+        }
     }
 
     #[test]
-    fn test_aes_dma_ctr_counter_carries_between_calls(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+    fn test_aes_ctr_counter_carries_between_calls(mut ctx: Context) {
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        let mut buffer = padded_plaintext();
-        let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
-        process_in_calls(&mut ctr, &mut buffer, &[128]);
-        hil_test::assert_eq!(buffer, CIPHERTEXT_CTR);
+            let mut buffer = padded_plaintext();
+            let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
+            process_in_calls(&mut ctr, &mut buffer, &[128]);
+            hil_test::assert_eq!(buffer, CIPHERTEXT_CTR, "{} backend", kind.name());
+        }
     }
 
     /// Bytes after the buffer, which no call may change
@@ -822,44 +963,78 @@ mod work_queue_dma_tests {
 
     /// A stream mode also processes a partial last block.
     #[test]
-    fn test_aes_dma_ctr_partial_last_block(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
+    fn test_aes_ctr_partial_last_block(mut ctx: Context) {
         const LEN: usize = 250;
-        let mut memory = [0; LEN + GUARD.len()];
-        memory[..LEN].copy_from_slice(&padded_plaintext()[..LEN]);
-        memory[LEN..].copy_from_slice(&GUARD);
 
-        let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
-        process_in_calls(&mut ctr, &mut memory[..LEN], &[]);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        hil_test::assert_eq!(memory[..LEN], CIPHERTEXT_CTR[..LEN]);
-        hil_test::assert_eq!(memory[LEN..], GUARD);
+            let mut memory = [0; LEN + GUARD.len()];
+            memory[..LEN].copy_from_slice(&padded_plaintext()[..LEN]);
+            memory[LEN..].copy_from_slice(&GUARD);
+
+            let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
+            process_in_calls(&mut ctr, &mut memory[..LEN], &[]);
+
+            hil_test::assert_eq!(
+                memory[..LEN],
+                CIPHERTEXT_CTR[..LEN],
+                "{} backend",
+                kind.name()
+            );
+            hil_test::assert_eq!(memory[LEN..], GUARD, "{} backend", kind.name());
+        }
     }
 
-    /// A call that ends part way through a block leaves the rest of that block's key stream to
-    /// the next call, which starts with it.
+    /// Each mode that takes any length, in calls of 1, 3, 96, 100 and 56 bytes. The first call is
+    /// shorter than a block. The second ends inside the block that the first call started, so CTR
+    /// and CFB-128 finish it from the key stream that the first call left over. Later calls start
+    /// and end part way through a block.
     #[test]
-    fn test_aes_dma_ctr_partial_blocks_between_calls(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+    fn test_aes_stream_modes_in_pieces(mut ctx: Context) {
+        const SPLITS: &[usize] = &[1, 4, 100, 200];
 
-        let mut memory = [0; PLAINTEXT_BUF_SIZE + GUARD.len()];
-        memory[..PLAINTEXT_BUF_SIZE].copy_from_slice(&padded_plaintext());
-        memory[PLAINTEXT_BUF_SIZE..].copy_from_slice(&GUARD);
+        let modes: [(&str, CipherState, &[u8]); 3] = [
+            ("CTR", Ctr::new(IV).into(), &CIPHERTEXT_CTR),
+            ("CFB-8", Cfb8::new(IV).into(), &CIPHERTEXT_CFB8),
+            ("CFB-128", Cfb128::new(IV).into(), &CIPHERTEXT_CFB128),
+        ];
 
-        let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
-        process_in_calls(&mut ctr, &mut memory[..PLAINTEXT_BUF_SIZE], &[100, 200]);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        hil_test::assert_eq!(memory[..PLAINTEXT_BUF_SIZE], CIPHERTEXT_CTR);
-        hil_test::assert_eq!(memory[PLAINTEXT_BUF_SIZE..], GUARD);
+            for (mode, state, ciphertext) in &modes {
+                let mut memory = [0; PLAINTEXT_BUF_SIZE + GUARD.len()];
+                memory[..PLAINTEXT_BUF_SIZE].copy_from_slice(&padded_plaintext());
+                memory[PLAINTEXT_BUF_SIZE..].copy_from_slice(&GUARD);
+
+                let mut context = AesContext::new(state.clone(), Operation::Encrypt, KEY_128);
+                process_in_calls(&mut context, &mut memory[..PLAINTEXT_BUF_SIZE], SPLITS);
+
+                hil_test::assert_eq!(
+                    memory[..PLAINTEXT_BUF_SIZE],
+                    ciphertext[..],
+                    "{}, {} backend",
+                    mode,
+                    kind.name()
+                );
+                hil_test::assert_eq!(
+                    memory[PLAINTEXT_BUF_SIZE..],
+                    GUARD,
+                    "{}, {} backend",
+                    mode,
+                    kind.name()
+                );
+            }
+        }
     }
 
     /// The counter block increments as one 128-bit number, so a carry out of its low 32 bits
     /// reaches the bits above them.
     #[test]
-    fn test_aes_dma_ctr_counter_carries_past_32_bits(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
+    fn test_aes_ctr_counter_carries_past_32_bits(mut ctx: Context) {
         // The low 32 bits wrap after the second block
         const NONCE: [u8; 16] = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0xff, 0xff, 0xff, 0xfe,
@@ -868,11 +1043,16 @@ mod work_queue_dma_tests {
         let mut expected = padded_plaintext();
         ctr::Ctr128BE::<Aes128>::new(&KEY_128.into(), &NONCE.into()).apply_keystream(&mut expected);
 
-        let mut buffer = padded_plaintext();
-        let mut ctr = AesContext::new(Ctr::new(NONCE), Operation::Encrypt, KEY_128);
-        process_in_calls(&mut ctr, &mut buffer, &[]);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        hil_test::assert_eq!(buffer, expected);
+            let mut buffer = padded_plaintext();
+            let mut ctr = AesContext::new(Ctr::new(NONCE), Operation::Encrypt, KEY_128);
+            process_in_calls(&mut ctr, &mut buffer, &[]);
+
+            hil_test::assert_eq!(buffer, expected, "{} backend", kind.name());
+        }
     }
 
     /// Longer than one DMA descriptor carries, so the DMA takes more than one transfer over it.
@@ -881,7 +1061,7 @@ mod work_queue_dma_tests {
     /// Encrypts the plaintext, repeated to `LONG_LEN` bytes, in one ECB call, in place at
     /// `offset` into `memory`. ECB has no chaining state, so each repeat must come out as the
     /// known ciphertext.
-    fn run_long_call(memory: &mut [u8], offset: usize) {
+    fn run_long_call(backend: &str, memory: &mut [u8], offset: usize) {
         let buffer = &mut memory[offset..][..LONG_LEN];
         let plaintext = padded_plaintext();
         for repeat in buffer.chunks_mut(PLAINTEXT_BUF_SIZE) {
@@ -892,27 +1072,34 @@ mod work_queue_dma_tests {
         process_in_calls(&mut ecb, buffer, &[]);
 
         for (i, repeat) in buffer.chunks(PLAINTEXT_BUF_SIZE).enumerate() {
-            hil_test::assert_eq!(repeat, &CIPHERTEXT_ECB_128[..], "repeat {}", i);
+            hil_test::assert_eq!(
+                repeat,
+                &CIPHERTEXT_ECB_128[..],
+                "repeat {}, {} backend",
+                i,
+                backend
+            );
         }
     }
 
     #[test]
-    fn test_aes_dma_long_call(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
+    fn test_aes_long_call(mut ctx: Context) {
         let mut internal_memory = Vec::with_capacity_in(LONG_LEN, esp_alloc::InternalMemory);
         internal_memory.resize(LONG_LEN, 0);
 
-        run_long_call(&mut internal_memory, 0);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_long_call(kind.name(), &mut internal_memory, 0);
+        }
     }
 
-    /// In external memory, each transfer hands its partial last cache line to the CPU through a
-    /// bounce buffer, and the next transfer starts in that same line.
+    /// In external memory, each DMA transfer hands its partial last cache line to the CPU through
+    /// a bounce buffer, and the next transfer starts in that same line.
     #[test]
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
-    fn test_aes_dma_long_call_psram(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
+    fn test_aes_long_call_psram(mut ctx: Context) {
         let len = LONG_LEN + SHARED_LINE + 16;
         let mut external_memory = Vec::with_capacity_in(len, esp_alloc::ExternalMemory);
         external_memory.resize(len, 0);
@@ -921,7 +1108,12 @@ mod work_queue_dma_tests {
         let addr = external_memory.as_ptr().addr();
         let offset = addr.next_multiple_of(SHARED_LINE) - addr + 8;
 
-        run_long_call(&mut external_memory, offset);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_long_call(kind.name(), &mut external_memory, offset);
+        }
     }
 }
 
