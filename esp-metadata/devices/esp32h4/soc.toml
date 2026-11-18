@@ -214,6 +214,7 @@ version = 3
 fifo_size = 64
 has_app_interrupts = true
 has_dma_segmented_transfer = true
+has_clk_pre_div = true
 instances = [
     {
         name = "spi2",

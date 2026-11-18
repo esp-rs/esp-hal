@@ -97,9 +97,10 @@ system_clocks = { clock_tree = [
         ], div_num = "0 .. 0x100" } },
     ] },
     { group = "SPI", clocks = [
+        { name = "PLL_F160M_DIV2", type = "generic", output = "PLL_F160M / 2" },
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL",      outputs = "XTAL_CLK" },
-            { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
+            { name = "PLL_F160M", outputs = "PLL_F160M_DIV2", default = true },
             { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
         ] },
     ] },

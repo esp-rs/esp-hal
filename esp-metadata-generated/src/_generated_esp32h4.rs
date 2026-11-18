@@ -227,7 +227,7 @@ macro_rules! property {
         true
     };
     ("spi_master.has_clk_pre_div") => {
-        false
+        true
     };
     ("spi_master.dma_can_access_flash") => {
         false

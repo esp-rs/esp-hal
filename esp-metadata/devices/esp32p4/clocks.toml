@@ -161,12 +161,13 @@ system_clocks = { clock_tree = [
       ],
     },
     { group = "SPI", clocks = [
+        { name = "SPLL_MST_CLOCK", type = "generic", output = "SPLL_D3_CLOCK / 2" },
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL",    outputs = "XTAL_CLK" },
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
             # { name = "SDIO_PLL0", outputs = "SDIO_PLL0_CLK" },
             # { name = "APLL", outputs = "APLL_CLK" },
-            { name = "SPLL",    outputs = "SPLL_D3_CLOCK", default = true },
+            { name = "SPLL",    outputs = "SPLL_MST_CLOCK", default = true },
         ] },
     ] },
     { group = "I2S",
