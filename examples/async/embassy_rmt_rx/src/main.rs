@@ -13,7 +13,7 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator},
+    rmt::{PulseCode, Rmt, RmtConfig, RxConfig},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -47,26 +47,24 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    let freq = cfg_select! {
-        feature = "esp32h2" => Rate::from_mhz(32),
-        _ => Rate::from_mhz(80),
-    };
-
-    let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
-    let rx_config = RxChannelConfig::default()
-        .with_clk_divider(255)
-        .with_idle_threshold(10000);
+    let rmt = Rmt::new(peripherals.RMT, RmtConfig::default())
+        .unwrap()
+        .into_async();
+    let rx_config = RxConfig::default()
+        .with_tick_rate(Rate::from_mhz(1))
+        .with_idle_ns(10_000_000);
 
     let channel = cfg_select! {
-        any(feature = "esp32", feature = "esp32s2") => {
-            rmt.channel0.configure_rx(&rx_config).unwrap()
-        }
-        any(feature = "esp32s3", feature = "esp32s31", feature = "esp32p4") => {
-            rmt.channel7.configure_rx(&rx_config).unwrap()
-        }
-        _ => rmt.channel2.configure_rx(&rx_config).unwrap(),
+        any(feature = "esp32", feature = "esp32s2") => rmt
+            .async_rx_channel(peripherals.RMT_CH0, rx_config)
+            .unwrap(),
+        any(feature = "esp32s3", feature = "esp32s31", feature = "esp32p4") => rmt
+            .async_rx_channel(peripherals.RMT_CH7, rx_config)
+            .unwrap(),
+        _ => rmt
+            .async_rx_channel(peripherals.RMT_CH2, rx_config)
+            .unwrap(),
     };
-
     let mut channel = channel.with_pin(peripherals.GPIO4);
 
     spawner.spawn(
@@ -82,7 +80,7 @@ async fn main(spawner: Spawner) {
 
     loop {
         println!("receive");
-        if channel.receive(&mut data).await.is_err() {
+        if channel.receive_async(&mut data).await.is_err() {
             println!("receive error");
             continue;
         }

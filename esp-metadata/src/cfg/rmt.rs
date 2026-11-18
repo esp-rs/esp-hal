@@ -58,24 +58,28 @@ impl GenericProperty for RmtChannelConfig {
             matches!(cap, RmtChannelCapability::Rx | RmtChannelCapability::RxTx)
         });
 
-        // A TX channel can use the RAM blocks of the channels that follow it, whatever their
+        // A channel can use the RAM blocks of the channels that follow it, whatever their
         // direction.
         let channel_count = self.0.len();
-        let tx_tuple_cfgs = self
-            .0
-            .iter()
-            .enumerate()
-            .filter(|&(_, &cap)| cap != RmtChannelCapability::Rx)
-            .flat_map(|(first, _)| {
-                (2..=channel_count - first).map(move |blocks| {
-                    let channels = (first..first + blocks).map(|ch| format_ident!("RMT_CH{ch}"));
-                    let blocks = number(blocks);
-                    quote! {
-                        #blocks, (#(#channels),*)
-                    }
+        let make_tuple_cfgs = |skip: RmtChannelCapability| {
+            self.0
+                .iter()
+                .enumerate()
+                .filter(|&(_, &cap)| cap != skip)
+                .flat_map(|(first, _)| {
+                    (2..=channel_count - first).map(move |blocks| {
+                        let channels =
+                            (first..first + blocks).map(|ch| format_ident!("RMT_CH{ch}"));
+                        let blocks = number(blocks);
+                        quote! {
+                            #blocks, (#(#channels),*)
+                        }
+                    })
                 })
-            })
-            .collect::<Vec<_>>();
+                .collect::<Vec<_>>()
+        };
+        let tx_tuple_cfgs = make_tuple_cfgs(RmtChannelCapability::Rx);
+        let rx_tuple_cfgs = make_tuple_cfgs(RmtChannelCapability::Tx);
 
         let for_each = generate_for_each_macro(
             "rmt_channel",
@@ -84,6 +88,7 @@ impl GenericProperty for RmtChannelConfig {
                 ("tx", &tx_channel_cfgs),
                 ("rx", &rx_channel_cfgs),
                 ("tx_tuples", &tx_tuple_cfgs),
+                ("rx_tuples", &rx_tuple_cfgs),
             ],
         );
 
@@ -93,20 +98,22 @@ impl GenericProperty for RmtChannelConfig {
             /// For an explanation on the general syntax, as well as usage of individual/repeated
             /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
             ///
-            /// This macro has four options for its "Individual matcher" case:
+            /// This macro has five options for its "Individual matcher" case:
             ///
             /// - `all`: `($num:literal)`
             /// - `tx`: `($num:literal, $idx:literal)`
             /// - `rx`: `($num:literal, $idx:literal)`
             /// - `tx_tuples`: `($blocks:literal, ($($peri:ident),+))`
+            /// - `rx_tuples`: `($blocks:literal, ($($peri:ident),+))`
             ///
             /// Macro fragments:
             ///
             /// - `$num`: number of the channel, e.g. `0`
             /// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
-            /// - `$blocks`: number of RAM blocks of a TX channel that uses the RAM of the
-            ///   channels that follow it, e.g. `2`
-            /// - `$peri`: the singletons of these channels, the TX channel first, e.g. `RMT_CH1`
+            /// - `$blocks`: number of RAM blocks of a channel that uses the RAM of the channels
+            ///   that follow it, e.g. `2`
+            /// - `$peri`: the singletons of these channels, the TX or RX channel first, e.g.
+            ///   `RMT_CH1`
             ///
             /// Example data:
             ///
@@ -114,6 +121,7 @@ impl GenericProperty for RmtChannelConfig {
             /// - `tx`: `(1, 1)`
             /// - `rx`: `(2, 0)`
             /// - `tx_tuples`: `(2, (RMT_CH1, RMT_CH2))`
+            /// - `rx_tuples`: `(2, (RMT_CH2, RMT_CH3))`
             #for_each
         })
     }
