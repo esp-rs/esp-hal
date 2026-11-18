@@ -128,5 +128,9 @@ defmt-espflash = ["dep:defmt", "defmt?/encoding-rzcobs"]
 ## Colors the message severity in the terminal.
 colors = []
 
+[lints.cargo]
+# False positives for dependencies that only some configurations use.
+unused_dependencies = "allow"
+
 [lints.rust]
 static_mut_refs = "allow"

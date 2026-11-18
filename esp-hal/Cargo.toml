@@ -431,5 +431,9 @@ requires-unstable = []
 [lints.clippy]
 mixed_attributes_style = "allow"
 
+[lints.cargo]
+# False positives for dependencies that only some configurations use.
+unused_dependencies = "allow"
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(host_os, values("windows"))'] }

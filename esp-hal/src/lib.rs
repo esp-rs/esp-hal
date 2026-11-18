@@ -455,24 +455,6 @@ unstable_driver! {
     pub mod mipi_dsi;
 }
 
-// Cargo features cannot require both the chip and `unstable`, so these driver dependencies are
-// also enabled in builds that do not compile the driver. We just ignore them there.
-#[cfg(all(feature = "__usb_otg", not(feature = "unstable")))]
-use embassy_usb_synopsys_otg as _;
-#[cfg(all(
-    feature = "unstable",
-    not(any(twai_driver_supported, canfd_driver_supported))
-))]
-use embedded_can as _;
-#[cfg(all(feature = "__sdmmc", not(feature = "unstable")))]
-use sdio as _;
-#[cfg(all(feature = "unstable", not(sha_driver_supported)))]
-use {digest_010 as _, digest_011 as _};
-#[cfg(all(feature = "__ethernet", not(feature = "unstable")))]
-use {embassy_net_driver_02 as _, xarxa_driver as _};
-#[cfg(all(esp32, not(feature = "unstable")))]
-use {sha1 as _, sha2 as _};
-
 /// State of the CPU saved when entering exception or interrupt
 #[instability::unstable]
 #[cfg(feature = "rt")]

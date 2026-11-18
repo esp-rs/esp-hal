@@ -134,3 +134,7 @@ esp32    = ["esp-sync/esp32", "esp-metadata-generated/esp32"]
 esp32s2  = ["esp-sync/esp32s2", "esp-metadata-generated/esp32s2"]
 ##
 esp32s3  = ["esp-sync/esp32s3", "esp-metadata-generated/esp32s3"]
+
+[lints.cargo]
+# False positives for dependencies that only some configurations use.
+unused_dependencies = "allow"
