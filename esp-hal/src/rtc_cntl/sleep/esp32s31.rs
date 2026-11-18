@@ -2,7 +2,7 @@
 use core::ops::Not;
 
 use crate::{
-    peripherals::{HP_ALIVE_SYS, HP_SYS_CLKRST, IOMUX_MSPI_PIN, LP_SYS as LP_AON, MEMSPI2, PMU},
+    peripherals::{HP_ALIVE_SYS, HP_SYS_CLKRST, IOMUX_MSPI_PIN, MEMSPI2, PMU},
     psram::psram_range,
     rtc_cntl::{
         Rtc,
@@ -205,17 +205,17 @@ pub struct PowerSleepConfig {
 }
 
 impl PowerSleepConfig {
-    fn defaults(pd_flags: PowerDownFlags) -> Self {
+    fn defaults(pd_flags: PowerDownFlags, keep_usb_serial_jtag: bool) -> Self {
         let mut this = Self {
             hp_sys: HpSysPower::default(),
             lp_sys_active: LpSysPower::default(),
             lp_sys_sleep: LpSysPower::default(),
         };
-        this.apply_flags(pd_flags);
+        this.apply_flags(pd_flags, keep_usb_serial_jtag);
         this
     }
 
-    fn apply_flags(&mut self, pd_flags: PowerDownFlags) {
+    fn apply_flags(&mut self, pd_flags: PowerDownFlags, keep_usb_serial_jtag: bool) {
         // PMU_SLEEP_POWER_CONFIG_DEFAULT
         self.hp_sys
             .dig_power
@@ -232,8 +232,12 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_modem_pwr_pd_en(pd_flags.pd_mem());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
 
-        self.hp_sys.clk.set_i2c_iso_en(true);
-        self.hp_sys.clk.set_i2c_retention(true);
+        // USB Serial/JTAG needs BBPLL to keep answering the host.
+        self.hp_sys.clk.set_i2c_iso_en(!keep_usb_serial_jtag);
+        self.hp_sys.clk.set_i2c_retention(!keep_usb_serial_jtag);
+        self.hp_sys.clk.set_xpd_bb_i2c(keep_usb_serial_jtag);
+        self.hp_sys.clk.set_xpd_bbpll_i2c(keep_usb_serial_jtag);
+        self.hp_sys.clk.set_xpd_bbpll(keep_usb_serial_jtag);
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
 
@@ -642,7 +646,7 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
-        self.keep_usb_serial_jtag = super::usb_serial_jtag::keep_running_in_sleep(self.deep);
+        self.keep_usb_serial_jtag = !self.deep && super::usb_serial_jtag::keep_in_light_sleep();
 
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
@@ -695,11 +699,9 @@ impl RtcSleepConfig {
             crate::psram::low_speed::enter();
         }
 
-        let keep_usb_serial_jtag = self.keep_usb_serial_jtag;
-
         let (cpu_root_clk, mpll_mhz) = ClockTree::with(|clocks| {
             let old = clocks.cpu_root_clk();
-            if keep_usb_serial_jtag {
+            if self.keep_usb_serial_jtag {
                 clocks::request_bbpll_clk(clocks);
             }
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
@@ -708,14 +710,7 @@ impl RtcSleepConfig {
             (old, clocks::requested_mpll_mhz(clocks))
         });
 
-        let mut power = PowerSleepConfig::defaults(self.pd_flags);
-        if keep_usb_serial_jtag {
-            power.hp_sys.clk.set_i2c_iso_en(false);
-            power.hp_sys.clk.set_i2c_retention(false);
-            power.hp_sys.clk.set_xpd_bb_i2c(true);
-            power.hp_sys.clk.set_xpd_bbpll_i2c(true);
-            power.hp_sys.clk.set_xpd_bbpll(true);
-        }
+        let power = PowerSleepConfig::defaults(self.pd_flags, self.keep_usb_serial_jtag);
         power.apply(self.deep);
 
         let config = if self.deep {
@@ -736,15 +731,14 @@ impl RtcSleepConfig {
             AnalogSleepConfig::defaults_deep_sleep().apply();
         } else {
             AnalogSleepConfig::defaults_light_sleep(self.pd_flags).apply();
-            DigitalSleepConfig::defaults_light_sleep(self.pd_flags, keep_usb_serial_jtag).apply();
+            DigitalSleepConfig::defaults_light_sleep(self.pd_flags, self.keep_usb_serial_jtag)
+                .apply();
         }
 
         param.apply();
 
-        // lp_aon_hal_inform_wakeup_type: RTC_SLEEP_MODE_REG is LP_STORE8.
-        LP_AON::regs()
-            .lp_store(8)
-            .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
+        // lp_aon_hal_inform_wakeup_type
+        super::pmu_common::set_sleep_mode(self.deep);
 
         PMU::regs()
             .slp_wakeup_cntl2()
@@ -769,12 +763,12 @@ impl RtcSleepConfig {
             .write(|w| w.slp_reject_en().bit(reject_mask != 0));
 
         let usb_serial_jtag =
-            (!self.deep && !keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
+            (!self.deep && !self.keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
 
         SavedState {
             usb_serial_jtag,
             cpu_root_clk,
-            keep_usb_serial_jtag,
+            keep_usb_serial_jtag: self.keep_usb_serial_jtag,
             psram_slowed,
             mpll_mhz,
             deep: self.deep,
@@ -984,9 +978,4 @@ fn update_modem_after_wake(clocks: &ClockTree) {
             disable_bbpll();
         }
     }
-}
-
-/// Returns whether the last sleep that [`RtcSleepConfig::start_sleep`] prepared was a deep sleep.
-pub(super) fn last_sleep_was_deep() -> bool {
-    LP_AON::regs().lp_store(8).read().bits() & 0x01 != 0
 }

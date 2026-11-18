@@ -481,8 +481,11 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
-    ("sleep.usb_serial_jtag_light_sleep") => {
-        "keep_cpu_powered"
+    ("sleep.keeps_usb_serial_jtag") => {
+        true
+    };
+    ("sleep.keeps_cpu_powered_for_usb_serial_jtag") => {
+        true
     };
     ("sleep.regdma_list_count") => {
         4

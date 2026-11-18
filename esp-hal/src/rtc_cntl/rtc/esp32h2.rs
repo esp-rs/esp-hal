@@ -5,9 +5,6 @@ use crate::{
     soc::{clocks::ClockConfig, regi2c},
 };
 
-// `backup_clk_sel` uses `SOC_CPU_CLK_SRC_*`, where XTAL = 0.
-const HP_SYSCLK_XTAL: u8 = 0;
-
 // `backup_mode` is `PMU_HP_RETENTION_REGDMA_CONFIG(dir, entry)`: the direction in bit 2, where 1
 // is the backup, then the REGDMA entry.
 const RESTORE_ENTRY_0: u8 = 0;
@@ -140,6 +137,9 @@ pub enum SocResetReason {
     /// Glitch on power resets the digital core
     CorePwrGlitch = 0x17,
 }
+
+pub(crate) const HP_SYSCLK_XTAL: u8 = 0;
+pub(crate) const HP_SYSCLK_PLL: u8 = 1;
 
 bitfield::bitfield! {
     /// Representation of `PMU_HP_{ACTIVE,SLEEP}_DIG_POWER_REG` registers.

@@ -398,17 +398,17 @@ pub struct PowerSleepConfig {
 }
 
 impl PowerSleepConfig {
-    fn defaults(pd_flags: PowerDownFlags) -> Self {
+    fn defaults(pd_flags: PowerDownFlags, keep_usb_serial_jtag: bool) -> Self {
         let mut this = Self {
             hp_sys: HpSysPower::default(),
             lp_sys_active: LpSysPower::default(),
             lp_sys_sleep: LpSysPower::default(),
         };
-        this.apply_flags(pd_flags);
+        this.apply_flags(pd_flags, keep_usb_serial_jtag);
         this
     }
 
-    fn apply_flags(&mut self, pd_flags: PowerDownFlags) {
+    fn apply_flags(&mut self, pd_flags: PowerDownFlags, keep_usb_serial_jtag: bool) {
         // PMU_HP_SLEEP_POWER_CONFIG_DEFAULT + flag overrides.
         // `dcdc_switch_pd_en` is powered down only in deep sleep (which sets
         // `pd_vddsdio`); light sleep keeps the DCDC switch so the DCDC can supply
@@ -421,10 +421,13 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
         self.hp_sys.dig_power.set_mem_pd_en(pd_flags.pd_mem());
 
-        self.hp_sys.clk.set_i2c_iso_en(true);
-        self.hp_sys.clk.set_i2c_retention(true);
-        self.hp_sys.clk.set_xpd_pll_i2c(0);
-        self.hp_sys.clk.set_xpd_pll(0);
+        // USB Serial/JTAG needs the SPLL to keep answering the host. The PAC does not document
+        // which `xpd_pll` bit is the SPLL, so such a sleep keeps all PLLs powered, as in HP_ACTIVE.
+        let xpd_pll = if keep_usb_serial_jtag { 0xf } else { 0 };
+        self.hp_sys.clk.set_i2c_iso_en(!keep_usb_serial_jtag);
+        self.hp_sys.clk.set_i2c_retention(!keep_usb_serial_jtag);
+        self.hp_sys.clk.set_xpd_pll_i2c(xpd_pll);
+        self.hp_sys.clk.set_xpd_pll(xpd_pll);
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
 
@@ -796,7 +799,7 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
-        self.keep_usb_serial_jtag = super::usb_serial_jtag::keep_running_in_sleep(self.deep);
+        self.keep_usb_serial_jtag = !self.deep && super::usb_serial_jtag::keep_in_light_sleep();
 
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
@@ -841,29 +844,23 @@ impl RtcSleepConfig {
     /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
-        let keep_usb_serial_jtag = self.keep_usb_serial_jtag;
-
         let cpu_root_clk = ClockTree::with(|clocks| {
             let old = clocks.cpu_root_clk();
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
             old
         });
 
-        let mut power = PowerSleepConfig::defaults(self.pd_flags);
-        if keep_usb_serial_jtag {
-            // The PAC does not document which `xpd_pll` bit is the SPLL, so keep
-            // all PLLs powered, as in HP_ACTIVE.
-            power.hp_sys.clk.set_i2c_iso_en(false);
-            power.hp_sys.clk.set_i2c_retention(false);
-            power.hp_sys.clk.set_xpd_pll_i2c(0xf);
-            power.hp_sys.clk.set_xpd_pll(0xf);
-        }
+        let power = PowerSleepConfig::defaults(self.pd_flags, self.keep_usb_serial_jtag);
         power.apply();
 
         // USB Serial/JTAG sits behind HP_SLEEP clock gates that neither the PAC nor the ESP-IDF
         // map names, so the sleep opens all of them.
         // See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/soc/esp32p4/include/soc/pmu_icg_mapping.h>.
-        let icg = if keep_usb_serial_jtag { u32::MAX } else { 0 };
+        let icg = if self.keep_usb_serial_jtag {
+            u32::MAX
+        } else {
+            0
+        };
         PMU::regs()
             .hp_sleep_icg_hp_func()
             .write(|w| unsafe { w.bits(icg) });
@@ -872,7 +869,7 @@ impl RtcSleepConfig {
             .write(|w| unsafe { w.bits(icg) });
         PMU::regs()
             .hp_sleep_sysclk()
-            .modify(|_, w| w.hp_sleep_icg_sys_clock_en().bit(keep_usb_serial_jtag));
+            .modify(|_, w| w.hp_sleep_icg_sys_clock_en().bit(self.keep_usb_serial_jtag));
 
         let config = if self.deep {
             SleepTimeConfig::deep_sleep()
@@ -894,7 +891,7 @@ impl RtcSleepConfig {
             DigitalSleepConfig::defaults_deep_sleep(self.pd_flags).apply();
             AnalogSleepConfig::defaults_deep_sleep().apply(true);
         } else {
-            AnalogSleepConfig::defaults_light_sleep(self.pd_flags, keep_usb_serial_jtag)
+            AnalogSleepConfig::defaults_light_sleep(self.pd_flags, self.keep_usb_serial_jtag)
                 .apply(false);
             DigitalSleepConfig::defaults_light_sleep(self.pd_flags).apply();
         }
@@ -912,12 +909,8 @@ impl RtcSleepConfig {
 
         // like esp-idf pmu_sleep_start()
 
-        // lp_aon_hal_inform_wakeup_type: on P4 RTC_SLEEP_MODE_REG is
-        // LP_SYSTEM_REG_LP_STORE8 (bit0 = run deep-sleep wake stub). The ROM
-        // reads this on wake to pick the deep vs light wake path.
-        crate::peripherals::LP_AON::regs()
-            .lp_store8()
-            .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
+        // lp_aon_hal_inform_wakeup_type
+        super::pmu_common::set_sleep_mode(self.deep);
 
         // The wakeup enable field is bits 30:0 here, unlike the other PMU chips where it is the
         // whole register. Bit 31 is reserved and reads 0, so a whole-register write is correct and
@@ -954,7 +947,7 @@ impl RtcSleepConfig {
         }
 
         let usb_serial_jtag =
-            (!self.deep && !keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
+            (!self.deep && !self.keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
 
         // The PMU FSM switches the pads to their sleep setting and holds IOs
         // at the same stage; trigger the pad sleep selection first so the IOs
@@ -1061,8 +1054,3 @@ pub(crate) fn pmu_sleep_start(_saved: &SavedState) -> bool {
 /// Runs the wake steps after a CPU power-down. The ESP32-P4 has no wake steps yet.
 #[inline(always)]
 pub(crate) fn pmu_sleep_finish(_saved: &SavedState) {}
-
-/// Returns whether the last sleep that [`RtcSleepConfig::start_sleep`] prepared was a deep sleep.
-pub(super) fn last_sleep_was_deep() -> bool {
-    crate::peripherals::LP_AON::regs().lp_store8().read().bits() & 0x01 != 0
-}

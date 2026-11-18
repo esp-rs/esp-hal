@@ -342,7 +342,8 @@ support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 idle_frequency_scaling = true
 deep_sleep = true
-usb_serial_jtag_light_sleep = "keep_cpu_powered"
+keeps_usb_serial_jtag = true
+keeps_cpu_powered_for_usb_serial_jtag = true
 ext1_version = 2
 pin_wakeup_version = 3
 wakeup_sources = {

@@ -107,7 +107,7 @@ impl WakeupWaits {
 
 #[cfg(soc_has_pmu)]
 pub(crate) mod pmu_common;
-#[cfg(sleep_usb_serial_jtag_light_sleep_is_set)]
+#[cfg(soc_has_usb_device)]
 mod usb_serial_jtag;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
@@ -162,18 +162,13 @@ use crate::rtc_cntl::cpu_retention;
 #[doc(hidden)]
 #[instability::unstable]
 pub mod __rtos_implementation {
-    /// Returns whether automatic light sleep should keep the chip awake for USB Serial/JTAG.
+    /// Returns whether automatic light sleep must keep the chip awake for USB Serial/JTAG.
     ///
-    /// On chips whose light sleep disconnects USB Serial/JTAG, automatic light sleep stays out of
-    /// light sleep while a host is connected, unless the `keep-usb-serial-jtag-connected` option is
-    /// disabled.
+    /// Light sleep disconnects USB Serial/JTAG from the host. Automatic light sleep does not start
+    /// while a host is connected, unless the `keep-usb-serial-jtag-connected` option is disabled.
+    #[cfg(all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)))]
     pub fn usb_serial_jtag_blocks_light_sleep() -> bool {
-        cfg_select! {
-            sleep_usb_serial_jtag_light_sleep = "disconnect" => {
-                cfg!(keep_usb_serial_jtag_connected) && super::usb_serial_jtag::host_connected()
-            }
-            _ => false,
-        }
+        cfg!(keep_usb_serial_jtag_connected) && super::usb_serial_jtag::host_connected()
     }
 }
 
@@ -205,18 +200,14 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
 /// Returns whether the last reset was a wakeup from deep sleep.
 ///
 /// On a chip that keeps USB Serial/JTAG running in light sleep, a USB reset during a light sleep
-/// has the same reset reason. Bit 0 of `RTC_SLEEP_MODE_REG` tells the two apart: the sleep code
-/// sets it for a deep sleep and clears it for a light sleep.
-/// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/esp_rom/esp32c6/include/esp32c6/rom/rtc.h#L68-L69>.
-pub(crate) fn deep_sleep_wakeup() -> bool {
+/// has the same reset reason. The sleep mode that the sleep code leaves for the ROM tells the two
+/// apart.
+pub(crate) fn woke_from_deep_sleep() -> bool {
     let deep_sleep_reset = super::reset_reason(crate::system::Cpu::ProCpu)
         == Some(super::SocResetReason::CoreDeepSleep);
 
     cfg_select! {
-        any(
-            sleep_usb_serial_jtag_light_sleep = "keep",
-            sleep_usb_serial_jtag_light_sleep = "keep_cpu_powered"
-        ) => deep_sleep_reset && sleep_impl::last_sleep_was_deep(),
+        sleep_keeps_usb_serial_jtag => deep_sleep_reset && pmu_common::last_sleep_was_deep(),
         _ => deep_sleep_reset,
     }
 }
@@ -500,7 +491,7 @@ impl<'d> LowPower<'d> {
         // USB Serial/JTAG connected.
         #[cfg(supports_cpu_power_down)]
         let retention_buffer = match kind {
-            #[cfg(sleep_usb_serial_jtag_light_sleep = "keep_cpu_powered")]
+            #[cfg(sleep_keeps_cpu_powered_for_usb_serial_jtag)]
             SleepKind::Light if config.keep_usb_serial_jtag => None,
             SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
             SleepKind::Deep => None,

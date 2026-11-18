@@ -1109,14 +1109,14 @@ driver_configs![
                 /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
                 #[serde(default)]
                 deep_sleep_needs_gpio_isolation: bool,
-                /// How light sleep handles USB Serial/JTAG.
-                ///
-                /// `"keep"`: a light sleep keeps USB Serial/JTAG running while a USB host is
-                /// connected, and disconnects it otherwise. `"keep_cpu_powered"`: as `"keep"`, and
-                /// such a sleep also keeps the CPU powered, because a powered-down CPU does not
-                /// reliably come back from it. `"disconnect"`: a light sleep always disconnects USB
-                /// Serial/JTAG.
-                usb_serial_jtag_light_sleep: Option<String>,
+                /// Whether a light sleep can keep USB Serial/JTAG running while a USB host is
+                /// connected. Without it, a light sleep disconnects USB Serial/JTAG from the host.
+                #[serde(default)]
+                keeps_usb_serial_jtag: bool,
+                /// Whether a light sleep that keeps USB Serial/JTAG running also keeps the CPU
+                /// powered, because a powered-down CPU does not reliably come back from it.
+                #[serde(default)]
+                keeps_cpu_powered_for_usb_serial_jtag: bool,
                 /// CPU retention capabilities and reachable retention-memory bounds.
                 ///
                 /// Not `Option`: an absent table must emit no symbols at all, and an optional

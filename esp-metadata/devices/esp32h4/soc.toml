@@ -439,7 +439,6 @@ algo = {
 support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 deep_sleep = true
-usb_serial_jtag_light_sleep = "disconnect"
 ext1_version = 2
 pin_wakeup_version = 3
 # esp-idf components/esp_hw_support/port/esp32h4/private_include/pmu_bit_defs.h

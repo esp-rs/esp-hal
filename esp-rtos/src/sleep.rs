@@ -42,10 +42,11 @@ impl Sleep {
     /// memory, and it adds the save and the restore to the sleep and the wake.
     ///
     /// After this call, light sleep powers the CPU domain down. Nothing turns it off again, because
-    /// the memory stays with the driver for the life of the program. Only a light sleep that keeps
-    /// USB Serial/JTAG connected to a host can keep the CPU domain powered. See the
-    /// `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option of esp-hal.
-    ///
+    /// the memory stays with the driver for the life of the program.
+    #[cfg_attr(
+        sleep_keeps_cpu_powered_for_usb_serial_jtag,
+        doc = "Only a light sleep that keeps USB Serial/JTAG connected to a host keeps the CPU domain powered. See the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option of esp-hal."
+    )]
     /// # Errors
     ///
     /// Returns [`CpuRetentionMemoryError`] if a buffer is installed already, or if `memory` is
@@ -113,12 +114,13 @@ impl DeepSleep {
 ///
 /// Each time the scheduler runs out of ready tasks, the hook disables interrupts on this core,
 /// takes the scheduler lock, and checks that:
-/// - no [`WakeLock`] is held,
-/// - all cores are idle,
-/// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away,
-/// - on the ESP32-C3, ESP32-H4 and ESP32-S3, no USB host is connected to USB Serial/JTAG, unless
-///   `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` is `false`.
-///
+/// - no [`WakeLock`] is held
+/// - all cores are idle
+/// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away
+#[cfg_attr(
+    all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)),
+    doc = "- no USB host is connected to USB Serial/JTAG, unless `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` is `false`"
+)]
 /// If all hold, it releases the lock and enters light sleep with interrupts still disabled. The
 /// sleep path keeps interrupts disabled, and parks every other running core for the duration of
 /// the sleep. Then it checks the first two conditions again, and a failed check refuses the sleep.
@@ -176,8 +178,12 @@ extern "C" fn auto_light_sleep_hook() -> ! {
         let irq_token = unsafe { SingleCoreInterruptLock.enter() };
 
         let sleep = SCHEDULER.with(|scheduler| {
-            if WakeLock::is_active()
-                || esp_hal::rtc_cntl::sleep::__rtos_implementation::usb_serial_jtag_blocks_light_sleep()
+            if WakeLock::is_active() {
+                return false;
+            }
+
+            #[cfg(all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)))]
+            if esp_hal::rtc_cntl::sleep::__rtos_implementation::usb_serial_jtag_blocks_light_sleep()
             {
                 return false;
             }

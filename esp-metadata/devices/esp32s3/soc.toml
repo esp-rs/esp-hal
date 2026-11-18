@@ -341,7 +341,6 @@ apb_cycle_wait_num = 16 # TODO
 support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 deep_sleep = true
-usb_serial_jtag_light_sleep = "disconnect"
 ext1_version = 1
 pin_wakeup_version = 1
 deep_sleep_needs_gpio_isolation = true
