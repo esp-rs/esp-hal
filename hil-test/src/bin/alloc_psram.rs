@@ -3,6 +3,8 @@
 //% CHIP_FILTER(llff, tlsf): psram_driver_supported
 //% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
+// Just below 512 KiB, so that only the second-level rounding of TLSF needs the next size class.
+//% ENV(tlsf): ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION=524256
 // The default 64KB leaves nothing to reclaim, see the dcache_reclaimed tests below.
 //% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
 //% FEATURES: unstable esp-alloc/nightly
@@ -64,6 +66,23 @@ mod tests {
             for i in 0..free {
                 assert_eq!(vec[i], crate::pattern(i));
             }
+        }
+    }
+
+    #[test]
+    fn tlsf_max_allocation_is_applied() {
+        if option_env!("ESP_ALLOC_CONFIG_HEAP_ALGORITHM") == Some("TLSF") {
+            // The configured maximum needs `FLLEN = 16`. Its largest size class starts at
+            // `2^19 + 31 * 2^14` bytes, which must also hold the 8 byte block header.
+            const TOO_LARGE: usize = (1 << 19) + 31 * (1 << 14) - 8 + 1;
+
+            // The heap splits a region into pools of `GRANULARITY << FLLEN` (1 MiB) bytes. With
+            // this much free memory, one pool is complete, and its free block can hold `TOO_LARGE`.
+            assert!(esp_alloc::HEAP.free() >= 1024 * 1024);
+
+            let mut vec = AllocVec::<u8>::new();
+            assert!(vec.try_reserve_exact(TOO_LARGE).is_err());
+            assert!(vec.try_reserve_exact(524256).is_ok());
         }
     }
 
