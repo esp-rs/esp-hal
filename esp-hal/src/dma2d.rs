@@ -6,13 +6,15 @@
 use core::sync::atomic::{Ordering, compiler_fence};
 
 pub use self::{rx::AnyDma2dRxChannel, tx::AnyDma2dTxChannel};
+#[cfg(esp32s31)]
+use crate::peripherals::HP_SYS;
 use crate::{
-    peripherals::{DMA2D, HP_SYS},
-    soc::{cache_writeback_addr, is_slice_in_psram},
+    dma::aligned::region_needs_cache_op,
+    peripherals::DMA2D,
+    soc::{cache_invalidate_addr, cache_writeback_addr},
     system::{GenericPeripheralGuard, Peripheral},
 };
 
-pub(crate) const CACHE_LINE_SIZE: usize = 64;
 pub(crate) const BURST_128_BYTES: u8 = 4;
 pub(crate) const MACRO_BLOCK_NONE: u8 = 3;
 
@@ -54,6 +56,7 @@ mod rx {
 
 fn init_dma2d() {
     // DMA2D transfers stall while SRAM low-power enable is set.
+    #[cfg(esp32s31)]
     HP_SYS::regs()
         .dma2d_mem_lp_ctrl()
         .modify(|_, w| w._2ddma_mem_lp_en().clear_bit());
@@ -157,9 +160,19 @@ impl<'d> Channels<'d> {
 }
 
 pub(crate) fn writeback<T>(buffer: &[T]) {
-    if is_slice_in_psram(buffer) {
-        let start = buffer.as_ptr() as usize & !(CACHE_LINE_SIZE - 1);
-        let end = (buffer.as_ptr_range().end as usize).next_multiple_of(CACHE_LINE_SIZE);
-        unsafe { cache_writeback_addr(start as u32, (end - start) as u32) };
+    let (address, size) = (buffer.as_ptr() as usize, size_of_val(buffer));
+    if region_needs_cache_op(address, size) {
+        unsafe { cache_writeback_addr(address as u32, size as u32) };
+    }
+}
+
+/// # Safety
+///
+/// The buffer must cover whole cache lines of its memory region, so that the invalidation drops
+/// no other data.
+pub(crate) unsafe fn invalidate<T>(buffer: &[T]) {
+    let (address, size) = (buffer.as_ptr() as usize, size_of_val(buffer));
+    if region_needs_cache_op(address, size) {
+        unsafe { cache_invalidate_addr(address as u32, size as u32) };
     }
 }

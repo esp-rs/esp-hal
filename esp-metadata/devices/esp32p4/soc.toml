@@ -109,6 +109,9 @@ peripherals = [
     # esp-hal's `Dma` singleton needs the GDMA v2 layout, so map it to AHB_DMA.
     { name = "DMA", pac = "AHB_DMA" },
     { name = "AXI_GDMA", pac = "AXI_DMA" },
+    { name = "DMA2D" },
+    { name = "JPEG", interrupts = { peri = "JPEG" } },
+    { name = "PPA" },
 
     { name = "ETH", virtual = true, interrupts = { peri = "ETH_MAC" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
@@ -640,11 +643,16 @@ support_status = "not_supported"
 [device.isp]
 support_status = "not_supported"
 
+[device.dma2d]
+support_status = "partial"
+tx_channel_count = 4
+rx_channel_count = 3
+
 [device.pixel_accelerator]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.jpeg]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.h264_encoder]
 support_status = "not_supported"

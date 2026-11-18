@@ -300,6 +300,11 @@ peripheral_clocks = { templates = [
     { name = "AhbGdma", template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "ahb_pdma", rst_group = "1", rst_field = "ahb_pdma" } },
     { name = "AxiGdma", template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "axi_pdma", rst_group = "1", rst_field = "axi_pdma" } },
     { name = "Vdma",    template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "gdma",     rst_group = "0", rst_field = "gdma" } },
+    { name = "Dma2d",   template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "dma2d",    rst_group = "0", rst_field = "dma2d" } },
+    # JPEG codec
+    { name = "Jpeg",    template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "jpeg",     rst_group = "0", rst_field = "jpeg" } },
+    # Pixel processing accelerator
+    { name = "Ppa",     template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "ppa",      rst_group = "1", rst_field = "ppa" } },
     # ADC -- the digital controller needs both the APB gate and the PERI_CLK_CTRL23 function clock.
     { name = "ApbSarAdc", template_params = { clk_en_template = "{{apb_clk_template}} {{control}}::regs().peri_clk_ctrl23().modify(|_, w| w.adc_clk_en().bit(enable));", clk_field = "adc", rst_group = "2", rst_field = "adc" } },
     # Parallel IO -- reset asserts the parlio block plus its rx/tx subreset bits in one write.

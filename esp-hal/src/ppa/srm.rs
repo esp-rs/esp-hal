@@ -1,4 +1,9 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "output_alignment" => {
+        cfg(soc_internal_memory_cached) => "Destination addresses and buffer lengths must be multiples of 64 bytes in internal RAM and 128 bytes in PSRAM.",
+        _ => "PSRAM destination addresses and buffer lengths must be multiples of 64 bytes."
+    }
+))]
 //! # Scaling, Rotation, and Mirroring (SRM)
 //!
 //! ## Overview
@@ -15,7 +20,7 @@
 //! - Each buffer must contain at least `width * height * format.bytes_per_pixel()` bytes for its
 //!   image size.
 //! - Buffers must be entirely within internal RAM or initialized PSRAM.
-//! - PSRAM destination addresses and buffer lengths must be multiples of 64 bytes.
+//! - __output_alignment__
 //!
 //! PSRAM encryption and ECC configurations requiring strictly aligned memory transactions are
 //! not supported.
@@ -62,16 +67,17 @@ use core::marker::PhantomData;
 use crate::{
     Blocking,
     DriverMode,
+    dma::aligned::{region_dma_alignment, region_needs_cache_op},
     dma2d::{
         AnyDma2dRxChannel,
         AnyDma2dTxChannel,
         BURST_128_BYTES,
-        CACHE_LINE_SIZE,
         Channels,
         MACRO_BLOCK_NONE,
+        invalidate,
         writeback,
     },
-    peripherals::{DMA2D, HP_SYS, PPA},
+    peripherals::{DMA2D, PPA},
     soc::{is_slice_in_dram, is_slice_in_psram},
     system::{GenericPeripheralGuard, Peripheral, PeripheralClockControl},
 };
@@ -330,7 +336,7 @@ pub enum Error {
     InvalidSize,
     /// A scaling factor is outside the supported range or is NaN.
     InvalidScale,
-    /// A PSRAM destination address or length is not 64-byte aligned.
+    /// A destination address or length does not meet the [buffer requirements][self].
     UnalignedBuffer,
     /// A buffer is outside internal RAM or initialized PSRAM.
     UnsupportedMemoryRegion,
@@ -346,7 +352,7 @@ impl core::fmt::Display for Error {
             Self::InvalidSize => f.write_str("invalid image dimensions, offset, or buffer length"),
             Self::InvalidScale => f.write_str("invalid scaling factor"),
             Self::UnalignedBuffer => {
-                f.write_str("PSRAM destination address or length is not 64-byte aligned")
+                f.write_str("destination address or length is not cache-line aligned")
             }
             Self::UnsupportedMemoryRegion => {
                 f.write_str("image buffer is outside internal RAM or initialized PSRAM")
@@ -364,8 +370,8 @@ impl core::fmt::Display for Error {
 #[instability::unstable]
 pub struct Srm<'d, Dm: DriverMode> {
     _ppa: PPA<'d>,
+    _memory: MemoryPower,
     channels: Channels<'d>,
-    ppa_mem_lp: (bool, bool),
     _ppa_guard: GenericPeripheralGuard<{ Peripheral::Ppa as u8 }>,
     _mode: PhantomData<Dm>,
 }
@@ -380,19 +386,10 @@ impl<'d> Srm<'d, Blocking> {
     ) -> Self {
         let channels = Channels::new(tx, rx);
         let ppa_guard = GenericPeripheralGuard::new();
-        let memory = HP_SYS::regs().ppa_mem_lp_ctrl();
-        let previous = memory.read();
-        memory.modify(|_, w| {
-            w.ppa_sprf_mem_force_ctrl().set_bit();
-            w.ppa_sprf_mem_lp_en().clear_bit()
-        });
         Self {
             _ppa: ppa,
+            _memory: MemoryPower::force_on(),
             channels,
-            ppa_mem_lp: (
-                previous.ppa_sprf_mem_force_ctrl().bit(),
-                previous.ppa_sprf_mem_lp_en().bit(),
-            ),
             _ppa_guard: ppa_guard,
             _mode: PhantomData,
         }
@@ -411,8 +408,7 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
     ///
     /// - [`Error::InvalidSize`] when dimensions, offsets, or buffer lengths are invalid.
     /// - [`Error::InvalidScale`] when a scaling factor is invalid.
-    /// - [`Error::UnalignedBuffer`] when a PSRAM destination address or length is not 64-byte
-    ///   aligned.
+    /// - [`Error::UnalignedBuffer`] when a destination address or length is unaligned.
     /// - [`Error::UnsupportedMemoryRegion`] when a buffer is outside the supported memory regions.
     /// - [`Error::Hardware`] on a peripheral error.
     ///
@@ -455,11 +451,15 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
         {
             return Err(Error::UnsupportedMemoryRegion);
         }
-        if is_slice_in_psram(output.data)
-            && (!(output.data.as_ptr() as usize).is_multiple_of(CACHE_LINE_SIZE)
-                || !output.data.len().is_multiple_of(CACHE_LINE_SIZE))
-        {
-            return Err(Error::UnalignedBuffer);
+        let output_address = output.data.as_ptr() as usize;
+        if region_needs_cache_op(output_address, output.data.len()) {
+            let alignment =
+                region_dma_alignment(output_address).ok_or(Error::UnsupportedMemoryRegion)?;
+            if !output_address.is_multiple_of(alignment)
+                || !output.data.len().is_multiple_of(alignment)
+            {
+                return Err(Error::UnalignedBuffer);
+            }
         }
 
         let mut tx = Descriptor::new(
@@ -545,14 +545,8 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
             PeripheralClockControl::reset(Peripheral::Ppa);
         }
         result?;
-        if is_slice_in_psram(output.data) {
-            unsafe {
-                crate::soc::cache_invalidate_addr(
-                    output.data.as_ptr() as u32,
-                    output.data.len() as u32,
-                );
-            }
-        }
+        // SAFETY: A cached destination covers whole cache lines because of the alignment check.
+        unsafe { invalidate(output.data) };
         Ok(())
     }
 
@@ -595,12 +589,53 @@ impl<Dm: DriverMode> Srm<'_, Dm> {
     }
 }
 
-impl<Dm: DriverMode> Drop for Srm<'_, Dm> {
-    fn drop(&mut self) {
-        HP_SYS::regs().ppa_mem_lp_ctrl().modify(|_, w| {
-            w.ppa_sprf_mem_force_ctrl().bit(self.ppa_mem_lp.0);
-            w.ppa_sprf_mem_lp_en().bit(self.ppa_mem_lp.1)
-        });
+cfg_select! {
+    esp32s31 => {
+        use crate::peripherals::HP_SYS;
+
+        /// Forces the PPA memory on, and restores its low-power control when dropped.
+        #[derive(Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        struct MemoryPower {
+            force_ctrl: bool,
+            low_power: bool,
+        }
+
+        impl MemoryPower {
+            fn force_on() -> Self {
+                let memory = HP_SYS::regs().ppa_mem_lp_ctrl();
+                let previous = memory.read();
+                memory.modify(|_, w| {
+                    w.ppa_sprf_mem_force_ctrl().set_bit();
+                    w.ppa_sprf_mem_lp_en().clear_bit()
+                });
+                Self {
+                    force_ctrl: previous.ppa_sprf_mem_force_ctrl().bit(),
+                    low_power: previous.ppa_sprf_mem_lp_en().bit(),
+                }
+            }
+        }
+
+        impl Drop for MemoryPower {
+            fn drop(&mut self) {
+                HP_SYS::regs().ppa_mem_lp_ctrl().modify(|_, w| {
+                    w.ppa_sprf_mem_force_ctrl().bit(self.force_ctrl);
+                    w.ppa_sprf_mem_lp_en().bit(self.low_power)
+                });
+            }
+        }
+    }
+    _ => {
+        // The PPA memory has no software low-power control.
+        #[derive(Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        struct MemoryPower;
+
+        impl MemoryPower {
+            fn force_on() -> Self {
+                Self
+            }
+        }
     }
 }
 
