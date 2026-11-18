@@ -296,6 +296,21 @@ impl Driver {
         Ok(())
     }
 
+    #[cfg(feature = "unstable")]
+    pub(super) fn frequency(&self) -> crate::time::Rate {
+        let _clock = SpiClockGuard::new(self.info);
+        let source_hz = self.info.clock_instance.function_clock_frequency();
+        let clock = self.regs().clock().read();
+        let divider = if clock.clk_equ_sysclk().bit_is_set() {
+            1
+        } else {
+            let n = u32::from(clock.clkcnt_n().bits()) + 1;
+            let pre = u32::from(clock.clkdiv_pre().bits()) + 1;
+            n * pre
+        };
+        crate::time::Rate::from_hz(source_hz / divider)
+    }
+
     fn set_data_mode(&self, data_mode: Mode) {
         version::set_data_mode(self, data_mode);
     }

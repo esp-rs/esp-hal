@@ -27,6 +27,7 @@ cfg_select! {
         use allocator_api2::vec::Vec;
         #[cfg(all(spi_master_supports_dma, pcnt_driver_supported))]
         use esp_hal::Async;
+        use esp_hal::spi::master::{Address, Command, DataMode};
         #[cfg(spi_master_supports_dma)]
         use esp_hal::{
             dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, aligned::DmaAlignedMut},
@@ -40,10 +41,6 @@ cfg_select! {
         use esp_hal::{
             gpio::Input,
             pcnt::{channel::EdgeMode, unit::Unit},
-        };
-        use esp_hal::{
-            peripherals::SPI2,
-            spi::master::{Address, Command, DataMode},
         };
     }
     _ => {}
@@ -1423,67 +1420,42 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")] // Needed for register access
+    #[cfg(feature = "unstable")]
     fn test_clock_calculation_accuracy(mut ctx: Context) {
         #[track_caller]
-        fn assert_frequency_roundtrips(
-            ctx: &mut Context,
-            source: SpiFunctionClockConfig,
-            input: u32,
-        ) {
-            let f_mst = SpiInstance::function_clock_source_frequency(source);
-            ctx.spi
-                .apply_config(
-                    &Config::default()
-                        .with_frequency(Rate::from_hz(input))
-                        .with_clock_source(source),
-                )
-                .unwrap();
-
-            // Read back effective SCLK
-            let spi2 = unsafe { SPI2::steal() };
-
-            let clock = spi2.register_block().clock().read();
-
-            let n = clock.clkcnt_n().bits() as u32 + 1;
-            let pre = clock.clkdiv_pre().bits() as u32 + 1;
-
-            let actual = f_mst.div_ceil(n * pre);
-
-            assert_eq!(
-                actual, input,
-                "source: {:?} ({}), n={}, pre={}",
-                source, f_mst, n, pre
-            );
-        }
-
         fn check_typical_values(ctx: &mut Context, source: SpiFunctionClockConfig) {
-            esp_hal::clock::ll::ClockTree::with(|clocks| {
-                SpiInstance::Spi2.request_function_clock(clocks)
-            });
-            let f_min = SpiInstance::function_clock_source_frequency(source).div_ceil(1024);
-            for input in [0, f_min - 1] {
+            let config = Config::default().with_clock_source(source);
+            let source_hz = SpiInstance::function_clock_source_frequency(source);
+            let min_hz = source_hz.div_ceil(1024);
+            let divided_hz = source_hz / 3;
+
+            for (requested, expected) in [
+                (min_hz, source_hz / 1024),
+                (source_hz, source_hz),
+                // The divider search must continue past /66 to find /65.
+                (source_hz.div_ceil(65), source_hz / 65),
+                (source_hz / 2 - 1, divided_hz),
+            ] {
+                ctx.spi
+                    .apply_config(&config.with_frequency(Rate::from_hz(requested)))
+                    .unwrap();
                 assert_eq!(
-                    ctx.spi.apply_config(
-                        &Config::default()
-                            .with_clock_source(source)
-                            .with_frequency(Rate::from_hz(input)),
-                    ),
-                    Err(esp_hal::spi::master::ConfigError::FrequencyOutOfRange),
+                    ctx.spi.frequency().as_hz(),
+                    expected,
+                    "source: {:?}, requested: {} Hz",
+                    source,
+                    requested
                 );
             }
-            assert_frequency_roundtrips(ctx, source, f_min);
-            assert_frequency_roundtrips(
-                ctx,
-                source,
-                SpiInstance::function_clock_source_frequency(source),
-            );
 
-            if f_min < 100_000 {
-                assert_frequency_roundtrips(ctx, source, 100_000);
+            for requested in [0, min_hz - 1] {
+                assert_eq!(
+                    ctx.spi
+                        .apply_config(&config.with_frequency(Rate::from_hz(requested))),
+                    Err(esp_hal::spi::master::ConfigError::FrequencyOutOfRange),
+                );
+                assert_eq!(ctx.spi.frequency().as_hz(), divided_hz);
             }
-            assert_frequency_roundtrips(ctx, source, 1_000_000);
-            assert_frequency_roundtrips(ctx, source, 2_000_000);
         }
 
         use esp_hal::clock::ll::{SpiFunctionClockConfig, SpiInstance};
@@ -1508,6 +1480,13 @@ mod tests {
         check_typical_values(&mut ctx, SpiFunctionClockConfig::Spll);
         #[cfg(esp32s31)]
         check_typical_values(&mut ctx, SpiFunctionClockConfig::Bbpll);
+
+        #[cfg(spi_master_supports_dma)]
+        {
+            let expected = ctx.spi.frequency();
+            let spi = ctx.spi.with_dma(ctx.dma_channel);
+            assert_eq!(spi.frequency(), expected);
+        }
     }
 }
 

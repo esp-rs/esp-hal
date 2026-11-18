@@ -1445,6 +1445,12 @@ aligned, otherwise the driver requires copying the entire buffer."
         self.driver().apply_config(config)
     }
 
+    /// Returns the SCK frequency from the applied clock configuration, rounded down to whole hertz.
+    #[instability::unstable]
+    pub fn frequency(&self) -> Rate {
+        self.driver().frequency()
+    }
+
     fn transfer_buffers_dma(
         &mut self,
         read_bytes: usize,
