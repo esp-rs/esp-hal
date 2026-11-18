@@ -21,6 +21,7 @@ clippy-configs = [{ features = ["defmt"] }]
 [dependencies]
 document-features = "0.2"
 esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated" }
+procmacros             = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 embassy-sync-06 = { package = "embassy-sync", version = "0.6" }
 embassy-sync-07 = { package = "embassy-sync", version = "0.7" }
 embassy-sync-08 = { package = "embassy-sync", version = "0.8" }

@@ -728,6 +728,74 @@ mod tests {
     }
 
     #[test]
+    #[timeout(5)]
+    #[cfg(multi_core)]
+    fn raw_mutex_excludes_threads_that_change_cores_while_waiting(ctx: Context) {
+        // A thread waiting for the lock enables interrupts between attempts, so time slicing
+        // preempts it there, and the other core may resume it. The lock must record the core that
+        // finally takes it, not the one the thread started waiting on.
+        use esp_sync::RawMutex;
+
+        static LOCK: RawMutex = RawMutex::new();
+        static INSIDE: AtomicBool = AtomicBool::new(false);
+        static CORE_CHANGES: AtomicUsize = AtomicUsize::new(0);
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        // Time slicing, and so changing cores, needs more workers than cores to run at once. The
+        // workers must not preempt the main task before it has spawned all of them.
+        CurrentThreadHandle::get().set_priority(2);
+
+        // The cores take turns picking from one FIFO queue. With three workers, a preempted worker
+        // is the next one picked, by the other core. With four, it would return to its own core.
+        let workers = [(); 3].map(|()| {
+            ThreadSpawner::new(4096).with_priority(1).spawn(|| {
+                let end = Instant::now() + Duration::from_secs(1);
+                let mut last_cpu = Cpu::current();
+                while Instant::now() < end {
+                    LOCK.lock(|| {
+                        hil_test::assert!(
+                            !INSIDE.swap(true, Ordering::Relaxed),
+                            "Two threads hold the lock"
+                        );
+                        // Holding the lock this long keeps the other threads waiting most of the
+                        // time, so that most time slices end while a thread waits.
+                        let start = Instant::now();
+                        while start.elapsed() < Duration::from_micros(20) {}
+                        INSIDE.store(false, Ordering::Relaxed);
+                    });
+
+                    let cpu = Cpu::current();
+                    if cpu != last_cpu {
+                        CORE_CHANGES.fetch_add(1, Ordering::Relaxed);
+                        last_cpu = cpu;
+                    }
+                }
+            })
+        });
+
+        for worker in workers {
+            worker.join();
+        }
+
+        hil_test::assert!(
+            CORE_CHANGES.load(Ordering::Relaxed) > 0,
+            "No thread changed cores"
+        );
+
+        esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
+    }
+
+    #[test]
     #[cfg(multi_core)]
     fn deleting_a_task_on_another_core_keeps_other_tasks_alive(ctx: Context) {
         // Core 0 deletes a task that is running on core 1. The task is freed while core 1 still
