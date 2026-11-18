@@ -33,6 +33,7 @@ async fn writer(
     )
     .await
     .unwrap();
+    embedded_io_async::Write::flush(&mut tx).await.unwrap();
     loop {
         let message = signal.wait().await;
         signal.reset();
