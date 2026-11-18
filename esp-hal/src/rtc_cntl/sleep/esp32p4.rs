@@ -234,7 +234,7 @@ impl AnalogSleepConfig {
         }
     }
 
-    fn defaults_light_sleep(pd_flags: PowerDownFlags, keep_usb: bool) -> Self {
+    fn defaults_light_sleep(pd_flags: PowerDownFlags, keep_usb_serial_jtag: bool) -> Self {
         // PMU_SLEEP_ANALOG_LSLP_CONFIG_DEFAULT
         let mut this = Self {
             hp_sys: {
@@ -270,9 +270,8 @@ impl AnalogSleepConfig {
             this.hp_sys.bias.set_bias_sleep(false);
             this.hp_sys.bias.set_dbg_atten(0);
             this.hp_sys.regulator0.set_dbias(HP_CALI_ACTIVE_DBIAS);
-            // USB Serial/JTAG kept running in light sleep stops working at the DCDC sleep
-            // voltage.
-            if keep_usb {
+            // USB Serial/JTAG stops working at the DCDC sleep voltage.
+            if keep_usb_serial_jtag {
                 this.hp_sys.bias.set_dcm_vset(HP_CALI_ACTIVE_DCM_VSET);
             }
 
@@ -670,7 +669,7 @@ pub struct RtcSleepConfig {
     /// Power-down flags.
     pub pd_flags: PowerDownFlags,
     /// Whether the sleep keeps USB Serial/JTAG running.
-    pub(super) keep_usb: bool,
+    pub(super) keep_usb_serial_jtag: bool,
 }
 
 impl Default for RtcSleepConfig {
@@ -678,7 +677,7 @@ impl Default for RtcSleepConfig {
         Self {
             deep: false,
             pd_flags: PowerDownFlags(0),
-            keep_usb: false,
+            keep_usb_serial_jtag: false,
         }
     }
 }
@@ -797,7 +796,7 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
-        self.keep_usb = super::usb_serial_jtag::keep_running_in_sleep(self.deep);
+        self.keep_usb_serial_jtag = super::usb_serial_jtag::keep_running_in_sleep(self.deep);
 
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
@@ -829,8 +828,8 @@ impl RtcSleepConfig {
             // core is gated. Powering down XTAL also makes the analog config use
             // the 0.6 V light-sleep operating point.
             //
-            // A USB Serial/JTAG kept running needs XTAL as the SPLL reference.
-            self.pd_flags.set_pd_xtal(!self.keep_usb);
+            // USB Serial/JTAG needs XTAL as the SPLL reference.
+            self.pd_flags.set_pd_xtal(!self.keep_usb_serial_jtag);
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
@@ -842,7 +841,7 @@ impl RtcSleepConfig {
     /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
-        let keep_usb = self.keep_usb;
+        let keep_usb_serial_jtag = self.keep_usb_serial_jtag;
 
         let cpu_root_clk = ClockTree::with(|clocks| {
             let old = clocks.cpu_root_clk();
@@ -851,7 +850,7 @@ impl RtcSleepConfig {
         });
 
         let mut power = PowerSleepConfig::defaults(self.pd_flags);
-        if keep_usb {
+        if keep_usb_serial_jtag {
             // The PAC does not document which `xpd_pll` bit is the SPLL, so keep
             // all PLLs powered, as in HP_ACTIVE.
             power.hp_sys.clk.set_i2c_iso_en(false);
@@ -861,10 +860,10 @@ impl RtcSleepConfig {
         }
         power.apply();
 
-        // The USB Serial/JTAG registers and the JTAG bridge sit behind the HP bus clock
-        // gates, which HP_SLEEP otherwise closes. The PAC does not name the gate bits, and the
-        // ESP-IDF map for this chip is a copy of the ESP32-C6 map, so the sleep opens all of them.
-        let icg = if keep_usb { u32::MAX } else { 0 };
+        // USB Serial/JTAG sits behind HP_SLEEP clock gates that neither the PAC nor the ESP-IDF
+        // map names, so the sleep opens all of them.
+        // See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/soc/esp32p4/include/soc/pmu_icg_mapping.h>.
+        let icg = if keep_usb_serial_jtag { u32::MAX } else { 0 };
         PMU::regs()
             .hp_sleep_icg_hp_func()
             .write(|w| unsafe { w.bits(icg) });
@@ -873,7 +872,7 @@ impl RtcSleepConfig {
             .write(|w| unsafe { w.bits(icg) });
         PMU::regs()
             .hp_sleep_sysclk()
-            .modify(|_, w| w.hp_sleep_icg_sys_clock_en().bit(keep_usb));
+            .modify(|_, w| w.hp_sleep_icg_sys_clock_en().bit(keep_usb_serial_jtag));
 
         let config = if self.deep {
             SleepTimeConfig::deep_sleep()
@@ -895,7 +894,8 @@ impl RtcSleepConfig {
             DigitalSleepConfig::defaults_deep_sleep(self.pd_flags).apply();
             AnalogSleepConfig::defaults_deep_sleep().apply(true);
         } else {
-            AnalogSleepConfig::defaults_light_sleep(self.pd_flags, keep_usb).apply(false);
+            AnalogSleepConfig::defaults_light_sleep(self.pd_flags, keep_usb_serial_jtag)
+                .apply(false);
             DigitalSleepConfig::defaults_light_sleep(self.pd_flags).apply();
         }
 
@@ -954,7 +954,7 @@ impl RtcSleepConfig {
         }
 
         let usb_serial_jtag =
-            (!self.deep && !keep_usb).then(super::usb_serial_jtag::pad_backup_and_disable);
+            (!self.deep && !keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
 
         // The PMU FSM switches the pads to their sleep setting and holds IOs
         // at the same stage; trigger the pad sleep selection first so the IOs
@@ -1025,7 +1025,7 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
-    usb_serial_jtag: Option<super::usb_serial_jtag::PadBackup>,
+    usb_serial_jtag: Option<super::usb_serial_jtag::Disconnected>,
     cpu_root_clk: Option<CpuRootClkConfig>,
     boot_from_lp_ram: bool,
 }
@@ -1033,8 +1033,8 @@ pub(crate) struct SavedState {
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
-        if let Some(backup) = self.usb_serial_jtag {
-            super::usb_serial_jtag::pad_restore(backup);
+        if let Some(usb_serial_jtag) = self.usb_serial_jtag {
+            usb_serial_jtag.reconnect();
         }
         ClockTree::with(|clocks| {
             if let Some(cpu_root_clk) = self.cpu_root_clk {

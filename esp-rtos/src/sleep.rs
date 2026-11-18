@@ -43,7 +43,8 @@ impl Sleep {
     ///
     /// After this call, light sleep powers the CPU domain down. Nothing turns it off again, because
     /// the memory stays with the driver for the life of the program. Only a light sleep that keeps
-    /// USB Serial/JTAG connected to a host keeps the CPU domain powered.
+    /// USB Serial/JTAG connected to a host can keep the CPU domain powered. See the
+    /// `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option of esp-hal.
     ///
     /// # Errors
     ///

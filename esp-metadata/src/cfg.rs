@@ -1102,8 +1102,10 @@ driver_configs![
                 /// How light sleep handles USB Serial/JTAG.
                 ///
                 /// `"keep"`: a light sleep keeps USB Serial/JTAG running while a USB host is
-                /// connected, and disconnects it from the host otherwise. `"disconnect"`: a light
-                /// sleep always disconnects USB Serial/JTAG from the host.
+                /// connected, and disconnects it otherwise. `"keep_cpu_powered"`: as `"keep"`, and
+                /// such a sleep also keeps the CPU powered, because a powered-down CPU does not
+                /// reliably come back from it. `"disconnect"`: a light sleep always disconnects USB
+                /// Serial/JTAG.
                 usb_serial_jtag_light_sleep: Option<String>,
                 /// CPU retention capabilities and reachable retention-memory bounds.
                 ///

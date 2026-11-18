@@ -118,10 +118,9 @@ use crate::rtc_cntl::cpu_retention;
 pub mod __rtos_implementation {
     /// Returns whether automatic light sleep should keep the chip awake for USB Serial/JTAG.
     ///
-    /// On chips whose light sleep cannot keep USB Serial/JTAG running, a light sleep disconnects
-    /// it from the host. Automatic light sleep stays out of light sleep while a host is connected,
-    /// so the console and the debugger keep working, unless the `keep-usb-serial-jtag-connected`
-    /// option is disabled.
+    /// On chips whose light sleep disconnects USB Serial/JTAG, automatic light sleep stays out of
+    /// light sleep while a host is connected, unless the `keep-usb-serial-jtag-connected` option is
+    /// disabled.
     pub fn usb_serial_jtag_blocks_light_sleep() -> bool {
         cfg_select! {
             sleep_usb_serial_jtag_light_sleep = "disconnect" => {
@@ -144,8 +143,8 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     gpio::wakeup::record_wakeup();
 
     // Release the pads after a deep-sleep wake, and only if the previous run armed an IO wake
-    // source. A reset that ended a light sleep has the same reset reason, and the holds that the
-    // light sleep took stay too, so the release applies to it as well.
+    // source. A USB reset that ended a light sleep has the same reset reason and keeps the light
+    // sleep's pad holds, so it needs the release too.
     if super::reset_reason(crate::system::Cpu::ProCpu) == Some(super::SocResetReason::CoreDeepSleep)
         && gpio::wakeup::wake_enabled()
     {
@@ -159,19 +158,19 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
 
 /// Returns whether the last reset was a wakeup from deep sleep.
 ///
-/// On a chip that keeps USB Serial/JTAG running in light sleep, a USB reset from the host can end
-/// a light sleep, and that reset has the same reset reason. Bit 0 of `RTC_SLEEP_MODE_REG` tells
-/// the two apart. The sleep code sets it for a deep sleep and clears it for a light sleep, and the
-/// ROM only reads it. The next sleep writes it again, also a sleep that the hardware rejects.
+/// On a chip that keeps USB Serial/JTAG running in light sleep, a USB reset during a light sleep
+/// has the same reset reason. Bit 0 of `RTC_SLEEP_MODE_REG` tells the two apart: the sleep code
+/// sets it for a deep sleep and clears it for a light sleep.
 /// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/esp_rom/esp32c6/include/esp32c6/rom/rtc.h#L68-L69>.
 pub(crate) fn deep_sleep_wakeup() -> bool {
     let deep_sleep_reset = super::reset_reason(crate::system::Cpu::ProCpu)
         == Some(super::SocResetReason::CoreDeepSleep);
 
     cfg_select! {
-        sleep_usb_serial_jtag_light_sleep = "keep" => {
-            deep_sleep_reset && sleep_impl::last_sleep_was_deep()
-        }
+        any(
+            sleep_usb_serial_jtag_light_sleep = "keep",
+            sleep_usb_serial_jtag_light_sleep = "keep_cpu_powered"
+        ) => deep_sleep_reset && sleep_impl::last_sleep_was_deep(),
         _ => deep_sleep_reset,
     }
 }
@@ -449,13 +448,12 @@ impl<'d> LowPower<'d> {
         // The buffer is read once, because the save of the APP CPU and the power-down must agree on
         // it. A buffer that another core installs during this sleep serves the next one.
         //
-        // A sleep that keeps USB Serial/JTAG connected keeps the CPU powered. The ROM treats a
-        // USB reset during the sleep as a sleep wakeup, and would restore a powered-down CPU onto
-        // peripherals that the reset cleared.
+        // On some chips, a powered-down CPU does not reliably come back from a sleep that keeps
+        // USB Serial/JTAG connected.
         #[cfg(supports_cpu_power_down)]
         let retention_buffer = match kind {
-            #[cfg(sleep_usb_serial_jtag_light_sleep = "keep")]
-            SleepKind::Light if config.keep_usb => None,
+            #[cfg(sleep_usb_serial_jtag_light_sleep = "keep_cpu_powered")]
+            SleepKind::Light if config.keep_usb_serial_jtag => None,
             SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
             SleepKind::Deep => None,
         };

@@ -280,12 +280,14 @@ options:
 
   - name: keep-usb-serial-jtag-connected
     description: "Keeps USB Serial/JTAG connected to a USB host across light sleep, so that the
-      console and the debugger keep working. On chips that can keep USB Serial/JTAG running in
-      light sleep, a light sleep keeps it running while a host is connected, which increases the
-      light-sleep current. Such a light sleep also keeps the CPU domain powered, even if CPU
-      power-down is enabled. On the ESP32-C3, ESP32-H4 and ESP32-S3, which cannot, automatic light
-      sleep does not start while a host is connected. When disabled, every light sleep disconnects USB
-      Serial/JTAG from the host."
+      console and the debugger keep working. On the ESP32-C5, ESP32-C6, ESP32-C61, ESP32-H2,
+      ESP32-P4 and ESP32-S31, a light sleep keeps USB Serial/JTAG running while a host is
+      connected, which increases the light-sleep current. On the ESP32-C6, ESP32-H2 and ESP32-P4,
+      such a light sleep also keeps the CPU domain powered, even if CPU power-down is enabled. On the
+      ESP32-C3, ESP32-H4 and ESP32-S3, where light sleep does not keep USB Serial/JTAG running,
+      automatic light sleep does not start while a host is connected, and a light sleep that the
+      application requests still disconnects USB Serial/JTAG. When disabled, every light sleep
+      disconnects USB Serial/JTAG from the host."
     default:
       - value: true
     active: "sleep_usb_serial_jtag_light_sleep_is_set"

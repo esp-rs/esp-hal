@@ -789,7 +789,7 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl4()
             .write(|w| w.slp_reject_cause_clr().bit(true));
 
-        let usb_serial_jtag = (!self.deep).then(super::usb_serial_jtag::pad_backup_and_disable);
+        let usb_serial_jtag = (!self.deep).then(super::usb_serial_jtag::disconnect);
 
         SavedState {
             usb_serial_jtag,
@@ -825,7 +825,7 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
-    usb_serial_jtag: Option<super::usb_serial_jtag::PadBackup>,
+    usb_serial_jtag: Option<super::usb_serial_jtag::Disconnected>,
     hp_root_clk: Option<HpRootClkConfig>,
     cpu_clk: Option<CpuClkConfig>,
     ahb_clk: Option<AhbClkConfig>,
@@ -834,8 +834,8 @@ pub(crate) struct SavedState {
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
-        if let Some(backup) = self.usb_serial_jtag {
-            super::usb_serial_jtag::pad_restore(backup);
+        if let Some(usb_serial_jtag) = self.usb_serial_jtag {
+            usb_serial_jtag.reconnect();
         }
         ClockTree::with(|clocks| {
             clocks::reconfigure_pll(clocks);
