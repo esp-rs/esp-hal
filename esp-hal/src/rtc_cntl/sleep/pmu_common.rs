@@ -62,31 +62,43 @@ impl SleepTimeConfig {
     }
 }
 
-/// Selects the HP_SLEEP system clock and the HP_SLEEP APB clock gates.
+/// Selects the HP_SLEEP system clock and clock gates.
 ///
-/// A sleep that keeps USB Serial/JTAG running runs the system clock from the PLL, and keeps the
-/// APB clocks of USB Serial/JTAG and IOMUX. `pll_sysclk` is the `hp_sleep_dig_sys_clk_sel` value
-/// that selects the PLL.
+/// A sleep that keeps USB Serial/JTAG running opens the gates of USB Serial/JTAG, the HP bus and
+/// IOMUX on top of `icg_func`, and runs the system clock from the PLL, which `pll_sysclk` selects.
+///
+/// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/soc/esp32c6/include/soc/pmu_icg_mapping.h>.
 #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
 #[inline(always)]
-pub(super) fn configure_hp_sleep_clocks(keep_usb: bool, pll_sysclk: u8) {
+pub(super) fn configure_hp_sleep_clocks(icg_func: u32, keep_usb_serial_jtag: bool, pll_sysclk: u8) {
     const HP_SYSCLK_XTAL: u8 = 0;
+    const PMU_ICG_FUNC_ENA_USB_DEVICE: u32 = 1 << 6;
+    const PMU_ICG_FUNC_ENA_HPBUS: u32 = 1 << 15;
+    const PMU_ICG_FUNC_ENA_IOMUX: u32 = 1 << 28;
     const PMU_ICG_APB_ENA_USB_DEVICE: u32 = 1 << 17;
     const PMU_ICG_APB_ENA_IOMUX: u32 = 1 << 26;
 
-    let (sysclk, icg_apb) = if keep_usb {
+    let (icg_func, icg_apb, sysclk) = if keep_usb_serial_jtag {
         (
-            pll_sysclk,
+            icg_func
+                | PMU_ICG_FUNC_ENA_USB_DEVICE
+                | PMU_ICG_FUNC_ENA_HPBUS
+                | PMU_ICG_FUNC_ENA_IOMUX,
             PMU_ICG_APB_ENA_USB_DEVICE | PMU_ICG_APB_ENA_IOMUX,
+            pll_sysclk,
         )
     } else {
-        (HP_SYSCLK_XTAL, 0)
+        (icg_func, 0, HP_SYSCLK_XTAL)
     };
-    PMU::regs()
-        .hp_sleep_sysclk()
-        .modify(|_, w| unsafe { w.hp_sleep_dig_sys_clk_sel().bits(sysclk) });
-    PMU::regs()
-        .hp_sleep_icg_hp_apb()
+
+    let pmu = PMU::regs();
+    pmu.hp_sleep_sysclk().modify(|_, w| unsafe {
+        w.hp_sleep_icg_sys_clock_en().bit(icg_func != 0);
+        w.hp_sleep_dig_sys_clk_sel().bits(sysclk)
+    });
+    pmu.hp_sleep_icg_hp_func()
+        .write(|w| unsafe { w.hp_sleep_dig_icg_func_en().bits(icg_func) });
+    pmu.hp_sleep_icg_hp_apb()
         .write(|w| unsafe { w.hp_sleep_dig_icg_apb_en().bits(icg_apb) });
 }
 

@@ -797,7 +797,7 @@ static LIGHT_SLEEP_WAKEUP: portable_atomic::AtomicBool = portable_atomic::Atomic
 /// or after a reset unrelated to deep sleep).
 ///
 /// A USB reset from the host during a light sleep is not a wakeup either, although
-/// [`reset_reason`] returns [`SocResetReason::CoreDeepSleep`] for it.
+/// [`reset_reason`] can return [`SocResetReason::CoreDeepSleep`] for it.
 #[cfg(sleep_driver_supported)]
 pub fn wakeup_cause() -> WakeupReason {
     if !sleep::deep_sleep_wakeup() && !LIGHT_SLEEP_WAKEUP.load(portable_atomic::Ordering::Relaxed) {

@@ -1,14 +1,12 @@
 //! USB Serial/JTAG handling across light sleep.
 //!
-//! A chip that can keep USB Serial/JTAG running keeps it running while a USB host is connected.
-//! Otherwise, a light sleep leaves the PHY driving the pads, including the D+ pull-up, while the
-//! peripheral is stopped. The host keeps the device enumerated, and the link does not recover after
-//! the wake. Such a sleep disconnects USB Serial/JTAG before it starts and reconnects it on wake.
+//! A light sleep that stops USB Serial/JTAG leaves the D+ pull-up on. The host keeps the device
+//! enumerated, and the link does not recover after the wake. Such a sleep disconnects USB
+//! Serial/JTAG first, and reconnects it on wake.
 //!
-//! A host that attaches later, or that resumes a suspended bus, enumerates the device only while
-//! the chip stays awake for longer than the 100 ms attach debounce. Keeping the pull-up during
-//! such sleeps does not help: a host that resumes the bus then finds a device that does not
-//! respond.
+//! A host that attaches or resumes the bus during such sleeps enumerates the device only while the
+//! chip stays awake for longer than the 100 ms attach debounce. A kept pull-up does not help,
+//! because the host then finds a device that does not respond.
 
 use crate::{
     peripherals::USB_DEVICE,
@@ -87,62 +85,69 @@ fn pad_is_enabled() -> bool {
 ///
 /// A light sleep keeps it running while a USB host is connected, unless the
 /// `keep-usb-serial-jtag-connected` option is disabled.
-#[cfg(sleep_usb_serial_jtag_light_sleep = "keep")]
+#[cfg(any(
+    sleep_usb_serial_jtag_light_sleep = "keep",
+    sleep_usb_serial_jtag_light_sleep = "keep_cpu_powered"
+))]
 pub(super) fn keep_running_in_sleep(deep: bool) -> bool {
     cfg!(keep_usb_serial_jtag_connected) && !deep && host_connected()
 }
 
-/// The USB Serial/JTAG state that [`pad_backup_and_disable`] changes.
-pub(super) struct PadBackup {
-    clock_was_enabled: bool,
-    conf0: u32,
-    /// The pull-up of the D+ pad, if USB Serial/JTAG had the pad.
-    dp_pad_pullup: Option<bool>,
-}
-
-/// The GPIO of the D+ pad.
+/// The GPIOs of the D- and D+ pads.
+///
+/// The `USB_EXCHG_PINS` eFuse swaps the two lines, so the sleep handles the pull-ups of both pads.
 #[allow(unused_assignments)]
-const DP_PAD: u8 = {
-    let mut pad = None;
+const PADS: [u8; 2] = {
+    let mut dm = None;
+    let mut dp = None;
     for_each_analog_function! {
-        (USJ_DP, $gpio:ident) => { pad = Some(crate::peripherals::$gpio::NUMBER); };
+        (USJ_DM, $gpio:ident) => { dm = Some(crate::peripherals::$gpio::NUMBER); };
+        (USJ_DP, $gpio:ident) => { dp = Some(crate::peripherals::$gpio::NUMBER); };
     }
-    // The ESP32-S3 shares the PHY with USB OTG, and the metadata names the pad after USB OTG.
-    if pad.is_none() {
+    // The ESP32-S3 shares the PHY with USB OTG, and the metadata names the pads after USB OTG.
+    if dp.is_none() {
         for_each_analog_function! {
-            (USB_FS_DP, $gpio:ident) => { pad = Some(crate::peripherals::$gpio::NUMBER); };
+            (USB_FS_DM, $gpio:ident) => { dm = Some(crate::peripherals::$gpio::NUMBER); };
+            (USB_FS_DP, $gpio:ident) => { dp = Some(crate::peripherals::$gpio::NUMBER); };
         }
     }
-    pad.unwrap()
+    [dm.unwrap(), dp.unwrap()]
 };
 
-fn enable_bus_clock(enable: bool) {
-    PeripheralClockControl::set_enabled_untracked(Peripheral::UsbDevice, enable);
+fn set_bus_clock_enabled(enabled: bool) {
+    PeripheralClockControl::set_enabled_untracked(Peripheral::UsbDevice, enabled);
 }
 
-fn set_pad_enable(enable: bool) {
+fn set_pad_enabled(enabled: bool) {
     USB_DEVICE::regs()
         .conf0()
-        .modify(|_, w| w.usb_pad_enable().bit(enable));
+        .modify(|_, w| w.usb_pad_enable().bit(enabled));
 }
 
-/// Disconnects USB Serial/JTAG on light-sleep entry.
+/// The USB Serial/JTAG state that [`disconnect`] changes.
+pub(super) struct Disconnected {
+    module_was_enabled: bool,
+    conf0: u32,
+    /// The pull-ups of [`PADS`], if USB Serial/JTAG had the pads.
+    pad_pullups: Option<[bool; 2]>,
+}
+
+/// Disconnects USB Serial/JTAG from the host on light-sleep entry.
 ///
 /// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/esp_hw_support/sleep_console.c#L17-L36>.
-pub(super) fn pad_backup_and_disable() -> PadBackup {
-    let clock_was_enabled = module_is_enabled();
-    if !clock_was_enabled {
+pub(super) fn disconnect() -> Disconnected {
+    let module_was_enabled = module_is_enabled();
+    if !module_was_enabled {
         // The pad enable needs the register block clocked and out of reset.
-        enable_bus_clock(true);
+        set_bus_clock_enabled(true);
         PeripheralClockControl::reset(Peripheral::UsbDevice);
         // The register reset enables the pad, but the pad was off before the sleep.
-        set_pad_enable(false);
+        set_pad_enabled(false);
     }
     let pad_enabled = pad_is_enabled();
-    // Clearing `usb_pad_enable` alone keeps the D+ pull-up, so the host never sees a
-    // disconnect and USB Serial/JTAG stops responding after the sleep. The pad pulls D+ up while
-    // either the USB Serial/JTAG pull-up or the pull-up of the pad is enabled, and the pull-up
-    // of the pad is enabled after reset.
+    // The host sees a disconnect only if neither line is pulled up. Clearing `usb_pad_enable`
+    // keeps the pull-ups of USB Serial/JTAG and of the pads, and the pull-up of the D+ pad is
+    // enabled after reset.
     let conf0 = USB_DEVICE::regs().conf0();
     let saved_conf0 = conf0.read().bits();
     conf0.modify(|_, w| {
@@ -150,49 +155,56 @@ pub(super) fn pad_backup_and_disable() -> PadBackup {
         w.dp_pullup().clear_bit();
         w.dm_pullup().clear_bit()
     });
-    let dp_pad_pullup = pad_enabled.then(|| {
-        let dp = crate::gpio::io_mux_reg(DP_PAD);
-        let pullup = dp.read().fun_wpu().bit();
-        dp.modify(|_, w| w.fun_wpu().clear_bit());
-        pullup
+    let pad_pullups = pad_enabled.then(|| {
+        PADS.map(|pad| {
+            let reg = crate::gpio::io_mux_reg(pad);
+            let pullup = reg.read().fun_wpu().bit();
+            reg.modify(|_, w| w.fun_wpu().clear_bit());
+            pullup
+        })
     });
-    set_pad_enable(false);
-    enable_bus_clock(false);
+    set_pad_enabled(false);
+    set_bus_clock_enabled(false);
 
-    PadBackup {
-        clock_was_enabled,
+    Disconnected {
+        module_was_enabled,
         conf0: saved_conf0,
-        dp_pad_pullup,
+        pad_pullups,
     }
 }
 
-/// Reconnects USB Serial/JTAG on wake.
-///
-/// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/esp_hw_support/sleep_console.c#L38-L50>.
-pub(super) fn pad_restore(backup: PadBackup) {
-    enable_bus_clock(true);
-    USB_DEVICE::regs()
-        .conf0()
-        .write(|w| unsafe { w.bits(backup.conf0) });
-    if let Some(pullup) = backup.dp_pad_pullup {
-        crate::gpio::io_mux_reg(DP_PAD).modify(|_, w| w.fun_wpu().bit(pullup));
-    }
-    if !backup.clock_was_enabled {
-        enable_bus_clock(false);
+impl Disconnected {
+    /// Reconnects USB Serial/JTAG to the host on wake.
+    ///
+    /// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/esp_hw_support/sleep_console.c#L38-L50>.
+    pub(super) fn reconnect(self) {
+        set_bus_clock_enabled(true);
+        USB_DEVICE::regs()
+            .conf0()
+            .write(|w| unsafe { w.bits(self.conf0) });
+        if let Some(pullups) = self.pad_pullups {
+            for (pad, pullup) in PADS.into_iter().zip(pullups) {
+                crate::gpio::io_mux_reg(pad).modify(|_, w| w.fun_wpu().bit(pullup));
+            }
+        }
+        if !self.module_was_enabled {
+            set_bus_clock_enabled(false);
+        }
     }
 }
 
 /// Returns whether a USB host talks to USB Serial/JTAG.
 ///
-/// A connected host that has not suspended the bus sends a start-of-frame packet every
-/// millisecond, and each packet advances the frame index. Two calls within that millisecond see
-/// the same index, so a change in the last few milliseconds counts. The SOF interrupt flag stays
-/// untouched, because esp-println reads it to pick its output.
+/// A host that has not suspended the bus sends a start-of-frame packet every millisecond, and each
+/// packet advances the frame index. A change in the last few milliseconds counts, because two
+/// calls within a millisecond see the same index. The SOF interrupt flag stays untouched, because
+/// esp-println reads it to pick its output.
 ///
-/// The first call after boot, and a call after the microsecond counter wraps, can report a host
-/// that is not there. The next sleep then keeps USB Serial/JTAG running once without need.
+/// The first call after boot reports a host even if none is there. The 11-bit frame index wraps
+/// every 2048 ms, so a call that follows the previous one by a multiple of 2048 ms misses a
+/// connected host. Either error affects one sleep only.
 pub(super) fn host_connected() -> bool {
-    use core::sync::atomic::{AtomicU32, Ordering};
+    use portable_atomic::{AtomicU32, Ordering};
 
     const TOLERANCE_US: u32 = 3_000;
     static LAST_FRAME: AtomicU32 = AtomicU32::new(u32::MAX);

@@ -527,7 +527,7 @@ macro_rules! property {
         false
     };
     ("sleep.usb_serial_jtag_light_sleep") => {
-        "keep"
+        "keep_cpu_powered"
     };
     ("sleep.regdma_list_count") => {
         4
