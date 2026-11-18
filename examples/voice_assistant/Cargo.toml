@@ -47,6 +47,10 @@ serde = { version = "1.0.228", default-features = false, features = ["alloc", "d
 serde_json = { version = "1.0.145", default-features = false, features = ["alloc"] }
 static_cell = "2.1.0"
 
+[package.metadata.cargo-machete]
+# `der` and `der_derive` are only listed to pin the versions that `embedded-tls` builds with.
+ignored = ["der", "der_derive"]
+
 [features]
 esp32s31 = [
     "esp-alloc/esp32s31",
@@ -62,6 +66,10 @@ esp32s31 = [
 # esp-sr allocates from the heap of esp-alloc, so it must use the same esp-alloc as this example.
 [patch.crates-io]
 esp-alloc = { path = "../../esp-alloc" }
+
+[profile.dev.package.esp-hal]
+# Parking a core needs esp-hal at opt-level 2 or 3
+opt-level = 2
 
 [profile.release]
 debug            = true
