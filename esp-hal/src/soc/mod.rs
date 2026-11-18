@@ -204,9 +204,8 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
         fn main(a0: usize, a1: usize, a2: usize) -> !;
     }
 
-    setup_stack_guard();
-
     unsafe {
+        setup_stack_guard();
         __esp_bootloader_init();
         main(a0, a1, a2);
     }
@@ -408,20 +407,28 @@ fn stack_chk_panic() -> ! {
 }
 
 #[cfg(all(feature = "rt", riscv))]
-fn setup_stack_guard() {
-    unsafe extern "C" {
-        static mut __stack_chk_guard: u32;
-    }
+unsafe extern "C" {
+    static mut __stack_chk_guard: u32;
+}
 
-    unsafe {
-        let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
-        // we _should_ use a random value but we don't have a good source for random
-        // numbers here
-        stack_chk_guard.write_volatile(esp_config::esp_config_int!(
-            u32,
-            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-        ));
-    }
+#[cfg(all(feature = "rt", riscv))]
+#[unsafe(naked)]
+unsafe extern "C" fn setup_stack_guard() {
+    // `-Z stack-protector=all` instruments every normal function. This store is what plants the
+    // canary, so a prologue would snapshot the old word and the epilogue would report corruption.
+    // Until rustc 1.102 the helper was inlined into `hal_main` (`-> !`), and LLVM deleted that
+    // unreachable check. 1.102 leaves the helper as its own function, so the check runs. Naked
+    // code has no prologue. Xtensa does the same store in `__pre_init`.
+    core::arch::naked_asm!(
+        "
+        la   t0, {guard}
+        li   t1, {value}
+        sw   t1, 0(t0)
+        ret
+        ",
+        guard = sym __stack_chk_guard,
+        value = const esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_VALUE"),
+    );
 }
 
 #[cfg(all(init_stack_ptr_range_check, feature = "rt"))]
