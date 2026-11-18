@@ -203,8 +203,6 @@ fn read_partition_table_impl<'a, F: FlashAccess>(
 
 #[cfg(test)]
 mod tests {
-    use core::assert_matches;
-
     use super::*;
     use crate::partitions::{AppPartitionSubType, DataPartitionSubType};
 

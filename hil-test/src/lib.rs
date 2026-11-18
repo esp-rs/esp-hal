@@ -59,6 +59,17 @@ macro_rules! assert_ne {
 
 #[cfg(feature = "defmt")]
 #[macro_export]
+macro_rules! assert_matches {
+    ($left:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?))
+    };
+    ($left:expr, $pattern:pat $(if $guard:expr)?, $($arg:tt)+) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?), $($arg)+)
+    };
+}
+
+#[cfg(feature = "defmt")]
+#[macro_export]
 macro_rules! panic {
     ($($t:tt)*) => { defmt::panic!($($t)*) }
 }
@@ -79,6 +90,12 @@ macro_rules! assert_eq {
 #[macro_export]
 macro_rules! assert_ne {
     ($($t:tt)*) => { ::core::assert_ne!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! assert_matches {
+    ($($t:tt)*) => { ::core::assert_matches!($($t)*) }
 }
 
 #[cfg(not(feature = "defmt"))]

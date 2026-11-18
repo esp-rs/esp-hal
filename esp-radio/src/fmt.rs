@@ -53,6 +53,25 @@ macro_rules! assert_ne {
     };
 }
 
+#[cfg(feature = "defmt")]
+#[collapse_debuginfo(yes)]
+macro_rules! assert_matches {
+    ($left:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        ::defmt::assert!(::core::matches!($left, $pattern $(if $guard)?))
+    };
+    ($left:expr, $pattern:pat $(if $guard:expr)?, $($arg:tt)+) => {
+        ::defmt::assert!(::core::matches!($left, $pattern $(if $guard)?), $($arg)+)
+    };
+}
+
+#[cfg(not(feature = "defmt"))]
+#[collapse_debuginfo(yes)]
+macro_rules! assert_matches {
+    ($($x:tt)*) => {
+        ::core::assert_matches!($($x)*)
+    };
+}
+
 #[collapse_debuginfo(yes)]
 macro_rules! debug_assert {
     ($($x:tt)*) => {

@@ -264,8 +264,9 @@ mod tests {
             }
 
             // Assert that the I2C transaction was cancelled.
-            hil_test::assert!(
-                matches!(select_result, Either::Second(_)),
+            hil_test::assert_matches!(
+                select_result,
+                Either::Second(_),
                 "({}) Transaction completed with {:?}",
                 n_yield,
                 select_result
@@ -1039,10 +1040,10 @@ mod i2c_slave {
             .modify(|_, w| w.i2c_sclk_en().clear_bit());
         assert!(!function_clock_enabled());
 
-        assert!(matches!(
+        hil_test::assert_matches!(
             I2cSlave::new(i2c.reborrow(), Config::new(0x80)),
             Err(ConfigError::AddressInvalid)
-        ));
+        );
         assert!(!function_clock_enabled());
 
         for _ in 0..2 {

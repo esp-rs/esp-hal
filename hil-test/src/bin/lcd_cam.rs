@@ -662,10 +662,7 @@ mod camera_tests {
                 (dpi, sent) = send_frame(dpi, sent, &pclk);
                 // Cancel the wait after EOF, before observing its result.
             }
-            hil_test::assert!(matches!(
-                poll_once(transfer.wait_for_dma_eof()),
-                Poll::Ready(Ok(()))
-            ));
+            hil_test::assert_matches!(poll_once(transfer.wait_for_dma_eof()), Poll::Ready(Ok(())));
             (camera, received) = transfer.stop();
 
             hil_test::assert!(received.number_of_received_bytes() >= sent.len());
@@ -696,10 +693,10 @@ mod camera_tests {
                 rx_bytes
             );
             if expected.is_err() {
-                hil_test::assert!(matches!(
+                hil_test::assert_matches!(
                     poll_once(transfer.wait_for_dma_eof()),
                     Poll::Ready(result) if result == expected
-                ));
+                );
                 let (result, next_camera, next_received) = transfer.wait();
                 hil_test::assert_eq!(result, expected);
                 (camera, received) = (next_camera, next_received);

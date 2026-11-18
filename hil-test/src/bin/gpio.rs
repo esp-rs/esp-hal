@@ -624,7 +624,7 @@ mod tests {
         })
         .await;
 
-        assert!(matches!(should_timeout, Either::Second(_)));
+        hil_test::assert_matches!(should_timeout, Either::Second(_));
     }
 
     #[test]

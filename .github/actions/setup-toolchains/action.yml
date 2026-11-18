@@ -124,3 +124,10 @@ runs:
         toolchain: ${{ steps.pins.outputs.riscv-toolchain }}
         targets: ${{ steps.chips.outputs.targets }}
         components: ${{ inputs.riscv-components }}
+
+    # Host tools (xtask, esp-metadata) build with the default toolchain, which the runner image may
+    # ship older than the MSRV.
+    - if: inputs.riscv != 'true' && inputs.xtensa-default != 'true'
+      uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: ${{ steps.pins.outputs.riscv-toolchain }}

@@ -366,8 +366,6 @@ impl<'a, 'd> AutoFlashRegion<'a, 'd> {
 
 #[cfg(test)]
 mod tests {
-    use core::assert_matches;
-
     use super::*;
     use crate::partitions::{
         DataPartitionSubType,

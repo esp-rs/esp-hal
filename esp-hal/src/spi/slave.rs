@@ -769,8 +769,9 @@ impl Info {
             });
 
             if dma {
-                assert!(
-                    matches!(data_mode, Mode::_1 | Mode::_3),
+                assert_matches!(
+                    data_mode,
+                    Mode::_1 | Mode::_3,
                     "Mode {:?} is not supported with DMA",
                     data_mode
                 );
