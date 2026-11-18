@@ -3,7 +3,7 @@ use core::cell::Cell;
 use core::{
     cell::UnsafeCell,
     future::Future,
-    mem::MaybeUninit,
+    mem::{DropGuard, MaybeUninit},
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
     task::{Context, Poll},
@@ -31,7 +31,7 @@ use crate::{
     handler,
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
-    private::{self, DropGuard},
+    private,
     ram,
     spi::{BitOrder, Error, Mode},
     system::PeripheralGuard,
@@ -473,7 +473,7 @@ impl Driver {
             let _ = self.flush();
         });
         self.flush_async().await;
-        cancel_on_drop.defuse();
+        DropGuard::dismiss(cancel_on_drop);
     }
 
     // Check if the bus is busy and if it is wait for it to be idle

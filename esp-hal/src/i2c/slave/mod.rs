@@ -19,6 +19,7 @@
 use core::{
     future::Future,
     marker::PhantomData,
+    mem::DropGuard,
     pin::Pin,
     sync::atomic::{AtomicBool, Ordering},
     task::{Context, Poll},
@@ -45,7 +46,7 @@ use crate::{
     i2c::master::I2cAddress,
     interrupt::InterruptHandler,
     pac::i2c0::RegisterBlock,
-    private::{self, DropGuard},
+    private,
     ram,
     rtc_cntl::WakeLock,
     system::PeripheralGuard,
@@ -302,7 +303,7 @@ impl<'d> I2cSlave<'d, Async> {
             }
         }
         .await;
-        bytes_read.defuse();
+        DropGuard::dismiss(bytes_read);
         result
     }
 
@@ -339,7 +340,7 @@ impl<'d> I2cSlave<'d, Async> {
             }
         }
         .await;
-        cancel_on_drop.defuse();
+        DropGuard::dismiss(cancel_on_drop);
         result
     }
 }

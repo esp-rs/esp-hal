@@ -71,7 +71,3 @@ log-04 = ["dep:log-04"]
 
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = ["dep:defmt"]
-
-[lints.cargo]
-# False positives for dependencies that only some configurations use.
-unused_dependencies = "allow"

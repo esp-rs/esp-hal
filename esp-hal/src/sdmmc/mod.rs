@@ -32,6 +32,7 @@ use core::{
     cell::UnsafeCell,
     future::poll_fn,
     marker::PhantomData,
+    mem::DropGuard,
     pin::Pin,
     sync::atomic::Ordering,
     task::{Context, Poll},
@@ -61,7 +62,6 @@ use crate::{
         interconnect::{self, PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, SDHOST},
-    private::DropGuard,
     system::{Peripheral, PeripheralGuard},
     time::{Duration, Instant},
 };
@@ -747,7 +747,7 @@ impl EngineSession {
         if flags.busy {
             wait_busy_poll().await?;
         }
-        guard.defuse();
+        DropGuard::dismiss(guard);
         Ok(resp)
     }
 
@@ -790,7 +790,7 @@ impl EngineSession {
         }
         disable_idmac();
         let resp = read_response(ResponseLen::Short);
-        guard.defuse();
+        DropGuard::dismiss(guard);
         Ok(resp)
     }
 

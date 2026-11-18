@@ -1,7 +1,7 @@
 use core::{
     cell::{Cell, UnsafeCell},
     cmp::min,
-    mem::{ManuallyDrop, MaybeUninit},
+    mem::{DropGuard, ManuallyDrop, MaybeUninit},
     pin::Pin,
     ptr::NonNull,
     sync::atomic::{Ordering, fence},
@@ -36,7 +36,6 @@ use crate::{
         prepare_for_tx,
     },
     pac::spi2::RegisterBlock,
-    private::DropGuard,
     soc::is_slice_in_dram,
     spi::{DmaError, master::low_level::SpiClockGuard},
 };
@@ -773,7 +772,7 @@ impl<'d> SpiDma<'d, Async> {
             spi.start_dma_transfer(read_bytes, write_bytes, &mut rx_buffer, &mut tx_buffer)?;
         }
         spi.wait_for_idle_async().await;
-        spi.defuse();
+        DropGuard::dismiss(spi);
         Ok(())
     }
 
@@ -800,7 +799,7 @@ impl<'d> SpiDma<'d, Async> {
             )?;
         }
         spi.wait_for_idle_async().await;
-        spi.defuse();
+        DropGuard::dismiss(spi);
         Ok(())
     }
 
@@ -827,7 +826,7 @@ impl<'d> SpiDma<'d, Async> {
             )?;
         }
         spi.wait_for_idle_async().await;
-        spi.defuse();
+        DropGuard::dismiss(spi);
         Ok(())
     }
 }
