@@ -144,6 +144,7 @@ static OUTCOME: AtomicU8 = AtomicU8::new(Outcome::Ended as u8);
 #[derive(Clone, Copy)]
 struct Request {
     config: RtcSleepConfig,
+    allow_reject: bool,
     may_sleep: Option<fn() -> bool>,
 }
 
@@ -160,9 +161,19 @@ static REQUEST: RequestSlot = RequestSlot(UnsafeCell::new(MaybeUninit::uninit())
 ///
 /// Runs on the APP CPU, with interrupts disabled. The PRO CPU parks this core for the sleep.
 #[crate::ram]
-pub(crate) fn sleep_from_app_cpu(config: RtcSleepConfig, may_sleep: Option<fn() -> bool>) -> bool {
+pub(crate) fn sleep_from_app_cpu(
+    config: RtcSleepConfig,
+    allow_reject: bool,
+    may_sleep: Option<fn() -> bool>,
+) -> bool {
     // SAFETY: the outcome is not `Pending`, so the PRO CPU does not read the request.
-    unsafe { (*REQUEST.0.get()).write(Request { config, may_sleep }) };
+    unsafe {
+        (*REQUEST.0.get()).write(Request {
+            config,
+            allow_reject,
+            may_sleep,
+        })
+    };
     OUTCOME.store(Outcome::Pending as u8, Ordering::Release);
 
     let result = Ipc::new(unsafe { IPC::steal() }).post(Cpu::ProCpu, &SLEEP);
@@ -201,7 +212,7 @@ extern "C" fn sleep_entry() {
     let refused = LowPower::new(unsafe { LPWR::steal() }).sleep(
         request.config,
         SleepKind::Light,
-        true,
+        request.allow_reject,
         request.may_sleep,
     );
     if refused {

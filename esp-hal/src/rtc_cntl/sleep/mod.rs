@@ -83,7 +83,7 @@ mod timer;
 mod wakeup;
 pub(crate) use wakeup::*;
 #[instability::unstable]
-pub use wakeup::{SleepEntryHook, SleepExitHook, SleepKind, WrappedSleepConfig};
+pub use wakeup::{SleepEntryHook, SleepExitHook, WrappedSleepConfig};
 
 /// The result of a light sleep.
 #[cfg(sleep_light_sleep)]
@@ -98,7 +98,8 @@ pub enum LightSleep {
     /// catch. This result does not tell those apart from a sleep that a wakeup source ended.
     Ended,
 
-    /// A wakeup source refused the sleep, so the chip stayed awake.
+    /// A wakeup source or the check of [`LowPower::sleep_light_if`] refused the sleep, so the chip
+    /// stayed awake.
     ///
     /// The refusal holds until the state that caused it changes, so a second call refuses too.
     /// Wait for an interrupt instead.
@@ -264,37 +265,62 @@ impl<'d> LowPower<'d> {
     #[cfg(sleep_light_sleep)]
     #[cfg(feature = "rt")]
     pub fn sleep_light(&mut self, config: RtcSleepConfig) -> LightSleep {
-        if self.sleep(config, SleepKind::Light, true, None) {
+        self.sleep_light_checked(config, None)
+    }
+
+    /// Enters light sleep if `may_sleep` agrees, and returns when a wakeup source ends it.
+    ///
+    /// The documentation of [`Self::sleep_light`] applies. Before the sleep starts, this function
+    /// parks the other cores, and then calls `may_sleep`. A `false` answer refuses the sleep, and
+    /// the result is [`LightSleep::Refused`]. No other core runs until `may_sleep` returns, so the
+    /// answer holds for the whole sleep. A light sleep that the APP core starts can run on the PRO
+    /// core, and `may_sleep` then runs on the PRO core too.
+    ///
+    /// `may_sleep` runs with interrupts disabled. It must not take a lock that a core holds while
+    /// it parks another core.
+    #[cfg_attr(
+        cpu_retention = "software",
+        doc = "\n\nLight sleep suspends the caches. See [Optimization \
+               level](crate#optimization-level) for the build requirement."
+    )]
+    #[cfg(sleep_light_sleep)]
+    #[cfg(feature = "rt")]
+    pub fn sleep_light_if(
+        &mut self,
+        config: RtcSleepConfig,
+        may_sleep: fn() -> bool,
+    ) -> LightSleep {
+        self.sleep_light_checked(config, Some(may_sleep))
+    }
+
+    #[cfg(sleep_light_sleep)]
+    #[cfg(feature = "rt")]
+    fn sleep_light_checked(
+        &mut self,
+        config: RtcSleepConfig,
+        may_sleep: Option<fn() -> bool>,
+    ) -> LightSleep {
+        if self.sleep(config, SleepKind::Light, true, may_sleep) {
             LightSleep::Refused
         } else {
             LightSleep::Ended
         }
     }
 
-    /// Enters the sleep `kind`, and returns whether a wakeup source or `may_sleep` refused it.
+    /// Calculates the sleep configuration from the wakeup-enable mask, and enters the sleep.
     ///
-    /// [`Self::sleep_light`], [`Self::sleep_deep`] and [`Self::sleep_deep_with_rejection`] call
-    /// this function, and their documentation applies. `allow_reject` lets the hardware reject the
-    /// sleep if a wakeup source is already asserted. A deep sleep ignores a refusal, so this
-    /// function does not return `true` for a deep sleep. It returns from a deep sleep only if the
-    /// hardware rejected it.
+    /// Returns whether a wakeup source or `may_sleep` refused a light sleep. A deep sleep ignores
+    /// a refusal, so this function does not return `true` for a deep sleep.
     ///
-    /// A light sleep parks the other cores, and then calls `may_sleep`. A `false` answer refuses
-    /// the sleep. No other core runs until `may_sleep` returns, so the answer holds for the whole
-    /// sleep. A light sleep that the APP core starts can run on the PRO core, and `may_sleep` then
-    /// runs on the PRO core too.
+    /// A sleep limit can end the call before the sleep starts. That result is `false`. It is not a
+    /// refusal. A deep sleep whose limit the transition cannot catch panics when the caller cannot
+    /// accept a rejection.
     ///
-    /// `may_sleep` runs with interrupts disabled. It must not take a lock that a core holds while
-    /// it parks another core.
-    ///
-    /// # Panics
-    ///
-    /// Panics as [`Self::sleep_deep`] does, for a deep sleep that `allow_reject` does not allow to
-    /// return.
+    /// A light sleep parks the other cores, and then calls `may_sleep`, as
+    /// [`Self::sleep_light_if`] describes.
     #[cfg(sleep_driver_supported)]
     #[cfg(feature = "rt")]
-    #[instability::unstable]
-    pub fn sleep(
+    pub(crate) fn sleep(
         &mut self,
         config: RtcSleepConfig,
         kind: SleepKind,
@@ -311,7 +337,11 @@ impl<'d> LowPower<'d> {
                 // from the PRO CPU.
                 match (kind, crate::system::Cpu::current()) {
                     (SleepKind::Light, crate::system::Cpu::AppCpu) => {
-                        cpu_retention::rendezvous::sleep_from_app_cpu(config, may_sleep)
+                        cpu_retention::rendezvous::sleep_from_app_cpu(
+                            config,
+                            allow_reject,
+                            may_sleep,
+                        )
                     }
                     (SleepKind::Light, crate::system::Cpu::ProCpu) => {
                         let refused = self.sleep_with_interrupts_disabled(
@@ -604,7 +634,7 @@ impl ParkedCores {
     fn new(kind: SleepKind) -> Self {
         let mut parked = 0;
         if kind == SleepKind::Light {
-            // The handler of the workaround waits for the stalled core.
+            // The handler of the workaround waits for the parked core.
             #[cfg(cache_livelock_workaround)]
             crate::soc::cache_livelock::pause();
 

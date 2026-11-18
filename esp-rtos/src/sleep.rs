@@ -10,7 +10,7 @@ use esp_hal::{
     peripherals::LPWR,
     rtc_cntl::{
         WakeLock,
-        sleep::{LowPower, RtcSleepConfig, SleepKind},
+        sleep::{LightSleep, LowPower, RtcSleepConfig},
     },
     time::{Duration, Instant},
 };
@@ -196,8 +196,8 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             // The deadline stays until other code clears it, so each pass writes it, also a pass
             // that makes no sleep. A deadline from an earlier pass expires, and the
             // next sleep then returns immediately. A wakeup source can shorten this deadline
-            // inside `sleep_light`, or arm the timer when this hook cleared it. This call stays
-            // the scheduler's request. `sleep_light` restores it.
+            // inside `sleep_light_if`, or arm the timer when this hook cleared it. This call stays
+            // the scheduler's request. `sleep_light_if` restores it.
             if next_wakeup == u64::MAX {
                 lpwr.clear_wakeup_deadline();
             } else {
@@ -213,16 +213,12 @@ extern "C" fn auto_light_sleep_hook() -> ! {
 
         if sleep {
             // Each driver enables the wakeup source it owns. This hook does not know which
-            // sources are enabled. `sleep_light` returns immediately when none are enabled.
+            // sources are enabled. `sleep_light_if` returns immediately when none are enabled.
             // It also returns immediately when a source refuses the sleep. Do not call it
             // again here. The refusal is still true, and a retry would spin. `WFI` below
             // waits for an interrupt.
-            let refused = LowPower::new(unsafe { LPWR::steal() }).sleep(
-                RtcSleepConfig::default(),
-                SleepKind::Light,
-                true,
-                Some(may_sleep),
-            );
+            let result = LowPower::new(unsafe { LPWR::steal() })
+                .sleep_light_if(RtcSleepConfig::default(), may_sleep);
 
             SCHEDULER.with(|scheduler| {
                 let Some(time_driver) = scheduler.time_driver.as_mut() else {
@@ -233,7 +229,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 // stale. Force a re-arm against the restored time base so the tick handler
                 // fires promptly and drains the timer queue. A refusal leaves the timer
                 // running, so its alarm is still valid.
-                if !refused {
+                if result == LightSleep::Ended {
                     time_driver.rearm(crate::now());
                 }
 
