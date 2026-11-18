@@ -203,13 +203,15 @@ impl Disconnected {
 /// calls within a millisecond see the same index. The SOF interrupt flag stays untouched, because
 /// esp-println reads it to pick its output.
 ///
-/// The first call after boot reports a host even if none is there. The 11-bit frame index wraps
-/// every 2048 ms, so a call that follows the previous one by a multiple of 2048 ms misses a
-/// connected host. Either error affects one sleep only.
+/// The first call has no earlier index to compare with, so it waits for one more frame. The 11-bit
+/// frame index wraps every 2048 ms, so a call that follows the previous one by a multiple of
+/// 2048 ms misses a connected host. This error affects one sleep only.
 pub(super) fn host_connected() -> bool {
     use portable_atomic::{AtomicU32, Ordering};
 
     const TOLERANCE_US: u32 = 3_000;
+    // Longer than the 1 ms between two start-of-frame packets.
+    const FIRST_SAMPLE_GAP_US: u32 = 1_100;
     static LAST_FRAME: AtomicU32 = AtomicU32::new(u32::MAX);
     static LAST_CHANGE_US: AtomicU32 = AtomicU32::new(0);
 
@@ -217,16 +219,25 @@ pub(super) fn host_connected() -> bool {
         return false;
     }
 
+    let frame_index = || {
+        u32::from(
+            USB_DEVICE::regs()
+                .fram_num()
+                .read()
+                .sof_frame_index()
+                .bits(),
+        )
+    };
+
+    if LAST_FRAME.load(Ordering::Relaxed) == u32::MAX {
+        LAST_FRAME.store(frame_index(), Ordering::Relaxed);
+        crate::rom::ets_delay_us(FIRST_SAMPLE_GAP_US);
+    }
+
     let now = crate::time::Instant::now()
         .duration_since_epoch()
         .as_micros() as u32;
-    let frame = u32::from(
-        USB_DEVICE::regs()
-            .fram_num()
-            .read()
-            .sof_frame_index()
-            .bits(),
-    );
+    let frame = frame_index();
     if LAST_FRAME.load(Ordering::Relaxed) != frame {
         LAST_FRAME.store(frame, Ordering::Relaxed);
         LAST_CHANGE_US.store(now, Ordering::Relaxed);
