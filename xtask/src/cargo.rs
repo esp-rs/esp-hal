@@ -143,7 +143,7 @@ pub struct CargoArgsBuilder {
     pub(crate) config_path: Option<PathBuf>,
     pub(crate) manifest_path: Option<PathBuf>,
     pub(crate) toolchain: Option<String>,
-    pub(crate) subcommand: String,
+    pub(crate) subcommand: Vec<String>,
     pub(crate) target: Option<String>,
     pub(crate) features: Vec<String>,
     pub(crate) args: Vec<String>,
@@ -189,7 +189,17 @@ impl CargoArgsBuilder {
     where
         S: Into<String>,
     {
-        self.subcommand = subcommand.into();
+        self.subcommand = vec![subcommand.into()];
+        self
+    }
+
+    /// Appends a subcommand word before Cargo options and other arguments.
+    #[must_use]
+    pub fn subcommand_arg<S>(mut self, arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        self.subcommand.push(arg.into());
         self
     }
 
@@ -278,7 +288,7 @@ impl CargoArgsBuilder {
             args.push(format!("+{toolchain}"));
         }
 
-        args.push(self.subcommand.clone());
+        args.extend_from_slice(&self.subcommand);
 
         if let Some(manifest_path) = &self.manifest_path {
             args.push("--manifest-path".to_string());
@@ -438,11 +448,10 @@ impl CargoCommandBatcher {
 
             for item in group.iter() {
                 // Only some commands can be batched
-                let batchable = ["build", "doc", "check"];
-                if !batchable
-                    .iter()
-                    .any(|&subcommand| subcommand == item.subcommand)
-                {
+                if !matches!(
+                    item.subcommand.as_slice(),
+                    [command] if matches!(command.as_str(), "build" | "doc" | "check")
+                ) {
                     all.push(Self::build_one_for_cargo(item));
                     continue;
                 }
@@ -961,6 +970,87 @@ fn format_dependency_version(previous: &str, new: &semver::Version) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn subcommand_words_precede_cargo_options_and_test_arguments() {
+        let command = CargoArgsBuilder::default()
+            .toolchain("nightly")
+            .subcommand("miri")
+            .subcommand_arg("test")
+            .manifest_path(PathBuf::from("Cargo.toml"))
+            .arg("--lib")
+            .features(&["feature-a".into(), "feature-b".into()])
+            .arg("--")
+            .arg("test_filter")
+            .arg("--test-threads=1")
+            .build();
+
+        assert_eq!(
+            command,
+            [
+                "+nightly",
+                "miri",
+                "test",
+                "--manifest-path",
+                "Cargo.toml",
+                "--features=feature-a,feature-b",
+                "--lib",
+                "--",
+                "test_filter",
+                "--test-threads=1",
+            ]
+        );
+    }
+
+    #[test]
+    fn single_word_subcommands_keep_existing_option_order() {
+        assert_eq!(
+            CargoArgsBuilder::default().subcommand("test").build(),
+            ["test"]
+        );
+        assert_eq!(
+            CargoArgsBuilder::default()
+                .subcommand("test")
+                .arg("--lib")
+                .features(&["feature-a".into()])
+                .arg("--")
+                .arg("test_filter")
+                .build(),
+            ["test", "--features=feature-a", "--lib", "--", "test_filter"]
+        );
+    }
+
+    #[test]
+    fn setting_subcommand_replaces_all_previous_words() {
+        assert_eq!(
+            CargoArgsBuilder::default()
+                .subcommand("miri")
+                .subcommand_arg("test")
+                .subcommand("check")
+                .build(),
+            ["check"]
+        );
+    }
+
+    #[test]
+    fn multi_word_subcommands_are_not_batched() {
+        let mut batcher = CargoCommandBatcher::new();
+        batcher.push(CargoArgsBuilder::default().subcommand("check"));
+        batcher.push(
+            CargoArgsBuilder::default()
+                .subcommand("check")
+                .subcommand_arg("custom"),
+        );
+
+        let commands = batcher.build_for_cargo_batch();
+        assert_eq!(commands.len(), 2);
+        assert!(commands.iter().any(|c| c.command == ["check", "custom"]));
+        assert!(
+            commands
+                .iter()
+                .any(|c| c.command == ["batch", "---", "check"])
+        );
+    }
 
     #[test]
     fn test_format_dependency_version() {
