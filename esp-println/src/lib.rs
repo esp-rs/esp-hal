@@ -10,6 +10,10 @@ pub mod defmt;
 #[cfg(feature = "log-04")]
 pub mod logger;
 
+// `auto` enables `portable-atomic` on every chip, but only the USB-Serial-JTAG printer uses it.
+#[cfg(feature = "auto")]
+use portable_atomic as _;
+
 macro_rules! log_format {
     ($value:expr) => {
         #[unsafe(link_section = concat!(".espressif.metadata"))]

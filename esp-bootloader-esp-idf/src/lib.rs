@@ -106,6 +106,11 @@
 // MUST be the first module
 mod fmt;
 
+// The macros exist and can use log-04, but they aren't used currently. To keep
+// fmt.rs copy-paste friendly, we just ignore the unused dependency.
+#[cfg(feature = "log-04")]
+use log_04 as _;
+
 #[cfg(all(not(feature = "std"), flash_driver_supported))]
 mod rom;
 #[cfg(all(not(feature = "std"), flash_driver_supported))]

@@ -24,6 +24,17 @@ extern crate esp_metadata_generated;
 
 use core::arch::global_asm;
 
+// The trait features enable these dependencies on every chip, but only the LP UART driver uses
+// them.
+#[cfg(all(feature = "embedded-hal", not(lp_uart_driver_supported)))]
+use embedded_hal_nb as _;
+#[cfg(all(feature = "embedded-io", not(lp_uart_driver_supported)))]
+use embedded_io_06 as _;
+#[cfg(all(feature = "embedded-io", not(lp_uart_driver_supported)))]
+use embedded_io_07 as _;
+// `riscv` provides the `critical-section` implementation that the PAC needs.
+use riscv as _;
+
 pub mod delay;
 pub mod gpio;
 #[cfg(lp_i2c_master_version = "lp_i2c")]
