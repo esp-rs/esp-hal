@@ -433,7 +433,7 @@ impl<T> NonReentrantMutex<T> {
     /// Calling this reentrantly will panic.
     pub fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
         self.lock_state
-            .lock_non_reentrant(|| f(unsafe { &mut *self.data.get() }))
+            .lock_non_reentrant(|| f(unsafe { self.data.as_mut_unchecked() }))
     }
 }
 

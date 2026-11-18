@@ -394,6 +394,8 @@ impl<'a, 'd> Ota<'a, 'd> {
 
 #[cfg(test)]
 mod tests {
+    use core::assert_matches;
+
     use super::*;
     use crate::partitions::{FlashStorage, PartitionEntry};
 
@@ -761,10 +763,10 @@ mod tests {
         flash.write(0x0000, &slot).unwrap();
 
         let mut region = ota_region(&mut flash, PARTITION_RAW);
-        assert!(matches!(
+        assert_matches!(
             OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
             Err(crate::partitions::Error::Invalid)
-        ));
+        );
     }
 
     #[test]
@@ -781,10 +783,10 @@ mod tests {
         flash.write(0x0000, &slot).unwrap();
 
         let mut region = ota_region(&mut flash, PARTITION_RAW);
-        assert!(matches!(
+        assert_matches!(
             OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
             Err(crate::partitions::Error::Invalid)
-        ));
+        );
     }
 
     #[test]
@@ -797,10 +799,10 @@ mod tests {
         flash.write(0x0000, &slot).unwrap();
 
         let mut region = ota_region(&mut flash, PARTITION_RAW);
-        assert!(matches!(
+        assert_matches!(
             OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
             Err(crate::partitions::Error::Invalid)
-        ));
+        );
     }
 
     #[test]

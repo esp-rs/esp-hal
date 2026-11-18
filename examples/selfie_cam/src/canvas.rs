@@ -183,8 +183,8 @@ impl Mask {
         let words = &self.bits[line as usize * self.words_per_row..][..self.words_per_row];
         for (index, &word) in words.iter().enumerate() {
             let mut word = word;
-            while word != 0 {
-                let x = self.x + (index * 32) as i32 + word.trailing_zeros() as i32;
+            while let Some(bit) = word.lowest_one() {
+                let x = self.x + (index * 32) as i32 + bit as i32;
                 if (0..WIDTH as i32).contains(&x) {
                     row[x as usize] = self.color;
                 }

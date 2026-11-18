@@ -203,6 +203,8 @@ fn read_partition_table_impl<'a, F: FlashAccess>(
 
 #[cfg(test)]
 mod tests {
+    use core::assert_matches;
+
     use super::*;
     use crate::partitions::{AppPartitionSubType, DataPartitionSubType};
 
@@ -388,15 +390,15 @@ mod tests {
         let pt = PartitionTable::new(&[]).unwrap();
 
         assert_eq!(0, pt.len());
-        assert!(matches!(pt.get_partition(0), Err(Error::OutOfBounds)));
+        assert_matches!(pt.get_partition(0), Err(Error::OutOfBounds));
     }
 
     #[test]
     fn validation_fails_wo_hash() {
-        assert!(matches!(
+        assert_matches!(
             PartitionTable::new(&SIMPLE[..RAW_ENTRY_LEN * 3]),
             Err(Error::Invalid)
-        ));
+        );
     }
 
     #[test]
@@ -406,7 +408,7 @@ mod tests {
             data[(i * RAW_ENTRY_LEN)..][..RAW_ENTRY_LEN].copy_from_slice(&SIMPLE[..32]);
         }
 
-        assert!(matches!(PartitionTable::new(&data), Err(Error::Invalid)));
+        assert_matches!(PartitionTable::new(&data), Err(Error::Invalid));
     }
 
     #[test]

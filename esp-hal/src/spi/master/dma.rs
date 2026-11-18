@@ -263,7 +263,7 @@ impl<'d> SpiDma<'d, Blocking> {
         // Safety: The descriptors occupy their own shared cache line and are updated in a
         // synchronised fashion.
         let (tx_descriptors, rx_descriptors) = unsafe {
-            let descriptors = (&mut *state.descriptors.get()).get_mut().into_inner();
+            let descriptors = state.descriptors.as_mut_unchecked().get_mut().into_inner();
             descriptors.fill(DmaDescriptor::EMPTY);
             let (tx_descriptors, rx_descriptors) = descriptors.split_at_mut(1);
             (
@@ -2015,7 +2015,7 @@ impl DmaState {
         reason = "Safety requirements ensure this is okay"
     )]
     unsafe fn rx_buffer(&self) -> &mut ScopedDmaRxBuf<'static> {
-        unsafe { (&mut *self.rx_buffer.get()).assume_init_mut() }
+        unsafe { self.rx_buffer.as_mut_unchecked().assume_init_mut() }
     }
 
     // Syntactic helper to get a mutable reference to the "empty" TX DMA buffer.
@@ -2028,7 +2028,7 @@ impl DmaState {
         reason = "Safety requirements ensure this is okay"
     )]
     unsafe fn tx_buffer(&self) -> &mut ScopedDmaTxBuf<'static> {
-        unsafe { (&mut *self.tx_buffer.get()).assume_init_mut() }
+        unsafe { self.tx_buffer.as_mut_unchecked().assume_init_mut() }
     }
 }
 

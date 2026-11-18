@@ -366,6 +366,8 @@ impl<'a, 'd> AutoFlashRegion<'a, 'd> {
 
 #[cfg(test)]
 mod tests {
+    use core::assert_matches;
+
     use super::*;
     use crate::partitions::{
         DataPartitionSubType,
@@ -541,9 +543,9 @@ mod tests {
         assert!(!nvs.is_effectively_encrypted());
         assert!(nvs.as_flash_region(&mut storage).is_ok());
         assert!(!nvs.as_auto_flash_region(&mut storage).is_encrypted());
-        assert!(matches!(
+        assert_matches!(
             nvs.as_encrypted_flash_region(&mut storage),
             Err(Error::NotSupported)
-        ));
+        );
     }
 }

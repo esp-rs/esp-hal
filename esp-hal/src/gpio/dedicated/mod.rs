@@ -697,11 +697,10 @@ impl Drop for DedicatedGpioOutput<'_> {
         // Set the contained GPIOs back to GPIO mode.
         for (bank, mut pins) in self.contained_gpios.into_iter().enumerate() {
             let bank_offset = bank as u8 * 32;
-            while pins != 0 {
-                let pin = pins.trailing_zeros() as u8;
+            while let Some(pin) = pins.lowest_one() {
                 pins &= !(1 << pin);
 
-                let gpio = unsafe { AnyPin::steal(bank_offset + pin) };
+                let gpio = unsafe { AnyPin::steal(bank_offset + pin as u8) };
                 gpio.disconnect_from_peripheral_output();
                 gpio.connect_peripheral_to_output(OutputSignal::GPIO);
             }

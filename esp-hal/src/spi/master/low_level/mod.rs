@@ -1024,7 +1024,7 @@ impl State {
         reason = "Safety requirements ensure this is okay"
     )]
     pub(super) unsafe fn pins(&self) -> &mut SpiPinGuard {
-        unsafe { (&mut *self.pins.get()).assume_init_mut() }
+        unsafe { self.pins.as_mut_unchecked().assume_init_mut() }
     }
 
     unsafe fn deinit(&self) {

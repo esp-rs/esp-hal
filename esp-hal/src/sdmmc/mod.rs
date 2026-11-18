@@ -468,7 +468,7 @@ unsafe impl Sync for DescRing {}
 static DESC_RING: DescRing = DescRing(UnsafeCell::new(InternalMemory::new([Desc::ZERO; RING_LEN])));
 
 fn ring() -> DmaAlignedMut<'static, [Desc; RING_LEN]> {
-    unsafe { &mut *DESC_RING.0.get() }.get_mut()
+    unsafe { DESC_RING.0.as_mut_unchecked() }.get_mut()
 }
 
 /// Exclusive engine session: bounce scratch and last HW-programmed slot.
@@ -1059,7 +1059,7 @@ fn slot_state(id: SlotId) -> &'static SlotState {
 /// Exclusive access to a slot's pin guards (builder-time only).
 #[cfg(sdmmc_has_gpio_matrix)]
 fn slot_pins(id: SlotId) -> &'static mut SlotPins {
-    unsafe { &mut *slot_state(id).pins.get() }
+    unsafe { slot_state(id).pins.as_mut_unchecked() }
 }
 
 /// Immutable per-slot routing: SDIO card-interrupt bit plus the input/output
