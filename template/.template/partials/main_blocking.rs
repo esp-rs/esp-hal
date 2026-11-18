@@ -72,7 +72,29 @@ fn main() -> ! {
     // generator parameters: {{ generate_parameters }}
 
     //%if option("probe-rs")
+    //%if chip.name == "esp32p4"
+    // The debugger reads RTT from physical memory, past the CPU cache, so the control block and
+    // the buffers must be in uncached memory.
+    //+    let channels = rtt_target::rtt_init! {
+    //+        up: {
+    //+            0: {
+    //+                size: 1024,
     //%if option("defmt")
+    //+                name: "defmt",
+    //%else
+    //+                name: "Terminal",
+    //%endif
+    //+                section: ".uncached.data",
+    //+            }
+    //+        }
+    //+        section_cb: ".uncached.data"
+    //+    };
+    //%if option("defmt")
+    //+    rtt_target::set_defmt_channel(channels.up.0);
+    //%else
+    //+    rtt_target::set_print_channel(channels.up.0);
+    //%endif
+    //%else if option("defmt")
     rtt_target::rtt_init_defmt!();
     //%else
     rtt_target::rtt_init_print!();

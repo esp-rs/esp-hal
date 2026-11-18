@@ -22,7 +22,23 @@ mod tests {
         esp_rtos::start(timg0.timer0);
 
         //%if option("defmt")
+        //%if chip.name == "esp32p4"
+        // The debugger reads RTT from physical memory, past the CPU cache, so the control block
+        // and the buffers must be in uncached memory.
+        //+        let channels = rtt_target::rtt_init! {
+        //+            up: {
+        //+                0: {
+        //+                    size: 1024,
+        //+                    name: "defmt",
+        //+                    section: ".uncached.data",
+        //+                }
+        //+            }
+        //+            section_cb: ".uncached.data"
+        //+        };
+        //+        rtt_target::set_defmt_channel(channels.up.0);
+        //%else
         rtt_target::rtt_init_defmt!();
+        //%endif
         //%endif
     }
 
