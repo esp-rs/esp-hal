@@ -423,7 +423,7 @@ instances = {
     },
 }
 [device.sd_slave]
-support_status = "not_supported"
+support_status = "partial"
 [device.twai]
 support_status = { status = "partial", issue = 6781 }
 [device.usb_serial_jtag]

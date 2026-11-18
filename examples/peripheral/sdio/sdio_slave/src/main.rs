@@ -1,7 +1,7 @@
 //! Receives and echoes one packet using the C6 SLC0 interrupt and async API.
 //! See the shared SDIO README for the reference board, wiring and companion firmware.
 
-//% CHIP_FILTER: esp32c6
+//% CHIP_FILTER: sd_slave_driver_supported
 
 #![no_std]
 #![no_main]

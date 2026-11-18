@@ -105,7 +105,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | PARL_IO         | 🚧     |
 | RMT             | 🚧     |
 | SDMMC/SDIO host | 🚧     |
-| SDIO slave      | ❌     |
+| SDIO slave      | 🚧     |
 | TWAI            | 🚧     |
 | CANFD           | 🚧     |
 | USB OTG FS      | 🚧     |

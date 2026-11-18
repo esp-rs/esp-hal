@@ -3,7 +3,7 @@
 //! No additional wiring is required. Do not connect an SDIO host to GPIO18–23.
 //! These tests do not supply a bus clock or require a peer MCU.
 
-//% CHIP_FILTER: soc_has_slc
+//% CHIP_FILTER: sd_slave_driver_supported
 //% FEATURES: unstable
 
 #![no_std]
