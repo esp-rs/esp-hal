@@ -37,3 +37,16 @@ mod sha;
 #[cfg(rng_driver_supported)]
 #[path = "crypto/rng.rs"]
 mod rng;
+
+// The contexts can move to and be shared with another thread.
+const _: () = {
+    const fn send_sync<T: Send + Sync>() {}
+    #[cfg(aes_driver_supported)]
+    send_sync::<esp_hal::aes::AesContext>();
+    #[cfg(aes_dma_mode_gcm)]
+    send_sync::<esp_hal::aes::dma::AesGcmContext>();
+    #[cfg(rsa_driver_supported)]
+    send_sync::<esp_hal::rsa::RsaContext>();
+    #[cfg(sha_driver_supported)]
+    send_sync::<esp_hal::sha::Sha1Context>();
+};
