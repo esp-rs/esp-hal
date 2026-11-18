@@ -156,6 +156,14 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         ] },
     ] },
+    # PCR.twai0_func_clk_conf.twai0_func_clk_sel: 0 = XTAL, 1 = RC_FAST, 2 = PLL_F96M, see
+    # SOC_TWAI_CLKS. RC_FAST is not accurate enough for CAN bit timing.
+    { group = "TWAI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+            { name = "PLL_F96M", outputs = "PLL_F96M_CLK", default = true },
+        ] },
+    ] },
     # Sources: SOC_GPTIMER_CLKS and SOC_MWDT_CLKS. Like the other chips we default
     # to XTAL
     { group = "TIMG", clocks = [
@@ -210,4 +218,5 @@ peripheral_clocks = { templates = [
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "UsbDevice", keep_enabled = true },
     { name = "UsbFs", template_params = { peripheral = "usb_otg11" } },
+    { name = "Twai0" },
 ] }

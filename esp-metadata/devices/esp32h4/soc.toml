@@ -125,7 +125,7 @@ peripherals = [
     { name = "TOUCH", interrupts = { peri = "TOUCH" } },
     { name = "TOUCH_AON" },
     # The single TWAI controller is a CAN-FD, the PAC just keeps the TWAI0 name.
-    { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" } },
+    { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" }, clock_group = "TWAI" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0" },
@@ -295,7 +295,10 @@ has_rx_wrap = true
 has_rx_demodulation = true
 
 [device.canfd]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6746 }
+instances = [
+    { name = "twai0", sys_instance = "Twai0", rx = "TWAI0_RX", tx = "TWAI0_TX" },
+]
 
 [device.usb_otg]
 support_status = { status = "partial", issue = 6785 }

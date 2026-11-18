@@ -17,7 +17,6 @@ use esp_hal::{
     DriverMode,
     canfd::{
         CanFd,
-        CanFdInterrupt,
         ClockSource,
         Config,
         ConfigError,
@@ -36,7 +35,6 @@ use esp_hal::{
         TxBufferState,
     },
     rtc_cntl::WakeLock,
-    timer::timg::TimerGroup,
 };
 use hil_test as _;
 
@@ -689,8 +687,11 @@ mod blocking_tests {
 }
 
 /// Two controllers on one wire, so a peer acknowledges frames and arbitrates.
+#[cfg(soc_has_twai1)]
 #[embedded_test::tests(default_timeout = 5)]
 mod two_node_tests {
+    use esp_hal::canfd::CanFdInterrupt;
+
     use super::*;
 
     struct Nodes {
@@ -813,6 +814,7 @@ mod two_node_tests {
     }
 }
 
+#[cfg(soc_has_twai1)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod async_tests {
     use core::{
@@ -821,6 +823,7 @@ mod async_tests {
     };
 
     use embassy_time::{Duration, Instant, Timer};
+    use esp_hal::timer::timg::TimerGroup;
 
     use super::*;
 
@@ -967,6 +970,7 @@ mod async_tests {
 
 /// Two nodes exchanging real traffic, with the driver under test in async
 /// mode.
+#[cfg(soc_has_twai1)]
 #[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod contention_tests {
     use core::{
@@ -975,7 +979,10 @@ mod contention_tests {
     };
 
     use embassy_time::Timer;
-    use esp_hal::time::{Duration, Instant};
+    use esp_hal::{
+        time::{Duration, Instant},
+        timer::timg::TimerGroup,
+    };
 
     use super::*;
 
