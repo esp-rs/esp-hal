@@ -6179,16 +6179,31 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl2()
                         .modify(|_, w| w.twai0_apb_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .peri_clk_ctrl115()
+                        .modify(|_, w| {
+                            w.twai0_clk_src_sel().clear_bit().twai0_clk_en().bit(enable)
+                        });
                 }
                 Peripheral::Twai1 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl2()
                         .modify(|_, w| w.twai1_apb_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .peri_clk_ctrl115()
+                        .modify(|_, w| {
+                            w.twai1_clk_src_sel().clear_bit().twai1_clk_en().bit(enable)
+                        });
                 }
                 Peripheral::Twai2 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl2()
                         .modify(|_, w| w.twai2_apb_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .peri_clk_ctrl115()
+                        .modify(|_, w| {
+                            w.twai2_clk_src_sel().clear_bit().twai2_clk_en().bit(enable)
+                        });
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
