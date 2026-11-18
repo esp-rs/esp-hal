@@ -493,6 +493,8 @@ impl Config {
     ///
     /// The closest available frequency that does not exceed `frequency` is used,
     /// so the bus never runs faster than requested.
+    /// The minimum request is the source frequency divided by 1024 and rounded up
+    /// to whole hertz. The maximum request is the source frequency.
     pub fn with_frequency(mut self, frequency: Rate) -> Self {
         self.frequency = frequency;
         self.reg = self.recalculate();
@@ -1179,33 +1181,27 @@ where
         self
     }
 
-    #[doc_replace(
-        "max_frequency" => {
-            cfg(esp32h2) => "48MHz",
-            _ => "80MHz",
-        }
-    )]
+    #[procmacros::doc_replace]
     /// Changes the bus configuration.
     ///
     /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::spi::{
-    ///     Mode,
-    ///     master::{Config, Spi},
+    /// use esp_hal::{
+    ///     spi::master::{Config, Spi},
+    ///     time::Rate,
     /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?;
     ///
-    /// spi.apply_config(&Config::default().with_frequency(Rate::from_khz(100)));
-    /// #
+    /// spi.apply_config(&Config::default().with_frequency(Rate::from_mhz(2)))?;
     /// # {after_snippet}
     /// ```
     ///
     /// # Errors
     ///
-    /// [`ConfigError::FrequencyOutOfRange`] when frequency passed in config exceeds
-    /// __max_frequency__ or is below 70 kHz.
+    /// [`ConfigError::FrequencyOutOfRange`] when the requested frequency is
+    /// outside the range described in [`Config::with_frequency`].
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
