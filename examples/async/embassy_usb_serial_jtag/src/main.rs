@@ -13,7 +13,7 @@ use esp_backtrace as _;
 use esp_hal::{
     Async,
     timer::timg::TimerGroup,
-    usb::usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
+    usb::usb_serial_jtag::{Config, UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
 };
 use static_cell::StaticCell;
 
@@ -72,7 +72,8 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    let (rx, tx) = UsbSerialJtag::new(peripherals.USB_DEVICE)
+    let (rx, tx) = UsbSerialJtag::new(peripherals.USB_DEVICE, Config::default())
+        .unwrap()
         .into_async()
         .split();
 
