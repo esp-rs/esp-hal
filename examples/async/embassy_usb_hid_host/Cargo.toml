@@ -42,3 +42,13 @@ debug            = true
 debug-assertions = true
 lto              = "fat"
 codegen-units    = 1
+
+[patch.crates-io]
+embassy-net-driver-channel = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-sync              = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-time              = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-time-driver       = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-time-queue-utils  = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-usb               = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-usb-driver        = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
+embassy-usb-synopsys-otg  = { git = "https://github.com/embassy-rs/embassy", rev = "992efbfa8833dfa3ad6990a608ceffe642e2bfe2" }
