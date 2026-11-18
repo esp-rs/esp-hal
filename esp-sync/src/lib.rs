@@ -17,6 +17,11 @@ mod fmt;
 
 use core::{cell::UnsafeCell, marker::PhantomData};
 
+// The macros exist and can use log-04, but they aren't used currently. To keep
+// fmt.rs copy-paste friendly, we just ignore the unused dependency.
+#[cfg(feature = "log-04")]
+use log_04 as _;
+
 pub mod raw;
 
 use raw::{RawLock, SingleCoreInterruptLock};
@@ -232,10 +237,14 @@ mod multi_core {
     }
 }
 
-#[cfg(multi_core)]
-use multi_core::LockedState;
-#[cfg(single_core)]
-use single_core::LockedState;
+cfg_select! {
+    multi_core => {
+        use multi_core::LockedState;
+    }
+    _ => {
+        use single_core::LockedState;
+    }
+}
 
 /// A generic lock that wraps a [`RawLock`] implementation and tracks
 /// whether the caller has locked recursively.
