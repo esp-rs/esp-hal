@@ -69,7 +69,7 @@
 //!
 //! ### Using `ipc-implementations`
 //!
-//! The implementor must implement the [`wait_queue::WaitQueueImplementation`] trait, and can use
+//! The implementor must implement the `wait_queue::WaitQueueImplementation` trait, and can use
 //! the various `Compat` types as the default implementations for the IPC types.
 //!
 //! You still have the option to provide custom implementations for the IPC types.

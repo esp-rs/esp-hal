@@ -130,10 +130,12 @@ impl DeepSleep {
 ///
 /// The minimum-residency threshold is configurable via the
 /// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
-///
-/// Light sleep keeps the CPU domain powered, unless the program calls
-/// [`Sleep::enable_cpu_powerdown`].
-///
+#[doc = ""]
+#[doc = cfg_select! {
+    supports_cpu_power_down => "Light sleep keeps the CPU domain powered, unless the program calls [`Sleep::enable_cpu_powerdown`].",
+    _ => "Light sleep keeps the CPU domain powered.",
+}]
+#[doc = ""]
 /// See [`WakeLock`] for the wake-lock contract that governs when sleeping is safe.
 ///
 /// [`start_with_idle_hook`]: crate::start_with_idle_hook
