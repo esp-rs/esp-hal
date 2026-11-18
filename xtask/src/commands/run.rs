@@ -141,8 +141,10 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
     for (key, value) in &doc_config.env {
         builder.add_env_var(key, value);
     }
-    builder.add_env_var("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs");
-    builder.add_env_var("ESP_HAL_DOCTEST", "1");
+    builder.add_env_var(
+        "RUSTDOCFLAGS",
+        "--cfg docsrs --cfg not_really_docsrs -D warnings",
+    );
 
     let command = crate::cargo::CargoCommandBatcher::build_one_for_cargo(&builder);
     log::debug!("{command:#?}");
