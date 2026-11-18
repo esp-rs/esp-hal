@@ -393,8 +393,8 @@ pub struct Config {
     /// The TRM recommends [`ClockSource::Xtal`] up to 5 Mbit/s and the PLL
     /// clock above that.
     ///
-    /// Default value: the PLL clock, 80 MHz on the ESP32-C5 and 96 MHz on the
-    /// ESP32-H4.
+    /// Default value: the PLL clock, 80 MHz on the ESP32-C5 and ESP32-S31, and
+    /// 96 MHz on the ESP32-H4.
     clock_source: ClockSource,
 
     /// Bit timing of the arbitration phase.
@@ -444,7 +444,7 @@ impl Default for Config {
         // 500 kbit/s nominal and 2 Mbit/s data, 16 and 4 time quanta per bit,
         // sampling at 81.2% and 75%.
         let (clock_source, baud_rate_prescaler) = cfg_select! {
-            esp32c5 => (ClockSource::PllF80m, 10),
+            any(esp32c5, esp32s31) => (ClockSource::PllF80m, 10),
             esp32h4 => (ClockSource::PllF96m, 12),
         };
         Self {

@@ -124,6 +124,8 @@ peripherals = [
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
     { name = "TSENS", pac = "LP_TSENS", clock_group = "TSENS" },
+    { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" }, clock_group = "TWAI" },
+    { name = "TWAI1", interrupts = { peri = "TWAI1", timer = "TWAI1_TIMER" }, clock_group = "TWAI" },
     { name = "UART0", interrupts = { peri = "UART0" }, clock_group = "UART", stable = true },
     { name = "UART1", interrupts = { peri = "UART1" }, clock_group = "UART", stable = true },
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART", stable = true },
@@ -538,7 +540,11 @@ register_block = "lp_tsens"
 [device.touch]
 support_status = "not_supported"
 [device.canfd]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6746 }
+instances = [
+    { name = "twai0", sys_instance = "Twai0", rx = "TWAI0_RX", tx = "TWAI0_TX" },
+    { name = "twai1", sys_instance = "Twai1", rx = "TWAI1_RX", tx = "TWAI1_TX" },
+]
 [device.uhci]
 support_status = { status = "partial", issue = 6783 }
 combined_uart_selector_field = true

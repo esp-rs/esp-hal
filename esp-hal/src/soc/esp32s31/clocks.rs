@@ -853,6 +853,53 @@ impl RmtInstance {
     }
 }
 
+impl TwaiInstance {
+    // TWAI_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        let regs = HP_SYS::regs();
+        match self {
+            TwaiInstance::Twai0 => regs.can0_mem_lp_ctrl().modify(|_, w| unsafe {
+                w.can0_mem_lp_mode().bits(2);
+                w.can0_mem_lp_en().bit(!en);
+                w.can0_mem_force_ctrl().set_bit()
+            }),
+            TwaiInstance::Twai1 => regs.can1_mem_lp_ctrl().modify(|_, w| unsafe {
+                w.can1_mem_lp_mode().bits(2);
+                w.can1_mem_lp_en().bit(!en);
+                w.can1_mem_force_ctrl().set_bit()
+            }),
+        };
+
+        let regs = HP_SYS_CLKRST::regs();
+        match self {
+            TwaiInstance::Twai0 => regs.twai0_ctrl0().modify(|_, w| w.clk_en().bit(en)),
+            TwaiInstance::Twai1 => regs.twai1_ctrl0().modify(|_, w| w.clk_en().bit(en)),
+        };
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<TwaiFunctionClockConfig>,
+        new_config: TwaiFunctionClockConfig,
+    ) {
+        let bits = match new_config {
+            TwaiFunctionClockConfig::Xtal => 0,
+            TwaiFunctionClockConfig::PllF80m => 2,
+        };
+        let regs = HP_SYS_CLKRST::regs();
+        match self {
+            TwaiInstance::Twai0 => regs
+                .twai0_ctrl0()
+                .modify(|_, w| unsafe { w.clk_src_sel().bits(bits) }),
+            TwaiInstance::Twai1 => regs
+                .twai1_ctrl0()
+                .modify(|_, w| unsafe { w.clk_src_sel().bits(bits) }),
+        };
+    }
+}
+
 impl PsramInstance {
     // PSRAM_FUNCTION_CLOCK
 

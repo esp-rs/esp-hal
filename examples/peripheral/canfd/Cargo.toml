@@ -24,6 +24,11 @@ esp32h4 = [
     "esp-bootloader-esp-idf/esp32h4",
     "esp-hal/esp32h4",
 ]
+esp32s31 = [
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
+]
 
 [profile.release]
 debug            = true
