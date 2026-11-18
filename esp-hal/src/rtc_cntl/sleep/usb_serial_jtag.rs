@@ -17,12 +17,18 @@ use crate::{
 fn module_is_enabled() -> bool {
     cfg_select! {
         esp32p4 => {
+            let aon = crate::peripherals::LP_AON_CLKRST::regs();
             crate::peripherals::HP_SYS_CLKRST::regs()
                 .soc_clk_ctrl2()
                 .read()
                 .usb_device_apb_clk_en()
                 .bit_is_set()
-                && crate::peripherals::LP_AON_CLKRST::regs()
+                && aon
+                    .lp_aonclkrst_hp_usb_clkrst_ctrl0()
+                    .read()
+                    .lp_aonclkrst_usb_device_48m_clk_en()
+                    .bit_is_set()
+                && aon
                     .lp_aonclkrst_hp_usb_clkrst_ctrl1()
                     .read()
                     .lp_aonclkrst_rst_en_usb_device()
@@ -81,16 +87,13 @@ fn pad_is_enabled() -> bool {
         .bit_is_set()
 }
 
-/// Returns whether the coming sleep keeps USB Serial/JTAG running.
+/// Returns whether the coming light sleep keeps USB Serial/JTAG running.
 ///
 /// A light sleep keeps it running while a USB host is connected, unless the
 /// `keep-usb-serial-jtag-connected` option is disabled.
-#[cfg(any(
-    sleep_usb_serial_jtag_light_sleep = "keep",
-    sleep_usb_serial_jtag_light_sleep = "keep_cpu_powered"
-))]
-pub(super) fn keep_running_in_sleep(deep: bool) -> bool {
-    cfg!(keep_usb_serial_jtag_connected) && !deep && host_connected()
+#[cfg(sleep_keeps_usb_serial_jtag)]
+pub(super) fn keep_in_light_sleep() -> bool {
+    cfg!(keep_usb_serial_jtag_connected) && host_connected()
 }
 
 /// The GPIOs of the D- and D+ pads.

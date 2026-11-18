@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    peripherals::{LP_AON, PMU},
+    peripherals::PMU,
     rtc_cntl::{
         Rtc,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
@@ -21,61 +21,72 @@ use crate::{
 // Note: from all the fields defined in ESP-IDF's `pmu_sleep_analog_config_t`
 // the only one documented in Hardware Technical Reference Manual is `hp_sys.analog.xpd`
 // (corresponds to `PMU_HP_ACTIVE_HP_REGULATOR_XPD` in the Manual). Therefore only this
-// field is stored as bool without any nested structures.
+// field and the regulator voltages are stored, without any nested structures.
 pub struct AnalogSleepConfig {
     /// High-power system configuration.
     pub regulator_xpd: bool,
+    hp_regulator_dbias: u8,
+    lp_regulator_dbias: u8,
 }
 
 impl AnalogSleepConfig {
+    // The reset values.
+    const HP_SLEEP_DBIAS: u8 = 16;
+    const LP_SLEEP_DBIAS: u8 = 17;
+
     fn defaults_deep_sleep() -> Self {
         Self {
             // PMU_SLEEP_ANALOG_DSLP_CONFIG_DEFAULT
             regulator_xpd: false,
+            hp_regulator_dbias: Self::HP_SLEEP_DBIAS,
+            lp_regulator_dbias: Self::LP_SLEEP_DBIAS,
         }
     }
 
-    fn defaults_light_sleep() -> Self {
+    /// A light sleep that keeps XTAL_CLK or RC_FAST_CLK powered needs the HP and LP regulators at
+    /// the active voltage.
+    ///
+    /// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/esp_hw_support/port/esp32h2/pmu_sleep.c#L162-L174>.
+    fn defaults_light_sleep(pd_flags: PowerDownFlags) -> Self {
+        let pmu = PMU::regs();
+        let (hp_regulator_dbias, lp_regulator_dbias) =
+            if !pd_flags.pd_xtal() || !pd_flags.pd_rc_fast() {
+                (
+                    pmu.hp_active_hp_regulator0()
+                        .read()
+                        .hp_active_hp_regulator_dbias()
+                        .bits(),
+                    // The PAC names the LP regulator voltage of LP_ACTIVE after HP_SLEEP.
+                    pmu.hp_sleep_lp_regulator0()
+                        .read()
+                        .hp_sleep_lp_regulator_dbias()
+                        .bits(),
+                )
+            } else {
+                (Self::HP_SLEEP_DBIAS, Self::LP_SLEEP_DBIAS)
+            };
+
         Self {
             // PMU_SLEEP_ANALOG_LSLP_CONFIG_DEFAULT
             regulator_xpd: true,
+            hp_regulator_dbias,
+            lp_regulator_dbias,
         }
     }
 
-    /// `active_voltage` keeps the HP and LP regulators at the active voltage, which a sleep that
-    /// keeps XTAL_CLK or RC_FAST_CLK powered needs.
-    ///
-    /// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/esp_hw_support/port/esp32h2/pmu_sleep.c#L162-L174>.
-    fn apply(&self, active_voltage: bool) {
-        // The reset values.
-        const HP_SLEEP_DBIAS: u8 = 16;
-        const LP_SLEEP_DBIAS: u8 = 17;
-
+    fn apply(&self) {
         let pmu = PMU::regs();
-        let (hp_dbias, lp_dbias) = if active_voltage {
-            (
-                pmu.hp_active_hp_regulator0()
-                    .read()
-                    .hp_active_hp_regulator_dbias()
-                    .bits(),
-                // The LP regulator voltage of LP_ACTIVE.
-                pmu.hp_sleep_lp_regulator0()
-                    .read()
-                    .hp_sleep_lp_regulator_dbias()
-                    .bits(),
-            )
-        } else {
-            (HP_SLEEP_DBIAS, LP_SLEEP_DBIAS)
-        };
-
         // based on pmu_sleep_analog_init, with undocumented registers omitted
         pmu.hp_sleep_hp_regulator0().modify(|_, w| unsafe {
-            w.hp_sleep_hp_regulator_dbias().bits(hp_dbias);
+            w.hp_sleep_hp_regulator_dbias()
+                .bits(self.hp_regulator_dbias);
             w.hp_sleep_hp_regulator_xpd() // pmu_ll_hp_set_regulator_xpd
                 .bit(self.regulator_xpd)
         });
-        pmu.lp_sleep_lp_regulator0()
-            .modify(|_, w| unsafe { w.lp_sleep_lp_regulator_dbias().bits(lp_dbias) });
+        pmu.lp_sleep_lp_regulator0().modify(|_, w| unsafe {
+            w.lp_sleep_lp_regulator_dbias()
+                .bits(self.lp_regulator_dbias)
+        });
     }
 }
 
@@ -149,17 +160,17 @@ pub struct PowerSleepConfig {
 }
 
 impl PowerSleepConfig {
-    fn defaults(pd_flags: PowerDownFlags) -> Self {
+    fn defaults(pd_flags: PowerDownFlags, keep_usb_serial_jtag: bool) -> Self {
         let mut this = Self {
             hp_sys: HpSysPower::default(),
             lp_sys_active: LpSysPower::default(),
             lp_sys_sleep: LpSysPower::default(),
         };
-        this.apply_flags(pd_flags);
+        this.apply_flags(pd_flags, keep_usb_serial_jtag);
         this
     }
 
-    fn apply_flags(&mut self, pd_flags: PowerDownFlags) {
+    fn apply_flags(&mut self, pd_flags: PowerDownFlags, keep_usb_serial_jtag: bool) {
         // PMU_SLEEP_POWER_CONFIG_DEFAULT
         self.hp_sys
             .dig_power
@@ -168,9 +179,12 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_cpu_pd_en(pd_flags.pd_cpu());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
 
-        self.hp_sys.clk.set_i2c_iso_en(true);
-        self.hp_sys.clk.set_i2c_retention(true);
-        self.hp_sys.clk.set_xpd_bbpll(false);
+        // USB Serial/JTAG needs BBPLL to keep answering the host.
+        self.hp_sys.clk.set_i2c_iso_en(!keep_usb_serial_jtag);
+        self.hp_sys.clk.set_i2c_retention(!keep_usb_serial_jtag);
+        self.hp_sys.clk.set_xpd_bb_i2c(keep_usb_serial_jtag);
+        self.hp_sys.clk.set_xpd_bbpll_i2c(keep_usb_serial_jtag);
+        self.hp_sys.clk.set_xpd_bbpll(keep_usb_serial_jtag);
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
 
@@ -537,7 +551,7 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
-        self.keep_usb_serial_jtag = super::usb_serial_jtag::keep_running_in_sleep(self.deep);
+        self.keep_usb_serial_jtag = !self.deep && super::usb_serial_jtag::keep_in_light_sleep();
 
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
@@ -579,11 +593,9 @@ impl RtcSleepConfig {
     /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
-        let keep_usb_serial_jtag = self.keep_usb_serial_jtag;
-
         let (hp_root_clk, cpu_clk) = ClockTree::with(|clocks| {
             let old = (clocks.hp_root_clk(), clocks.cpu_clk());
-            if keep_usb_serial_jtag {
+            if self.keep_usb_serial_jtag {
                 clocks::request_pll_f96m_clk(clocks);
             }
             clocks::configure_hp_root_clk(clocks, HpRootClkConfig::Xtal);
@@ -595,14 +607,7 @@ impl RtcSleepConfig {
 
         // pmu_sleep_config_default + pmu_sleep_init
 
-        let mut power = PowerSleepConfig::defaults(self.pd_flags);
-        if keep_usb_serial_jtag {
-            power.hp_sys.clk.set_i2c_iso_en(false);
-            power.hp_sys.clk.set_i2c_retention(false);
-            power.hp_sys.clk.set_xpd_bb_i2c(true);
-            power.hp_sys.clk.set_xpd_bbpll_i2c(true);
-            power.hp_sys.clk.set_xpd_bbpll(true);
-        }
+        let power = PowerSleepConfig::defaults(self.pd_flags, self.keep_usb_serial_jtag);
         power.apply();
 
         // Needs to happen after rtc_clk_cpu_freq_set_xtal
@@ -616,24 +621,21 @@ impl RtcSleepConfig {
 
         if self.deep {
             DigitalSleepConfig::defaults_deep_sleep().apply();
-            AnalogSleepConfig::defaults_deep_sleep().apply(false);
+            AnalogSleepConfig::defaults_deep_sleep().apply();
         } else {
-            DigitalSleepConfig::defaults_light_sleep(self.pd_flags, keep_usb_serial_jtag).apply();
-            AnalogSleepConfig::defaults_light_sleep()
-                .apply(!self.pd_flags.pd_xtal() || !self.pd_flags.pd_rc_fast());
+            DigitalSleepConfig::defaults_light_sleep(self.pd_flags, self.keep_usb_serial_jtag)
+                .apply();
+            AnalogSleepConfig::defaults_light_sleep(self.pd_flags).apply();
         }
 
-        const HP_SYSCLK_PLL: u8 = 1;
-        super::pmu_common::configure_hp_sleep_clocks(0, keep_usb_serial_jtag, HP_SYSCLK_PLL);
+        super::pmu_common::configure_hp_sleep_clocks(0, self.keep_usb_serial_jtag);
 
         param.apply();
 
         // pmu_sleep_start
 
-        // lp_aon_hal_inform_wakeup_type - tells ROM which wakeup stub to run
-        LP_AON::regs()
-            .store9()
-            .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
+        // lp_aon_hal_inform_wakeup_type
+        super::pmu_common::set_sleep_mode(self.deep);
 
         // pmu_ll_hp_set_wakeup_enable
         PMU::regs()
@@ -661,13 +663,13 @@ impl RtcSleepConfig {
         // Start entry into sleep mode
 
         let usb_serial_jtag =
-            (!self.deep && !keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
+            (!self.deep && !self.keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
 
         SavedState {
             usb_serial_jtag,
             hp_root_clk,
             cpu_clk,
-            keep_usb_serial_jtag,
+            keep_usb_serial_jtag: self.keep_usb_serial_jtag,
         }
     }
 
@@ -731,8 +733,3 @@ pub(crate) fn pmu_sleep_start(_saved: &SavedState) -> bool {
 /// Runs the wake steps after a CPU power-down. The ESP32-H2 has no wake steps.
 #[inline(always)]
 pub(crate) fn pmu_sleep_finish(_saved: &SavedState) {}
-
-/// Returns whether the last sleep that [`RtcSleepConfig::start_sleep`] prepared was a deep sleep.
-pub(super) fn last_sleep_was_deep() -> bool {
-    LP_AON::regs().store9().read().bits() & 0x01 != 0
-}

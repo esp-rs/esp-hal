@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    peripherals::{HP_APM, LP_AON, PMU},
+    peripherals::{HP_APM, PMU},
     rtc_cntl::{
         Rtc,
         rtc::{
@@ -761,10 +761,8 @@ impl RtcSleepConfig {
 
         // like esp-idf pmu_sleep_start()
 
-        // lp_aon_hal_inform_wakeup_type - tells ROM which wakeup stub to run
-        LP_AON::regs()
-            .store8()
-            .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
+        // lp_aon_hal_inform_wakeup_type
+        super::pmu_common::set_sleep_mode(self.deep);
 
         // pmu_ll_hp_set_wakeup_enable
         PMU::regs()

@@ -118,6 +118,9 @@ pub enum SocResetReason {
     CorePwrGlitch = 0x17,
 }
 
+pub(crate) const HP_SYSCLK_XTAL: u8 = 0;
+pub(crate) const HP_SYSCLK_PLL: u8 = 1;
+
 bitfield::bitfield! {
     /// Representation of `PMU_HP_{ACTIVE,SLEEP}_DIG_POWER_REG` registers.
     #[derive(Clone, Copy, Default)]
