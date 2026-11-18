@@ -803,10 +803,65 @@ pub unsafe extern "C" fn wifi_disable_ac_ax() -> bool {
     false
 }
 
-#[cfg(all(wifi_has_wifi6, not(feature = "unstable")))]
-pub unsafe extern "C" fn wifi_sleep_retention_unsupported() -> i32 {
-    // IDF returns 1 when CONFIG_MAC_BB_PD is off.
-    1
+// The retention hooks return 0 when they attach or detach the nodes, and 1 when the MAC and
+// baseband are not retained, as IDF does with CONFIG_MAC_BB_PD off.
+#[cfg(wifi_has_wifi6)]
+pub unsafe extern "C" fn wifi_bb_sleep_retention_attach() -> i32 {
+    cfg_select! {
+        feature = "unstable" => unsafe { super::mac_bb::bb_sleep_retention_attach() },
+        _ => 1,
+    }
+}
+
+#[cfg(wifi_has_wifi6)]
+pub unsafe extern "C" fn wifi_bb_sleep_retention_detach() -> i32 {
+    cfg_select! {
+        feature = "unstable" => unsafe { super::mac_bb::bb_sleep_retention_detach() },
+        _ => 1,
+    }
+}
+
+#[cfg(wifi_has_wifi6)]
+pub unsafe extern "C" fn wifi_mac_sleep_retention_attach() -> i32 {
+    cfg_select! {
+        feature = "unstable" => unsafe { super::mac_bb::mac_sleep_retention_attach() },
+        _ => 1,
+    }
+}
+
+#[cfg(wifi_has_wifi6)]
+pub unsafe extern "C" fn wifi_mac_sleep_retention_detach() -> i32 {
+    cfg_select! {
+        feature = "unstable" => unsafe { super::mac_bb::mac_sleep_retention_detach() },
+        _ => 1,
+    }
+}
+
+#[cfg(any(esp32c6, esp32c5, esp32c61, esp32s31))]
+pub unsafe extern "C" fn sleep_retention_find_link_by_id(id: c_int) -> *mut c_void {
+    cfg_select! {
+        feature = "unstable" => unsafe { super::mac_bb::sleep_retention_find_link_by_id(id) },
+        _ => todo!("sleep_retention_find_link_by_id {}", id),
+    }
+}
+
+#[cfg(any(esp32c6, esp32c5, esp32c61, esp32s31))]
+pub unsafe extern "C" fn regdma_link_set_write_wait_content(
+    link: *mut c_void,
+    value: u32,
+    mask: u32,
+) {
+    cfg_select! {
+        feature = "unstable" => unsafe {
+            super::mac_bb::regdma_link_set_write_wait_content(link, value, mask)
+        },
+        _ => todo!(
+            "regdma_link_set_write_wait_content {:?} {} {}",
+            link,
+            value,
+            mask
+        ),
+    }
 }
 
 #[cfg(esp32s31)]

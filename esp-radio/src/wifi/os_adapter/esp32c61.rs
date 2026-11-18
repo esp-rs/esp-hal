@@ -31,22 +31,6 @@ pub(crate) unsafe extern "C" fn set_intr(
     // get us into trouble
 }
 
-#[cfg(not(feature = "unstable"))]
-pub(crate) unsafe extern "C" fn regdma_link_set_write_wait_content_dummy(
-    _arg1: *mut c_void,
-    _arg2: u32,
-    _arg3: u32,
-) {
-    todo!()
-}
-
-#[cfg(not(feature = "unstable"))]
-pub(crate) unsafe extern "C" fn sleep_retention_find_link_by_id_dummy(
-    _arg1: crate::sys::c_types::c_int,
-) -> *mut c_void {
-    todo!()
-}
-
 /// **************************************************************************
 /// Name: esp_set_isr
 ///

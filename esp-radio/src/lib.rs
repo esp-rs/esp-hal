@@ -250,7 +250,7 @@ mod interrupt_dispatch;
 #[cfg(all(
     supports_modem_power_down,
     feature = "unstable",
-    any(feature = "ble", feature = "wifi"),
+    any(feature = "ble", feature = "wifi", feature = "ieee802154"),
 ))]
 mod modem_power;
 mod radio_clocks;

@@ -183,30 +183,29 @@ pub(super) fn power_up() {
     unsafe { pm_mac_wakeup() };
 }
 
-/// The return value of the blob hooks when the nodes do not exist.
-const NOT_RETAINED: i32 = 1;
+// The hooks return 1 when the MAC and baseband are not retained, as in `os_adapter`.
 
 /// The blob calls this when Wi-Fi starts.
-pub(super) unsafe extern "C" fn bb_sleep_retention_attach() -> i32 {
+pub(super) unsafe fn bb_sleep_retention_attach() -> i32 {
     if regdma::attach(Module::WifiBb).is_err() {
-        return NOT_RETAINED;
+        return 1;
     }
     0
 }
 
 /// The blob calls this when Wi-Fi stops.
-pub(super) unsafe extern "C" fn bb_sleep_retention_detach() -> i32 {
+pub(super) unsafe fn bb_sleep_retention_detach() -> i32 {
     if !CREATED.load(Ordering::Relaxed) {
-        return NOT_RETAINED;
+        return 1;
     }
     regdma::detach(Module::WifiBb);
     0
 }
 
 /// The blob calls this when Wi-Fi starts, after [`bb_sleep_retention_attach`].
-pub(super) unsafe extern "C" fn mac_sleep_retention_attach() -> i32 {
+pub(super) unsafe fn mac_sleep_retention_attach() -> i32 {
     if regdma::attach(Module::WifiMac).is_err() {
-        return NOT_RETAINED;
+        return 1;
     }
     // The blob looks up the node of the MAC state now, so the node must exist.
     let result = unsafe { esp_wifi_internal_set_mac_sleep(true) };
@@ -219,9 +218,9 @@ pub(super) unsafe extern "C" fn mac_sleep_retention_attach() -> i32 {
 }
 
 /// The blob calls this when Wi-Fi stops, before [`bb_sleep_retention_detach`].
-pub(super) unsafe extern "C" fn mac_sleep_retention_detach() -> i32 {
+pub(super) unsafe fn mac_sleep_retention_detach() -> i32 {
     if !CREATED.load(Ordering::Relaxed) {
-        return NOT_RETAINED;
+        return 1;
     }
     modem_power::disable_power_down(Radio::Wifi);
     let result = unsafe { esp_wifi_internal_set_mac_sleep(false) };
@@ -230,16 +229,12 @@ pub(super) unsafe extern "C" fn mac_sleep_retention_detach() -> i32 {
 }
 
 /// The blob calls this to look up the node of the MAC state.
-pub(super) unsafe extern "C" fn sleep_retention_find_link_by_id(id: c_int) -> *mut c_void {
+pub(super) unsafe fn sleep_retention_find_link_by_id(id: c_int) -> *mut c_void {
     regdma::find_link_by_id(id as u16).map_or(ptr::null_mut(), |link| link.as_ptr().cast())
 }
 
 /// The blob calls this in `pm_mac_sleep`, with the MAC state that the REGDMA restores.
-pub(super) unsafe extern "C" fn regdma_link_set_write_wait_content(
-    link: *mut c_void,
-    value: u32,
-    mask: u32,
-) {
+pub(super) unsafe fn regdma_link_set_write_wait_content(link: *mut c_void, value: u32, mask: u32) {
     if let Some(link) = ptr::NonNull::new(link.cast()) {
         unsafe { regdma::set_write_wait_content(link, value, mask) };
     }

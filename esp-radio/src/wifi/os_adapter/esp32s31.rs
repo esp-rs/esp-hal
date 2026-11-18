@@ -40,22 +40,6 @@ pub(crate) unsafe extern "C" fn set_intr(
     // These are expected to be direct-bound, but we don't do that for now.
 }
 
-#[cfg(not(feature = "unstable"))]
-pub(crate) unsafe extern "C" fn regdma_link_set_write_wait_content_dummy(
-    _arg1: *mut c_void,
-    _arg2: u32,
-    _arg3: u32,
-) {
-    todo!()
-}
-
-#[cfg(not(feature = "unstable"))]
-pub(crate) unsafe extern "C" fn sleep_retention_find_link_by_id_dummy(
-    _arg1: crate::sys::c_types::c_int,
-) -> *mut c_void {
-    todo!()
-}
-
 pub unsafe extern "C" fn set_isr(n: i32, f: *mut c_void, arg: *mut c_void) {
     trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
 
