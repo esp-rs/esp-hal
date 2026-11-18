@@ -1528,6 +1528,12 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// // PLL_F80M
+///
+/// fn enable_pll_f80m_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
 /// // RC_FAST_CLK
 ///
 /// fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -2507,7 +2513,7 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL_CLK`.
             Xtal,
             #[default]
-            /// Selects `APB_CLK`.
+            /// Selects `PLL_F80M`.
             Apb,
         }
         /// The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output.
@@ -2638,6 +2644,7 @@ macro_rules! define_clock_tree_types {
             uart_function_clock: [Option<UartFunctionClockConfig>; 3],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 3],
             pub(crate) pll_clk_refcount: u32,
+            pub(crate) pll_f80m_refcount: u32,
             pub(crate) rc_fast_clk_refcount: u32,
             #[cfg(use_xtal32k)]
             pub(crate) xtal32k_clk_refcount: u32,
@@ -2843,6 +2850,7 @@ macro_rules! define_clock_tree_types {
                 uart_function_clock: [None; 3],
                 uart_baud_rate_generator: [None; 3],
                 pll_clk_refcount: 0,
+                pll_f80m_refcount: 0,
                 rc_fast_clk_refcount: 0,
                 #[cfg(use_xtal32k)]
                 xtal32k_clk_refcount: 0,
@@ -2910,14 +2918,14 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static LCD_CAM_CAM_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
+        static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static CRYPTO_PWM_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static RMT_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
-        static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static TIMG_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
@@ -2948,6 +2956,10 @@ macro_rules! define_clock_tree_types {
         /// Returns the clock source that `PLL_CLK` currently runs on.
         pub fn pll_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
             xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `PLL_F80M` currently runs on.
+        pub fn pll_f80m_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            pll_clk_root_source(clocks)
         }
         /// Returns the clock source that `RC_FAST_CLK` currently runs on.
         pub fn rc_fast_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
@@ -3135,6 +3147,28 @@ macro_rules! define_clock_tree_types {
         }
         pub fn pll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
+        }
+        pub fn request_pll_f80m(clocks: &mut ClockTree) {
+            trace!("Requesting PLL_F80M");
+            if increment_reference_count(&mut clocks.pll_f80m_refcount) {
+                trace!("Enabling PLL_F80M");
+                request_pll_clk(clocks);
+                enable_pll_f80m_impl(clocks, true);
+            }
+        }
+        pub fn release_pll_f80m(clocks: &mut ClockTree) {
+            trace!("Releasing PLL_F80M");
+            if decrement_reference_count(&mut clocks.pll_f80m_refcount) {
+                trace!("Disabling PLL_F80M");
+                enable_pll_f80m_impl(clocks, false);
+                release_pll_clk(clocks);
+            }
+        }
+        pub fn pll_f80m_frequency() -> u32 {
+            80000000
+        }
+        pub fn pll_f80m_source_frequency() -> u32 {
+            pll_clk_frequency()
         }
         pub fn request_rc_fast_clk(clocks: &mut ClockTree) {
             trace!("Requesting RC_FAST_CLK");
@@ -4526,14 +4560,14 @@ macro_rules! define_clock_tree_types {
                 if active {
                     match new_selector {
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
-                        SpiFunctionClockConfig::Apb => request_apb_clk(clocks),
+                        SpiFunctionClockConfig::Apb => request_pll_f80m(clocks),
                     }
                 }
                 self.configure_function_clock_impl(clocks, old_selector, new_selector);
                 if active && let Some(old_selector) = old_selector {
                     match old_selector {
                         SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
-                        SpiFunctionClockConfig::Apb => release_apb_clk(clocks),
+                        SpiFunctionClockConfig::Apb => release_pll_f80m(clocks),
                     }
                 }
             }
@@ -4551,7 +4585,7 @@ macro_rules! define_clock_tree_types {
                     crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
-                        SpiFunctionClockConfig::Apb => request_apb_clk(clocks),
+                        SpiFunctionClockConfig::Apb => request_pll_f80m(clocks),
                     }
                     self.enable_function_clock_impl(clocks, true);
                 }
@@ -4565,14 +4599,14 @@ macro_rules! define_clock_tree_types {
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
-                        SpiFunctionClockConfig::Apb => release_apb_clk(clocks),
+                        SpiFunctionClockConfig::Apb => release_pll_f80m(clocks),
                     }
                 }
             }
             pub fn function_clock_config_frequency(config: SpiFunctionClockConfig) -> u32 {
                 match config {
                     SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
-                    SpiFunctionClockConfig::Apb => apb_clk_frequency(),
+                    SpiFunctionClockConfig::Apb => pll_f80m_frequency(),
                 }
             }
             pub fn function_clock_frequency(self) -> u32 {
@@ -4928,11 +4962,11 @@ macro_rules! define_clock_tree_types {
                 refresh_lcd_cam_lcd_clock_downstream(clocks, child_instance);
                 refresh_lcd_cam_cam_clock_downstream(clocks, child_instance);
             }
-            for child_instance in [RmtInstance::Rmt] {
-                refresh_rmt_sclk_downstream(clocks, child_instance);
-            }
             for child_instance in [SpiInstance::Spi2, SpiInstance::Spi3] {
                 refresh_spi_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [RmtInstance::Rmt] {
+                refresh_rmt_sclk_downstream(clocks, child_instance);
             }
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
@@ -4960,6 +4994,9 @@ macro_rules! define_clock_tree_types {
             for child_instance in [LcdCamInstance::LcdCam] {
                 refresh_lcd_cam_lcd_clock_downstream(clocks, child_instance);
                 refresh_lcd_cam_cam_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [SpiInstance::Spi2, SpiInstance::Spi3] {
+                refresh_spi_function_clock_downstream(clocks, child_instance);
             }
         }
         fn refresh_rc_fast_clk_downstream(clocks: &mut ClockTree) {
@@ -5132,6 +5169,14 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
+        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
+            if let Some(config) = clocks.spi_function_clock[instance as usize] {
+                SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    SpiInstance::function_clock_config_frequency(config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
         fn refresh_apb_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.apb_clk {
                 APB_CLK_FREQ_CACHE.store(
@@ -5141,9 +5186,6 @@ macro_rules! define_clock_tree_types {
             }
             for child_instance in [RmtInstance::Rmt] {
                 refresh_rmt_sclk_downstream(clocks, child_instance);
-            }
-            for child_instance in [SpiInstance::Spi2, SpiInstance::Spi3] {
-                refresh_spi_function_clock_downstream(clocks, child_instance);
             }
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
@@ -5168,14 +5210,6 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.rmt_sclk[instance as usize] {
                 RMT_SCLK_FREQ_CACHE[instance as usize].store(
                     RmtInstance::sclk_config_frequency(config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
-        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
-            if let Some(config) = clocks.spi_function_clock[instance as usize] {
-                SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                    SpiInstance::function_clock_config_frequency(config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
