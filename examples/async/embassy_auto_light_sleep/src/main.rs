@@ -95,6 +95,9 @@ cfg_select! {
     feature = "esp32p4" => {
         use peripherals::GPIO35 as BOOT_GPIO;
     }
+    feature = "esp32s31" => {
+        use peripherals::GPIO61 as BOOT_GPIO;
+    }
     // esp32c3, esp32c6, esp32c61, esp32h2
     _ => {
         use peripherals::GPIO9 as BOOT_GPIO;
@@ -180,6 +183,7 @@ async fn main(spawner: Spawner) {
         feature = "esp32c5" => p.GPIO28,
         feature = "esp32h4" => p.GPIO34,
         feature = "esp32p4" => p.GPIO35,
+        feature = "esp32s31" => p.GPIO61,
         // esp32c2, esp32c3, esp32c6, esp32c61, esp32h2
         _ => p.GPIO9,
     };
