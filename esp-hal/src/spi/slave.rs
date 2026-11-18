@@ -694,9 +694,19 @@ impl Info {
     /// Initializes for full-duplex 1 bit mode.
     fn init(&self) {
         #[cfg(soc_has_pcr)]
-        crate::peripherals::PCR::regs()
-            .spi2_clkm_conf()
-            .modify(|_, w| w.spi2_clkm_en().set_bit());
+        match self.peripheral {
+            #[cfg(soc_has_spi3)]
+            crate::system::Peripheral::Spi3 => {
+                crate::peripherals::PCR::regs()
+                    .spi3_clkm_conf()
+                    .modify(|_, w| w.spi3_clkm_en().set_bit());
+            }
+            _ => {
+                crate::peripherals::PCR::regs()
+                    .spi2_clkm_conf()
+                    .modify(|_, w| w.spi2_clkm_en().set_bit());
+            }
+        }
 
         self.regs().clock().write(|w| unsafe { w.bits(0) });
         self.regs().user().write(|w| unsafe { w.bits(0) });
