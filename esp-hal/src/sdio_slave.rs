@@ -1,9 +1,20 @@
-//! # ESP32-C6 SDIO Slave: single-packet, bidirectional SLC0 transfers
+//! # Secure Digital Input Output (SDIO) Slave
+//!
+//! ## Overview
+//!
+//! The ESP32-C6 controller exchanges one packet at a time through SLC0 DMA.
 //!
 //! One descriptor receives one incremental-address packet on SLC0. The host
 //! reads or writes CMD53 at `0x1F800 - length`, after function 1 is enabled and
-//! ready. One direction is armed at a time. Explicit rearming is supported;
-//! descriptor chains, SLC1 and automatic rearming are not implemented.
+//! ready. One direction is armed at a time. Rearming is explicit.
+//!
+//! ## Configuration
+//!
+//! Pads use fixed IO MUX function 0: CMD GPIO18, CLK GPIO19, DATA0..3 GPIO20..23.
+//! Disabling the bus selects GPIO with input/output disabled. Previous pad
+//! settings are not restored; pull resistors are unchanged.
+//!
+//! ## Usage
 //!
 //! Convert with [`SdioSlave::into_async`] for SLC0 IRQ completion waits. Dropping
 //! a wait masks notifications but retains the DMA-owned storage. Stop DMA with
@@ -17,10 +28,6 @@
 //! If destruction cannot confirm idle, the clock reference and static storage
 //! are retained instead of permitting unsafe reuse.
 //!
-//! Pads use fixed IO MUX function 0: CMD GPIO18, CLK GPIO19, DATA0..3 GPIO20..23.
-//! Disabling the bus selects GPIO with input/output disabled. Previous pad
-//! settings are not restored; pull resistors are unchanged.
-//!
 //! The implementation uses HINF, SLC and SLCHOST (ESP32-C6 TRM chapter 34).
 //! Use function 1 for incremental-address packets. Transmit length is published
 //! as a cumulative 20-bit counter; the host subtracts its consumed-byte count
@@ -32,6 +39,8 @@
 //! For register details, see the
 #![doc = concat!(crate::trm_markdown_link!(), ".\n")]
 //! ## Examples
+//!
+//! ### Configure the Native Pads
 //!
 //! Construct the native C6 bus with its fixed pads. Borrowing peripherals lets
 //! the application construct another driver after dropping an invalidated one.
@@ -62,6 +71,12 @@
 //! let slave = slave.with_cmd(peripherals.GPIO19);
 #![doc = crate::after_snippet!()]
 //! ```
+#![doc = "\n"]
+//! ## Implementation State
+//!
+//! The driver supports single-packet SLC0 DMA in both directions, blocking
+//! polling, and interrupt-driven asynchronous waits on ESP32-C6. It does not
+//! support descriptor chains, SLC1 transfers, or automatic rearming.
 
 use core::{
     marker::PhantomData,
@@ -166,7 +181,7 @@ pub struct SdioSlave<'d, Dm: DriverMode = Blocking> {
 }
 
 impl<'d> SdioSlave<'d, Blocking> {
-    /// Creates a new SDIO slave controller in Blocking mode.
+    /// Creates a new SDIO slave controller in [`Blocking`] mode.
     ///
     /// Enables the block clock. The first clock user also resets the block.
     /// No pad is configured or routed. All six native pads must be supplied
@@ -197,6 +212,59 @@ impl<'d> SdioSlave<'d, Blocking> {
         self._slc.disable_ch0_interrupt_on_all_cores();
         self._slc.bind_ch0_interrupt(slc0_handler);
         self.map_mode()
+    }
+}
+
+impl<'d> SdioSlave<'d, Async> {
+    /// Removes the asynchronous IRQ handler and returns blocking operation.
+    /// An active transfer remains owned and can be polled or stopped.
+    #[instability::unstable]
+    pub fn into_blocking(self) -> SdioSlave<'d, Blocking> {
+        self.mask_dma_interrupts();
+        self._slc.disable_ch0_interrupt_on_all_cores();
+        self.map_mode()
+    }
+
+    /// Waits for an armed host-to-slave packet using SLC0 interrupts.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidState`] unless a receive is active, or a DMA error.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Dropping this future masks notification. It does not stop DMA or return
+    /// storage. Resume the wait, poll completion, or call [`Self::disable_bus`].
+    /// This permits cancellation with Embassy without returning DMA-owned RAM.
+    /// Disabling an incomplete transfer invalidates its peer accounting; recover
+    /// storage and create a new session after resetting controller and host.
+    #[instability::unstable]
+    pub async fn wait_received(&mut self) -> Result<usize, Error> {
+        let mut source = CompletionWait {
+            driver: self,
+            transmitting: false,
+        };
+        events::Wait::new(&mut source).await
+    }
+
+    /// Waits for an armed slave-to-host packet using SLC0 interrupts.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidState`] unless a transmit is active, or a DMA error.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Cancellation masks notification and retains the active transfer and its
+    /// storage. Use [`Self::disable_bus`] for explicit cancellation of DMA.
+    /// Stopping an incomplete transfer requires a new controller/host session.
+    #[instability::unstable]
+    pub async fn wait_transmitted(&mut self) -> Result<usize, Error> {
+        let mut source = CompletionWait {
+            driver: self,
+            transmitting: true,
+        };
+        events::Wait::new(&mut source).await
     }
 }
 
@@ -405,7 +473,7 @@ impl<'d, Dm: DriverMode> SdioSlave<'d, Dm> {
     /// Reads the diagnostic registers without clearing or acknowledging
     /// anything.
     ///
-    /// The block is clocked for as long as this value exists, so the read is
+    /// The block is clocked for as long as the driver exists, so the read is
     /// always valid. Raw interrupt status is read: the masked status would
     /// read zero while the interrupts are disabled.
     pub fn snapshot(&self) -> RegisterSnapshot {
@@ -967,59 +1035,6 @@ impl<'d, Dm: DriverMode> SdioSlave<'d, Dm> {
         for pad in self.pads.iter().flatten() {
             pad.init_gpio();
         }
-    }
-}
-
-impl<'d> SdioSlave<'d, Async> {
-    /// Removes the asynchronous IRQ handler and returns blocking operation.
-    /// An active transfer remains owned and can be polled or stopped.
-    #[instability::unstable]
-    pub fn into_blocking(self) -> SdioSlave<'d, Blocking> {
-        self.mask_dma_interrupts();
-        self._slc.disable_ch0_interrupt_on_all_cores();
-        self.map_mode()
-    }
-
-    /// Waits for an armed host-to-slave packet using SLC0 interrupts.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::InvalidState`] unless a receive is active, or a DMA error.
-    ///
-    /// # Cancellation Safety
-    ///
-    /// Dropping this future masks notification. It does not stop DMA or return
-    /// storage. Resume the wait, poll completion, or call [`Self::disable_bus`].
-    /// This permits cancellation with Embassy without returning DMA-owned RAM.
-    /// Disabling an incomplete transfer invalidates its peer accounting; recover
-    /// storage and create a new session after resetting controller and host.
-    #[instability::unstable]
-    pub async fn wait_received(&mut self) -> Result<usize, Error> {
-        let mut source = CompletionWait {
-            driver: self,
-            transmitting: false,
-        };
-        events::Wait::new(&mut source).await
-    }
-
-    /// Waits for an armed slave-to-host packet using SLC0 interrupts.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::InvalidState`] unless a transmit is active, or a DMA error.
-    ///
-    /// # Cancellation Safety
-    ///
-    /// Cancellation masks notification and retains the active transfer and its
-    /// storage. Use [`Self::disable_bus`] for explicit cancellation of DMA.
-    /// Stopping an incomplete transfer requires a new controller/host session.
-    #[instability::unstable]
-    pub async fn wait_transmitted(&mut self) -> Result<usize, Error> {
-        let mut source = CompletionWait {
-            driver: self,
-            transmitting: true,
-        };
-        events::Wait::new(&mut source).await
     }
 }
 
