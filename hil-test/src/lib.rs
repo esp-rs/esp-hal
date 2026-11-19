@@ -198,21 +198,68 @@ macro_rules! adc_pin {
     }};
 }
 
-// The D+ and D- pins of the USB Serial/JTAG PHY, when no eFuse moves the controller to another PHY.
+// Creates the USB Serial/JTAG driver on the D+ and D- pins of the PHY that the controller uses.
+// With `other_phy`, it passes the pins of the other PHY of the chip instead.
+//
+// The H4 rig board has the `USB_PHY_SEL` eFuse burned, so the pins differ between boards.
 #[macro_export]
-macro_rules! usb_serial_jtag_pins {
-    ($peripherals:expr) => {{
+macro_rules! usb_serial_jtag {
+    ($peripherals:expr, $config:expr) => {
+        $crate::usb_serial_jtag!(@new $peripherals, $config, $crate::usb_phy_sel_burned!())
+    };
+    ($peripherals:expr, $config:expr, other_phy) => {
+        $crate::usb_serial_jtag!(@new $peripherals, $config, !$crate::usb_phy_sel_burned!())
+    };
+    (@new $peripherals:expr, $config:expr, $usb_fs_phy:expr) => {{
         // Order: (D+, D-)
         cfg_select! {
-            esp32c3 => ($peripherals.GPIO19, $peripherals.GPIO18),
-            any(esp32c5, esp32h4) => ($peripherals.GPIO14, $peripherals.GPIO13),
-            any(esp32c6, esp32c61) => ($peripherals.GPIO13, $peripherals.GPIO12),
-            esp32h2 => ($peripherals.GPIO27, $peripherals.GPIO26),
-            esp32p4 => ($peripherals.GPIO25, $peripherals.GPIO24),
-            esp32s3 => ($peripherals.GPIO20, $peripherals.GPIO19),
-            esp32s31 => ($peripherals.GPIO34, $peripherals.GPIO33),
+            esp32c3 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO19, GPIO18),
+            esp32c5 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO14, GPIO13),
+            any(esp32c6, esp32c61) => {
+                $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO13, GPIO12)
+            }
+            esp32h2 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO27, GPIO26),
+            esp32h4 => {
+                if $usb_fs_phy {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO22, GPIO21)
+                } else {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO14, GPIO13)
+                }
+            }
+            esp32p4 => {
+                if $usb_fs_phy {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO27, GPIO26)
+                } else {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO25, GPIO24)
+                }
+            }
+            esp32s3 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO20, GPIO19),
+            esp32s31 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO34, GPIO33),
         }
     }};
+    (@pins $peripherals:expr, $config:expr, $dp:ident, $dm:ident) => {
+        esp_hal::usb::usb_serial_jtag::UsbSerialJtag::new(
+            $peripherals.USB_DEVICE,
+            $peripherals.$dp,
+            $peripherals.$dm,
+            $config,
+        )
+    };
+}
+
+// Returns whether the `USB_PHY_SEL` eFuse moves USB Serial/JTAG to the USB FS PHY. The tests do not
+// write the PHY selection register, so the eFuse selects the PHY.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! usb_phy_sel_burned {
+    () => {
+        cfg_select! {
+            all(usb_serial_jtag_phy_pads_usj, usb_serial_jtag_phy_pads_usb_fs) => {
+                esp_hal::efuse::read_bit(esp_hal::efuse::USB_PHY_SEL)
+            }
+            _ => false,
+        }
+    };
 }
 
 #[macro_export]

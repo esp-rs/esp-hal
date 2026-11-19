@@ -11,10 +11,7 @@
 
 #[embedded_test::tests(default_timeout = 2)]
 mod tests {
-    use esp_hal::{
-        peripherals::Peripherals,
-        usb::usb_serial_jtag::{Config, UsbSerialJtag},
-    };
+    use esp_hal::{peripherals::Peripherals, usb::usb_serial_jtag::Config};
     use hil_test as _;
 
     struct Context {
@@ -30,8 +27,7 @@ mod tests {
 
     #[test]
     fn creating_peripheral_does_not_break_debug_connection(ctx: Context) {
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        _ = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default())
+        _ = hil_test::usb_serial_jtag!(ctx.p, Config::default())
             .unwrap()
             .into_async()
             .split();
@@ -42,12 +38,7 @@ mod tests {
     fn usb_serial_jtag_rejects_the_pins_of_the_other_phy(ctx: Context) {
         use esp_hal::usb::usb_serial_jtag::ConfigError;
 
-        // The rig boards have no `USB_PHY_SEL` eFuse burned.
-        let (dp, dm) = cfg_select! {
-            esp32h4 => (ctx.p.GPIO22, ctx.p.GPIO21),
-            esp32p4 => (ctx.p.GPIO27, ctx.p.GPIO26),
-        };
-        let result = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default());
+        let result = hil_test::usb_serial_jtag!(ctx.p, Config::default(), other_phy);
         assert!(matches!(result, Err(ConfigError::WrongPins)));
     }
 
@@ -56,9 +47,7 @@ mod tests {
     // `usb-serial-jtag-io` tests reads.
     #[test]
     fn usb_serial_jtag_reports_room_and_no_data(ctx: Context) {
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let mut usb_serial =
-            UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default()).unwrap();
+        let mut usb_serial = hil_test::usb_serial_jtag!(ctx.p, Config::default()).unwrap();
 
         // Other programs on the runner can leave bytes in the input FIFO. A chip reset does not
         // clear the input FIFO.
@@ -94,9 +83,7 @@ mod tests {
 
     #[test]
     fn usb_serial_jtag_io_write_returns_after_one_packet(ctx: Context) {
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let mut usb_serial =
-            UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default()).unwrap();
+        let mut usb_serial = hil_test::usb_serial_jtag!(ctx.p, Config::default()).unwrap();
         assert_eq!(
             embedded_io::Write::write(&mut usb_serial, &[0x55; 100]),
             Ok(64)
@@ -113,8 +100,7 @@ mod tests {
 
     #[test]
     fn usb_serial_jtag_io_write_returns_a_short_count(ctx: Context) {
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default())
+        let (_, mut tx) = hil_test::usb_serial_jtag!(ctx.p, Config::default())
             .unwrap()
             .split();
 
@@ -124,8 +110,7 @@ mod tests {
 
     #[test]
     fn usb_serial_jtag_io_flush_and_write_all_finish(ctx: Context) {
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default())
+        let (_, mut tx) = hil_test::usb_serial_jtag!(ctx.p, Config::default())
             .unwrap()
             .split();
 
@@ -143,8 +128,7 @@ mod tests {
     fn usb_serial_jtag_empty_buffers_return_zero(ctx: Context) {
         use embassy_futures::block_on;
 
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let mut usb_serial = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default())
+        let mut usb_serial = hil_test::usb_serial_jtag!(ctx.p, Config::default())
             .unwrap()
             .into_async();
 
@@ -160,8 +144,7 @@ mod tests {
     fn usb_serial_jtag_async_write_returns_after_one_packet(ctx: Context) {
         use embassy_futures::block_on;
 
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default())
+        let (_, mut tx) = hil_test::usb_serial_jtag!(ctx.p, Config::default())
             .unwrap()
             .into_async()
             .split();
@@ -178,8 +161,7 @@ mod tests {
     fn usb_serial_jtag_write_after_flush_and_wait_finishes(ctx: Context) {
         use embassy_futures::block_on;
 
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default())
+        let (_, mut tx) = hil_test::usb_serial_jtag!(ctx.p, Config::default())
             .unwrap()
             .into_async()
             .split();
@@ -194,8 +176,7 @@ mod tests {
 
     #[test]
     fn usb_serial_jtag_two_full_packets_without_flush_finish(ctx: Context) {
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default())
+        let (_, mut tx) = hil_test::usb_serial_jtag!(ctx.p, Config::default())
             .unwrap()
             .split();
 
@@ -206,8 +187,7 @@ mod tests {
 
     #[test]
     fn usb_serial_jtag_try_flush_sends_a_packet_once(ctx: Context) {
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, Config::default())
+        let (_, mut tx) = hil_test::usb_serial_jtag!(ctx.p, Config::default())
             .unwrap()
             .split();
 
@@ -233,10 +213,7 @@ mod tests {
         };
 
         let config = Config::default().with_tx(TxConfig::default().with_timeout(Duration::ZERO));
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let (_, mut tx) = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, config)
-            .unwrap()
-            .split();
+        let (_, mut tx) = hil_test::usb_serial_jtag!(ctx.p, config).unwrap().split();
 
         // A full-speed host needs about 40 µs to take a packet of 63 or 64 bytes, so the
         // timeouts below can't race the host. A shorter packet would leave only a few µs.
@@ -264,8 +241,7 @@ mod tests {
 
         let timeout = Duration::from_millis(5);
         let config = Config::default().with_rx(RxConfig::default().with_timeout(timeout));
-        let (dp, dm) = hil_test::usb_serial_jtag_pins!(ctx.p);
-        let mut usb_serial = UsbSerialJtag::new(ctx.p.USB_DEVICE, dp, dm, config).unwrap();
+        let mut usb_serial = hil_test::usb_serial_jtag!(ctx.p, config).unwrap();
         let mut buf = [0u8; 8];
 
         // Other programs on the runner can leave bytes in the input FIFO. A chip reset does not
