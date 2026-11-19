@@ -193,6 +193,23 @@ macro_rules! adc_pin {
     }};
 }
 
+// The D+ and D- pins of the USB Serial/JTAG PHY, when no eFuse moves the controller to another PHY.
+#[macro_export]
+macro_rules! usb_serial_jtag_pins {
+    ($peripherals:expr) => {{
+        // Order: (D+, D-)
+        cfg_select! {
+            esp32c3 => ($peripherals.GPIO19, $peripherals.GPIO18),
+            any(esp32c5, esp32h4) => ($peripherals.GPIO14, $peripherals.GPIO13),
+            any(esp32c6, esp32c61) => ($peripherals.GPIO13, $peripherals.GPIO12),
+            esp32h2 => ($peripherals.GPIO27, $peripherals.GPIO26),
+            esp32p4 => ($peripherals.GPIO25, $peripherals.GPIO24),
+            esp32s3 => ($peripherals.GPIO20, $peripherals.GPIO19),
+            esp32s31 => ($peripherals.GPIO34, $peripherals.GPIO33),
+        }
+    }};
+}
+
 #[macro_export]
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
