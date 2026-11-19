@@ -815,6 +815,10 @@ macro_rules! property {
         ::soc::clocks::RmtSclkConfig::RcFastClk, crate
         ::soc::clocks::RmtSclkConfig::XtalClk]
     };
+    ("clock_tree.twai.function_clock") => {
+        [crate ::soc::clocks::TwaiFunctionClockConfig::Xtal, crate
+        ::soc::clocks::TwaiFunctionClockConfig::PllF80m]
+    };
     ("clock_tree.parl_io.rx_clock") => {
         [crate ::soc::clocks::ParlIoClkConfig::XtalClk, crate
         ::soc::clocks::ParlIoClkConfig::RcFastClk, crate
@@ -2273,6 +2277,22 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 /// }
+/// impl TwaiInstance {
+///     // TWAI_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<TwaiFunctionClockConfig>,
+///         _new_config: TwaiFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl UartInstance {
 ///     // UART_FUNCTION_CLOCK
 ///
@@ -2388,6 +2408,12 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum TsensInstance {
             Tsens = 0,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TwaiInstance {
+            Twai0 = 0,
+            Twai1 = 1,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -3050,6 +3076,16 @@ macro_rules! define_clock_tree_types {
             /// Selects `LP_PERI_CLK`.
             LpPeri,
         }
+        /// The list of clock signals that the `TWAI0_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TwaiFunctionClockConfig {
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            #[default]
+            /// Selects `PLL_F80M`.
+            PllF80m,
+        }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum UartFunctionClockSclk {
@@ -3172,6 +3208,7 @@ macro_rules! define_clock_tree_types {
             spi_function_clock: [Option<SpiFunctionClockConfig>; 2],
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
+            twai_function_clock: [Option<TwaiFunctionClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 4],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 4],
             psram_function_clock: [Option<PsramFunctionClockConfig>; 1],
@@ -3212,6 +3249,7 @@ macro_rules! define_clock_tree_types {
             pub(crate) timg_function_clock_refcount: [u32; 2],
             pub(crate) timg_wdt_clock_refcount: [u32; 2],
             pub(crate) tsens_sclk_refcount: [u32; 1],
+            pub(crate) twai_function_clock_refcount: [u32; 2],
             pub(crate) uart_function_clock_refcount: [u32; 4],
             pub(crate) uart_baud_rate_generator_refcount: [u32; 4],
             pub(crate) uart_mem_clock_refcount: [u32; 4],
@@ -3354,6 +3392,14 @@ macro_rules! define_clock_tree_types {
             pub fn timg1_wdt_clock(&self) -> Option<TimgWdtClockConfig> {
                 self.timg_wdt_clock[TimgInstance::Timg1 as usize]
             }
+            /// Returns the current configuration of the TWAI0_FUNCTION_CLOCK clock tree node
+            pub fn twai0_function_clock(&self) -> Option<TwaiFunctionClockConfig> {
+                self.twai_function_clock[TwaiInstance::Twai0 as usize]
+            }
+            /// Returns the current configuration of the TWAI1_FUNCTION_CLOCK clock tree node
+            pub fn twai1_function_clock(&self) -> Option<TwaiFunctionClockConfig> {
+                self.twai_function_clock[TwaiInstance::Twai1 as usize]
+            }
             /// Returns the current configuration of the UART0_FUNCTION_CLOCK clock tree node
             pub fn uart0_function_clock(&self) -> Option<UartFunctionClockConfig> {
                 self.uart_function_clock[UartInstance::Uart0 as usize]
@@ -3419,6 +3465,7 @@ macro_rules! define_clock_tree_types {
                 spi_function_clock: [None; 2],
                 timg_function_clock: [None; 2],
                 timg_wdt_clock: [None; 2],
+                twai_function_clock: [None; 2],
                 uart_function_clock: [None; 4],
                 uart_baud_rate_generator: [None; 4],
                 psram_function_clock: [None; 1],
@@ -3459,6 +3506,7 @@ macro_rules! define_clock_tree_types {
                 timg_function_clock_refcount: [0; 2],
                 timg_wdt_clock_refcount: [0; 2],
                 tsens_sclk_refcount: [0; 1],
+                twai_function_clock_refcount: [0; 2],
                 uart_function_clock_refcount: [0; 4],
                 uart_baud_rate_generator_refcount: [0; 4],
                 uart_mem_clock_refcount: [0; 4],
@@ -3515,6 +3563,8 @@ macro_rules! define_clock_tree_types {
         static TIMG_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static TIMG_WDT_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
+        static TWAI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 4] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 4];
@@ -5511,6 +5561,75 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
+        impl TwaiInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: TwaiFunctionClockConfig,
+            ) {
+                let old_selector = clocks.twai_function_clock[self as usize].replace(new_selector);
+                refresh_twai_function_clock_downstream(clocks, self);
+                let active = clocks.twai_function_clock_refcount[self as usize] > 0;
+                if active {
+                    match new_selector {
+                        TwaiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        TwaiFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                    }
+                }
+                self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                if active && let Some(old_selector) = old_selector {
+                    match old_selector {
+                        TwaiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                        TwaiFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                    }
+                }
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<TwaiFunctionClockConfig> {
+                clocks.twai_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(
+                    &mut clocks.twai_function_clock_refcount[self as usize],
+                ) {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    match unwrap!(clocks.twai_function_clock[self as usize]) {
+                        TwaiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        TwaiFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(
+                    &mut clocks.twai_function_clock_refcount[self as usize],
+                ) {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.twai_function_clock[self as usize]) {
+                        TwaiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                        TwaiFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                    }
+                }
+            }
+            pub fn function_clock_config_frequency(config: TwaiFunctionClockConfig) -> u32 {
+                match config {
+                    TwaiFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    TwaiFunctionClockConfig::PllF80m => pll_f80m_frequency(),
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                TWAI_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
+            }
+            pub fn function_clock_source_frequency(source: TwaiFunctionClockConfig) -> u32 {
+                Self::function_clock_config_frequency(source)
+            }
+        }
         impl UartInstance {
             pub fn configure_function_clock(
                 self,
@@ -6081,6 +6200,14 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
+        fn refresh_twai_function_clock_downstream(clocks: &mut ClockTree, instance: TwaiInstance) {
+            if let Some(config) = clocks.twai_function_clock[instance as usize] {
+                TWAI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    TwaiInstance::function_clock_config_frequency(config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
         fn refresh_uart_function_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {
             if let Some(config) = clocks.uart_function_clock[instance as usize] {
                 UART_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
@@ -6186,6 +6313,10 @@ macro_rules! implement_peripheral_clocks {
             Timg1,
             /// TSENS peripheral clock signal
             Tsens,
+            /// TWAI0 peripheral clock signal
+            Twai0,
+            /// TWAI1 peripheral clock signal
+            Twai1,
             /// UART0 peripheral clock signal
             Uart0,
             /// UART1 peripheral clock signal
@@ -6241,6 +6372,8 @@ macro_rules! implement_peripheral_clocks {
                 Self::Timg0,
                 Self::Timg1,
                 Self::Tsens,
+                Self::Twai0,
+                Self::Twai1,
                 Self::Uart0,
                 Self::Uart1,
                 Self::Uart2,
@@ -6412,6 +6545,16 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::LP_PERI::regs()
                         .tsens_ctrl()
                         .modify(|_, w| w.lp_tsens_clk_en().bit(enable));
+                }
+                Peripheral::Twai0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .twai0_ctrl0()
+                        .modify(|_, w| w.apb_clk_en().bit(enable));
+                }
+                Peripheral::Twai1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .twai1_ctrl0()
+                        .modify(|_, w| w.apb_clk_en().bit(enable));
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -6607,6 +6750,16 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::LP_PERI::regs()
                         .tsens_ctrl()
                         .modify(|_, w| w.lp_tsens_rst_en().bit(reset));
+                }
+                Peripheral::Twai0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .twai0_ctrl0()
+                        .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::Twai1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .twai1_ctrl0()
+                        .modify(|_, w| w.rst_en().bit(reset));
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -6947,7 +7100,10 @@ macro_rules! for_each_pcnt_unit {
 macro_rules! for_each_canfd {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_canfd { $(($pattern) => $code;)* ($other : tt) => {}
-        } _for_each_inner_canfd!((all));
+        } _for_each_inner_canfd!((TWAI0, Twai0, TWAI0_RX, TWAI0_TX));
+        _for_each_inner_canfd!((TWAI1, Twai1, TWAI1_RX, TWAI1_TX));
+        _for_each_inner_canfd!((all(TWAI0, Twai0, TWAI0_RX, TWAI0_TX), (TWAI1, Twai1,
+        TWAI1_RX, TWAI1_TX)));
     };
 }
 #[macro_export]
@@ -7406,7 +7562,15 @@ macro_rules! for_each_peripheral {
         "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "TSENS peripheral singleton"]
         TSENS <= LP_TSENS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
+        = "TWAI0 peripheral singleton"] TWAI0 <= TWAI0(TWAI0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }, TWAI0_TIMER : {
+        bind_timer_interrupt, enable_timer_interrupt, disable_timer_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TWAI1 peripheral singleton"] TWAI1 <= TWAI1(TWAI1 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }, TWAI1_TIMER : {
+        bind_timer_interrupt, enable_timer_interrupt, disable_timer_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
         _for_each_inner_peripheral!((@ peri_type #[doc = "UART1 peripheral singleton"]
         UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
@@ -7586,6 +7750,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((TIMG0(unstable)));
         _for_each_inner_peripheral!((TIMG1(unstable)));
         _for_each_inner_peripheral!((TSENS(unstable)));
+        _for_each_inner_peripheral!((TWAI0(unstable)));
+        _for_each_inner_peripheral!((TWAI1(unstable)));
         _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
         _for_each_inner_peripheral!((UART2)); _for_each_inner_peripheral!((UART3));
         _for_each_inner_peripheral!((UHCI0(unstable)));
@@ -7957,7 +8123,14 @@ macro_rules! for_each_peripheral {
         peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)), (@
         peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)), (@
         peri_type #[doc = "TSENS peripheral singleton"] TSENS <= LP_TSENS() (unstable)),
-        (@ peri_type #[doc = "UART0 peripheral singleton"] UART0 <= UART0(UART0 : {
+        (@ peri_type #[doc = "TWAI0 peripheral singleton"] TWAI0 <= TWAI0(TWAI0 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt }, TWAI0_TIMER
+        : { bind_timer_interrupt, enable_timer_interrupt, disable_timer_interrupt })
+        (unstable)), (@ peri_type #[doc = "TWAI1 peripheral singleton"] TWAI1 <=
+        TWAI1(TWAI1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }, TWAI1_TIMER : { bind_timer_interrupt,
+        enable_timer_interrupt, disable_timer_interrupt }) (unstable)), (@ peri_type
+        #[doc = "UART0 peripheral singleton"] UART0 <= UART0(UART0 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
         peri_type #[doc = "UART1 peripheral singleton"] UART1 <= UART1(UART1 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
@@ -8034,17 +8207,18 @@ macro_rules! for_each_peripheral {
         (RMT(unstable)), (RSA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2),
         (SPI3), (AXI_GDMA(unstable)), (DMA(unstable)), (SHA(unstable)),
         (SYSTEM(unstable)), (SYSTIMER(unstable)), (SDHOST(unstable)), (TEE(unstable)),
-        (TIMG0(unstable)), (TIMG1(unstable)), (TSENS(unstable)), (UART0), (UART1),
-        (UART2), (UART3), (UHCI0(unstable)), (USB_DEVICE(unstable)), (USB_HS(unstable)),
-        (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)), (FLASH(unstable)),
-        (PSRAM(unstable)), (GPIO_DEDICATED(unstable)), (WIFI), (CPU_CTRL(unstable)),
-        (IPC(unstable)), (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
-        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(UHCI0, Uhci0, 0, AhbGdmaChannel),
-        (LCD_CAM, LcdCam, 0, AxiGdmaChannel), (I2S0, I2s0, 1, AhbGdmaChannel), (SPI2,
-        Spi2, 1, AxiGdmaChannel), (SPI3, Spi3, 2, AxiGdmaChannel), (PARL_IO, ParlIo, 3,
-        AxiGdmaChannel), (AES, Aes, 4, AxiGdmaChannel), (I2S1, I2s1, 5, AhbGdmaChannel),
-        (SHA, Sha, 5, AxiGdmaChannel)));
+        (TIMG0(unstable)), (TIMG1(unstable)), (TSENS(unstable)), (TWAI0(unstable)),
+        (TWAI1(unstable)), (UART0), (UART1), (UART2), (UART3), (UHCI0(unstable)),
+        (USB_DEVICE(unstable)), (USB_HS(unstable)), (ADC1(unstable)), (ADC2(unstable)),
+        (BT(unstable)), (FLASH(unstable)), (PSRAM(unstable)), (GPIO_DEDICATED(unstable)),
+        (WIFI), (CPU_CTRL(unstable)), (IPC(unstable)), (FROM_CPU_INTR0(unstable)),
+        (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
+        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(UHCI0,
+        Uhci0, 0, AhbGdmaChannel), (LCD_CAM, LcdCam, 0, AxiGdmaChannel), (I2S0, I2s0, 1,
+        AhbGdmaChannel), (SPI2, Spi2, 1, AxiGdmaChannel), (SPI3, Spi3, 2,
+        AxiGdmaChannel), (PARL_IO, ParlIo, 3, AxiGdmaChannel), (AES, Aes, 4,
+        AxiGdmaChannel), (I2S1, I2s1, 5, AhbGdmaChannel), (SHA, Sha, 5,
+        AxiGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
@@ -9313,6 +9487,8 @@ macro_rules! define_io_mux_signals {
             PCNT1_U1_CTRL_CH1       = 77,
             PCNT1_U2_CTRL_CH1       = 78,
             PCNT1_U3_CTRL_CH1       = 79,
+            TWAI0_RX                = 80,
+            TWAI1_RX                = 81,
             PCNT1_U0_SIG_CH0        = 204,
             PCNT1_U1_SIG_CH0        = 205,
             PCNT1_U2_SIG_CH0        = 206,
@@ -9531,6 +9707,8 @@ macro_rules! define_io_mux_signals {
             GPIO_SD5               = 77,
             GPIO_SD6               = 78,
             GPIO_SD7               = 79,
+            TWAI0_TX               = 80,
+            TWAI1_TX               = 83,
             CPU_GPIO_0             = 214,
             CPU_GPIO_1             = 215,
             CPU_GPIO_2             = 216,

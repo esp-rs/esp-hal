@@ -157,6 +157,9 @@ input_signals = [
     { name = "PCNT1_U1_CTRL_CH1",   id = 77 },
     { name = "PCNT1_U2_CTRL_CH1",   id = 78 },
     { name = "PCNT1_U3_CTRL_CH1",   id = 79 },
+    # TWAI
+    { name = "TWAI0_RX",            id = 80 },
+    { name = "TWAI1_RX",            id = 81 },
     { name = "PCNT1_U0_SIG_CH0",    id = 204 },
     { name = "PCNT1_U1_SIG_CH0",    id = 205 },
     { name = "PCNT1_U2_SIG_CH0",    id = 206 },
@@ -389,6 +392,9 @@ output_signals = [
     { name = "GPIO_SD5",            id = 77 },
     { name = "GPIO_SD6",            id = 78 },
     { name = "GPIO_SD7",            id = 79 },
+    # TWAI
+    { name = "TWAI0_TX",            id = 80 },
+    { name = "TWAI1_TX",            id = 83 },
     # CPU GPIO
     { name = "CPU_GPIO_0",          id = 214 },
     { name = "CPU_GPIO_1",          id = 215 },
