@@ -105,6 +105,9 @@ log-04                   = { package = "log", version = "0.4", optional = true }
 sha1                     = { version = "0.11", default-features = false, optional = true }
 sha2                     = { version = "0.11", default-features = false, optional = true }
 
+# Software GHASH for AES-GCM that runs as AES-CTR steps
+ghash                    = { version = "0.6", default-features = false, features = ["zeroize"], optional = true }
+
 # Optional dependencies that enable ecosystem support.
 # We could support individually enabling them, but there is no big downside to just
 # enabling them all via the `unstable` feature.
@@ -222,6 +225,7 @@ esp32   = [
     "esp-metadata-generated/esp32",
     "dep:sha1",
     "dep:sha2",
+    "dep:ghash",
 ]
 ##
 esp32c2 = [
@@ -242,6 +246,7 @@ esp32c3 = [
     "esp-rom-sys/esp32c3",
     "esp-sync/esp32c3",
     "esp-metadata-generated/esp32c3",
+    "dep:ghash",
 ]
 ##
 esp32c5 = [
@@ -253,6 +258,7 @@ esp32c5 = [
     "esp-rom-sys/esp32c5",
     "esp-sync/esp32c5",
     "esp-metadata-generated/esp32c5",
+    "dep:ghash",
 ]
 ##
 esp32c6 = [
@@ -263,6 +269,7 @@ esp32c6 = [
     "esp-rom-sys/esp32c6",
     "esp-sync/esp32c6",
     "esp-metadata-generated/esp32c6",
+    "dep:ghash",
 ]
 ## ESP32-P4 (chip revision >= v3.x)
 esp32p4 = [
@@ -279,6 +286,7 @@ esp32p4 = [
     "esp-rom-sys/esp32p4",
     "esp-sync/esp32p4",
     "esp-metadata-generated/esp32p4",
+    "dep:ghash",
 ]
 ##
 esp32c61 = [
@@ -297,6 +305,7 @@ esp32h2 = [
     "esp-rom-sys/esp32h2",
     "esp-sync/esp32h2",
     "esp-metadata-generated/esp32h2",
+    "dep:ghash",
 ]
 ##
 esp32h4 = [
@@ -306,6 +315,7 @@ esp32h4 = [
     "esp-rom-sys/esp32h4",
     "esp-sync/esp32h4",
     "esp-metadata-generated/esp32h4",
+    "dep:ghash",
 ]
 ##
 esp32s2 = [
@@ -318,6 +328,7 @@ esp32s2 = [
     "esp-rom-sys/esp32s2",
     "esp-sync/esp32s2",
     "esp-metadata-generated/esp32s2",
+    "dep:ghash",
 ]
 ##
 esp32s3 = [
@@ -331,6 +342,7 @@ esp32s3 = [
     "esp-rom-sys/esp32s3",
     "esp-sync/esp32s3",
     "esp-metadata-generated/esp32s3",
+    "dep:ghash",
 ]
 ##
 esp32s31 = [
@@ -344,6 +356,7 @@ esp32s31 = [
     "esp-rom-sys/esp32s31",
     "esp-sync/esp32s31",
     "esp-metadata-generated/esp32s31",
+    "dep:ghash",
 ]
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.
