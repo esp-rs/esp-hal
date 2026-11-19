@@ -214,7 +214,8 @@ struct Chain {
     last: NonNull<u32>,
 }
 
-// SAFETY: The nodes are plain memory, which only the registry touches, under its lock.
+// SAFETY: The nodes are plain memory, which only the registry touches after `create`, under its
+// lock.
 unsafe impl Send for Chain {}
 
 /// The chains of a module, one for each of [`USED_ENTRIES`].
@@ -289,30 +290,35 @@ pub unsafe fn create(
     configs: &[&[LinkConfig]],
     memory: &mut LinkMemory,
 ) -> Result<(), Error> {
-    REGISTRY.with(|registry| {
-        let links_of_module = &mut registry.links[module as usize];
-        if links_of_module.is_some() {
-            return Err(Error::AlreadyCreated);
-        }
-        let size = configs
-            .iter()
-            .map(|configs| links_size(configs))
-            .sum::<usize>();
-        let mut next = memory.take(size / 4).ok_or(Error::OutOfMemory)?;
+    let size = configs
+        .iter()
+        .map(|configs| links_size(configs))
+        .sum::<usize>();
+    let start = memory.next;
+    let mut next = memory.take(size / 4).ok_or(Error::OutOfMemory)?;
 
-        let mut links: Links = Default::default();
-        for (chain, entry) in links.iter_mut().zip(used_entries()) {
-            let owned = configs
-                .iter()
-                .flat_map(|configs| configs.iter())
-                .filter(|config| config.owner & (1 << entry) != 0);
-            for config in owned {
-                append(chain, build(config, &mut next));
-            }
+    // Nothing reads the nodes before the registry has them, so they are built without its lock.
+    let mut links: Links = Default::default();
+    for (chain, entry) in links.iter_mut().zip(used_entries()) {
+        let owned = configs
+            .iter()
+            .flat_map(|configs| configs.iter())
+            .filter(|config| config.owner & (1 << entry) != 0);
+        for config in owned {
+            append(chain, build(config, &mut next));
         }
-        *links_of_module = Some(links);
-        Ok(())
-    })
+    }
+
+    REGISTRY
+        .with(|registry| {
+            let links_of_module = &mut registry.links[module as usize];
+            if links_of_module.is_some() {
+                return Err(Error::AlreadyCreated);
+            }
+            *links_of_module = Some(links);
+            Ok(())
+        })
+        .inspect_err(|_| memory.next = start)
 }
 
 /// Builds one node at `next`, moves `next` past it, and returns its link, the address of its head.
