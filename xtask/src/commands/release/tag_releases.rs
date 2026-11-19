@@ -1,4 +1,4 @@
-use std::{path::Path, process::Command};
+use std::{collections::HashSet, path::Path, process::Command};
 
 use anyhow::{Context, Result, ensure};
 use clap::Args;
@@ -21,6 +21,10 @@ pub struct TagReleasesArgs {
     /// the package or one of its in-repo dependencies changed since then.
     #[arg(long, conflicts_with = "no_dry_run")]
     changed_since: Option<String>,
+
+    /// Skip packages whose current version has no tag on the `origin` remote yet.
+    #[arg(long, conflicts_with = "no_dry_run")]
+    tagged_only: bool,
 }
 
 /// Tag the releases for the specified packages.
@@ -41,6 +45,12 @@ pub fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         tag: String,
     }
 
+    let remote_tags = if args.tagged_only {
+        Some(remote_tags(workspace)?)
+    } else {
+        None
+    };
+
     let mut created = Vec::new();
     for package in args.packages {
         // If a package does not require documentation, this also means that it is not
@@ -52,6 +62,13 @@ pub fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
 
         let version = package_version(workspace, package)?;
         let tag = package.tag(&version);
+
+        if let Some(tags) = &remote_tags
+            && !tags.contains(&tag)
+        {
+            log::warn!("Skipping {package}: '{tag}' is not tagged on origin");
+            continue;
+        }
 
         if args.no_dry_run {
             let output = Command::new("git")
@@ -93,7 +110,7 @@ pub fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
 
 fn changed_paths(workspace: &Path, rev: &str) -> Result<Vec<String>> {
     let output = Command::new("git")
-        .args(["diff", "--name-only", rev, "HEAD"])
+        .args(["diff", "--name-only", "--no-renames", rev, "HEAD"])
         .current_dir(workspace)
         .output()
         .context("Failed to run git diff")?;
@@ -109,6 +126,25 @@ fn changed_paths(workspace: &Path, rev: &str) -> Result<Vec<String>> {
         .collect())
 }
 
+fn remote_tags(workspace: &Path) -> Result<HashSet<String>> {
+    let output = Command::new("git")
+        .args(["ls-remote", "--tags", "--refs", "origin"])
+        .current_dir(workspace)
+        .output()
+        .context("Failed to run git ls-remote")?;
+    ensure!(
+        output.status.success(),
+        "git ls-remote origin failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| line.split_once("refs/tags/"))
+        .map(|(_, tag)| tag.to_string())
+        .collect())
+}
+
 /// Whether any of `changed` can alter the docs of a package whose in-repo dependency closure (the
 /// package included) is `related`. A path outside every package directory can, so a new shared
 /// docs input never leaves docs stale.
@@ -116,7 +152,12 @@ fn docs_affected(changed: &[String], related: &[Package]) -> bool {
     changed.iter().any(|path| {
         let owner =
             Package::iter().find(|package| path.starts_with(&format!("{}/", package.directory())));
-        owner.is_none_or(|owner| related.contains(&owner))
+        match owner {
+            // xtask reads esp-metadata while building any package's docs (doc cfgs, the esp-hal
+            // peripheral table), so it changes docs even though no published package depends on it.
+            None | Some(Package::EspMetadata) => true,
+            Some(owner) => related.contains(&owner),
+        }
     })
 }
 
@@ -169,5 +210,14 @@ mod tests {
         ] {
             assert!(affects(&[path], &[Package::EspPrintln]), "{path}");
         }
+    }
+
+    #[test]
+    fn esp_metadata_affects_everything() {
+        assert!(affects(
+            &["esp-metadata/devices/esp32c6/device.toml"],
+            &[Package::EspPrintln]
+        ));
+        assert!(affects(&["esp-metadata/src/lib.rs"], ESP_RADIO));
     }
 }

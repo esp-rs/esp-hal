@@ -80,7 +80,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.packages == '') }}
         # Release PRs will ignore the tag values and just check out the latest commit
         run: |
-          output=$(hal-xtask release tag-releases)
+          output=$(hal-xtask release tag-releases ${{ github.event_name == 'workflow_dispatch' && '--tagged-only' || '' }})
           echo "packages=${output}" >> "$GITHUB_OUTPUT"
 
       # Diff against the last successful deploy rather than `github.event.before`: a run cancelled
