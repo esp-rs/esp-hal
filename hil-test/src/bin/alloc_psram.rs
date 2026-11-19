@@ -285,7 +285,9 @@ mod multi_core_cache_tests {
         cpu_ctrl: CPU_CTRL<'static>,
         mut line: DmaAlignedMut<'static, [u32]>,
     ) {
-        const BIG_LINES: usize = 1024 * 1024 / size_of::<PsramLine>();
+        // Stays below the 524256 byte `ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION` of the `tlsf`
+        // configuration. A 1 MiB buffer cannot be allocated there.
+        const BIG_LINES: usize = 384 * 1024 / size_of::<PsramLine>();
         static STOP: AtomicBool = AtomicBool::new(false);
         static STOPPED: AtomicBool = AtomicBool::new(false);
         static ROUNDS: AtomicU32 = AtomicU32::new(0);
