@@ -48,6 +48,8 @@ pub const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u8 = 100;
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 /// Deep sleep debug attenuation setting for ultra-low power mode.
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_DEFAULT: u8 = 15;
+/// Deep sleep debug attenuation setting that keeps the voltage up.
+const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_NODROP: u8 = 0;
 /// Power-up setting for other blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
 /// Waits cycles for other blocks.
@@ -537,8 +539,16 @@ impl RtcSleepConfig {
         let pd_cur_monitor = self.pd_cur_monitor() && !xtal_on;
         let bias_sleep_slp = self.bias_sleep_slp() && !xtal_on;
         let pd_cur_slp = self.pd_cur_slp() && !xtal_on;
-        let rc_fast_on = !self.int_8m_pd_en() && !self.deep_slp();
-        let (rtc_dbias_slp, dig_dbias_slp, dbg_atten_slp) = if xtal_on || rc_fast_on {
+        // RC_FAST needs the RTC regulator and no voltage drop in a deep sleep.
+        let rc_fast_on = !self.int_8m_pd_en();
+        let rtc_regulator_fpu = self.rtc_regulator_fpu() || (self.deep_slp() && rc_fast_on);
+        let (rtc_dbias_slp, dig_dbias_slp, dbg_atten_slp) = if self.deep_slp() && rc_fast_on {
+            (
+                RTC_CNTL_DBIAS_0V90,
+                self.dig_dbias_slp(),
+                RTC_CNTL_DBG_ATTEN_DEEPSLEEP_NODROP,
+            )
+        } else if xtal_on || rc_fast_on {
             (
                 RTC_CNTL_DBIAS_1V10,
                 RTC_CNTL_DBIAS_1V10,
@@ -589,7 +599,6 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.dg_wrap_pd_en().clear_bit());
             }
 
-            let rtc_regulator_fpu = self.rtc_regulator_fpu();
             rtc_cntl
                 .reg()
                 .modify(|_, w| w.regulator_force_pu().bit(rtc_regulator_fpu));

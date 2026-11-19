@@ -360,6 +360,15 @@ pub(crate) struct SleepEntry {
 pub(crate) fn run_entry_hooks(config: &mut RtcSleepConfig) -> SleepEntry {
     let mut wrapped = WrappedSleepConfig::new(config);
 
+    // The RTC timer counts the RTC slow clock, also when the timer is not a wakeup source: the
+    // time after a light sleep comes from it.
+    #[cfg(soc_has_clock_node_rtc_slow_clk)]
+    if let Some(source) =
+        crate::soc::clocks::ClockTree::with(crate::soc::clocks::rtc_slow_clk_root_source)
+    {
+        wrapped.keep_clock_running(source);
+    }
+
     for source in enabled_sources() {
         let hook = HOOKS.with(|hooks| hooks.entry[source as usize]);
         if let Some(hook) = hook {
