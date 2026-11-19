@@ -301,6 +301,7 @@ esp32h2 = [
 ##
 esp32h4 = [
     "dep:esp32h4",
+    "__usb_otg",
     "esp-riscv-rt/clic-48",
     "esp-rom-sys/esp32h4",
     "esp-sync/esp32h4",

@@ -385,28 +385,52 @@ struct EccMemoryPowerGuard;
 
 impl EccMemoryPowerGuard {
     fn new() -> Self {
-        #[cfg(soc_has_pcr)]
-        crate::peripherals::PCR::regs()
-            .ecc_pd_ctrl()
-            .modify(|_, w| {
-                w.ecc_mem_force_pd().clear_bit();
-                w.ecc_mem_force_pu().set_bit();
-                w.ecc_mem_pd().clear_bit()
-            });
+        cfg_select! {
+            esp32h4 => {
+                crate::peripherals::PCR::regs()
+                    .ecc_mem_lp_ctrl()
+                    .modify(|_, w| {
+                        w.ecc_mem_lp_en().clear_bit();
+                        w.ecc_mem_force_ctrl().set_bit()
+                    });
+            }
+            soc_has_pcr => {
+                crate::peripherals::PCR::regs()
+                    .ecc_pd_ctrl()
+                    .modify(|_, w| {
+                        w.ecc_mem_force_pd().clear_bit();
+                        w.ecc_mem_force_pu().set_bit();
+                        w.ecc_mem_pd().clear_bit()
+                    });
+            }
+            _ => {}
+        }
         Self
     }
 }
 
 impl Drop for EccMemoryPowerGuard {
     fn drop(&mut self) {
-        #[cfg(soc_has_pcr)]
-        crate::peripherals::PCR::regs()
-            .ecc_pd_ctrl()
-            .modify(|_, w| {
-                w.ecc_mem_force_pd().clear_bit();
-                w.ecc_mem_force_pu().clear_bit();
-                w.ecc_mem_pd().set_bit()
-            });
+        cfg_select! {
+            esp32h4 => {
+                crate::peripherals::PCR::regs()
+                    .ecc_mem_lp_ctrl()
+                    .modify(|_, w| unsafe {
+                        w.ecc_mem_lp_mode().bits(0);
+                        w.ecc_mem_lp_en().set_bit()
+                    });
+            }
+            soc_has_pcr => {
+                crate::peripherals::PCR::regs()
+                    .ecc_pd_ctrl()
+                    .modify(|_, w| {
+                        w.ecc_mem_force_pd().clear_bit();
+                        w.ecc_mem_force_pu().clear_bit();
+                        w.ecc_mem_pd().set_bit()
+                    });
+            }
+            _ => {}
+        }
     }
 }
 

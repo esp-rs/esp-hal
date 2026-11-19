@@ -145,7 +145,12 @@ impl<'d> Hmac<'d> {
             .set_para_finish()
             .write(|w| w.set_para_end().set_bit());
 
-        if self.regs().query_error().read().query_check().bit_is_set() {
+        let query_error = self.regs().query_error().read();
+        let key_mismatch = cfg_select! {
+            esp32h4 => query_error.qurey_check().bit_is_set(),
+            _ => query_error.query_check().bit_is_set(),
+        };
+        if key_mismatch {
             return Err(nb::Error::Other(Error::KeyPurposeMismatch));
         }
 
