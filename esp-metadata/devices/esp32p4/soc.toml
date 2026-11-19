@@ -279,7 +279,7 @@ engines = [
 ]
 
 [device.twai]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6781 }
 
 [device.adc]
 support_status = { status = "partial", issue = 6747 }

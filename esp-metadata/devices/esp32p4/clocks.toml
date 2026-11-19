@@ -237,6 +237,7 @@ peripheral_clocks = { templates = [
     { name = "clk_apb_field",           value = "{{clk_field}}_apb" },
     { name = "clk_field",               value = "{{peripheral}}" },
     { name = "sys_apb_clk_template",    value = "{{sys_clk_template}} {{apb_clk_template}}" },
+    { name = "twai_func_clk_template",  value = "{{control}}::regs().peri_clk_ctrl115().modify(|_, w| w.{{peripheral}}_clk_src_sel().clear_bit().{{peripheral}}_clk_en().bit(enable));" },
     { name = "uart_rst_template",       value = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_{{peripheral}}_core().bit(reset).rst_en_{{peripheral}}_apb().bit(reset));" },
     # Reusable reset building blocks. Reset bit name is supplied via {{rst_field}} if not default.
     { name = "default_rst_template",    value = "{{rst_en_template}}" },
@@ -276,10 +277,10 @@ peripheral_clocks = { templates = [
     { name = "Mcpwm1", template_params = { clk_en_template = "{{apb_clk_template}}", rst_group = "1", rst_field = "pwm1" } },
     # NOTE: `rmt_sys_clk_en` despite the name lives on SOC_CLK_CTRL2, not CTRL1.
     { name = "Rmt", template_params = { clk_en_template = "{{apb_clk_template}}", clk_apb_field = "rmt_sys", rst_group = "1" } },
-    # TWAI (CAN) -- reset bits named can0/can1/can2 in PAC.
-    { name = "Twai0", template_params = { clk_en_template = "{{apb_clk_template}}", rst_group = "1", rst_field = "can0" } },
-    { name = "Twai1", template_params = { clk_en_template = "{{apb_clk_template}}", rst_group = "1", rst_field = "can1" } },
-    { name = "Twai2", template_params = { clk_en_template = "{{apb_clk_template}}", rst_group = "1", rst_field = "can2" } },
+    # TWAI (CAN) -- apb_clk + XTAL function clock in PERI_CLK_CTRL115; reset bits named can0/can1/can2 in PAC.
+    { name = "Twai0", template_params = { clk_en_template = "{{apb_clk_template}} {{twai_func_clk_template}}", rst_group = "1", rst_field = "can0" } },
+    { name = "Twai1", template_params = { clk_en_template = "{{apb_clk_template}} {{twai_func_clk_template}}", rst_group = "1", rst_field = "can1" } },
+    { name = "Twai2", template_params = { clk_en_template = "{{apb_clk_template}} {{twai_func_clk_template}}", rst_group = "1", rst_field = "can2" } },
     # USB -- reset is via LP-domain registers, leave rst as no-op here.
     { name = "UsbFs",  template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "usb_otg11", rst_template = "{{no_rst}}" } },
     { name = "UsbHs",  template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "usb_otg20", rst_template = "{{no_rst}}" } },
