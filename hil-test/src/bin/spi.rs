@@ -1373,6 +1373,54 @@ mod tests {
         check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF120m);
         check_typical_values(&mut ctx, SpiFunctionClockConfig::default());
     }
+
+    #[cfg(all(pcnt_driver_supported, spi_master_supports_dma))]
+    #[test]
+    fn test_sck_frequency_matches_configuration(ctx: Context) {
+        use esp_hal::spi::master::ClockSource;
+
+        const SCK: Rate = Rate::from_mhz(2);
+
+        let counter = set_up_pcnt!(ctx, sclk_input);
+        let mut spi = ctx.spi.with_dma(ctx.dma_channel);
+        let mut buffer = DmaTxBuf::new(
+            DmaAlignedMut::new(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.tx_buffer).unwrap(),
+        )
+        .unwrap();
+
+        let config = Config::default().with_frequency(SCK);
+        let expected_hz = u64::from(SCK.as_hz());
+        for source in [
+            // On C5, select XTAL before each PLL to reset the PCR pre-divider to /1.
+            #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
+            ClockSource::Xtal,
+            ClockSource::default(),
+            #[cfg(soc_has_clock_node_spi_pll_f120m_div2)]
+            ClockSource::Xtal,
+            #[cfg(soc_has_clock_node_spi_pll_f120m_div2)]
+            ClockSource::PllF120m,
+        ] {
+            spi.apply_config(&config.with_clock_source(source)).unwrap();
+            let transfer = spi.write_buffer(1024, buffer).map_err(|err| err.0).unwrap();
+            counter.clear();
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(500) {}
+            let pulses = u64::try_from(counter.value()).unwrap();
+            let elapsed_us = start.elapsed().as_micros();
+            assert!(
+                !transfer.is_done(),
+                "{source:?}: SPI transfer ended during SCK measurement"
+            );
+            (spi, buffer) = transfer.wait();
+
+            let actual_hz = pulses * 1_000_000 / elapsed_us;
+            assert!(
+                actual_hz.abs_diff(expected_hz) <= expected_hz / 20,
+                "{source:?}: SCK was {actual_hz} Hz, expected {expected_hz} Hz"
+            );
+        }
+    }
 }
 
 #[cfg(all(dma_can_access_psram, feature = "unstable"))]
