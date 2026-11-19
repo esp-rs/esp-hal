@@ -4,6 +4,9 @@
 //!
 //! - the chip oversleeps: <https://github.com/esp-rs/esp-hal/issues/5183>
 //! - the RTC time jumps when esp-hal recalibrates the slow clock. See `make_calibration_stale`.
+//!
+//! On esp32, esp32c3, esp32s2 and esp32s3, also run the test with `RTC_SLOW_CLK` set to
+//! `RtcSlowClkConfig::RcFast`. RC_FAST must keep running through the sleep.
 
 // esp32c2, esp32c61 and esp32h4 have no rtc-fast memory, which is required by the persistent
 // BOOT_COUNT variable.
@@ -34,6 +37,15 @@ const MAX_ITERATIONS: u32 = 100;
 
 const THRESHOLD_US: u64 = SLEEP_MS * SLEEP_MS * 1_000;
 
+#[cfg(any(
+    feature = "esp32",
+    feature = "esp32c3",
+    feature = "esp32s2",
+    feature = "esp32s3"
+))]
+const RTC_SLOW_CLK: esp_hal::clock::ll::RtcSlowClkConfig =
+    esp_hal::clock::ll::RtcSlowClkConfig::RcSlow;
+
 // Each stale calibration moves the RTC time back by half the time since power-up, and the time
 // keeps that offset. Start one day after 0, so the time does not wrap around.
 const START_TIME_US: u64 = 24 * 60 * 60 * 1_000_000;
@@ -47,7 +59,21 @@ static mut PRE_SLEEP_US: u64 = 0;
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    cfg_select! {
+        any(
+            feature = "esp32",
+            feature = "esp32c3",
+            feature = "esp32s2",
+            feature = "esp32s3"
+        ) => {
+            let mut clock_config: esp_hal::clock::ll::ClockConfig = CpuClock::max().into();
+            clock_config.rtc_slow_clk = Some(RTC_SLOW_CLK);
+        }
+        _ => {
+            let clock_config = CpuClock::max();
+        }
+    }
+    let config = esp_hal::Config::default().with_cpu_clock(clock_config);
     let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(size: 32768);
