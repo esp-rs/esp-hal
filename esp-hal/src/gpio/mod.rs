@@ -1631,65 +1631,7 @@ impl<'lt> AnyPin<'lt> {
 
     pub(crate) fn disable_usb_pads(&self) {
         #[cfg(soc_has_usb_device)]
-        {
-            /// Workaround to make D+ and D- work when the pin is assigned to
-            /// the `USB_SERIAL_JTAG` peripheral by default.
-            fn disable_usb_pads(_gpionum: u8) {
-                crate::peripherals::USB_DEVICE::regs()
-                    .conf0()
-                    .modify(|_, w| {
-                        w.usb_pad_enable().clear_bit();
-                        w.dm_pullup().clear_bit();
-                        w.dm_pulldown().clear_bit();
-                        w.dp_pullup().clear_bit();
-                        w.dp_pulldown().clear_bit()
-                    });
-            }
-
-            #[cfg(any(esp32h4, esp32p4))]
-            fn disable_usb_fs_pads(_gpionum: u8) {
-                crate::peripherals::USB_WRAP::regs()
-                    .otg_conf()
-                    .modify(|_, w| {
-                        w.pad_pull_override().set_bit();
-                        w.dm_pullup().clear_bit();
-                        w.dm_pulldown().clear_bit();
-                        w.dp_pullup().clear_bit();
-                        w.dp_pulldown().clear_bit()
-                    });
-            }
-
-            #[cfg(soc_has_usb_fs)]
-            macro_rules! disable_usb_fs_pads {
-                ($gpio:ident) => {
-                    if self.number() == crate::peripherals::$gpio::NUMBER {
-                        cfg_select! {
-                            any(esp32h4, esp32p4) => {
-                                disable_usb_fs_pads(crate::peripherals::$gpio::NUMBER);
-                            }
-                            _ => {
-                                disable_usb_pads(crate::peripherals::$gpio::NUMBER);
-                            }
-                        }
-                    }
-                };
-            }
-
-            for_each_analog_function! {
-                (USJ_DM, $gpio:ident) => {
-                    if self.number() == crate::peripherals::$gpio::NUMBER {
-                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
-                    }
-                };
-                (USJ_DP, $gpio:ident) => {
-                    if self.number() == crate::peripherals::$gpio::NUMBER {
-                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
-                    }
-                };
-                (USB_FS_DM, $gpio:ident) => { disable_usb_fs_pads!($gpio) };
-                (USB_FS_DP, $gpio:ident) => { disable_usb_fs_pads!($gpio) };
-            }
-        }
+        crate::soc::usb_phy::release_pad(self.number());
     }
 
     /// Takes or releases the hold of the pad.

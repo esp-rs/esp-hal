@@ -30,6 +30,9 @@ pub(crate) mod cache;
 #[cfg(soc_has_xtal32k_pads)]
 pub(crate) mod xtal32k;
 
+#[cfg(soc_has_usb_device)]
+pub(crate) mod usb_phy;
+
 #[cfg(soc_has_bus_clock_update)]
 mod bus_clock_update {
     use core::sync::atomic::{AtomicBool, Ordering};
