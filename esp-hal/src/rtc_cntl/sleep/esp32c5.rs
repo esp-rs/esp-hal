@@ -4,7 +4,7 @@ use crate::{
     peripherals::PMU,
     rtc_cntl::{
         Rtc,
-        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
+        rtc::{HpAnalog, HpBackupClk, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
         sleep::{
             SleepKind,
             pmu_common::{SleepTimeConfig, request_sleep},
@@ -836,7 +836,11 @@ impl RtcSleepConfig {
                 .apply();
         }
 
-        super::pmu_common::configure_hp_sleep_clocks(0, self.keep_usb_serial_jtag);
+        // JTAG reaches the debug module only while the HP core clock runs. The clock costs current,
+        // so the sleep keeps it only for an attached debugger.
+        let mut icg_func = HpBackupClk::default();
+        icg_func.set_hpcore(self.keep_usb_serial_jtag && crate::debugger::debugger_connected());
+        super::pmu_common::configure_hp_sleep_clocks(icg_func.0, self.keep_usb_serial_jtag);
 
         param.apply();
 

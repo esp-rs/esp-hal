@@ -791,6 +791,9 @@ impl RtcSleepConfig {
         // https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/port/esp32c6/pmu_sleep.c#L299-L302
         let mut icg_func = HpBackupClk::default();
         icg_func.set_retention(!self.deep && clocks::wifi_pwr_clk_runs_in_sleep());
+        // JTAG reaches the debug module only while the HP core clock runs. The clock costs current,
+        // so the sleep keeps it only for an attached debugger.
+        icg_func.set_hpcore(self.keep_usb_serial_jtag && crate::debugger::debugger_connected());
         super::pmu_common::configure_hp_sleep_clocks(icg_func.0, self.keep_usb_serial_jtag);
 
         param.apply();
