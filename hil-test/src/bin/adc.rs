@@ -141,6 +141,7 @@ mod tests {
     #[test]
     #[cfg(not(esp32s31))]
     fn blocking_raw_sweep(p: Peripherals) {
+        hil_test::init_logger!(p);
         let delay = Delay::new();
         let (sda, scl) = hil_test::i2c_pins!(p);
         let mut i2c = I2c::new(
@@ -217,6 +218,7 @@ mod tests {
     #[test]
     #[cfg(not(esp32s31))]
     fn every_attenuation_scales_readings(mut p: Peripherals) {
+        hil_test::init_logger!(p);
         let delay = Delay::new();
         let (sda, scl) = hil_test::i2c_pins!(p);
         let mut i2c = I2c::new(
@@ -287,6 +289,7 @@ mod tests {
     #[test]
     #[cfg(adc_basic_calibration)]
     fn basic_calibration_reads(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::analog::adc::AdcCalBasic;
 
         let delay = Delay::new();
@@ -330,6 +333,7 @@ mod tests {
     #[test]
     #[cfg(all(adc_line_calibration, not(esp32h2)))]
     fn line_calibration_accuracy(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::analog::adc::AdcCalLine;
 
         let delay = Delay::new();
@@ -383,6 +387,7 @@ mod tests {
     #[test]
     #[cfg(esp32h2)]
     fn line_calibration_missing_data_reports_error(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::analog::adc::{AdcCalLine, Error};
 
         let (failed_pin, _) = hil_test::hp_test_pins!(p);
@@ -410,6 +415,7 @@ mod tests {
     #[test]
     #[cfg(esp32c2)]
     fn line_calibration_unsupported_attenuation_reports_error(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::analog::adc::{AdcCalLine, Error};
 
         let (failed_pin, _) = hil_test::lp_test_pins!(p);
@@ -436,6 +442,7 @@ mod tests {
     #[test]
     #[cfg(all(adc_curve_calibration, not(esp32h2)))]
     fn curve_calibration_accuracy(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::analog::adc::AdcCalCurve;
 
         let delay = Delay::new();
@@ -488,6 +495,7 @@ mod tests {
     #[test]
     #[cfg(not(any(esp32, esp32s31)))]
     async fn async_raw_sweep(p: Peripherals) {
+        hil_test::init_logger!(p);
         let delay = Delay::new();
         let (sda, scl) = hil_test::i2c_pins!(p);
         let mut i2c = I2c::new(
@@ -530,6 +538,7 @@ mod tests {
 
     #[test]
     fn unconfigured_channel_returns_error(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::analog::adc::{AdcChannel, Error};
 
         let mut config = AdcConfig::new();
@@ -550,6 +559,7 @@ mod tests {
     #[test]
     #[cfg(not(esp32))]
     async fn async_unconfigured_channel_returns_error(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::analog::adc::{AdcChannel, Error};
 
         let mut config = AdcConfig::new();
@@ -573,6 +583,7 @@ mod tests {
     #[test]
     #[cfg(esp32)]
     fn adc2_contention_keeps_claim_and_allows_retry(mut p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::{
             Internal,
             analog::adc::{Adc, AdcConfig, Error, release_adc2, try_claim_adc2},

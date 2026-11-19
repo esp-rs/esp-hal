@@ -42,7 +42,6 @@ use embedded_io_async::Read;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
-use esp_println::{print, println};
 use esp_radio::wifi::{
     AuthenticationMethodConfig,
     Config,
@@ -79,9 +78,10 @@ macro_rules! mk_static {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
@@ -98,7 +98,7 @@ async fn main(spawner: Spawner) -> ! {
         AccessPointConfig::default().with_ssid("esp-radio-apsta".try_into().unwrap()),
     );
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
     let wifi_ap_device = esp_radio::wifi::Interface::access_point();
     let wifi_sta_device = esp_radio::wifi::Interface::station();
     let controller = esp_radio::wifi::WifiController::new(
@@ -106,7 +106,7 @@ async fn main(spawner: Spawner) -> ! {
         ControllerConfig::default().with_initial_config(access_point_station_config),
     )
     .unwrap();
-    println!("Wifi started!");
+    log::info!("Wifi started!");
 
     let ap_config = embassy_net::Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Addr::new(192, 168, 2, 1), 24),
@@ -139,19 +139,23 @@ async fn main(spawner: Spawner) -> ! {
     let sta_address = loop {
         if let Some(config) = sta_stack.config_v4() {
             let address = config.address.address();
-            println!("Got IP: {}", address);
+            log::info!("Got IP: {}", address);
             break address;
         }
-        println!("Waiting for IP...");
+        log::info!("Waiting for IP...");
         Timer::after(Duration::from_millis(500)).await;
     };
     ap_stack.wait_config_up().await;
 
-    println!(
+    log::info!(
         "Connect to the AP `esp-radio-apsta` and point your browser to http://192.168.2.1:8080/"
     );
-    println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
-    println!("Or connect to the ap `{SSID}` and point your browser to http://{sta_address}:8080/");
+    log::info!(
+        "Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1"
+    );
+    log::info!(
+        "Or connect to the ap `{SSID}` and point your browser to http://{sta_address}:8080/"
+    );
 
     // Init HTTP client
     let tcp_client = TcpClient::new(
@@ -180,7 +184,7 @@ async fn main(spawner: Spawner) -> ! {
     sta_server_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
     loop {
-        println!("Wait for connection...");
+        log::info!("Wait for connection...");
         // FIXME: If connections are attempted on both sockets at the same time, we
         // might end up dropping one of them. Might be better to spawn both
         // accept() calls, or use fused futures? Note that we only attempt to
@@ -200,10 +204,10 @@ async fn main(spawner: Spawner) -> ! {
             Either::First(r) => (r, &mut ap_server_socket),
             Either::Second(r) => (r, &mut sta_server_socket),
         };
-        println!("Connected...");
+        log::info!("Connected...");
 
         if let Err(e) = r {
-            println!("connect error: {:?}", e);
+            log::info!("connect error: {:?}", e);
             continue;
         }
 
@@ -214,7 +218,7 @@ async fn main(spawner: Spawner) -> ! {
         loop {
             match server_socket.read(&mut buffer).await {
                 Ok(0) => {
-                    println!("AP read EOF");
+                    log::info!("AP read EOF");
                     break;
                 }
                 Ok(len) => {
@@ -222,21 +226,20 @@ async fn main(spawner: Spawner) -> ! {
                         unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
 
                     if to_print.contains("\r\n\r\n") {
-                        print!("{}", to_print);
-                        println!();
+                        log::info!("{}", to_print);
                         break;
                     }
 
                     pos += len;
                 }
                 Err(e) => {
-                    println!("AP read error: {:?}", e);
+                    log::info!("AP read error: {:?}", e);
                     break;
                 }
             };
         }
         if sta_stack.is_link_up() {
-            println!("connecting via HttpClient...");
+            log::info!("connecting via HttpClient...");
             let mut client = HttpClient::new(&tcp_client, &dns_client);
             let mut rx_buf = [0u8; 4096];
 
@@ -252,7 +255,7 @@ async fn main(spawner: Spawner) -> ! {
 
                     match response_result {
                         Ok(response) => {
-                            println!("HTTP request successful, streaming body...");
+                            log::info!("HTTP request successful, streaming body...");
 
                             let _ = server_socket.write_all(b"HTTP/1.0 200 OK\r\n").await;
                             let _ = server_socket
@@ -270,19 +273,19 @@ async fn main(spawner: Spawner) -> ! {
                                         if let Err(e) =
                                             server_socket.write_all(&chunk_buf[..n]).await
                                         {
-                                            println!("AP write error: {:?}", e);
+                                            log::info!("AP write error: {:?}", e);
                                             break;
                                         }
                                     }
                                     Err(e) => {
-                                        println!("Body read error: {:?}", e);
+                                        log::info!("Body read error: {:?}", e);
                                         break;
                                     }
                                 }
                             }
                         }
                         Err(e) => {
-                            println!("Station request error: {:?}", e);
+                            log::info!("Station request error: {:?}", e);
                             let _ = server_socket
                                 .write_all(
                                     b"HTTP/1.0 500 Internal Server Error\r\n\r\nRequest failed",
@@ -292,7 +295,7 @@ async fn main(spawner: Spawner) -> ! {
                     }
                 }
                 Err(e) => {
-                    println!("DNS/Connect error: {:?}", e);
+                    log::info!("DNS/Connect error: {:?}", e);
                     let _ = server_socket
                         .write_all(b"HTTP/1.0 500 Internal Server Error\r\n\r\nDNS Error")
                         .await;
@@ -311,12 +314,12 @@ async fn main(spawner: Spawner) -> ! {
                 )
                 .await;
             if let Err(e) = r {
-                println!("AP write error: {:?}", e);
+                log::info!("AP write error: {:?}", e);
             }
         }
         let r = server_socket.flush().await;
         if let Err(e) = r {
-            println!("AP flush error: {:?}", e);
+            log::info!("AP flush error: {:?}", e);
         }
         Timer::after(Duration::from_millis(1000)).await;
         server_socket.close();
@@ -327,7 +330,7 @@ async fn main(spawner: Spawner) -> ! {
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
+    log::info!("start connection task");
 
     loop {
         match controller.connect_async().await {
@@ -343,7 +346,7 @@ async fn connection(mut controller: WifiController<'static>) {
                     match info {
                         Either::First(station_disconnected) => {
                             if let Ok(station_disconnected) = station_disconnected {
-                                println!("Station disconnected: {:?}", station_disconnected);
+                                log::info!("Station disconnected: {:?}", station_disconnected);
                                 break;
                             }
                         }
@@ -351,10 +354,10 @@ async fn connection(mut controller: WifiController<'static>) {
                             if let Ok(event) = event {
                                 match event {
                                     esp_radio::wifi::ap::EventInfo::Connected(info) => {
-                                        println!("Station connected: {:?}", info);
+                                        log::info!("Station connected: {:?}", info);
                                     }
                                     esp_radio::wifi::ap::EventInfo::Disconnected(info) => {
-                                        println!("Station disconnected: {:?}", info);
+                                        log::info!("Station disconnected: {:?}", info);
                                     }
                                 }
                             }
@@ -363,7 +366,7 @@ async fn connection(mut controller: WifiController<'static>) {
                 }
             }
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                log::info!("Failed to connect to wifi: {e:?}");
                 Timer::after(Duration::from_millis(5000)).await
             }
         }

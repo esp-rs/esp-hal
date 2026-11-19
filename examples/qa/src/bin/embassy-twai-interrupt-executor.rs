@@ -29,7 +29,6 @@ use esp_hal::{
     timer::timg::TimerGroup,
     twai::{BaudRate, EspTwaiFrame, StandardId, TwaiConfiguration, TwaiMode},
 };
-use esp_println::println;
 use esp_rtos::embassy::InterruptExecutor;
 use static_cell::StaticCell;
 
@@ -54,11 +53,11 @@ async fn transmit(config: TwaiConfiguration<'static, Blocking>) {
         match with_timeout(Duration::from_millis(50), twai.transmit_async(&frame)).await {
             Ok(Ok(())) => sent += 1,
             Ok(Err(e)) => {
-                println!("FAIL: frame {} not sent: {:?}", sent, e);
+                log::info!("FAIL: frame {} not sent: {:?}", sent, e);
                 return;
             }
             Err(_) => {
-                println!("FAIL: frame {} not sent within 50 ms", sent);
+                log::info!("FAIL: frame {} not sent within 50 ms", sent);
                 return;
             }
         }
@@ -66,9 +65,9 @@ async fn transmit(config: TwaiConfiguration<'static, Blocking>) {
     let took = start.elapsed();
 
     if took <= DEADLINE {
-        println!("PASS: {} frames in {} ms", sent, took.as_millis());
+        log::info!("PASS: {} frames in {} ms", sent, took.as_millis());
     } else {
-        println!(
+        log::info!(
             "FAIL: {} frames took {} ms, expected at most {} ms",
             sent,
             took.as_millis(),
@@ -80,6 +79,7 @@ async fn transmit(config: TwaiConfiguration<'static, Blocking>) {
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 

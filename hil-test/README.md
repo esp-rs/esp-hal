@@ -218,10 +218,14 @@ If the test is supported by all the targets, you can omit the header. See [`xtas
 
 ## Logging in tests
 
-The tests print [defmt] logs. The default `log-serial` feature prints them through `esp-println`,
-on the USB-Serial-JTAG port if the chip has one and a USB host is attached, and on UART0 if not.
+The tests print [defmt] logs. The default `log-serial` feature prints them through `esp-log`,
+on the USB-Serial-JTAG port if the chip has one, and on UART0's default TX pin if not.
 `probe-rs run` reads the serial port of the probe and decodes the logs. It shows the log of a test
 only if the test fails. Use `--nocapture` to see the logs of all tests.
+
+A test installs the logger with `hil_test::init_logger!(peripherals)` after `esp_hal::init`. The
+macro moves the port it logs on out of `peripherals`. The logger uses the unstable UART and
+USB-Serial-JTAG drivers, so a test that does not enable `unstable` prints no logs.
 
 If the serial port of the probe is not connected to the chip, for example an ESP-Prog with the
 UART of the chip on a separate USB cable, set the port in the probe-rs configuration file:

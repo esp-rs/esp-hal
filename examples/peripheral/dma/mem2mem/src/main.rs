@@ -21,9 +21,9 @@ const DATA_SIZE: usize = 1024 * 10;
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger(log::LevelFilter::Info);
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let delay = Delay::new();
 

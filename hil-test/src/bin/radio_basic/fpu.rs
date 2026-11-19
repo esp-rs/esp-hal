@@ -207,7 +207,8 @@ mod tests {
     }
 
     #[test]
-    fn fpu_is_enabled() {
+    fn fpu_is_enabled(p: Peripherals) {
+        hil_test::init_logger!(p);
         let result = run_float_calc(2.0);
         assert_eq!(result, 4.0);
     }
@@ -215,6 +216,7 @@ mod tests {
     #[cfg(multi_core)]
     #[test]
     fn fpu_is_enabled_on_core1(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         use core::sync::atomic::{AtomicBool, Ordering};
 
         static DONE: AtomicBool = AtomicBool::new(false);
@@ -246,6 +248,7 @@ mod tests {
     #[cfg(multi_core)]
     #[test]
     fn fpu_is_enabled_on_core1_with_preempt(p: Peripherals) {
+        hil_test::init_logger!(p);
         use core::sync::atomic::{AtomicBool, Ordering};
 
         use esp_hal::timer::timg::TimerGroup;
@@ -279,6 +282,7 @@ mod tests {
     #[cfg(float_save_restore)]
     #[test]
     fn interrupt_handler_keeps_fpu_state(p: Peripherals) {
+        hil_test::init_logger!(p);
         static HANDLER_RAN: AtomicBool = AtomicBool::new(false);
 
         #[handler]
@@ -301,6 +305,7 @@ mod tests {
     #[cfg(float_save_restore)]
     #[test]
     fn nested_interrupt_handler_keeps_fpu_state(p: Peripherals) {
+        hil_test::init_logger!(p);
         static HIGH_RAN: AtomicBool = AtomicBool::new(false);
         static LOW_KEPT_STATE: AtomicBool = AtomicBool::new(false);
 
@@ -336,6 +341,7 @@ mod tests {
     #[cfg(float_save_restore)]
     #[test]
     fn task_switch_keeps_fpu_state(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::{time::Instant, timer::timg::TimerGroup};
         use esp_rtos::thread::ThreadSpawner;
 

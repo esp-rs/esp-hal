@@ -24,7 +24,6 @@ use esp_hal::{
     system::{Cpu, CpuControl, Stack},
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use esp_rtos::embassy::InterruptExecutor;
 use static_cell::StaticCell;
 
@@ -37,13 +36,13 @@ async fn control_led(
     mut led: Output<'static>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
-    println!("Starting control_led() on core {}", Cpu::current() as usize);
+    log::info!("Starting control_led() on core {}", Cpu::current() as usize);
     loop {
         if control.wait().await {
-            esp_println::println!("LED on");
+            log::info!("LED on");
             led.set_low();
         } else {
-            esp_println::println!("LED off");
+            log::info!("LED off");
             led.set_high();
         }
     }
@@ -52,17 +51,17 @@ async fn control_led(
 /// Sends periodic messages to control_led, enabling or disabling it.
 #[embassy_executor::task]
 async fn enable_disable_led(control: &'static Signal<CriticalSectionRawMutex, bool>) {
-    println!(
+    log::info!(
         "Starting enable_disable_led() on core {}",
         Cpu::current() as usize
     );
     let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
-        esp_println::println!("Sending LED on");
+        log::info!("Sending LED on");
         control.signal(true);
         ticker.next().await;
 
-        esp_println::println!("Sending LED off");
+        log::info!("Sending LED off");
         control.signal(false);
         ticker.next().await;
     }
@@ -70,8 +69,9 @@ async fn enable_disable_led(control: &'static Signal<CriticalSectionRawMutex, bo
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);

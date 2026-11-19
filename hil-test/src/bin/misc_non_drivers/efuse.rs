@@ -8,7 +8,8 @@ mod tests {
 
     #[init]
     fn init() {
-        _ = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
     }
 
     #[cfg(temp_sensor_driver_supported)]

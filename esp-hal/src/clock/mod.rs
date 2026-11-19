@@ -240,7 +240,8 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
         #[cfg(soc_has_clock_node_rtc_slow_clk)]
         clocks::request_rtc_slow_clk(clocks);
         // esp-println writes to UART0's FIFO without a driver, and the UARTs share this memory.
-        // TODO: remove once https://github.com/esp-rs/esp-hal/issues/4666 is resolved.
+        // esp-println is deprecated, but this stays as long as esp-println is supported, see
+        // https://github.com/esp-rs/esp-hal/issues/6860.
         #[cfg(soc_has_clock_node_uart_mem_clk)]
         clocks::request_uart_mem_clk(clocks);
     });

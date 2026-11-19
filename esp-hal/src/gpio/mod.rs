@@ -2245,6 +2245,25 @@ for_each_gpio! {
 
 define_io_mux_reg!();
 
+/// Switches every pin whose IO MUX function outputs `signal` back to GPIO.
+///
+/// The boot ROM leaves UART0's default pins on their IO MUX function. Without this, UART0 would
+/// keep driving them next to the pin the driver routes through the GPIO matrix.
+pub(crate) fn disconnect_io_mux_output(signal: OutputSignal) {
+    for_each_gpio! {
+        ($n:literal, $gpio:ident $inputs:tt ($( $af_output_num:ident => $af_output_signal:ident )*) $attrs:tt) => {
+            $(
+                if signal == OutputSignal::$af_output_signal {
+                    let reg = io_mux_reg($n);
+                    if reg.read().mcu_sel().bits() == AlternateFunction::$af_output_num as u8 {
+                        reg.modify(|_, w| unsafe { w.mcu_sel().bits(AlternateFunction::GPIO as u8) });
+                    }
+                }
+            )*
+        };
+    }
+}
+
 // documentation only - renders nicer than the blanket implementation, but
 // doesn't prevent generic code from working.
 #[cfg(docsrs)]

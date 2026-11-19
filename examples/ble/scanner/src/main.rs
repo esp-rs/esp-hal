@@ -23,8 +23,9 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_s: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 

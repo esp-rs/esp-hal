@@ -455,6 +455,7 @@ mod tests {
     fn init() -> Context<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
 
         Context {
             ecc: Ecc::new(p.ECC, Default::default()).unwrap(),
@@ -954,6 +955,7 @@ mod work_queue_tests {
     fn init() -> Context<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
 
         Context {
             ecc: EccBackend::new(p.ECC, Default::default()).unwrap(),

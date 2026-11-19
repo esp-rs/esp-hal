@@ -260,9 +260,10 @@ For initial bring-up, you may also need to add support in:
 - `esp-backtrace`
 - `esp-bootloader-esp-idf`
 - `esp-sync`
-- `esp-println` (optional, for a basic "Hello World")
 
-These crates are mostly platform-independent. In many cases, adding a feature flag in `Cargo.toml` is enough. Where chip-specific adjustments are required (e.g., `esp-println`, `esp-bootloader-esp-idf`), verify values against ESP-IDF.
+These crates are mostly platform-independent. In many cases, adding a feature flag in `Cargo.toml` is enough. Where chip-specific adjustments are required (e.g., `esp-bootloader-esp-idf`), verify values against ESP-IDF.
+
+For a basic "Hello World", `esp-log` logs over the HAL's `Uart` or `UsbSerialJtag` driver once that driver works. Add the chip feature and the default UART0 and USB-Serial-JTAG pins of the new chip to `esp-log/src/macros.rs`.
 
 ### Interrupts
 

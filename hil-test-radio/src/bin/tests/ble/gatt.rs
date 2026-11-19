@@ -20,6 +20,7 @@ mod tests {
 
     #[test]
     async fn ble_central_connects_to_peripheral(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -33,6 +34,7 @@ mod tests {
     #[cfg(soc_has_ieee802154)]
     #[test]
     async fn ble_central_connects_while_ieee802154_is_up(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_radio::ieee802154::{Config, Ieee802154};
 
         let timg0 = TimerGroup::new(p.TIMG0);

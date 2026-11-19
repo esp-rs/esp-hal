@@ -16,17 +16,18 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[embassy_executor::task]
 async fn run() {
     loop {
-        esp_println::println!("Hello world from embassy!");
+        log::info!("Hello world from embassy!");
         Timer::after(Duration::from_millis(1_000)).await;
     }
 }
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    esp_println::println!("Init!");
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
@@ -34,7 +35,7 @@ async fn main(spawner: Spawner) {
     spawner.spawn(run().unwrap());
 
     loop {
-        esp_println::println!("Bing!");
+        log::info!("Bing!");
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }

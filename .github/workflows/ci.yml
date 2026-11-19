@@ -451,6 +451,7 @@ jobs:
             esp-hal
             esp-hal-procmacros
             esp-lp-hal
+            esp-log
             esp-metadata
             esp-phy
             esp-println

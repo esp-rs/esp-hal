@@ -96,9 +96,10 @@ const DRAM2_UNINIT_SIZE: usize = {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    esp_log::init_uart!(peripherals);
 
     // Large buffers are allocated explicitly in PSRAM, everything else in internal RAM.
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);

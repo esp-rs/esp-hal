@@ -18,27 +18,27 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
     let delay = Delay::new();
     let mut lpwr = LowPower::new(peripherals.LPWR);
 
-    println!("up and running!");
+    log::info!("up and running!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
-    println!("reset reason: {:?}", reason);
+    log::info!("reset reason: {:?}", reason);
     let wake_reason = wakeup_cause();
-    println!("wake reason: {:?}", wake_reason);
+    log::info!("wake reason: {:?}", wake_reason);
 
     // The deadline is absolute, so the delay below does not shorten the sleep.
     lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(5));
 
-    println!("sleeping!");
+    log::info!("sleeping!");
     delay.delay_millis(100);
     lpwr.sleep_deep(RtcSleepConfig::deep());
 }
