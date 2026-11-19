@@ -33,6 +33,9 @@ PROVIDE(__naked_level_5_interrupt = __default_naked_level_5_interrupt);
 PROVIDE(__naked_level_6_interrupt = __default_naked_level_6_interrupt);
 PROVIDE(__naked_level_7_interrupt = __default_naked_level_7_interrupt);
 
+/* runs after `__level_1_interrupt`, and can choose the context to return to */
+PROVIDE(__level_1_interrupt_exit = __default_level_1_interrupt_exit);
+
 
 /* needed to force inclusion of the vectors */
 EXTERN(__default_exception);
@@ -47,6 +50,7 @@ EXTERN(__default_naked_level_4_interrupt);
 EXTERN(__default_naked_level_5_interrupt);
 EXTERN(__default_naked_level_6_interrupt);
 EXTERN(__default_naked_level_7_interrupt);
+EXTERN(__default_level_1_interrupt_exit);
 
 
 /* Define output sections */
