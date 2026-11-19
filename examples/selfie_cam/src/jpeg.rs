@@ -1,8 +1,10 @@
-//! JPEG files from the 1280x720 RGB565 pictures, and back.
+//! Encodes RGB565 camera frames in hardware and decodes JPEG files in software.
 
-use alloc::{vec, vec::Vec};
+use alloc::vec;
 
-use jpeg_encoder::{Encoder, EncodingError, ImageBuffer, JpegColorType, rgb_to_ycbcr};
+use allocator_api2::vec::Vec;
+use esp_alloc::DmaCompatibleExternalMemory;
+use esp_hal::jpeg::{Config, Encoder, Error, PixelFormat, Subsampling};
 use zune_core::{bytestream::ZCursor, colorspace::ColorSpace, options::DecoderOptions};
 use zune_jpeg::{JpegDecoder, errors::DecodeErrors};
 
@@ -13,10 +15,47 @@ use crate::{
 
 const QUALITY: u8 = 90;
 
-pub fn encode(pixels: &[u16]) -> Result<Vec<u8>, EncodingError> {
-    let mut jpeg = Vec::with_capacity(512 * 1024);
-    Encoder::new(&mut jpeg, QUALITY).encode_image(Rgb565(pixels))?;
-    Ok(jpeg)
+pub enum EncodeError {
+    OutOfMemory,
+    Jpeg(Error),
+}
+
+impl core::fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::OutOfMemory => f.write_str("not enough PSRAM to encode the photo"),
+            Self::Jpeg(error) => write!(f, "{error}"),
+        }
+    }
+}
+
+pub fn encode(
+    encoder: &mut Encoder<'_>,
+    pixels: &[u8],
+) -> Result<Vec<u8, DmaCompatibleExternalMemory>, EncodeError> {
+    let config = Config {
+        width: WIDTH as u16,
+        height: HEIGHT as u16,
+        quality: QUALITY,
+        input_format: PixelFormat::Rgb565Be,
+        subsampling: Subsampling::Yuv444,
+    };
+
+    let mut capacity = 512 * 1024;
+    loop {
+        let mut jpeg = Vec::new_in(DmaCompatibleExternalMemory);
+        jpeg.try_reserve_exact(capacity)
+            .map_err(|_| EncodeError::OutOfMemory)?;
+        jpeg.resize(capacity, 0);
+        match encoder.encode(pixels, &mut jpeg, config) {
+            Ok(size) => {
+                jpeg.truncate(size);
+                return Ok(jpeg);
+            }
+            Err(Error::OutputTooSmall) => capacity *= 2,
+            Err(error) => return Err(EncodeError::Jpeg(error)),
+        }
+    }
 }
 
 pub enum DecodeError {
@@ -52,35 +91,4 @@ pub fn decode(jpeg: &[u8], frame: &mut Frame) -> Result<(), DecodeError> {
         *pixel = rgb565(r, g, b);
     }
     Ok(())
-}
-
-struct Rgb565<'a>(&'a [u16]);
-
-impl ImageBuffer for Rgb565<'_> {
-    fn get_jpeg_color_type(&self) -> JpegColorType {
-        JpegColorType::Ycbcr
-    }
-
-    fn width(&self) -> u16 {
-        WIDTH as u16
-    }
-
-    fn height(&self) -> u16 {
-        HEIGHT as u16
-    }
-
-    fn fill_buffers(&self, y: u16, buffers: &mut [Vec<u8>; 4]) {
-        let row = &self.0[usize::from(y) * WIDTH..][..WIDTH];
-        for &pixel in row {
-            let pixel = u16::from_be(pixel);
-            // Repeat the high bits in the low bits, so that white stays 255.
-            let r = (pixel >> 11) as u8;
-            let g = (pixel >> 5) as u8 & 0x3f;
-            let b = pixel as u8 & 0x1f;
-            let (y, cb, cr) = rgb_to_ycbcr(r << 3 | r >> 2, g << 2 | g >> 4, b << 3 | b >> 2);
-            buffers[0].push(y);
-            buffers[1].push(cb);
-            buffers[2].push(cr);
-        }
-    }
 }

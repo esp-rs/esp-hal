@@ -22,6 +22,7 @@ use esp_hal::{
     assign_resources,
     clock::{ClockConfig, CpuClock},
     i2c::master::{Config as I2cConfig, I2c},
+    jpeg::Encoder,
     lcd_cam::LcdCam,
     ram,
     system::Stack,
@@ -125,6 +126,11 @@ assign_resources! {
             ladder: GPIO42,
             boot: GPIO61,
         },
+        jpeg: JpegResources<'d> {
+            encoder: JPEG,
+            tx: DMA2D_TX_CH0,
+            rx: DMA2D_RX_CH0,
+        },
         sd: SdResources<'d> {
             sdhost: SDHOST,
             power: GPIO39,
@@ -186,10 +192,14 @@ async fn main(spawner: Spawner) -> ! {
     let touch = Touch::new(i2c).await;
     log::info!("Goodix touch controller at 0x{:02x}", touch.address());
 
+    let r = resources.jpeg;
+    let mut jpeg = Encoder::new(r.encoder, r.tx, r.rx);
+    jpeg.set_timeout(Some(esp_hal::time::Duration::from_millis(500)));
     let mut app = App {
         touch,
         buttons: Buttons::new(resources.buttons),
         storage: Storage::new(resources.sd, STORE_IN_RAM),
+        jpeg,
         photos: None,
         camera: Screen::camera(),
         gallery: Screen::gallery(),
@@ -208,6 +218,7 @@ struct App {
     touch: Touch,
     buttons: Buttons,
     storage: Storage,
+    jpeg: Encoder<'static>,
     /// The photo numbers, or `None` without a card.
     photos: Option<Vec<u32>>,
     camera: Screen,
@@ -353,7 +364,7 @@ impl App {
         self.post(Some(picture.clone()), true, Mode::Camera);
 
         let started = Instant::now();
-        let jpeg = jpeg::encode(picture.pixels());
+        let jpeg = jpeg::encode(&mut self.jpeg, picture.bytes());
         let encoded = started.elapsed();
         let saved = match jpeg {
             Ok(jpeg) => match self.storage.save(number, &jpeg).await {
@@ -367,7 +378,7 @@ impl App {
                     .map(|()| jpeg.len())
                     .map_err(|error| format!("{error:?}")),
             },
-            Err(error) => Err(format!("{error:?}")),
+            Err(error) => Err(format!("{error}")),
         };
         match saved {
             Ok(bytes) => {
