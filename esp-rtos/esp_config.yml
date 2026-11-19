@@ -33,6 +33,15 @@ options:
     default:
       - value: true
 
+  - name: switch-stack-size
+    description: "Size, in bytes, of the stack that the scheduler of each CPU runs on. A multiple of 16.
+      On Xtensa, this stack also holds the next context (256 bytes), and the context of interrupts above level 3 that occur during a task switch."
+    default:
+      - value: 1536
+    constraints:
+      - type:
+          validator: positive_integer
+
   - name: radio-timer-thread-priority
     description: "Priority of the timer thread serving esp-radio."
     default:

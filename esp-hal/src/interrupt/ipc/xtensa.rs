@@ -12,7 +12,6 @@ use crate::{
     peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1, Interrupt},
     ram,
     system::Cpu,
-    trapframe::TrapFrame,
 };
 
 pub(super) fn raise(core: Cpu) {
@@ -43,22 +42,14 @@ pub(crate) fn install() {
 }
 
 fn install_core(core: Cpu) {
-    let handler = crate::interrupt::InterruptHandler::new(
-        // The vectored dispatcher calls every handler with the trap frame.
-        unsafe {
-            core::mem::transmute::<fn(&mut TrapFrame), extern "C" fn()>(
-                ipc_handler as fn(&mut TrapFrame),
-            )
-        },
-        Priority::min(),
-    );
+    let handler = crate::interrupt::InterruptHandler::new(ipc_handler, Priority::min());
 
     crate::interrupt::bind_vector(interrupt(core), handler);
     crate::interrupt::enable_on_cpu(core, interrupt(core), Priority::min());
 }
 
 #[ram]
-fn ipc_handler(context: &mut TrapFrame) {
+extern "C" fn ipc_handler() {
     let core = Cpu::current();
 
     // This is the only place that clears the request. A second clear would drop a request
@@ -81,13 +72,12 @@ fn ipc_handler(context: &mut TrapFrame) {
         return;
     }
 
-    // The context switch chooses the context that the interrupt returns to, so it runs last.
+    // The context switch chooses the context that the interrupt returns to, so it runs at the
+    // exit of the interrupt, after all level 1 handlers.
     let handler = state
         .pending_context_switch
         .swap(core::ptr::null_mut(), Ordering::AcqRel);
     if !handler.is_null() {
-        let handler =
-            unsafe { core::mem::transmute::<*mut (), extern "C" fn(&mut TrapFrame)>(handler) };
-        handler(context);
+        crate::interrupt::__rtos_implementation::exit::switch_at_exit(handler);
     }
 }
