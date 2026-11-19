@@ -27,10 +27,22 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_rtos::main]
 async fn main(_spawner: Spawner) {
-    esp_println::println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32h4" => peripherals.GPIO24,
+        feature = "esp32p4" => peripherals.GPIO37,
+        any(feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO43,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);

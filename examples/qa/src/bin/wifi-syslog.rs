@@ -12,7 +12,6 @@ use embassy_executor::Spawner;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::wifi::{AuthenticationMethodConfig, Config, ControllerConfig, sta::StationConfig};
 use qa_test::DRAM2_UNINIT_SIZE;
 
@@ -23,9 +22,9 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    qa_test::init_logger!(peripherals);
 
     esp_alloc::heap_allocator!(size: 32 * 1024);
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
@@ -41,7 +40,7 @@ async fn main(_spawner: Spawner) {
             )),
     );
 
-    println!("Creating wifi controller with print-logs-from-driver enabled");
+    log::info!("Creating wifi controller with print-logs-from-driver enabled");
 
     let mut controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
@@ -49,13 +48,13 @@ async fn main(_spawner: Spawner) {
     )
     .unwrap();
 
-    println!("Connecting to WiFi...");
+    log::info!("Connecting to WiFi...");
     controller.connect_async().await.unwrap();
-    println!("Connected! Driver syslog output should be visible above.");
+    log::info!("Connected! Driver syslog output should be visible above.");
 
     // Disconnect to exercise teardown log paths too
     controller.disconnect_async().await.unwrap();
-    println!("Disconnected.");
+    log::info!("Disconnected.");
 
-    println!("Done");
+    log::info!("Done");
 }

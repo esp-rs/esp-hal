@@ -182,7 +182,7 @@ peripheral_clocks = { templates = [
     { name = "Systimer", keep_enabled = true },
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
     #{ name = "Spi3Dma" },
-    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
+    { name = "UartMem" },
     { name = "UsbDevice", keep_enabled = true },
     { name = "I2s0" },
     { name = "Twai0", template_params = { peripheral = "twai" } },
@@ -195,7 +195,7 @@ peripheral_clocks = { templates = [
     { name = "I2cExt0" },
     { name = "Spi2" },
     { name = "Uart1" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart0", template_params = { peripheral = "uart" } },
     #{ name = "Spi01" },
     
     # Radio clocks not modeled here.

@@ -48,13 +48,12 @@ use esp_hal::{
     },
     time::Rate,
 };
-use esp_println::{print, println};
-
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
 
     let (sclk, miso, mosi, sio2, sio3, cs) = cfg_select! {
         feature = "esp32" => (
@@ -192,15 +191,18 @@ fn main() -> ! {
         // `wait`
         (spi, dma_rx_buf) = transfer.wait();
 
-        println!("{:x?}", dma_rx_buf.as_slice());
-        for b in &mut dma_rx_buf.as_slice().iter() {
-            if *b >= 32 && *b <= 127 {
-                print!("{}", *b as char);
-            } else {
-                print!(".");
+        log::info!("{:x?}", dma_rx_buf.as_slice());
+        let text = core::fmt::from_fn(|f| {
+            for b in dma_rx_buf.as_slice() {
+                if *b >= 32 && *b <= 127 {
+                    write!(f, "{}", *b as char)?;
+                } else {
+                    write!(f, ".")?;
+                }
             }
-        }
-        println!();
+            Ok(())
+        });
+        log::info!("{text}");
 
         delay.delay_millis(250);
     }

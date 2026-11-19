@@ -22,7 +22,6 @@ use esp_hal::{
     time::{Duration, Instant},
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use esp_radio::wifi::{
     self,
     AuthenticationMethodConfig,
@@ -39,6 +38,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[main]
 async fn main(_spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
 
@@ -48,13 +48,13 @@ async fn main(_spawner: Spawner) -> ! {
     let delay = Delay::new();
     let mut lpwr = LowPower::new(peripherals.LPWR);
 
-    println!("up and running!");
+    log::info!("up and running!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
-    println!("reset reason: {:?}", reason);
+    log::info!("reset reason: {:?}", reason);
     let wake_reason = wakeup_cause();
-    println!("wake reason: {:?}", wake_reason);
+    log::info!("wake reason: {:?}", wake_reason);
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
 
     let station_config = wifi::Config::Station(
         StationConfig::default()
@@ -70,19 +70,19 @@ async fn main(_spawner: Spawner) -> ! {
     )
     .unwrap();
 
-    println!("Scan");
+    log::info!("Scan");
     let scan_config = ScanConfig::default().with_max(10);
     let result = controller.scan_async(&scan_config).await.unwrap();
     for ap in result {
-        println!("{:?}", ap);
+        log::info!("{:?}", ap);
     }
 
-    println!("Wifi configured and started!");
+    log::info!("Wifi configured and started!");
 
     // The deadline is absolute, so the delay below does not shorten the sleep.
     lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(5));
 
-    println!("sleeping!");
+    log::info!("sleeping!");
     delay.delay_millis(100);
     lpwr.sleep_deep(RtcSleepConfig::deep());
 }

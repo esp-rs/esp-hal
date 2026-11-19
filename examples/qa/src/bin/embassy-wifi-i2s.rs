@@ -20,7 +20,6 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use esp_radio::wifi::{
     AuthenticationMethodConfig,
     Config,
@@ -61,22 +60,22 @@ async fn connection_manager(
     mut controller: WifiController<'static>,
     connected_signal: &'static Signal<NoopRawMutex, bool>,
 ) {
-    println!("start connection task");
+    log::info!("start connection task");
 
     loop {
-        println!("About to connect...");
+        log::info!("About to connect...");
 
         match controller.connect_async().await {
             Ok(info) => {
-                println!("Wifi connected to {:?}", info);
+                log::info!("Wifi connected to {:?}", info);
                 connected_signal.signal(true);
 
                 // wait until we're no longer connected
                 let info = controller.wait_for_disconnect_async().await.ok();
-                println!("Disconnected: {:?}", info);
+                log::info!("Disconnected: {:?}", info);
             }
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                log::info!("Failed to connect to wifi: {e:?}");
             }
         }
 
@@ -96,11 +95,11 @@ async fn i2s_dma_drain(
     let i2s_data = I2S_DATA_BUFFER.init([0u8; 8192]);
 
     // Create circular DMA transaction
-    println!("🎛️  Creating I2S DMA circular transaction");
+    log::info!("🎛️  Creating I2S DMA circular transaction");
     let mut transaction = match i2s_rx.read(buffer) {
         Ok(t) => t,
         Err(e) => {
-            println!("Failed to start I2S DMA: {:?}", e.0);
+            log::info!("Failed to start I2S DMA: {:?}", e.0);
             return;
         }
     };
@@ -109,7 +108,7 @@ async fn i2s_dma_drain(
     let start = Instant::now();
 
     // Start continuous draining to prevent DmaError(Late)
-    println!("Starting continuous buffer drain to keep DMA synchronized...");
+    log::info!("Starting continuous buffer drain to keep DMA synchronized...");
     while !connected_signal.signaled() {
         // Check for available data and drain it
         transaction.wait_for_available_async().await.unwrap();
@@ -121,7 +120,7 @@ async fn i2s_dma_drain(
             total_drained += bytes;
         }
     }
-    println!(
+    log::info!(
         "Drained: {} bytes | uptime: {} ms",
         total_drained,
         start.elapsed().as_millis()
@@ -130,15 +129,15 @@ async fn i2s_dma_drain(
     transaction.wait_for_available_async().await.unwrap();
     let avl = transaction.available_bytes();
     let bytes = transaction.pop(&mut i2s_data[..avl]);
-    println!("Final drained {} bytes total", bytes);
+    log::info!("Final drained {} bytes total", bytes);
 }
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
     // Enable logging from the ESP_LOG environment variable (set at build time)
     // Example: ESP_LOG=warn,esp_rtos=trace,esp_radio=info
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
 
     // Provide a heap for components that allocate (esp-rtos/esp-radio, etc.)
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
@@ -181,14 +180,14 @@ async fn main(spawner: Spawner) {
             )),
     );
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
     let wifi_interface = esp_radio::wifi::Interface::station();
     let controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )
     .unwrap();
-    println!("Wifi configured and started!");
+    log::info!("Wifi configured and started!");
 
     let config = embassy_net::Config::dhcpv4(Default::default());
     let rng = Rng::new();

@@ -9,12 +9,14 @@ embassy-executor = "0.10.0"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
-    "println",
+    "log-04",
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-metadata-generated = { path = "../../../esp-metadata-generated" }
-esp-println = { path = "../../../esp-println", features = ["log-04"] }
+embedded-log = { path = "../../../embedded-log", features = ["log-04"] }
+log = "0.4"
+static_cell = "2.1.1"
 esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "log-04", "embassy"] }
 esp-radio = { path = "../../../esp-radio", features = [
     "log-04",

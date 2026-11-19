@@ -19,7 +19,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, main, ram, rtc_cntl::Rtc, time::Duration};
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -43,6 +42,7 @@ static mut UNCACHE_BSS: [u8; 8] = [0; 8];
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
 
     let delay = Delay::new();
 
@@ -51,7 +51,7 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.RTC_TIMER);
     rtc.rwdt.enable();
 
-    println!(
+    log::info!(
         "IRAM function located at {:p}",
         function_in_ram as *const ()
     );
@@ -79,18 +79,18 @@ fn main() -> ! {
             SOME_PERSISTENT_DATA[1] = 0;
         }
 
-        println!("Counter {}", SOME_PERSISTENT_DATA[1]);
+        log::info!("Counter {}", SOME_PERSISTENT_DATA[1]);
         SOME_PERSISTENT_DATA[1] += 1;
     }
 
-    println!(
+    log::info!(
         "RTC_FAST function located at {:p}",
         function_in_rtc_ram as *const ()
     );
 
     assert_eq!(42, function_in_rtc_ram());
 
-    println!("Restarting in ~ 10 seconds.");
+    log::info!("Restarting in ~ 10 seconds.");
     let mut i = 10;
     loop {
         assert_eq!(42, function_in_rtc_ram());
@@ -102,7 +102,7 @@ fn main() -> ! {
 
 #[ram]
 fn function_in_ram(count: u32) {
-    println!("{}", count);
+    log::info!("{}", count);
 }
 
 #[ram(unstable(rtc_fast))]

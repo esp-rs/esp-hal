@@ -7,11 +7,13 @@ publish = false
 [dependencies]
 esp-backtrace = { path = "../../esp-backtrace", features = [
     "panic-handler",
-    "println",
+    "log-04",
 ] }
 esp-bootloader-direct-boot = { path = "../../esp-bootloader-direct-boot" }
 esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
-esp-println = { path = "../../esp-println", features = ["log-04"] }
+embedded-log = { path = "../../embedded-log", features = ["log-04"] }
+log = "0.4"
+static_cell = "2.1.1"
 
 [features]
 esp32c2 = [

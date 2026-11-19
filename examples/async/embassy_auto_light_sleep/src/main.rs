@@ -23,13 +23,16 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
+    Blocking,
     gpio::{Event, Input, InputConfig, Pull},
     peripherals,
     rtc_cntl::WakeLock,
     system::wakeup_cause,
     time::Instant,
     timer::timg::TimerGroup,
+    uart::UartTx,
 };
+use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -67,7 +70,7 @@ cfg_select! {
 #[embassy_executor::task]
 async fn periodic() {
     loop {
-        esp_println::println!(
+        log::info!(
             "tick @ {} (wakeup cause: {:?})",
             Instant::now().duration_since_epoch().as_millis(),
             wakeup_cause(),
@@ -103,10 +106,10 @@ async fn gpio(boot_btn: BOOT_GPIO<'static>) {
         // A pin that waits for an event also ends a light sleep, so it needs no wakeup
         // configuration.
         input.wait_for(Event::LowLevel).await;
-        esp_println::println!("button low (wakeup cause: {:?})", wakeup_cause());
+        log::info!("button low (wakeup cause: {:?})", wakeup_cause());
 
         input.wait_for(Event::HighLevel).await;
-        esp_println::println!("button high");
+        log::info!("button high");
     }
 }
 
@@ -114,7 +117,7 @@ async fn gpio(boot_btn: BOOT_GPIO<'static>) {
 #[embassy_executor::task]
 async fn periodic_core2() {
     loop {
-        esp_println::println!(
+        log::info!(
             "tick on core 2 @ {}",
             Instant::now().duration_since_epoch().as_millis()
         );
@@ -128,18 +131,35 @@ async fn wake_lock_demo() {
         Timer::after(Duration::from_secs(5)).await;
 
         let guard = WakeLock::new();
-        esp_println::println!("wake lock held: auto light-sleep disabled for 3s");
+        log::info!("wake lock held: auto light-sleep disabled for 3s");
         Timer::after(Duration::from_secs(3)).await;
         core::mem::drop(guard);
 
-        esp_println::println!("wake lock released: auto light-sleep re-enabled");
+        log::info!("wake lock released: auto light-sleep re-enabled");
     }
 }
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let p = esp_hal::init(esp_hal::Config::default());
+
+    // Log on UART0's default TX pin: USB-Serial-JTAG disconnects while the chip sleeps.
+    let log_tx = cfg_select! {
+        feature = "esp32" => p.GPIO1,
+        feature = "esp32c2" => p.GPIO20,
+        feature = "esp32c3" => p.GPIO21,
+        any(feature = "esp32c5", feature = "esp32c61") => p.GPIO11,
+        feature = "esp32c6" => p.GPIO16,
+        any(feature = "esp32h2", feature = "esp32h4") => p.GPIO24,
+        feature = "esp32p4" => p.GPIO37,
+        feature = "esp32s31" => p.GPIO58,
+        any(feature = "esp32s2", feature = "esp32s3") => p.GPIO43,
+    };
+    let log_writer = UartTx::new(p.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     let timg0 = TimerGroup::new(p.TIMG0);
 
@@ -184,7 +204,6 @@ async fn main(spawner: Spawner) {
     {
         use esp_hal::system::Stack;
         use esp_rtos::embassy::Executor;
-        use static_cell::StaticCell;
 
         static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
         let app_core_stack = APP_CORE_STACK.init(Stack::new());

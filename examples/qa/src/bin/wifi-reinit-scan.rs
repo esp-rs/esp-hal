@@ -24,7 +24,6 @@ use embassy_time::{Duration, Instant, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::wifi::{ControllerConfig, WifiController, scan::ScanConfig};
 use qa_test::DRAM2_UNINIT_SIZE;
 
@@ -39,9 +38,9 @@ const INACTIVE_PHASE: Duration = Duration::from_secs(10);
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    qa_test::init_logger!(peripherals);
 
     esp_alloc::heap_allocator!(size: 32 * 1024);
     // add some more RAM
@@ -50,7 +49,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    println!(
+    log::info!(
         "Waiting {}s (baseline power, radio never initialized)",
         STARTUP_DELAY.as_secs()
     );
@@ -64,7 +63,7 @@ async fn main(_spawner: Spawner) {
         let mut controller = WifiController::new(wifi.reborrow(), ControllerConfig::default())
             .expect("failed to create Wi-Fi controller");
 
-        println!(
+        log::info!(
             "Iteration {iteration}: active for {}s",
             ACTIVE_PHASE.as_secs()
         );
@@ -75,18 +74,18 @@ async fn main(_spawner: Spawner) {
                 .await
             {
                 Ok(aps) => {
-                    println!("Iteration {iteration}: found {} access points", aps.len());
+                    log::info!("Iteration {iteration}: found {} access points", aps.len());
                     for ap in aps {
-                        println!("  {ap:?}");
+                        log::info!("  {ap:?}");
                     }
                 }
-                Err(e) => println!("Iteration {iteration}: scan failed: {e:?}"),
+                Err(e) => log::info!("Iteration {iteration}: scan failed: {e:?}"),
             }
             Timer::after(Duration::from_secs(1)).await;
         }
 
         drop(controller);
-        println!(
+        log::info!(
             "Iteration {iteration}: Wi-Fi deinitialized, inactive for {}s (measure power now)",
             INACTIVE_PHASE.as_secs()
         );

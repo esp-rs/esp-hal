@@ -9,16 +9,17 @@ embassy-executor = "0.10.0"
 embassy-time = "0.5.0"
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
-    "println",
+    "log-04",
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-rtos = { path = "../../../esp-rtos", features = ["embassy", "log-04"] }
-esp-println = { path = "../../../esp-println", default-features = false, features = ["uart", "log-04", "critical-section"] }
-static_cell = { version = "2.1.1", optional = true }
+embedded-log = { path = "../../../embedded-log", features = ["log-04"] }
+log = "0.4"
+static_cell = "2.1.1"
 
 [features]
-multi_core = ["dep:static_cell"]
+multi_core = []
 
 esp32 = [
     "multi_core",

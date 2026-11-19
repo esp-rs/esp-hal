@@ -12,7 +12,6 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{assist_debug::DebugAssist, handler, main};
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -20,8 +19,23 @@ static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32c2" => peripherals.GPIO20,
+        feature = "esp32c3" => peripherals.GPIO21,
+        any(feature = "esp32c5", feature = "esp32c61") => peripherals.GPIO11,
+        feature = "esp32c6" => peripherals.GPIO16,
+        feature = "esp32h2" => peripherals.GPIO24,
+        feature = "esp32s3" => peripherals.GPIO43,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
     da.set_interrupt_handler(interrupt_handler);
@@ -76,39 +90,39 @@ fn main() -> ! {
 
 #[allow(unconditional_recursion)]
 fn eat_up_stack(v: u32) {
-    println!("Iteration {v}");
+    log::info!("Iteration {v}");
     eat_up_stack(v + 1);
 }
 
 #[handler(priority = esp_hal::interrupt::Priority::min())]
 fn interrupt_handler() {
     critical_section::with(|cs| {
-        println!("\n\nDEBUG_ASSIST interrupt");
+        log::info!("\n\nDEBUG_ASSIST interrupt");
         let mut da = DA.borrow_ref_mut(cs);
         let da = da.as_mut().unwrap();
 
         #[cfg(not(feature = "esp32s3"))]
         if da.is_sp_monitor_interrupt_set() {
-            println!("SP MONITOR TRIGGERED");
+            log::info!("SP MONITOR TRIGGERED");
             da.clear_sp_monitor_interrupt();
             let pc = da.sp_monitor_pc();
-            println!("PC = 0x{:x}", pc);
+            log::info!("PC = 0x{:x}", pc);
         }
 
         #[cfg(not(feature = "esp32c2"))]
         if da.is_region0_monitor_interrupt_set() {
-            println!("REGION0 MONITOR TRIGGERED");
+            log::info!("REGION0 MONITOR TRIGGERED");
             da.clear_region0_monitor_interrupt();
             let pc = da.region_monitor_pc();
-            println!("PC = 0x{:x}", pc);
+            log::info!("PC = 0x{:x}", pc);
         }
 
         #[cfg(not(feature = "esp32c2"))]
         if da.is_region1_monitor_interrupt_set() {
-            println!("REGION1 MONITOR TRIGGERED");
+            log::info!("REGION1 MONITOR TRIGGERED");
             da.clear_region1_monitor_interrupt();
             let pc = da.region_monitor_pc();
-            println!("PC = 0x{:x}", pc);
+            log::info!("PC = 0x{:x}", pc);
         }
 
         loop {}

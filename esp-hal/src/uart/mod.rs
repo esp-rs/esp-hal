@@ -614,6 +614,10 @@ where
         uart.info().rx_signal.connect_to(&crate::gpio::Level::High);
         uart.info().cts_signal.connect_to(&crate::gpio::Level::Low);
 
+        // Outputs only appear on the pins passed to the driver.
+        crate::gpio::disconnect_io_mux_output(uart.info().tx_signal);
+        crate::gpio::disconnect_io_mux_output(uart.info().rts_signal);
+
         Self {
             uart,
             phantom: PhantomData,

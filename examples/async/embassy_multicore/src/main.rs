@@ -26,7 +26,6 @@ use esp_hal::{
     system::{Cpu, Stack},
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use esp_rtos::embassy::Executor;
 use static_cell::StaticCell;
 
@@ -39,13 +38,13 @@ async fn control_led(
     mut led: Output<'static>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
-    println!("Starting control_led() on core {}", Cpu::current() as usize);
+    log::info!("Starting control_led() on core {}", Cpu::current() as usize);
     loop {
         if control.wait().await {
-            esp_println::println!("LED on");
+            log::info!("LED on");
             led.set_low();
         } else {
-            esp_println::println!("LED off");
+            log::info!("LED off");
             led.set_high();
         }
     }
@@ -53,8 +52,22 @@ async fn control_led(
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32" => peripherals.GPIO1,
+        feature = "esp32h4" => peripherals.GPIO24,
+        feature = "esp32p4" => peripherals.GPIO37,
+        feature = "esp32s3" => peripherals.GPIO43,
+        feature = "esp32s31" => peripherals.GPIO58,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
     let app_core_stack = APP_CORE_STACK.init(Stack::new());
@@ -80,17 +93,17 @@ async fn main(_spawner: Spawner) {
     });
 
     // Sends periodic messages to control_led, enabling or disabling it.
-    println!(
+    log::info!(
         "Starting enable_disable_led() on core {}",
         Cpu::current() as usize
     );
     let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
-        esp_println::println!("Sending LED on");
+        log::info!("Sending LED on");
         led_ctrl_signal.signal(true);
         ticker.next().await;
 
-        esp_println::println!("Sending LED off");
+        log::info!("Sending LED off");
         led_ctrl_signal.signal(false);
         ticker.next().await;
     }

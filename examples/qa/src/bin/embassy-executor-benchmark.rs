@@ -20,7 +20,6 @@ use esp_hal::{
     time::Duration,
     timer::{OneShotTimer, systimer::SystemTimer},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -35,12 +34,12 @@ const TEST_MILLIS: u64 = 500;
 fn timer_handler() {
     let c = unsafe { COUNTER } as u64;
     let cpu_clock = CLOCK as u64 * 1_000_000;
-    println!("task2 count={}", unsafe { T2_COUNTER });
-    println!("task3 count={}", unsafe { T3_COUNTER });
+    log::info!("task2 count={}", unsafe { T2_COUNTER });
+    log::info!("task3 count={}", unsafe { T3_COUNTER });
     let total_test_cpu_cycles = cpu_clock * TEST_MILLIS / 1000;
     // Average cycles per task execution, with a precision of 2 decimal places.
     let centicycles = (100 * total_test_cpu_cycles) / c;
-    println!(
+    log::info!(
         "Test OK, count={}, cycles={}.{}",
         c,
         centicycles / 100,
@@ -80,22 +79,21 @@ async fn task3() {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
-
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    qa_test::init_logger!(peripherals);
 
     Hooks::init();
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     esp_rtos::start(systimer.alarm0);
-    println!("Embassy initialized!");
+    log::info!("Embassy initialized!");
 
     spawner.spawn(TASK1.spawn(|| Task1 {}).unwrap());
     spawner.spawn(task2().unwrap());
     spawner.spawn(task3().unwrap());
 
-    println!("Starting test");
+    log::info!("Starting test");
 
     let mut timer = OneShotTimer::new(systimer.alarm1);
     timer.set_interrupt_handler(timer_handler);

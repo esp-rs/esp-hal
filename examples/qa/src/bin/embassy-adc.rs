@@ -20,14 +20,13 @@ use esp_hal::{
     delay::Delay,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -58,7 +57,7 @@ async fn main(_spawner: Spawner) {
 
     loop {
         let adc1_value: u16 = adc1.read_oneshot(&mut pin1).await.unwrap();
-        println!("ADC1 value: {}", adc1_value);
+        log::info!("ADC1 value: {}", adc1_value);
         delay.delay_millis(1000);
     }
 }

@@ -51,7 +51,6 @@ use esp_hal::{
     peripherals::Peripherals,
     time::Rate,
 };
-use esp_println::println;
 
 cfg_select! {
     esp32s3 => {
@@ -71,9 +70,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
-
     let peripherals: Peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
 
     let tx_channel = cfg_select! {
         lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH2,
@@ -97,7 +95,7 @@ fn main() -> ! {
 
             let delay = Delay::new();
 
-            println!("Initialising");
+            log::info!("Initialising");
 
             let mut write_byte = |b: u8, is_cmd: bool| {
                 const SCS_BIT: u8 = 0b0000_0010;
@@ -310,7 +308,7 @@ fn main() -> ! {
         // Once we get we have red, and we can start again.
         .cycle();
 
-    println!("Rendering");
+    log::info!("Rendering");
     loop {
         let transfer = dpi.send(false, dma_buf).map_err(|e| e.0).unwrap();
         (_, dpi, dma_buf) = transfer.wait();

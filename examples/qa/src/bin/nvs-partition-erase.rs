@@ -30,7 +30,6 @@ use esp_hal::{
     flash::{self, Config, Flash},
     main,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -38,8 +37,8 @@ const SECTOR_SIZE: u32 = 4096;
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
 
     let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
 
@@ -53,7 +52,7 @@ fn main() -> ! {
 
     let mut region = nvs.as_flash_region(&mut flash).unwrap();
     let len = region.partition_size() as u32;
-    println!("NVS partition: {} bytes", len);
+    log::info!("NVS partition: {} bytes", len);
     assert!(len >= 2 * SECTOR_SIZE);
 
     let mut sector = [0u8; SECTOR_SIZE as usize];
@@ -105,7 +104,7 @@ fn main() -> ! {
         Err(flash::Error::OutOfBounds)
     );
 
-    println!("Test passed");
+    log::info!("Test passed");
 
     loop {}
 }

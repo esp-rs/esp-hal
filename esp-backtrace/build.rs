@@ -8,7 +8,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
 
     // Ensure that exactly a backend is selected:
-    assert_unique_used_features!("defmt", "println");
+    assert_unique_used_features!("defmt", "log-04", "println");
+
+    if cfg!(feature = "println") {
+        print_warning(
+            "The `println` feature of esp-backtrace is deprecated. Use `log-04` or `defmt` with a logger such as `embedded-log`.",
+        );
+    }
 
     // Ensure that there aren't multiple halt methods selected:
     assert_unique_features!("custom-halt", "halt-cores", "semihosting");

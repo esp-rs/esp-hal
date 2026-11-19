@@ -25,7 +25,6 @@ use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, rng::Rng, rtc_cntl::Rtc, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::wifi::{
     AuthenticationMethodConfig,
     Config,
@@ -87,9 +86,26 @@ impl NtpTimestampGenerator for Timestamp<'_> {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32" => peripherals.GPIO1,
+        feature = "esp32c2" => peripherals.GPIO20,
+        feature = "esp32c3" => peripherals.GPIO21,
+        any(feature = "esp32c5", feature = "esp32c61") => peripherals.GPIO11,
+        feature = "esp32c6" => peripherals.GPIO16,
+        any(feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO43,
+        feature = "esp32s31" => peripherals.GPIO58,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
+
     let rtc = Rtc::new(peripherals.RTC_TIMER);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
@@ -106,14 +122,14 @@ async fn main(spawner: Spawner) -> ! {
             )),
     );
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
     let wifi_interface = esp_radio::wifi::Interface::station();
     let mut controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )
     .unwrap();
-    println!("Wifi configured and started!");
+    log::info!("Wifi configured and started!");
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -128,11 +144,11 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    println!("Scan");
+    log::info!("Scan");
     let scan_config = ScanConfig::default().with_max(10);
     let result = controller.scan_async(&scan_config).await.unwrap();
     for ap in result {
-        println!("{:?}", ap);
+        log::info!("{:?}", ap);
     }
 
     spawner.spawn(connection(controller).unwrap());
@@ -145,7 +161,7 @@ async fn main(spawner: Spawner) -> ! {
 
     stack.wait_config_up().await;
     if let Some(config) = stack.config_v4() {
-        println!("Got IP: {}", config.address);
+        log::info!("Got IP: {}", config.address);
     }
 
     let ntp_addrs = stack.dns_query(NTP_SERVER, DnsQueryType::A).await.unwrap();
@@ -219,21 +235,21 @@ async fn main(spawner: Spawner) -> ! {
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
+    log::info!("start connection task");
 
     loop {
-        println!("About to connect...");
+        log::info!("About to connect...");
 
         match controller.connect_async().await {
             Ok(info) => {
-                println!("Wifi connected to {:?}", info);
+                log::info!("Wifi connected to {:?}", info);
 
                 // wait until we're no longer connected
                 let info = controller.wait_for_disconnect_async().await.ok();
-                println!("Disconnected: {:?}", info);
+                log::info!("Disconnected: {:?}", info);
             }
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                log::info!("Failed to connect to wifi: {e:?}");
             }
         }
 

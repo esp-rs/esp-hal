@@ -9,12 +9,13 @@ embassy-executor = "0.10.0"
 embassy-usb-host = { version = "0.1.0", default-features = false }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
-    "println",
+    "log-04",
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-rtos = { path = "../../../esp-rtos", features = ["embassy", "log-04"] }
-esp-println = { path = "../../../esp-println", features = ["log-04"] }
+embedded-log = { path = "../../../embedded-log", features = ["log-04"] }
+static_cell = "2.1.1"
 log = "0.4"
 
 [features]

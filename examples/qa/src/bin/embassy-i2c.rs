@@ -30,6 +30,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -47,7 +48,7 @@ async fn main(_spawner: Spawner) {
 
     loop {
         let norm = lis3dh.accel_norm().await.unwrap();
-        esp_println::println!("X: {:+.5}  Y: {:+.5}  Z: {:+.5}", norm.x, norm.y, norm.z);
+        log::info!("X: {:+.5}  Y: {:+.5}  Z: {:+.5}", norm.x, norm.y, norm.z);
 
         Timer::after(Duration::from_millis(100)).await;
     }

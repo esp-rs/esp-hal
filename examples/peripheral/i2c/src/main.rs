@@ -21,10 +21,26 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(Config::default());
 
-    esp_println::println!("Initializing I2C Slave on I2C0...");
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32c3" => peripherals.GPIO21,
+        feature = "esp32c6" => peripherals.GPIO16,
+        feature = "esp32c61" => peripherals.GPIO11,
+        any(feature = "esp32h2", feature = "esp32h4") => peripherals.GPIO24,
+        feature = "esp32p4" => peripherals.GPIO37,
+        feature = "esp32s3" => peripherals.GPIO43,
+        feature = "esp32s31" => peripherals.GPIO58,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
+
+    log::info!("Initializing I2C Slave on I2C0...");
 
     // Configure SDA and SCL pins
     let sda = peripherals.GPIO2;
@@ -36,25 +52,25 @@ fn main() -> ! {
         .with_sda(sda)
         .with_scl(scl);
 
-    esp_println::println!("I2C Slave listening on address 0x55...");
+    log::info!("I2C Slave listening on address 0x55...");
 
     let mut rx_buf = [0u8; 64];
 
     loop {
         match i2c_slave.listen(&mut rx_buf) {
             Ok(Command::Write(len)) => {
-                esp_println::println!("Received {} bytes from master: {:x?}", len, &rx_buf[..len]);
+                log::info!("Received {} bytes from master: {:x?}", len, &rx_buf[..len]);
             }
             Ok(Command::Read) => {
-                esp_println::println!("Master requested a read. Responding...");
+                log::info!("Master requested a read. Responding...");
                 let response = b"Hello from I2C Slave!";
                 match i2c_slave.respond_to_read(response) {
-                    Ok(_) => esp_println::println!("Responded successfully"),
-                    Err(e) => esp_println::println!("Failed to respond to read: {:?}", e),
+                    Ok(_) => log::info!("Responded successfully"),
+                    Err(e) => log::info!("Failed to respond to read: {:?}", e),
                 }
             }
             Err(e) => {
-                esp_println::println!("I2C Slave error: {:?}", e);
+                log::info!("I2C Slave error: {:?}", e);
             }
         }
     }

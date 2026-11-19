@@ -1,0 +1,101 @@
+[package]
+name          = "embedded-log"
+version       = "0.1.0"
+edition       = "2024"
+rust-version  = "1.95.0"
+description   = "`log` and `defmt` backend that writes to any `embedded_io::Write`"
+documentation = "https://docs.espressif.com/projects/rust/embedded-log/latest/"
+keywords      = ["defmt", "embedded", "log", "logging", "no-std"]
+categories    = ["embedded", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+links         = "embedded-log"
+
+[package.metadata.espressif]
+doc-config = { features = ["log-04", "timestamp"] }
+check-configs = [
+    { features = ["log-04"] },
+    { features = ["log-04", "timestamp"] },
+    { features = ["defmt"] },
+    { features = ["defmt", "timestamp"] },
+]
+clippy-configs = [
+    { features = ["log-04", "timestamp"] },
+    { features = ["defmt", "timestamp"] },
+]
+host-test-configs = [
+    { features = ["log-04"], test-args = ["--test-threads=1"] },
+    { features = ["log-04", "timestamp"], test-args = ["--test-threads=1"] },
+]
+
+[package.metadata.docs.rs]
+default-target = "riscv32imc-unknown-none-elf"
+features       = ["log-04", "timestamp"]
+
+[lib]
+bench = false
+test  = true
+
+[dependencies]
+critical-section  = "1.2"
+document-features = "0.2"
+embedded-io       = "0.7"
+
+# Logging interfaces, they are mutually exclusive so they need to be behind separate features.
+defmt  = { version = "1.1", optional = true }
+log-04 = { package = "log", version = "0.4", optional = true }
+
+[build-dependencies]
+log-04 = { package = "log", version = "0.4" }
+
+[dev-dependencies]
+critical-section = { version = "1.2", features = ["std"] }
+log-04           = { package = "log", version = "0.4" }
+
+[features]
+default = ["colors"]
+
+#! ### Logging framework features
+#! Enable exactly one of the features below.
+
+## Install a [`log`](https://docs.rs/log/0.4) 0.4 logger.
+log-04 = ["dep:log-04"]
+## Install a `defmt` global logger.
+##
+## The output uses rzCOBS framing, which only espflash can decode. espflash picks the decoder
+## from the `espflash.LOG_FORMAT` metadata this crate emits.
+##
+## Please note that `defmt` does _not_ provide MSRV guarantees with releases, and as such we are
+## not able to make any MSRV guarantees when this feature is enabled. For more information refer to
+## the MSRV section of `defmt`'s README: <https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv>
+defmt = ["dep:defmt", "defmt?/encoding-rzcobs"]
+
+#! ### Output features
+
+## Color the severity of `log` records. Has no effect with `defmt`.
+colors = []
+## Print a timestamp with each message.
+##
+## This option requires the following function to be implemented:
+##
+## ```rust,ignore
+## unsafe extern "Rust" {
+##     fn _embedded_log_timestamp() -> u64;
+## }
+## ```
+##
+## This function should return the current timestamp in milliseconds since power on.
+## When using `esp-hal`, you can define this function as follows:
+##
+## ```rust,ignore
+## #[unsafe(no_mangle)]
+## pub extern "Rust" fn _embedded_log_timestamp() -> u64 {
+##     esp_hal::time::Instant::now()
+##         .duration_since_epoch()
+##         .as_millis()
+## }
+## ```
+timestamp = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }

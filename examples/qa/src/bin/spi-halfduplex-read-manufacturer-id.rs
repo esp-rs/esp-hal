@@ -46,14 +46,13 @@ use esp_hal::{
     },
     time::Rate,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
 
     let (sclk, miso, mosi, sio2, sio3, cs) = cfg_select! {
         feature = "esp32" => (
@@ -109,7 +108,7 @@ fn main() -> ! {
             &mut data,
         )
         .unwrap();
-        println!("Single {:x?}", data);
+        log::info!("Single {:x?}", data);
         delay.delay_millis(250);
 
         // READ MANUFACTURER ID FROM FLASH CHIP
@@ -122,7 +121,7 @@ fn main() -> ! {
             &mut data,
         )
         .unwrap();
-        println!("Dual {:x?}", data);
+        log::info!("Dual {:x?}", data);
         delay.delay_millis(250);
 
         // READ MANUFACTURER ID FROM FLASH CHIP
@@ -135,7 +134,7 @@ fn main() -> ! {
             &mut data,
         )
         .unwrap();
-        println!("Quad {:x?}", data);
+        log::info!("Quad {:x?}", data);
         delay.delay_millis(1500);
     }
 }

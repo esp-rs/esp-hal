@@ -15,7 +15,6 @@ use alloc::{string::String, vec::Vec};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, main, ram, time::Instant};
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -32,7 +31,7 @@ const ITERATIONS: u32 = 4;
 fn print_throughput(label: &str, bytes: u64, elapsed_us: u64) {
     let us = elapsed_us.max(1);
     let mib_x100 = bytes * 100_000_000 / us / (1024 * 1024);
-    println!(
+    log::info!(
         "{label}: {bytes} bytes in {us} us ({}.{:02} MiB/s)",
         mib_x100 / 100,
         mib_x100 % 100
@@ -146,12 +145,12 @@ fn measure_psram_to_psram(dst: &mut [u8], src: &[u8]) {
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+    qa_test::init_logger!(peripherals);
 
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
-    println!("Going to access PSRAM");
+    log::info!("Going to access PSRAM");
     let mut psram_a = Vec::<u8>::with_capacity(PSRAM_BENCH_BYTES);
     psram_a.resize(PSRAM_BENCH_BYTES, 0);
     let mut psram_b = Vec::<u8>::with_capacity(PSRAM_BENCH_BYTES);
@@ -161,14 +160,14 @@ fn main() -> ! {
         *byte = (i & 0xff) as u8;
     }
 
-    println!("vec size = {} bytes", psram_a.len());
-    println!("vec address = {:p}", psram_a.as_ptr());
-    println!("vec[..100] = {:?}", &psram_a[..100]);
+    log::info!("vec size = {} bytes", psram_a.len());
+    log::info!("vec address = {:p}", psram_a.as_ptr());
+    log::info!("vec[..100] = {:?}", &psram_a[..100]);
 
     let string = String::from("A string allocated in PSRAM");
-    println!("'{}' allocated at {:p}", &string, string.as_ptr());
+    log::info!("'{}' allocated at {:p}", &string, string.as_ptr());
 
-    println!("{}", esp_alloc::HEAP.stats());
+    log::info!("{}", esp_alloc::HEAP.stats());
 
     // Keep the bounce buffer in internal RAM, not on the stack.
     let sram = {
@@ -180,7 +179,7 @@ fn main() -> ! {
         *byte = (i & 0xff) as u8;
     }
 
-    println!("PSRAM throughput (CPU, {ITERATIONS} iterations):");
+    log::info!("PSRAM throughput (CPU, {ITERATIONS} iterations):");
 
     let word_count = PSRAM_BENCH_BYTES / 4;
     // SAFETY: The allocator returns a word-aligned heap block.
@@ -193,7 +192,7 @@ fn main() -> ! {
     measure_psram_to_sram(sram, &psram_a);
     measure_psram_to_psram(&mut psram_b, &psram_a);
 
-    println!("done");
+    log::info!("done");
 
     loop {}
 }

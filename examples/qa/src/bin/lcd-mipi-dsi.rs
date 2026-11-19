@@ -36,7 +36,6 @@ use esp_hal::{
     peripherals::Peripherals,
     psram,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -49,9 +48,9 @@ const FB_SIZE: usize = H_ACTIVE as usize * V_ACTIVE as usize * BYTES_PER_PIXEL;
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals: Peripherals = esp_hal::init(config);
+    qa_test::init_logger!(peripherals);
 
     esp_alloc::psram_allocator!(
         peripherals.PSRAM,
@@ -59,7 +58,7 @@ fn main() -> ! {
         psram::PsramConfig::default()
     );
 
-    println!("PSRAM ready");
+    log::info!("PSRAM ready");
 
     let delay = Delay::new();
 
@@ -87,7 +86,7 @@ fn main() -> ! {
     )
     .expect("MipiDsi init failed");
 
-    println!("DSI bus up");
+    log::info!("DSI bus up");
 
     // ── EK79007 init via DBI (LP command mode) ──────────────────────────────
     {
@@ -103,7 +102,7 @@ fn main() -> ! {
         delay.delay_millis(20);
     }
 
-    println!("Panel init done");
+    log::info!("Panel init done");
 
     // ── Frame buffer in PSRAM (64-byte aligned) ─────────────────────────────
     let layout = Layout::from_size_align(FB_SIZE, 64).unwrap();
@@ -137,7 +136,7 @@ fn main() -> ! {
 
     let mut dpi = bus.dpi(dpi_cfg, &fbs).expect("DPI init failed");
 
-    println!("Streaming");
+    log::info!("Streaming");
 
     // ── Colour wheel loop ───────────────────────────────────────────────────
     let mut hue: u32 = 0;

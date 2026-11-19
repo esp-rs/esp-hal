@@ -24,7 +24,6 @@ use esp_hal::{
     },
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use qa_test::DRAM2_UNINIT_SIZE;
 
 extern crate alloc;
@@ -75,6 +74,7 @@ async fn main(_spawner: Spawner) {
     }
     let config = esp_hal::Config::default().with_cpu_clock(clock_config);
     let peripherals = esp_hal::init(config);
+    qa_test::init_logger!(peripherals);
 
     esp_alloc::heap_allocator!(size: 32768);
     esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
@@ -90,9 +90,10 @@ async fn main(_spawner: Spawner) {
 
     if boot_count == 0 {
         rtc.set_current_time_us(START_TIME_US);
-        println!(
+        log::info!(
             "Starting oversleep regression test ({} iterations, {} ms sleep)",
-            MAX_ITERATIONS, SLEEP_MS
+            MAX_ITERATIONS,
+            SLEEP_MS
         );
     } else {
         let wake_reason = rtc_cntl::wakeup_cause();
@@ -102,7 +103,7 @@ async fn main(_spawner: Spawner) {
         let elapsed_ms = elapsed_us / 1_000;
         let pass = elapsed_us <= THRESHOLD_US;
 
-        println!(
+        log::info!(
             "Iteration {} - woke after {} ms (wake={:?}) [{}]",
             boot_count,
             elapsed_ms,
@@ -111,7 +112,7 @@ async fn main(_spawner: Spawner) {
         );
 
         if !pass {
-            println!(
+            log::info!(
                 "FAIL: {} ms passed, threshold {} ms. The chip overslept, or the RTC time jumped at \
                  the slow clock recalibration.",
                 elapsed_ms,
@@ -130,7 +131,7 @@ async fn main(_spawner: Spawner) {
     }
 
     let next_iteration = boot_count + 1;
-    println!("Iteration {} - sleeping {} ms", next_iteration, SLEEP_MS);
+    log::info!("Iteration {} - sleeping {} ms", next_iteration, SLEEP_MS);
 
     unsafe {
         BOOT_COUNT = next_iteration;

@@ -25,7 +25,6 @@
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, main};
-use esp_println::println;
 use esp_radio::ieee802154::{Config, Frame, Ieee802154};
 use ieee802154::mac::{
     Address,
@@ -50,14 +49,14 @@ const FRAME_INTERVAL_MS: u32 = 500;
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
 
     esp_alloc::heap_allocator!(size: 24 * 1024);
 
     let delay = Delay::new();
 
-    println!(
+    log::info!(
         "Waiting {}s (baseline power, radio never initialized)",
         STARTUP_DELAY_MS / 1000
     );
@@ -77,7 +76,7 @@ fn main() -> ! {
                 ..Default::default()
             });
 
-            println!("Active for {}s", ACTIVE_PHASE_MS / 1000);
+            log::info!("Active for {}s", ACTIVE_PHASE_MS / 1000);
             for _ in 0..ACTIVE_PHASE_MS / FRAME_INTERVAL_MS {
                 seq_number = seq_number.wrapping_add(1);
 
@@ -102,15 +101,15 @@ fn main() -> ! {
                     },
                     true,
                 ) {
-                    Ok(()) => println!("Broadcast frame with seq {seq_number} sent"),
-                    Err(e) => println!("Failed to send frame with seq {seq_number}: {e:?}"),
+                    Ok(()) => log::info!("Broadcast frame with seq {seq_number} sent"),
+                    Err(e) => log::info!("Failed to send frame with seq {seq_number}: {e:?}"),
                 }
 
                 delay.delay_millis(FRAME_INTERVAL_MS);
             }
         }
 
-        println!(
+        log::info!(
             "Radio deinitialized, inactive for {}s (measure power now)",
             INACTIVE_PHASE_MS / 1000
         );

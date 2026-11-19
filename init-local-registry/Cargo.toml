@@ -19,4 +19,6 @@ esp-backtrace = "*"
 
 esp-println = "*"
 
+embedded-log = "*"
+
 esp-radio = "*"

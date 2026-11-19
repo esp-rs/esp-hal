@@ -38,7 +38,6 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -52,8 +51,10 @@ const SINE: [i16; 64] = [
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
+
+    log::info!("Init!");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -98,7 +99,7 @@ async fn main(_spawner: Spawner) {
         buf.len()
     });
 
-    println!("Start");
+    log::info!("Start");
     let mut transaction = i2s_tx.write(buffer).ok().unwrap();
     loop {
         transaction.wait_for_available_async().await.unwrap();
@@ -115,6 +116,6 @@ async fn main(_spawner: Spawner) {
             buf.len()
         });
 
-        println!("written {}", written);
+        log::info!("written {}", written);
     }
 }

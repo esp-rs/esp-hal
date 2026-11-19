@@ -189,7 +189,7 @@ peripheral_clocks = { templates = [
     { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
     { name = "rst_field", value = "{{peripheral}}_rst_en" },
 ], peripheral_clocks = [
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Timg0", template_params = { conf_register = "timergroup0_conf", clk_en_field = "tg0_clk_en", rst_field = "tg0_rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup1_conf", clk_en_field = "tg1_clk_en", rst_field = "tg1_rst_en" } },

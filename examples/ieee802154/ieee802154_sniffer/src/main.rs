@@ -9,6 +9,8 @@
 #![no_std]
 #![no_main]
 
+use core::fmt::Write;
+
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
@@ -16,15 +18,24 @@ use esp_hal::{
     system::software_reset,
     uart::{self, Uart},
 };
-use esp_println::println;
 use esp_radio::ieee802154::{Config, Ieee802154};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // The frames go to the host on UART0, so log, for example a panic report, on USB-Serial-JTAG.
+    let log_writer = esp_hal::usb::usb_serial_jtag::UsbSerialJtag::new(
+        peripherals.USB_DEVICE,
+        Default::default(),
+    )
+    .unwrap();
+    static LOG_WRITER: static_cell::StaticCell<
+        esp_hal::usb::usb_serial_jtag::UsbSerialJtag<'static, esp_hal::Blocking>,
+    > = static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     esp_alloc::heap_allocator!(size: 24 * 1024);
 
@@ -79,7 +90,7 @@ fn main() -> ! {
 
     loop {
         if let Some(frame) = ieee802154.raw_received() {
-            println!("@RAW {:02x?}", &frame.data);
+            _ = writeln!(uart0, "@RAW {:02x?}", &frame.data);
         }
 
         let mut buf = [0u8; 1];

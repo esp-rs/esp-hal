@@ -36,14 +36,13 @@ use esp_hal::{
     main,
     time::Rate,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
 
     let lcd_backlight = peripherals.GPIO45;
     let lcd_reset = peripherals.GPIO4;
@@ -201,7 +200,7 @@ fn main() -> ! {
     let width = 320u16;
     let height = 480u16;
     {
-        println!("Set addresses");
+        log::info!("Set addresses");
 
         let width_b = width.to_be_bytes();
         let height_b = height.to_be_bytes();
@@ -209,7 +208,7 @@ fn main() -> ! {
         bus.send(0x2B, &[0, 0, height_b[0], height_b[1]]) // PASET
     }
 
-    println!("Drawing");
+    log::info!("Drawing");
 
     const RED: u16 = 0b00000_000000_11111;
     const BLUE: u16 = 0b11111_000000_00000;

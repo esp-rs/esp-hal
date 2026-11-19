@@ -23,6 +23,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[main]
 fn main() -> ! {
     let peripherals: Peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
     let pin = peripherals.GPIO0;
 
     let clock_cfg = cfg_select! {

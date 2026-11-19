@@ -68,7 +68,6 @@ use esp_hal::{
     sha::{Sha256Context, ShaBackend},
     time::Instant,
 };
-use esp_println::{print, println};
 use hmac::{Hmac as HmacSw, KeyInit, Mac, SimpleHmac};
 use nb::block;
 use sha2::Sha256;
@@ -79,8 +78,21 @@ type HmacSha256 = HmacSw<Sha256>;
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let mut peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32c3" => peripherals.GPIO21,
+        feature = "esp32c6" => peripherals.GPIO16,
+        any(feature = "esp32h2", feature = "esp32h4") => peripherals.GPIO24,
+        any(feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO43,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     let mut sha_backend = ShaBackend::new(peripherals.SHA.reborrow());
 
@@ -92,10 +104,9 @@ fn main() -> ! {
 
     let mut output = [0u8; 32];
 
-    println!("Beginning stress tests...");
-    println!("Testing length from 0 to {:?} bytes for HMAC...", src.len());
+    log::info!("Beginning stress tests...");
+    log::info!("Testing length from 0 to {:?} bytes for HMAC...", src.len());
     for i in 0..src.len() + 1 {
-        print!("Testing for length: {:>4}", i);
         let (nsrc, _) = src.split_at(i);
 
         // Use a software algorithm to generate the expected value, and timing baseline
@@ -104,12 +115,11 @@ fn main() -> ! {
         sw_hmac.update(nsrc);
         let soft_result = sw_hmac.finalize().into_bytes();
         let soft_time = pre_sw_hash.elapsed();
-        print!(" SW: {:>7}", soft_time);
 
         // Use the hardware to see if we can get the same result, and compare the timing
         let mut hw_hmac = Hmac::new(peripherals.HMAC.reborrow());
         hw_hmac.init();
-        if block!(hw_hmac.configure(HmacPurpose::ToUser, KeyId::Key0)).is_ok() {
+        let hw_time = if block!(hw_hmac.configure(HmacPurpose::ToUser, KeyId::Key0)).is_ok() {
             let pre_hw_hmac = Instant::now();
             let mut remaining = nsrc;
             while !remaining.is_empty() {
@@ -121,9 +131,9 @@ fn main() -> ! {
 
             assert_eq!(output, soft_result.as_slice());
 
-            print!(", HW: {:>6} ({:>2}x faster)", hw_time, soft_time / hw_time);
+            Some(hw_time)
         } else {
-            print!(", HW HMAC skipped (Key not burned)");
+            None
         };
         core::mem::drop(hw_hmac);
 
@@ -137,16 +147,28 @@ fn main() -> ! {
         hyb_hmac.update(nsrc);
         let hybrid_result = hyb_hmac.finalize().into_bytes();
         let hybrid_time = pre_hyb_hash.elapsed();
-        print!(
-            ", SW+HW: {:>7} ({:>2}x faster)",
-            hybrid_time,
-            soft_time / hybrid_time
-        );
         assert_eq!(hybrid_result, soft_result);
 
-        println!();
+        match hw_time {
+            Some(hw_time) => log::info!(
+                "Testing for length: {:>4} SW: {:>7}, HW: {:>6} ({:>2}x faster), SW+HW: {:>7} ({:>2}x faster)",
+                i,
+                soft_time,
+                hw_time,
+                soft_time / hw_time,
+                hybrid_time,
+                soft_time / hybrid_time
+            ),
+            None => log::info!(
+                "Testing for length: {:>4} SW: {:>7}, HW HMAC skipped (Key not burned), SW+HW: {:>7} ({:>2}x faster)",
+                i,
+                soft_time,
+                hybrid_time,
+                soft_time / hybrid_time
+            ),
+        }
     }
-    println!("Finished stress tests!");
+    log::info!("Finished stress tests!");
 
     loop {}
 }

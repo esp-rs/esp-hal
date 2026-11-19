@@ -47,9 +47,22 @@ macro_rules! dma_alloc_buffer {
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger(log::LevelFilter::Info);
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        any(feature = "esp32c5", feature = "esp32c61") => peripherals.GPIO11,
+        feature = "esp32p4" => peripherals.GPIO37,
+        any(feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO43,
+        feature = "esp32s31" => peripherals.GPIO58,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init_with_level(LOG_WRITER.init(log_writer), log::LevelFilter::Info);
+
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
     let delay = Delay::new();

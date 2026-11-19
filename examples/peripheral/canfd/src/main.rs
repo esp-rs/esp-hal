@@ -35,14 +35,21 @@ use esp_hal::{
     delay::Delay,
     main,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // Log on UART0's default TX pin.
+    let log_tx = peripherals.GPIO11;
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     // Without an external transceiver, we only need a single line between the two
     // MCUs.
@@ -84,7 +91,7 @@ fn main() -> ! {
         while canfd.rx_frame_count() == 0 {}
         let received = canfd.receive().unwrap();
 
-        println!("Received a frame: {received:?}");
+        log::info!("Received a frame: {received:?}");
         delay.delay_millis(250);
 
         // Transmit a new frame back to the other ESP.
@@ -102,5 +109,5 @@ fn send(canfd: &mut CanFd<'_>, frame: &Frame) {
             state => panic!("transmission failed: {state:?}"),
         }
     }
-    println!("Sent a frame");
+    log::info!("Sent a frame");
 }

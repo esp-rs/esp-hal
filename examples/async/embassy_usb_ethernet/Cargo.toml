@@ -19,12 +19,12 @@ embassy-net = { version = "0.9", default-features = false, features = [
 ] }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
-    "println",
+    "log-04",
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-rtos = { path = "../../../esp-rtos", features = ["embassy", "log-04"] }
-esp-println = { path = "../../../esp-println", features = ["log-04"] }
+embedded-log = { path = "../../../embedded-log", features = ["log-04"] }
 edge-dhcp = "0.8.0"
 edge-nal = "0.7.0"
 edge-nal-embassy = "0.9.0"

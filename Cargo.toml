@@ -2,6 +2,7 @@
 resolver = "2"
 members  = ["xtask", "xtask-mcp-macros"]
 exclude  = [
+    "embedded-log",
     "esp-alloc",
     "esp-backtrace",
     "esp-bootloader-direct-boot",

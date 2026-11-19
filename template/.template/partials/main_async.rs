@@ -18,10 +18,18 @@ use trouble_host::prelude::*;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 
-//%if option("defmt")
-//%if !option("probe-rs")
-//+use esp_println as _;
+//%if !option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace"))
+//%if chip.soc_has_usb_device
+use esp_hal::{Blocking, usb::usb_serial_jtag::UsbSerialJtag};
+//%else
+//+use esp_hal::{
+//+    Blocking,
+//+    uart::{self, UartTx},
+//+};
 //%endif
+use static_cell::StaticCell;
+//%endif
+//%if option("defmt")
 //+use defmt::info;
 //%if !group_selected("panic-handler")
 //+use defmt::error;
@@ -110,12 +118,32 @@ async fn main(spawner: Spawner) -> ! {
     //%else
     rtt_target::rtt_init_print!();
     //%endif
-    //%else if option("log")
-    esp_println::logger::init_logger_from_env();
     //%endif
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    //%if !option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace"))
+    //%if chip.soc_has_usb_device
+    // Log on USB-Serial-JTAG. To log on UART0 instead, construct an `esp_hal::uart::UartTx` on
+    // the chip's default TX pin.
+    let log_writer = UsbSerialJtag::new(peripherals.USB_DEVICE, Default::default()).unwrap();
+    static LOG_WRITER: StaticCell<UsbSerialJtag<'static, Blocking>> = StaticCell::new();
+    //%else
+    //+    // Log on UART0's default TX pin.
+    //+    let log_writer = UartTx::new(peripherals.UART0, uart::Config::default())
+    //+        .unwrap()
+    //%if chip.name == "esp32"
+    //+        .with_tx(peripherals.GPIO1);
+    //%else if chip.name == "esp32c2"
+    //+        .with_tx(peripherals.GPIO20);
+    //%else
+    //+        .with_tx(peripherals.GPIO43);
+    //%endif
+    //+    static LOG_WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
+    //%endif
+    embedded_log::init(LOG_WRITER.init(log_writer));
+    //%endif
 
     {{ reserved_gpio_code }}
 

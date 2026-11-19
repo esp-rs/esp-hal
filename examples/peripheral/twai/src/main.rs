@@ -34,15 +34,29 @@ use esp_hal::{
     main,
     twai::{self, EspTwaiFrame, StandardId, TwaiMode, filter::SingleStandardFilter},
 };
-use esp_println::println;
 use nb::block;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32" => peripherals.GPIO1,
+        feature = "esp32c3" => peripherals.GPIO21,
+        feature = "esp32c6" => peripherals.GPIO16,
+        feature = "esp32h2" => peripherals.GPIO24,
+        feature = "esp32p4" => peripherals.GPIO37,
+        any(feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO43,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     // Without an external transceiver, we only need a single line between the two
     // MCUs.
@@ -88,7 +102,7 @@ fn main() -> ! {
         // Use `new_self_reception` if you want to use self-testing.
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         block!(twai.transmit(&frame)).unwrap();
-        println!("Sent a frame");
+        log::info!("Sent a frame");
     }
 
     let delay = Delay::new();
@@ -96,12 +110,12 @@ fn main() -> ! {
         // Wait for a frame to be received.
         let frame = block!(twai.receive()).unwrap();
 
-        println!("Received a frame: {frame:?}");
+        log::info!("Received a frame: {frame:?}");
         delay.delay_millis(250);
 
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         // Transmit a new frame back to the other ESP
         block!(twai.transmit(&frame)).unwrap();
-        println!("Sent a frame");
+        log::info!("Sent a frame");
     }
 }

@@ -35,7 +35,6 @@ use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::wifi::{
     AuthenticationMethodConfig,
     Config,
@@ -72,13 +71,13 @@ unsafe extern "Rust" fn _esp_alloc_alloc(
     ptr: usize,
     size: usize,
 ) {
-    println!("Allocated {} bytes: {:x}", size, ptr);
+    log::info!("Allocated {} bytes: {:x}", size, ptr);
 }
 
 #[cfg(feature = "alloc-hooks")]
 #[unsafe(no_mangle)]
 unsafe extern "Rust" fn _esp_alloc_dealloc(_heap: &EspHeap, ptr: usize, size: usize) {
-    println!("Deallocated {} bytes: {:x}", size, ptr);
+    log::info!("Deallocated {} bytes: {:x}", size, ptr);
 }
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
@@ -155,9 +154,25 @@ cfg_select! {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32" => peripherals.GPIO1,
+        feature = "esp32c2" => peripherals.GPIO20,
+        feature = "esp32c3" => peripherals.GPIO21,
+        any(feature = "esp32c5", feature = "esp32c61") => peripherals.GPIO11,
+        feature = "esp32c6" => peripherals.GPIO16,
+        any(feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO43,
+        feature = "esp32s31" => peripherals.GPIO58,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE - CPU_POWERDOWN_RAM);
     esp_alloc::heap_allocator!(size: 36 * 1024 + CPU_POWERDOWN_RAM);
@@ -181,7 +196,7 @@ async fn main(spawner: Spawner) -> ! {
             )),
     );
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
     let wifi_interface = esp_radio::wifi::Interface::station();
     let mut controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
@@ -189,7 +204,7 @@ async fn main(spawner: Spawner) -> ! {
     )
     .unwrap();
     controller.set_power_saving(POWER_SAVE).unwrap();
-    println!("Wifi configured and started!");
+    log::info!("Wifi configured and started!");
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -204,11 +219,11 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    println!("Scan");
+    log::info!("Scan");
     let scan_config = ScanConfig::default().with_max(10);
     let result = controller.scan_async(&scan_config).await.unwrap();
     for ap in result {
-        println!("{:?}", ap);
+        log::info!("{:?}", ap);
     }
 
     spawner.spawn(connection(controller).unwrap());
@@ -217,7 +232,7 @@ async fn main(spawner: Spawner) -> ! {
     stack.wait_config_up().await;
 
     if let Some(config) = stack.config_v4() {
-        println!("Got IP: {}", config.address);
+        log::info!("Got IP: {}", config.address);
     }
 
     // Init HTTP client
@@ -248,10 +263,10 @@ async fn main(spawner: Spawner) -> ! {
         match response.body().read_to_end().await {
             Ok(data) => {
                 if let Ok(st) = core::str::from_utf8(data) {
-                    println!("Body: {}", st);
+                    log::info!("Body: {}", st);
                 }
             }
-            Err(e) => println!("Body error: {:?}", e),
+            Err(e) => log::info!("Body error: {:?}", e),
         }
         Timer::after(Duration::from_millis(3000)).await;
     }
@@ -259,21 +274,21 @@ async fn main(spawner: Spawner) -> ! {
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
+    log::info!("start connection task");
 
     loop {
-        println!("About to connect...");
+        log::info!("About to connect...");
 
         match controller.connect_async().await {
             Ok(info) => {
-                println!("Wifi connected to {:?}", info);
+                log::info!("Wifi connected to {:?}", info);
 
                 // wait until we're no longer connected
                 let info = controller.wait_for_disconnect_async().await.ok();
-                println!("Disconnected: {:?}", info);
+                log::info!("Disconnected: {:?}", info);
             }
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                log::info!("Failed to connect to wifi: {e:?}");
             }
         }
 

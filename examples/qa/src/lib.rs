@@ -10,7 +10,9 @@ use esp_hal::{
     flash::Flash,
     rtc_cntl::{SocResetReason, reset_reason},
     system::Cpu,
+    uart::UartTx,
 };
+use static_cell::StaticCell;
 
 /// Bytes in `.dram2_uninit` for the selected chip.
 pub const DRAM2_UNINIT_SIZE: usize = {
@@ -20,19 +22,58 @@ pub const DRAM2_UNINIT_SIZE: usize = {
 
 #[doc(hidden)]
 pub mod __private {
-    pub use esp_hal::time::{Duration, Instant};
-    pub use esp_println::println;
+    pub use esp_hal::{
+        time::{Duration, Instant},
+        uart::UartTx,
+    };
+    pub use log::info;
 }
 
-/// Prints a line and waits 20 ms for the UART to send it. A light sleep or a reset loses unsent
+/// Logs a line and waits 20 ms for the UART to send it. A light sleep or a reset loses unsent
 /// UART data, and 20 ms sends about 230 bytes at 115200 baud.
 #[macro_export]
 macro_rules! report {
     ($($arg:tt)*) => {{
-        $crate::__private::println!($($arg)*);
+        $crate::__private::info!($($arg)*);
         let end = $crate::__private::Instant::now() + $crate::__private::Duration::from_millis(20);
         while $crate::__private::Instant::now() < end {}
     }};
+}
+
+/// Returns a `UartTx` on UART0's default TX pin. Takes the `Peripherals` returned by
+/// `esp_hal::init`, and moves the fields it needs out of it.
+#[macro_export]
+macro_rules! console_uart {
+    ($peripherals:ident) => {
+        $crate::__private::UartTx::new($peripherals.UART0, ::core::default::Default::default())
+            .unwrap()
+            .with_tx(::core::cfg_select! {
+                feature = "esp32" => $peripherals.GPIO1,
+                feature = "esp32c2" => $peripherals.GPIO20,
+                feature = "esp32c3" => $peripherals.GPIO21,
+                any(feature = "esp32c5", feature = "esp32c61") => $peripherals.GPIO11,
+                feature = "esp32c6" => $peripherals.GPIO16,
+                any(feature = "esp32h2", feature = "esp32h4") => $peripherals.GPIO24,
+                feature = "esp32p4" => $peripherals.GPIO37,
+                feature = "esp32s31" => $peripherals.GPIO58,
+                any(feature = "esp32s2", feature = "esp32s3") => $peripherals.GPIO43,
+            })
+    };
+}
+
+/// Installs the logger on UART0's default TX pin. Takes the `Peripherals` returned by
+/// `esp_hal::init`, and moves the fields it needs out of it.
+#[macro_export]
+macro_rules! init_logger {
+    ($peripherals:ident) => {
+        $crate::log_on_uart($crate::console_uart!($peripherals))
+    };
+}
+
+#[doc(hidden)]
+pub fn log_on_uart(tx: UartTx<'static, Blocking>) {
+    static WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
+    embedded_log::init(WRITER.init(tx));
 }
 
 /// The progress of a run of checks or phases, kept across resets in a [`ProgressWord`].

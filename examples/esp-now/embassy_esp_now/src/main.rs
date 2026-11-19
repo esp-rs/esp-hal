@@ -13,7 +13,6 @@ use embassy_time::{Duration, Ticker};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::esp_now::{BROADCAST_ADDRESS, PeerInfo};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -26,9 +25,25 @@ const DRAM2_UNINIT_SIZE: usize = {
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32" => peripherals.GPIO1,
+        feature = "esp32c2" => peripherals.GPIO20,
+        feature = "esp32c3" => peripherals.GPIO21,
+        any(feature = "esp32c5", feature = "esp32c61") => peripherals.GPIO11,
+        feature = "esp32c6" => peripherals.GPIO16,
+        any(feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO43,
+        feature = "esp32s31" => peripherals.GPIO58,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
@@ -42,13 +57,13 @@ async fn main(_spawner: Spawner) -> ! {
     let mut esp_now = controller.esp_now();
     esp_now.set_channel(11).unwrap();
 
-    println!("esp-now version {}", esp_now.version().unwrap());
+    log::info!("esp-now version {}", esp_now.version().unwrap());
 
     let mut ticker = Ticker::every(Duration::from_secs(5));
     loop {
         let res = select(ticker.next(), async {
             let r = esp_now.receive_async().await;
-            println!("Received {:?}", r);
+            log::info!("Received {:?}", r);
             if r.info.dst_address == BROADCAST_ADDRESS {
                 if !esp_now.peer_exists(&r.info.src_address) {
                     esp_now
@@ -62,16 +77,16 @@ async fn main(_spawner: Spawner) -> ! {
                         .unwrap();
                 }
                 let status = esp_now.send_async(&r.info.src_address, b"Hello Peer").await;
-                println!("Send hello to peer status: {:?}", status);
+                log::info!("Send hello to peer status: {:?}", status);
             }
         })
         .await;
 
         match res {
             Either::First(_) => {
-                println!("Send");
+                log::info!("Send");
                 let status = esp_now.send_async(&BROADCAST_ADDRESS, b"0123456789").await;
-                println!("Send broadcast status: {:?}", status)
+                log::info!("Send broadcast status: {:?}", status)
             }
             Either::Second(_) => (),
         }

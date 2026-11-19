@@ -29,7 +29,6 @@ use esp_hal::{
     delay::Delay,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -80,8 +79,8 @@ impl Converter for Identity {
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -105,7 +104,7 @@ async fn main(_spawner: Spawner) {
 
     loop {
         let id_value = id.measure().await;
-        println!("id value: {}", id_value);
+        log::info!("id value: {}", id_value);
         delay.delay_millis(1000);
     }
 }

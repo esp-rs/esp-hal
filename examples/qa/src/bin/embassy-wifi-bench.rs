@@ -33,7 +33,6 @@ use embassy_time::{Duration, Timer, with_timeout};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::wifi::{
     AuthenticationMethodConfig,
     Config,
@@ -148,9 +147,9 @@ const HEAP_SIZE: usize = {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    qa_test::init_logger!(peripherals);
 
     esp_alloc::heap_allocator!(size: HEAP_SIZE);
     // add some more RAM
@@ -179,11 +178,11 @@ async fn main(spawner: Spawner) -> ! {
         .with_rx_queue_size(usize::from(WIFI_BUFFERS.dynamic_rx).min(32))
         .with_tx_queue_size(usize::from(WIFI_BUFFERS.dynamic_tx).min(32));
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
     let wifi_interface = esp_radio::wifi::Interface::station();
     let mut controller =
         esp_radio::wifi::WifiController::new(peripherals.WIFI, controller_config).unwrap();
-    println!("Wifi configured and started!");
+    log::info!("Wifi configured and started!");
 
     controller
         .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
@@ -208,7 +207,7 @@ async fn main(spawner: Spawner) -> ! {
     stack.wait_config_up().await;
 
     if let Some(config) = stack.config_v4() {
-        println!("Got IP: {}", config.address);
+        log::info!("Got IP: {}", config.address);
     }
 
     let mut socket = TcpSocket::new(
@@ -228,21 +227,21 @@ async fn main(spawner: Spawner) -> ! {
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
+    log::info!("start connection task");
 
     loop {
-        println!("About to connect...");
+        log::info!("About to connect...");
 
         match controller.connect_async().await {
             Ok(info) => {
-                println!("Wifi connected to {:?}", info);
+                log::info!("Wifi connected to {:?}", info);
 
                 // wait until we're no longer connected
                 let info = controller.wait_for_disconnect_async().await.ok();
-                println!("Disconnected: {:?}", info);
+                log::info!("Disconnected: {:?}", info);
             }
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                log::info!("Failed to connect to wifi: {e:?}");
             }
         }
 
@@ -256,17 +255,17 @@ async fn net_task(mut runner: Runner<'static, Interface>) {
 }
 
 async fn test_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> usize {
-    println!("Testing download...");
+    log::info!("Testing download...");
 
     socket.abort();
     socket.set_timeout(Some(Duration::from_secs(10)));
 
-    println!("connecting to {:?}:{}...", server_address, DOWNLOAD_PORT);
+    log::info!("connecting to {:?}:{}...", server_address, DOWNLOAD_PORT);
     if let Err(e) = socket.connect((server_address, DOWNLOAD_PORT)).await {
-        println!("connect error: {:?}", e);
+        log::info!("connect error: {:?}", e);
         return 0;
     }
-    println!("connected, testing...");
+    log::info!("connected, testing...");
 
     let mut buf = [0; IO_BUFFER_SIZE];
     let mut total: usize = 0;
@@ -274,12 +273,12 @@ async fn test_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> 
         loop {
             match socket.read(&mut buf).await {
                 Ok(0) => {
-                    println!("read EOF");
+                    log::info!("read EOF");
                     return 0;
                 }
                 Ok(n) => total += n,
                 Err(e) => {
-                    println!("read error: {:?}", e);
+                    log::info!("read error: {:?}", e);
                     return 0;
                 }
             }
@@ -289,21 +288,21 @@ async fn test_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> 
     .ok();
 
     let kbps = (total + 512) / 1024 / TEST_DURATION;
-    println!("download: {} kB/s", kbps);
+    log::info!("download: {} kB/s", kbps);
     kbps
 }
 
 async fn test_upload(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> usize {
-    println!("Testing upload...");
+    log::info!("Testing upload...");
     socket.abort();
     socket.set_timeout(Some(Duration::from_secs(10)));
 
-    println!("connecting to {:?}:{}...", server_address, UPLOAD_PORT);
+    log::info!("connecting to {:?}:{}...", server_address, UPLOAD_PORT);
     if let Err(e) = socket.connect((server_address, UPLOAD_PORT)).await {
-        println!("connect error: {:?}", e);
+        log::info!("connect error: {:?}", e);
         return 0;
     }
-    println!("connected, testing...");
+    log::info!("connected, testing...");
 
     let buf = [0; IO_BUFFER_SIZE];
     let mut total: usize = 0;
@@ -311,12 +310,12 @@ async fn test_upload(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> us
         loop {
             match socket.write(&buf).await {
                 Ok(0) => {
-                    println!("write zero?!??!?!");
+                    log::info!("write zero?!??!?!");
                     return 0;
                 }
                 Ok(n) => total += n,
                 Err(e) => {
-                    println!("write error: {:?}", e);
+                    log::info!("write error: {:?}", e);
                     return 0;
                 }
             }
@@ -326,25 +325,26 @@ async fn test_upload(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> us
     .ok();
 
     let kbps = (total + 512) / 1024 / TEST_DURATION;
-    println!("upload: {} kB/s", kbps);
+    log::info!("upload: {} kB/s", kbps);
     kbps
 }
 
 async fn test_upload_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> usize {
-    println!("Testing upload+download...");
+    log::info!("Testing upload+download...");
 
     socket.abort();
     socket.set_timeout(Some(Duration::from_secs(10)));
 
-    println!(
+    log::info!(
         "connecting to {:?}:{}...",
-        server_address, UPLOAD_DOWNLOAD_PORT
+        server_address,
+        UPLOAD_DOWNLOAD_PORT
     );
     if let Err(e) = socket.connect((server_address, UPLOAD_DOWNLOAD_PORT)).await {
-        println!("connect error: {:?}", e);
+        log::info!("connect error: {:?}", e);
         return 0;
     }
-    println!("connected, testing...");
+    log::info!("connected, testing...");
 
     let (mut reader, mut writer) = socket.split();
 
@@ -355,12 +355,12 @@ async fn test_upload_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'
         loop {
             match writer.write(&tx_buf).await {
                 Ok(0) => {
-                    println!("write zero?!??!?!");
+                    log::info!("write zero?!??!?!");
                     return 0;
                 }
                 Ok(_) => {}
                 Err(e) => {
-                    println!("write error: {:?}", e);
+                    log::info!("write error: {:?}", e);
                     return 0;
                 }
             }
@@ -371,12 +371,12 @@ async fn test_upload_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'
         loop {
             match reader.read(&mut rx_buf).await {
                 Ok(0) => {
-                    println!("read EOF");
+                    log::info!("read EOF");
                     return 0;
                 }
                 Ok(n) => total += n,
                 Err(e) => {
-                    println!("read error: {:?}", e);
+                    log::info!("read error: {:?}", e);
                     return 0;
                 }
             }
@@ -391,6 +391,6 @@ async fn test_upload_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'
     .ok();
 
     let kbps = (total + 512) / 1024 / TEST_DURATION;
-    println!("upload+download: {} kB/s", kbps);
+    log::info!("upload+download: {} kB/s", kbps);
     kbps
 }

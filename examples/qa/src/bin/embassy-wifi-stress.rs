@@ -19,7 +19,6 @@ use esp_hal::{
     ram,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use esp_radio::wifi::{
     AuthenticationMethod,
     AuthenticationMethodConfig,
@@ -36,8 +35,8 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let mut peripherals = initialize_esp_hal(EspConfig::default().with_cpu_clock(CpuClock::max()));
+    qa_test::init_logger!(peripherals);
 
     // only have one memory region to make it easier to spot leaks
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
@@ -47,52 +46,52 @@ async fn main(_spawner: Spawner) {
 
     let mut i = 0;
     loop {
-        println!("{}", esp_alloc::HEAP.stats());
+        log::info!("{}", esp_alloc::HEAP.stats());
 
         i += 1;
-        println!(
+        log::info!(
             "==================================CONNECTION ATTEMPT=================================="
         );
-        println!(
+        log::info!(
             "===========================================#{}=========================================",
             i
         );
 
-        println!("Wifi stack setup (STA)");
+        log::info!("Wifi stack setup (STA)");
         let mut controller =
             esp_radio::wifi::WifiController::new(peripherals.WIFI.reborrow(), Default::default())
                 .unwrap();
 
         {
-            println!("Connecting to WiFi SSID: {}", SSID);
+            log::info!("Connecting to WiFi SSID: {}", SSID);
             let scan_config = ScanConfig::default()
                 .with_ssid(SSID.try_into().unwrap())
                 .with_scan_type(ScanTypeConfig::Active {
                     min: esp_hal::time::Duration::from_millis(50),
                     max: esp_hal::time::Duration::from_millis(200),
                 });
-            println!("Scanning for WiFi networks");
+            log::info!("Scanning for WiFi networks");
             let aps = controller
                 .scan_async(&scan_config)
                 .with_timeout(Duration::from_secs(5))
                 .await;
             if aps.is_err() {
-                println!("Failed to scan wifi networks, timeout hit!");
+                log::info!("Failed to scan wifi networks, timeout hit!");
                 Timer::after(Duration::from_secs(2)).await;
                 continue;
             }
 
             let mut aps = aps.unwrap().unwrap();
-            println!("Found {} access points", aps.len());
+            log::info!("Found {} access points", aps.len());
             if aps.is_empty() {
-                println!("No access points found.");
+                log::info!("No access points found.");
                 Timer::after(Duration::from_secs(2)).await;
                 continue;
             }
             aps.sort_by(|x, y| y.signal_strength.cmp(&x.signal_strength));
             let best_one = aps.first().unwrap();
-            println!("Best AP found: {:?}", best_one);
-            println!("Connecting to WiFi SSID: {}", SSID);
+            log::info!("Best AP found: {:?}", best_one);
+            log::info!("Connecting to WiFi SSID: {}", SSID);
 
             let station_config = Config::Station(
                 StationConfig::default()
@@ -128,16 +127,16 @@ async fn main(_spawner: Spawner) {
                 .await;
 
             if err.is_err() {
-                println!("Failed to connect to Wifi, timeout hit!");
+                log::info!("Failed to connect to Wifi, timeout hit!");
                 Timer::after(Duration::from_secs(2)).await;
                 continue;
             }
             let err = err.unwrap();
             if err.is_err() {
-                println!("Failed to connect to WiFi: {:?}", err);
+                log::info!("Failed to connect to WiFi: {:?}", err);
                 Timer::after(Duration::from_secs(2)).await;
             } else {
-                println!("Connect OK");
+                log::info!("Connect OK");
             }
         }
     }

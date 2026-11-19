@@ -18,7 +18,6 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
-use esp_println::println;
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -33,9 +32,25 @@ static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(B
 
 #[esp_hal::main]
 async fn main(_spawner: embassy_executor::Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    // Log on UART0's default TX pin.
+    let log_tx = cfg_select! {
+        feature = "esp32" => peripherals.GPIO1,
+        feature = "esp32c2" => peripherals.GPIO20,
+        feature = "esp32c3" => peripherals.GPIO21,
+        any(feature = "esp32c5", feature = "esp32c61") => peripherals.GPIO11,
+        feature = "esp32c6" => peripherals.GPIO16,
+        any(feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO43,
+        feature = "esp32s31" => peripherals.GPIO58,
+    };
+    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_tx(log_tx);
+    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
+        static_cell::StaticCell::new();
+    embedded_log::init(LOG_WRITER.init(log_writer));
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
@@ -60,7 +75,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
                 if critical_section::with(|cs| {
                     KNOWN_SSIDS.borrow_ref_mut(cs).insert(ssid.to_string())
                 }) {
-                    println!("Found new AP with SSID: {ssid}");
+                    log::info!("Found new AP with SSID: {ssid}");
                 }
             }
         };

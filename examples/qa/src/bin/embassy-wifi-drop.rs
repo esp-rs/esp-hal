@@ -10,7 +10,6 @@ use embassy_executor::Spawner;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::wifi::{AuthenticationMethodConfig, Config, ControllerConfig, sta::StationConfig};
 use qa_test::DRAM2_UNINIT_SIZE;
 
@@ -21,9 +20,9 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    qa_test::init_logger!(peripherals);
 
     esp_alloc::heap_allocator!(size: 32 * 1024);
     // add some more RAM
@@ -56,15 +55,15 @@ async fn main(_spawner: Spawner) {
 
         let token = wifi_interface.transmit();
 
-        println!("got token {}", token.is_some());
+        log::info!("got token {}", token.is_some());
 
         core::mem::drop(controller);
 
         if let Some(token) = token {
             token.consume_token(10, |tx| tx.fill(0));
-            println!("survived consumer_token");
+            log::info!("survived consumer_token");
         } else {
-            println!("no token");
+            log::info!("no token");
         }
 
         let token = wifi_interface.transmit();
@@ -90,15 +89,15 @@ async fn main(_spawner: Spawner) {
 
         let token = wifi_interface.transmit();
 
-        println!("got token {}", token.is_some());
+        log::info!("got token {}", token.is_some());
 
         if let Some(token) = token {
             token.consume_token(10, |tx| tx.fill(0));
-            println!("tx done");
+            log::info!("tx done");
         } else {
-            println!("no token");
+            log::info!("no token");
         }
     }
 
-    println!("Done");
+    log::info!("Done");
 }

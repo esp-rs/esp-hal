@@ -31,7 +31,6 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -47,7 +46,7 @@ fn sample_i16(data: &[u8], index: usize) -> i16 {
 fn print_head_samples(data: &[u8], count: usize) {
     let samples = count / 2;
     if samples >= 8 {
-        println!(
+        log::info!(
             "[0] {} [1] {} [2] {} [3] {}\n[4] {} [5] {} [6] {} [7] {}",
             sample_i16(data, 0),
             sample_i16(data, 1),
@@ -59,18 +58,18 @@ fn print_head_samples(data: &[u8], count: usize) {
             sample_i16(data, 7),
         );
     } else if count >= 2 {
-        println!("[0] {}", sample_i16(data, 0));
+        log::info!("[0] {}", sample_i16(data, 0));
     } else if count > 0 {
-        println!("bytes: {:x?}", &data[..count]);
+        log::info!("bytes: {:x?}", &data[..count]);
     }
 }
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
-    println!("embassy_i2s_pdm_rx: init");
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    qa_test::init_logger!(peripherals);
+
+    log::info!("embassy_i2s_pdm_rx: init");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -81,10 +80,10 @@ async fn main(_spawner: Spawner) {
 
     cfg_select! {
         i2s_supports_pdm2pcm => {
-            println!("embassy_i2s_pdm_rx: PDM RX in PCM format");
+            log::info!("embassy_i2s_pdm_rx: PDM RX in PCM format");
         }
         _ => {
-            println!("embassy_i2s_pdm_rx: PDM RX in raw PDM format");
+            log::info!("embassy_i2s_pdm_rx: PDM RX in raw PDM format");
         }
     }
 
@@ -99,7 +98,7 @@ async fn main(_spawner: Spawner) {
     let i2s = match I2s::new_pdm(peripherals.I2S0, dma_channel, pdm_cfg) {
         Ok(i2s) => i2s.into_async(),
         Err(err) => {
-            println!("I2S PDM RX init failed: {err:?}");
+            log::info!("I2S PDM RX init failed: {err:?}");
             loop {
                 core::hint::spin_loop();
             }
@@ -112,7 +111,7 @@ async fn main(_spawner: Spawner) {
         .with_din(peripherals.GPIO5)
         .build();
 
-    println!(
+    log::info!(
         "embassy_i2s_pdm_rx: PDM RX @ {} Hz on GPIO4 (CLK) / GPIO5 (DIN)",
         rx_cfg.clock.sample_rate.as_hz()
     );
@@ -122,7 +121,7 @@ async fn main(_spawner: Spawner) {
     let mut transaction = match i2s_rx.read(buffer) {
         Ok(tx) => tx,
         Err((err, _, _)) => {
-            println!("I2S DMA read failed: {err:?}");
+            log::info!("I2S DMA read failed: {err:?}");
             loop {
                 core::hint::spin_loop();
             }
@@ -144,10 +143,10 @@ async fn main(_spawner: Spawner) {
 
             if last_print.elapsed() >= print_interval {
                 let show = count.min(PRINT_BYTES);
-                println!("PDM RX: read {count} bytes");
-                println!("-----------------------------------");
+                log::info!("PDM RX: read {count} bytes");
+                log::info!("-----------------------------------");
                 print_head_samples(&pop_buf, show);
-                println!();
+                log::info!("");
                 last_print = Instant::now();
             }
         }
