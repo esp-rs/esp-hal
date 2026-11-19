@@ -52,6 +52,7 @@ jobs:
     outputs:
       labels: ${{ steps.labels.outputs.labels }}
       packages: ${{ steps.labels.outputs.packages }}
+      hil-required-chips: ${{ steps.labels.outputs.hil-required-chips }}
       run-build: ${{ steps.decide.outputs.run-build }}
       run-docs: ${{ steps.decide.outputs.run-docs }}
       run-msrv: ${{ steps.decide.outputs.run-msrv }}
@@ -78,9 +79,14 @@ jobs:
           fi
 
           PACKAGES=""
+          HIL_REQUIRED_CHIPS=""
           if [ -n "$LABELS" ]; then
             PACKAGES=$(printf '%s\n' "$LABELS" \
               | { grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true; } \
+              | tr '\n' ' ' | xargs)
+            # `hil-required-<soc>` makes a failure on that chip alone block the merge.
+            HIL_REQUIRED_CHIPS=$(printf '%s\n' "$LABELS" \
+              | { grep -oP '(?<=^hil-required-)[a-z0-9]+$' || true; } \
               | tr '\n' ' ' | xargs)
           fi
 
@@ -88,9 +94,11 @@ jobs:
 
           echo "labels=$LABELS_SPACE" >> "$GITHUB_OUTPUT"
           echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+          echo "hil-required-chips=$HIL_REQUIRED_CHIPS" >> "$GITHUB_OUTPUT"
 
           echo "Detected labels: $LABELS_SPACE"
           echo "Detected packages: $PACKAGES"
+          echo "Detected HIL-required chips: $HIL_REQUIRED_CHIPS"
 
       - name: Decide what to run
         id: decide
@@ -565,7 +573,8 @@ jobs:
     secrets: inherit
 
   # --------------------------------------------------------------------------
-  # HIL — build jobs gate artifacts; hil-gate gates device runs (≥50% rule).
+  # HIL — build jobs gate artifacts; hil-gate gates device runs (two failed
+  # runners, or any failure on a `hil-required-<soc>` chip).
 
   # `merge-freeze-gate` is a dependency so that a frozen-out queue entry never
   # occupies the device runners.
@@ -576,6 +585,7 @@ jobs:
     with:
       chips: all
       package: all
+      required_chips: ${{ needs.calculate.outputs.hil-required-chips }}
     secrets: inherit
 
   # --------------------------------------------------------------------------
@@ -587,8 +597,9 @@ jobs:
   # Failed or cancelled jobs cause this gate to fail.
   #
   # The `hil` job is the reusable hil.yml workflow, so it covers test
-  # compilation and the runner tool as well; its hil-gate job blocks when ≥50%
-  # of executed hil-run matrix legs fail. hil-run-radio is informational only.
+  # compilation and the runner tool as well; its hil-gate job blocks when two
+  # or more hil-run matrix legs fail, or when a `hil-required-<soc>` chip fails.
+  # hil-run-radio is informational only.
   # merge-freeze-gate rejects queue entries while a merge freeze is in effect.
   ci-result:
     if: ${{ always() }}

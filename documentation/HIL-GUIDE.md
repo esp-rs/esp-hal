@@ -35,6 +35,12 @@ Runs the **full** HIL matrix on **all supported chips**. `/test all` does the sa
 
 The full matrix run will also be executed in the merge queue and is a prerequisite for a successful merge.
 
+#### Merge queue gate
+
+In the merge queue, a single failed HIL runner does not block the merge, so that one flaky board does not hold the queue. Two or more failed runners block the merge. Radio HIL runs do not block the merge.
+
+To block the merge when one chip fails, add the `hil-required-<chip>` label to the PR, for example `hil-required-esp32h4`. You can add more than one label. The merge is blocked when a required chip fails, runs no tests, or has no HIL runner. Add the label before the PR enters the merge queue, because the queue reads the labels when it starts the run.
+
 ### `/test <chip> [<chip> ...]`
 
 Runs HIL tests **only for the listed chips**.
