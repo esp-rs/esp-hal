@@ -10,6 +10,33 @@ pub enum PhyPads {
     UsbFs,
 }
 
+/// Returns the pad group of `gpio`, if the pin is a D+ or D- pin of an internal USB PHY.
+fn pads_of(gpio: u8) -> Option<PhyPads> {
+    for_each_analog_function! {
+        (USJ_DP, $gpio:ident) => {
+            if gpio == peripherals::$gpio::NUMBER {
+                return Some(PhyPads::Usj);
+            }
+        };
+        (USJ_DM, $gpio:ident) => {
+            if gpio == peripherals::$gpio::NUMBER {
+                return Some(PhyPads::Usj);
+            }
+        };
+        (USB_FS_DP, $gpio:ident) => {
+            if gpio == peripherals::$gpio::NUMBER {
+                return Some(PhyPads::UsbFs);
+            }
+        };
+        (USB_FS_DM, $gpio:ident) => {
+            if gpio == peripherals::$gpio::NUMBER {
+                return Some(PhyPads::UsbFs);
+            }
+        };
+    }
+    None
+}
+
 /// Returns whether software or an eFuse moved the USB Serial/JTAG controller away from its default
 /// PHY.
 fn phy_swapped() -> bool {
@@ -58,5 +85,35 @@ pub(crate) fn usj_pads() -> Option<PhyPads> {
         Some(PhyPads::UsbFs)
     } else {
         None
+    }
+}
+
+/// Disconnects the USB controller that drives the pad of `gpio`, so the pad works as a GPIO.
+///
+/// The pad and pull bits of each controller follow the controller to the PHY that it is mapped
+/// to, so the PHY selection decides which register to write.
+pub(crate) fn release_pad(gpio: u8) {
+    let Some(pads) = pads_of(gpio) else {
+        return;
+    };
+    if usj_pads() == Some(pads) {
+        // Workaround to make D+ and D- work when the pin is assigned to
+        // the `USB_SERIAL_JTAG` peripheral by default.
+        USB_DEVICE::regs().conf0().modify(|_, w| {
+            w.usb_pad_enable().clear_bit();
+            w.dm_pullup().clear_bit();
+            w.dm_pulldown().clear_bit();
+            w.dp_pullup().clear_bit();
+            w.dp_pulldown().clear_bit()
+        });
+    } else {
+        #[cfg(any(esp32h4, esp32p4))]
+        peripherals::USB_WRAP::regs().otg_conf().modify(|_, w| {
+            w.pad_pull_override().set_bit();
+            w.dm_pullup().clear_bit();
+            w.dm_pulldown().clear_bit();
+            w.dp_pullup().clear_bit();
+            w.dp_pulldown().clear_bit()
+        });
     }
 }
