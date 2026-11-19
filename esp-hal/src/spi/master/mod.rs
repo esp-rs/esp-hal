@@ -495,6 +495,14 @@ impl Config {
     /// so the bus never runs faster than requested.
     /// The minimum request is the source frequency divided by 1024 and rounded up
     /// to whole hertz. The maximum request is the source frequency.
+    #[cfg_attr(
+        soc_has_clock_node_spi_pll_f160m_div2,
+        doc = "\n\nThe PCR pre-divider reduces the 160 MHz PLL clock to 80 MHz at the SPI module."
+    )]
+    #[cfg_attr(
+        soc_has_clock_node_spi_pll_f120m_div2,
+        doc = "The PCR pre-divider reduces the 120 MHz PLL clock to 60 MHz at the SPI module."
+    )]
     pub fn with_frequency(mut self, frequency: Rate) -> Self {
         self.frequency = frequency;
         self.reg = self.recalculate();
