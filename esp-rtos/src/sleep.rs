@@ -47,6 +47,13 @@ impl Sleep {
         sleep_keeps_cpu_powered_for_usb_serial_jtag,
         doc = "Only a light sleep that keeps USB Serial/JTAG connected to a host keeps the CPU domain powered. See the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option of esp-hal."
     )]
+    #[cfg_attr(
+        all(
+            sleep_keeps_usb_serial_jtag,
+            not(sleep_keeps_cpu_powered_for_usb_serial_jtag)
+        ),
+        doc = "Only a light sleep that keeps USB Serial/JTAG connected to a host while a debugger is attached keeps the CPU domain powered. See the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option of esp-hal."
+    )]
     /// # Errors
     ///
     /// Returns [`CpuRetentionMemoryError`] if a buffer is installed already, or if `memory` is

@@ -440,11 +440,21 @@ impl<'d> LowPower<'d> {
         // it. A buffer that another core installs during this sleep serves the next one.
         //
         // On some chips, a powered-down CPU does not reliably come back from a sleep that keeps
-        // USB Serial/JTAG connected.
+        // USB Serial/JTAG connected. On the others, such a sleep keeps the CPU powered while a
+        // debugger is attached, because powering it down loses the debug module.
         #[cfg(supports_cpu_power_down)]
         let retention_buffer = match kind {
             #[cfg(sleep_keeps_cpu_powered_for_usb_serial_jtag)]
             SleepKind::Light if config.keep_usb_serial_jtag => None,
+            #[cfg(all(
+                sleep_keeps_usb_serial_jtag,
+                not(sleep_keeps_cpu_powered_for_usb_serial_jtag)
+            ))]
+            SleepKind::Light
+                if config.keep_usb_serial_jtag && crate::debugger::debugger_connected() =>
+            {
+                None
+            }
             SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
             SleepKind::Deep => None,
         };

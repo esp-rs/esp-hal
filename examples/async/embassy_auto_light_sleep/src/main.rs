@@ -14,8 +14,9 @@
 //!
 //! The USB Serial/JTAG console keeps working while a USB host is connected.
 //! ESP32-C3, ESP32-H4 and ESP32-S3 then stay out of light sleep, and the other
-//! chips' light sleep draws more current. JTAG only responds while the chip is
-//! awake. Set `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` to `false` to let
+//! chips' light sleep draws more current. A debugger session also keeps working
+//! across light sleep, but a debugger connects only while the chip is awake.
+//! Set `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` to `false` to let
 //! light sleep disconnect the console instead. A host that connects after boot
 //! gets the console only while the chip stays awake, for example while
 //! `wake_lock_demo` holds its wake lock.
