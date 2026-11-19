@@ -18,6 +18,8 @@ use esp_hal::{
     canfd::{
         CanFd,
         CanFdInterrupt,
+        CanFdRx,
+        CanFdTx,
         ClockSource,
         Config,
         ConfigError,
@@ -36,6 +38,7 @@ use esp_hal::{
         TxBufferState,
     },
     rtc_cntl::WakeLock,
+    time::{Duration, Instant},
     timer::timg::TimerGroup,
 };
 use hil_test as _;
@@ -69,11 +72,16 @@ fn config() -> Config {
 
 /// Waits for a queued frame to leave the in-progress states.
 fn wait_tx<D: DriverMode>(canfd: &CanFd<'static, D>, index: u8) -> TxBufferState {
+    wait_tx_state(index, || canfd.tx_buffer_state(index))
+}
+
+/// [`wait_tx`] for any source of the buffer state, such as a transmitting half.
+fn wait_tx_state(index: u8, read_state: impl Fn() -> TxBufferState) -> TxBufferState {
     // The slowest bit rate these tests configure needs over a hundred
     // milliseconds for one frame.
-    let deadline = esp_hal::time::Instant::now() + esp_hal::time::Duration::from_millis(500);
+    let deadline = Instant::now() + Duration::from_millis(500);
     loop {
-        let state = canfd.tx_buffer_state(index);
+        let state = read_state();
         if !matches!(
             state,
             TxBufferState::Ready | TxBufferState::InProgress | TxBufferState::AbortInProgress
@@ -81,7 +89,7 @@ fn wait_tx<D: DriverMode>(canfd: &CanFd<'static, D>, index: u8) -> TxBufferState
             return state;
         }
         assert!(
-            esp_hal::time::Instant::now() < deadline,
+            Instant::now() < deadline,
             "TX buffer {} never finished, stuck in {:?}",
             index,
             state
@@ -106,10 +114,25 @@ fn accepted(canfd: &mut CanFd<'static, Blocking>, id: impl Into<Id>) -> bool {
     canfd.rx_frame_count() > 0
 }
 
+/// [`accepted`] through the two halves of a split driver.
+fn accepted_split(
+    rx: &mut CanFdRx<'_, Blocking>,
+    tx: &mut CanFdTx<'_, Blocking>,
+    id: impl Into<Id>,
+) -> bool {
+    rx.flush_rx();
+    let frame = Frame::new(id, &[0xAA]).unwrap();
+    let index = tx.transmit(&frame).unwrap();
+    assert_eq!(
+        wait_tx_state(index, || tx.tx_buffer_state(index)),
+        TxBufferState::Ok,
+        "transmit failed"
+    );
+    rx.rx_frame_count() > 0
+}
+
 #[embedded_test::tests(default_timeout = 3)]
 mod blocking_tests {
-    use esp_hal::time::{Duration, Instant};
-
     use super::*;
 
     /// Checks the timestamp counter advances at `rate` counts per second,
@@ -364,6 +387,68 @@ mod blocking_tests {
         let index = ctx.canfd.transmit(&fd).unwrap();
         assert_eq!(wait_tx(&ctx.canfd, index), TxBufferState::Ok);
         assert_eq!(ctx.canfd.rx_frame_count(), 0, "FD frame must be filtered");
+
+        ctx.canfd.accept_all();
+    }
+
+    #[test]
+    fn the_receiving_half_changes_filters_on_the_bus(mut ctx: Context<Blocking>) {
+        let (mut rx, mut tx) = ctx.canfd.split();
+
+        // Accept 0x220..=0x22F.
+        rx.set_mask_filter(
+            MaskFilter::A,
+            &MaskFilterConfig::standard(std(0x220), std(0x7F0)),
+        );
+        rx.disable_mask_filter(MaskFilter::B);
+        rx.disable_mask_filter(MaskFilter::C);
+        rx.disable_range_filter();
+        assert!(
+            accepted_split(&mut rx, &mut tx, std(0x225)),
+            "0x225 must pass"
+        );
+        assert!(
+            !accepted_split(&mut rx, &mut tx, std(0x235)),
+            "0x235 must not"
+        );
+
+        // Enabling another filter leaves filter A as it is.
+        rx.set_range_filter(&RangeFilterConfig::standard(std(0x400), std(0x40F)));
+        assert!(
+            accepted_split(&mut rx, &mut tx, std(0x225)),
+            "0x225 must still pass"
+        );
+        assert!(
+            accepted_split(&mut rx, &mut tx, std(0x408)),
+            "0x408 must pass"
+        );
+        assert!(
+            !accepted_split(&mut rx, &mut tx, std(0x235)),
+            "0x235 must not"
+        );
+
+        rx.accept_all();
+        assert!(
+            accepted_split(&mut rx, &mut tx, std(0x235)),
+            "all must pass"
+        );
+    }
+
+    #[test]
+    fn filters_set_through_the_receiving_half_outlive_it(mut ctx: Context<Blocking>) {
+        {
+            let (mut rx, _) = ctx.canfd.split();
+            rx.set_mask_filter(
+                MaskFilter::A,
+                &MaskFilterConfig::standard(std(0x220), std(0x7F0)),
+            );
+        }
+
+        // Changing another filter through the driver must not bring back what
+        // the driver last set on filter A itself.
+        ctx.canfd.disable_range_filter();
+        assert!(accepted(&mut ctx.canfd, std(0x225)), "0x225 must pass");
+        assert!(!accepted(&mut ctx.canfd, std(0x235)), "0x235 must not");
 
         ctx.canfd.accept_all();
     }
@@ -975,7 +1060,6 @@ mod contention_tests {
     };
 
     use embassy_time::Timer;
-    use esp_hal::time::{Duration, Instant};
 
     use super::*;
 
@@ -1446,7 +1530,6 @@ mod fault_tests {
         canfd::ErrorState,
         delay::Delay,
         gpio::{DriveMode, Level, Output, OutputConfig, Pull},
-        time::{Duration, Instant},
     };
 
     use super::*;
