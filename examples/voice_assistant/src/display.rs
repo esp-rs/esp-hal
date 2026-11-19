@@ -126,7 +126,7 @@ pub async fn run(mut dpi: Dpi<'static, Blocking>) {
 
 /// Set when a frame had too few refills and the picture is out of step with the bounce buffers.
 /// This happens when the refill interrupt waits longer than a bounce buffer lasts, for example
-/// while Wi-Fi starts.
+/// while the speech model loads.
 static OUT_OF_STEP: AtomicBool = AtomicBool::new(false);
 
 /// Waits for a new screen, or returns `None` when the picture is out of step. Restarting the
@@ -380,32 +380,18 @@ fn draw_message(frame: &mut FrameBuffer<'_>, title: &str, message: &str, top: i3
         .draw(frame)
         .unwrap();
 
-    let message = to_latin1(message);
     let area = Rectangle::new(Point::new(24, top + 24), Size::new(WIDTH - 48, height));
     let style = TextBoxStyleBuilder::new()
         .height_mode(HeightMode::Exact(VerticalOverdraw::FullRowsOnly))
         .build();
     TextBox::with_textbox_style(
-        &message,
+        message,
         area,
         MonoTextStyle::new(&FONT_10X20, FOREGROUND),
         style,
     )
     .draw(frame)
     .unwrap();
-}
-
-/// Replaces the typographic characters the model likes to use with ones the font has.
-fn to_latin1(text: &str) -> String {
-    text.chars()
-        .map(|c| match c {
-            '\u{2018}' | '\u{2019}' => '\'',
-            '\u{201C}' | '\u{201D}' => '"',
-            '\u{2013}' | '\u{2014}' => '-',
-            c if u32::from(c) <= 0xFF => c,
-            _ => '?',
-        })
-        .collect()
 }
 
 /// RGB565 pixels in little-endian byte order, as the panel's data lines expect them.

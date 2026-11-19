@@ -7,12 +7,6 @@ rustflags = [
 
 [env]
 ESP_LOG = "info"
-ESP_RADIO_CONFIG_WIFI_SOFTAP_SUPPORT = "false"
-SSID = "SSID"
-PASSWORD = "PASSWORD"
-# Set one of the keys for answers to questions. Without a key, only the light commands work.
-# ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
-# OPENAI_API_KEY = "OPENAI_API_KEY"
 
 [unstable]
 build-std = ["alloc", "core"]

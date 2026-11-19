@@ -1,18 +1,10 @@
 //! Voice assistant for the ESP32-S31-Korvo-1 LCD sub-board.
 //!
-//! Set SSID, PASSWORD and one of ANTHROPIC_API_KEY or OPENAI_API_KEY env variables before running
-//! this example. Without an API key, the example only recognizes the
-//! light commands and does not use Wi-Fi.
-//!
 //! This runs on the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board. Tap the talk button on the
 //! screen, say one of the phrases that the phrases button shows, then tap the talk button again.
-//! The second core recognizes the phrase with MultiNet from Espressif's ESP-SR, through the
-//! `esp-sr` crate, which provides its prebuilt libraries and model. Claude or OpenAI
-//! answers questions, and light commands set the color of the board's RGB LED. The phrase and the
-//! answer are shown on the screen.
-//!
-//! The API key is stored in the firmware in plain text, and anyone with access to the board can
-//! read it. Use a key with a spending limit.
+//! The second core recognizes the phrase offline with MultiNet from Espressif's ESP-SR, through
+//! the `esp-sr` crate, which provides its prebuilt libraries and model. The phrase sets the color
+//! of the board's RGB LED and is shown on the screen.
 //!
 //! Hardware setup:
 //! - Connect the LCD sub-board.
@@ -26,7 +18,6 @@
 
 extern crate alloc;
 
-mod api;
 mod audio;
 mod display;
 mod es8389;
@@ -38,7 +29,6 @@ use alloc::{format, string::String, vec::Vec};
 use core::ffi::CStr;
 
 use embassy_executor::Spawner;
-use embassy_net::{Runner, Stack, StackResources};
 use embassy_time::{Duration, Timer, with_timeout};
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -57,24 +47,14 @@ use esp_hal::{
         },
     },
     ram,
-    rng::Rng,
     system::{self, CpuControl},
     time::Rate,
     timer::timg::TimerGroup,
-};
-use esp_radio::wifi::{
-    AuthenticationMethodConfig,
-    Config,
-    ControllerConfig,
-    Interface,
-    WifiController,
-    sta::StationConfig,
 };
 use esp_rtos::embassy::InterruptExecutor;
 use static_cell::{ConstStaticCell, StaticCell};
 
 use crate::{
-    api::{Api, Service},
     audio::Samples,
     display::{Button, Screen},
     led::{Color, Led},
@@ -83,42 +63,15 @@ use crate::{
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-/// What the assistant does with a recognized phrase.
-#[derive(Clone, Copy)]
-enum Action {
-    /// Claude or OpenAI answers the phrase.
-    Ask,
-    /// The RGB LED shows the color.
-    Light(Color),
-}
-
-/// The phrases the assistant recognizes, see `speech`.
-const PHRASES: &[(&CStr, Action)] = &[
-    (c"tell me a joke", Action::Ask),
-    (c"tell me a fun fact", Action::Ask),
-    (c"tell me a short story", Action::Ask),
-    (c"say something nice", Action::Ask),
-    (c"who are you", Action::Ask),
-    (c"what can you do", Action::Ask),
-    (c"why is the sky blue", Action::Ask),
-    (c"how do airplanes fly", Action::Ask),
-    (c"how far away is the moon", Action::Ask),
-    (c"how hot is the sun", Action::Ask),
-    (c"what is the speed of light", Action::Ask),
-    (c"what is the tallest mountain", Action::Ask),
-    (c"what is the capital of france", Action::Ask),
-    (c"who invented the telephone", Action::Ask),
-    (c"how many people live on earth", Action::Ask),
-    (c"recommend a good book", Action::Ask),
-    (c"give me a recipe for pancakes", Action::Ask),
-    (c"what is a microcontroller", Action::Ask),
-    (c"turn the light red", Action::Light(Color::RED)),
-    (c"turn the light green", Action::Light(Color::GREEN)),
-    (c"turn the light blue", Action::Light(Color::BLUE)),
-    (c"turn the light yellow", Action::Light(Color::YELLOW)),
-    (c"turn the light purple", Action::Light(Color::PURPLE)),
-    (c"turn the light white", Action::Light(Color::WHITE)),
-    (c"turn off the light", Action::Light(Color::OFF)),
+/// The phrases the assistant recognizes, see `speech`, and the RGB LED colors they set.
+const PHRASES: &[(&CStr, Color)] = &[
+    (c"turn the light red", Color::RED),
+    (c"turn the light green", Color::GREEN),
+    (c"turn the light blue", Color::BLUE),
+    (c"turn the light yellow", Color::YELLOW),
+    (c"turn the light purple", Color::PURPLE),
+    (c"turn the light white", Color::WHITE),
+    (c"turn off the light", Color::OFF),
 ];
 
 /// Extra pronunciations of phrases in ESP-SR's phonemes, see [`esp_sr::Phrase`]. The t of "light"
@@ -134,9 +87,6 @@ const PRONUNCIATIONS: &[(&CStr, &[&CStr])] = &[
 
 /// How long the recording goes on after the tap that stops it.
 const RECORDING_TAIL: Duration = Duration::from_millis(300);
-
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
 
 // Full `.dram2_uninit` region for this chip.
 const DRAM2_UNINIT_SIZE: usize = {
@@ -222,7 +172,7 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(display::run(dpi).unwrap());
 
     // Audio. The audio task must keep the DMA fed while other tasks block the thread executor, for
-    // example while a TLS connection is set up.
+    // example while the display task draws a screen.
     static AUDIO_EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
     let audio_spawner = AUDIO_EXECUTOR
         .init(InterruptExecutor::new(peripherals.FROM_CPU_INTR2))
@@ -252,43 +202,11 @@ async fn main(spawner: Spawner) -> ! {
     let mut led = Led::new(peripherals.RMT, peripherals.GPIO37);
     led.set(Color::OFF).await;
 
-    let Some(service) = api::SERVICE else {
-        log::info!("No API key: only light commands, without Wi-Fi");
-        assistant(None, led).await
-    };
-
-    // Wi-Fi
-    let station_config = Config::Station(
-        StationConfig::default()
-            .with_ssid(SSID.try_into().unwrap())
-            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
-                PASSWORD.try_into().unwrap(),
-            )),
-    );
-    let controller = WifiController::new(
-        peripherals.WIFI,
-        ControllerConfig::default().with_initial_config(station_config),
-    )
-    .unwrap();
-
-    let rng = Rng::new();
-    let seed = u64::from(rng.random()) << 32 | u64::from(rng.random());
-    static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
-    let (stack, runner) = embassy_net::new(
-        Interface::station(),
-        embassy_net::Config::dhcpv4(Default::default()),
-        RESOURCES.init(StackResources::new()),
-        seed,
-    );
-    spawner.spawn(connection(controller).unwrap());
-    spawner.spawn(net_task(runner).unwrap());
-
-    assistant(Some((service, stack)), led).await
+    assistant(led).await
 }
 
-/// Runs conversation turns, one per tap. Without a service and a network stack to reach it, nobody
-/// answers questions.
-async fn assistant(service: Option<(Service, Stack<'static>)>, mut led: Led) -> ! {
+/// Runs conversation turns, one per tap.
+async fn assistant(mut led: Led) -> ! {
     let mut screen = Screen {
         status: String::from("Loading speech model"),
         button: Button::Busy,
@@ -299,15 +217,6 @@ async fn assistant(service: Option<(Service, Stack<'static>)>, mut led: Led) -> 
     // Loading the model takes so much PSRAM bandwidth that the display refresh can slip. The next
     // screen restarts the refresh, so it must come after the loading.
     speech::wait_until_ready().await;
-    let mut api = match service {
-        Some((service, stack)) => {
-            screen.status = String::from("Connecting to Wi-Fi");
-            display::show(&screen);
-            stack.wait_config_up().await;
-            Some((service, Api::new(stack)))
-        }
-        None => None,
-    };
 
     loop {
         screen.status = String::from("Ready");
@@ -332,55 +241,31 @@ async fn assistant(service: Option<(Service, Stack<'static>)>, mut led: Led) -> 
         log::info!("Recorded {} samples", speech.len());
 
         screen.button = Button::Busy;
-        if let Err(error) = converse(&mut api, &mut led, &mut screen, speech).await {
-            log::error!("{error}");
-            screen.status = String::from("Error");
-            screen.assistant = format!("{error}");
-        }
+        converse(&mut led, &mut screen, speech).await;
     }
 }
 
-async fn converse(
-    api: &mut Option<(Service, Api)>,
-    led: &mut Led,
-    screen: &mut Screen,
-    speech: Samples,
-) -> Result<(), api::Error> {
+async fn converse(led: &mut Led, screen: &mut Screen, speech: Samples) {
     screen.status = String::from("Recognizing");
     display::show(screen);
     let Some(index) = speech::recognize(speech).await else {
         screen.you.clear();
         screen.assistant = format!("I did not recognize that. {PHRASES_HINT}");
-        return Ok(());
+        return;
     };
-    let &(phrase, action) = available_phrases().nth(index).unwrap();
+    let &(phrase, color) = &PHRASES[index];
     screen.you = String::from(phrase.to_str().unwrap());
     log::info!("You: {}", screen.you);
-    if let Action::Light(color) = action {
-        led.set(color).await;
-        screen.assistant = String::from("Done.");
-        return Ok(());
-    }
-
-    let Some((service, api)) = api else {
-        unreachable!("Questions are only recognized with an API key");
-    };
-    screen.assistant.clear();
-    screen.status = String::from("Thinking");
-    display::show(screen);
-    screen.assistant = api.chat(*service, &screen.you).await?;
-    log::info!("Assistant: {}", screen.assistant);
-    if screen.assistant.trim().is_empty() {
-        screen.assistant = format!("{service} did not answer.");
-    }
-    Ok(())
+    led.set(color).await;
+    screen.assistant = String::from("Done.");
 }
 
 const PHRASES_HINT: &str = "Tap Phrases to see what I understand.";
 
 /// The phrases for the recognizer, with their extra pronunciations.
 fn recognized_phrases() -> Vec<esp_sr::Phrase<'static>> {
-    available_phrases()
+    PHRASES
+        .iter()
         .map(|&(text, _)| esp_sr::Phrase {
             text,
             pronunciations: PRONUNCIATIONS
@@ -391,45 +276,11 @@ fn recognized_phrases() -> Vec<esp_sr::Phrase<'static>> {
         .collect()
 }
 
-/// The phrases the assistant handles: all of them with an API key, only light commands without.
-fn available_phrases() -> impl Iterator<Item = &'static (&'static CStr, Action)> {
-    PHRASES
-        .iter()
-        .filter(|(_, action)| api::SERVICE.is_some() || matches!(action, Action::Light(_)))
-}
-
 /// The phrases the assistant recognizes, for the screen.
 fn phrases() -> String {
-    let list = |light: bool| {
-        let phrases: Vec<&str> = available_phrases()
-            .filter(|(_, action)| matches!(action, Action::Light(_)) == light)
-            .map(|(phrase, _)| phrase.to_str().unwrap())
-            .collect();
-        phrases.join(", ")
-    };
-    if api::SERVICE.is_some() {
-        format!("Ask one of: {}. Or say: {}.", list(false), list(true))
-    } else {
-        format!("Say one of: {}.", list(true))
-    }
-}
-
-#[embassy_executor::task]
-async fn connection(mut controller: WifiController<'static>) {
-    loop {
-        match controller.connect_async().await {
-            Ok(info) => {
-                log::info!("Wi-Fi connected to {info:?}");
-                let info = controller.wait_for_disconnect_async().await.ok();
-                log::info!("Wi-Fi disconnected: {info:?}");
-            }
-            Err(error) => log::error!("Failed to connect to Wi-Fi: {error:?}"),
-        }
-        Timer::after(Duration::from_secs(5)).await
-    }
-}
-
-#[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, Interface>) {
-    runner.run().await
+    let phrases: Vec<&str> = PHRASES
+        .iter()
+        .map(|(phrase, _)| phrase.to_str().unwrap())
+        .collect();
+    format!("Say one of: {}.", phrases.join(", "))
 }
