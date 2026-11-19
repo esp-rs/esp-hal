@@ -122,12 +122,26 @@ impl<'d> Channels<'d> {
         dma.in_conf0_ch(rx).modify(|_, w| w.in_rst_ch().clear_bit());
         dma.out_conf0_ch(tx).reset();
         dma.in_conf0_ch(rx).reset();
+        dma.out_color_convert_ch(tx).reset();
+        dma.out_scramble_ch(tx).reset();
         // Disconnect the trigger before another pair can bind to the peripheral.
         dma.out_peri_sel_ch(tx).reset();
         dma.in_peri_sel_ch(rx).reset();
         dma.out_int_clr_ch(tx)
             .write(|w| unsafe { w.bits(u32::MAX) });
         dma.in_int_clr_ch(rx).write(|w| unsafe { w.bits(u32::MAX) });
+    }
+
+    /// Configures the idle TX channel to swap the two bytes of each 16-bit pixel until reset.
+    pub(crate) fn swap_tx_pixel_bytes(&mut self) {
+        let tx = self.tx.index();
+        let dma = DMA2D::regs();
+        dma.out_color_convert_ch(tx).write(|w| unsafe {
+            w.out_color_input_sel_ch().bits(2);
+            w.out_color_output_sel_ch().bits(2)
+        });
+        dma.out_scramble_ch(tx)
+            .write(|w| unsafe { w.out_scramble_sel_pre_ch().bits(1) });
     }
 
     /// # Safety
