@@ -10,6 +10,7 @@
 
 use crate::{
     peripherals::USB_DEVICE,
+    soc::usb_phy::{self, PhyPads},
     system::{Peripheral, PeripheralClockControl},
 };
 
@@ -96,26 +97,12 @@ pub(super) fn keep_in_light_sleep() -> bool {
     cfg!(keep_usb_serial_jtag_connected) && host_connected()
 }
 
-/// The GPIOs of the D- and D+ pads.
+/// The GPIOs of the D- and D+ pads that USB Serial/JTAG drives, if they are known.
 ///
 /// The `USB_EXCHG_PINS` eFuse swaps the two lines, so the sleep handles the pull-ups of both pads.
-#[allow(unused_assignments)]
-const PADS: [u8; 2] = {
-    let mut dm = None;
-    let mut dp = None;
-    for_each_analog_function! {
-        (USJ_DM, $gpio:ident) => { dm = Some(crate::peripherals::$gpio::NUMBER); };
-        (USJ_DP, $gpio:ident) => { dp = Some(crate::peripherals::$gpio::NUMBER); };
-    }
-    // The ESP32-S3 shares the PHY with USB OTG, and the metadata names the pads after USB OTG.
-    if dp.is_none() {
-        for_each_analog_function! {
-            (USB_FS_DM, $gpio:ident) => { dm = Some(crate::peripherals::$gpio::NUMBER); };
-            (USB_FS_DP, $gpio:ident) => { dp = Some(crate::peripherals::$gpio::NUMBER); };
-        }
-    }
-    [dm.unwrap(), dp.unwrap()]
-};
+fn pads() -> Option<[u8; 2]> {
+    usb_phy::usj_pads().map(PhyPads::gpios)
+}
 
 fn set_bus_clock_enabled(enabled: bool) {
     PeripheralClockControl::set_enabled_untracked(Peripheral::UsbDevice, enabled);
@@ -131,7 +118,7 @@ fn set_pad_enabled(enabled: bool) {
 pub(super) struct Disconnected {
     module_was_enabled: bool,
     conf0: u32,
-    /// The pull-ups of [`PADS`], if USB Serial/JTAG had the pads.
+    /// The pull-ups of [`pads`], if USB Serial/JTAG had the pads.
     pad_pullups: Option<[bool; 2]>,
 }
 
@@ -158,8 +145,8 @@ pub(super) fn disconnect() -> Disconnected {
         w.dp_pullup().clear_bit();
         w.dm_pullup().clear_bit()
     });
-    let pad_pullups = pad_enabled.then(|| {
-        PADS.map(|pad| {
+    let pad_pullups = pad_enabled.then(pads).flatten().map(|pads| {
+        pads.map(|pad| {
             let reg = crate::gpio::io_mux_reg(pad);
             let pullup = reg.read().fun_wpu().bit();
             reg.modify(|_, w| w.fun_wpu().clear_bit());
@@ -185,8 +172,8 @@ impl Disconnected {
         USB_DEVICE::regs()
             .conf0()
             .write(|w| unsafe { w.bits(self.conf0) });
-        if let Some(pullups) = self.pad_pullups {
-            for (pad, pullup) in PADS.into_iter().zip(pullups) {
+        if let (Some(pullups), Some(pads)) = (self.pad_pullups, pads()) {
+            for (pad, pullup) in pads.into_iter().zip(pullups) {
                 crate::gpio::io_mux_reg(pad).modify(|_, w| w.fun_wpu().bit(pullup));
             }
         }
