@@ -70,8 +70,8 @@ static INSTALLED: RetentionSlot<BUFFER_SIZE> = RetentionSlot::new();
 
 /// Storage for [`CacheTagRetentionMemory`].
 ///
-/// This storage must be placed to `#[ram(reclaimed, unstable(zeroed))]`, then
-/// a static mutable reference to [`CacheTagRetentionMemory`] can be taken out of it.
+/// Place this storage in [`#[ram(unstable(retention))]`][crate::ram], then a static mutable
+/// reference to [`CacheTagRetentionMemory`] can be taken out of it.
 #[instability::unstable]
 pub type CacheTagRetentionStorage = RetentionStorage<BUFFER_SIZE>;
 
@@ -114,8 +114,7 @@ impl LowPower<'_> {
     ///
     /// Returns [`CacheTagRetentionMemoryError`] if the driver holds a buffer already, or if the
     /// buffer is not inside the range that the retention DMA reaches. The
-    /// [`#[ram(reclaimed, unstable(zeroed))]`][crate::ram] attribute places a static inside that
-    /// range.
+    /// [`#[ram(unstable(retention))]`][crate::ram] attribute places a static inside that range.
     ///
     /// # Examples
     ///
@@ -123,10 +122,10 @@ impl LowPower<'_> {
     /// # {before_snippet}
     /// use esp_hal::rtc_cntl::{CacheTagRetentionStorage, CpuRetentionStorage, sleep::LowPower};
     ///
-    /// // #[esp_hal::ram(reclaimed, unstable(zeroed))]
+    /// #[esp_hal::ram(unstable(retention))]
     /// static RETENTION: CpuRetentionStorage = CpuRetentionStorage::new();
     ///
-    /// // #[esp_hal::ram(reclaimed, unstable(zeroed))]
+    /// #[esp_hal::ram(unstable(retention))]
     /// static TAG_MEMORY: CacheTagRetentionStorage = CacheTagRetentionStorage::new();
     ///
     /// let mut lpwr = LowPower::new(peripherals.LPWR);

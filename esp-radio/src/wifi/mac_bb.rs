@@ -27,8 +27,8 @@ const BUFFER_SIZE: usize = 3280;
 
 /// Storage for [`RetentionMemory`].
 ///
-/// This storage must be placed in `#[ram(reclaimed, unstable(zeroed))]`, then a static mutable
-/// reference to [`RetentionMemory`] can be taken out of it.
+/// Place this storage in `#[ram(unstable(retention))]`, then a static mutable reference to
+/// [`RetentionMemory`] can be taken out of it.
 #[instability::unstable]
 pub type RetentionStorage = esp_hal::rtc_cntl::RetentionStorage<BUFFER_SIZE>;
 
@@ -57,7 +57,7 @@ static OFFERED: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
 /// # {before_snippet}
 /// use esp_radio::wifi::{RetentionStorage, install_retention_memory};
 ///
-/// #[esp_hal::ram(reclaimed, unstable(zeroed))]
+/// #[esp_hal::ram(unstable(retention))]
 /// static RETENTION: RetentionStorage = RetentionStorage::new();
 ///
 /// install_retention_memory(RETENTION.take())?;

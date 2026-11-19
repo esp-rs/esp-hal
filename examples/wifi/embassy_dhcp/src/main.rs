@@ -116,26 +116,28 @@ cfg_select! {
     ) => {
         use esp_hal::rtc_cntl::CpuRetentionStorage;
 
-        // The memory that the bootloader used is otherwise unused after boot.
-        #[ram(reclaimed, unstable(zeroed))]
+        #[ram(unstable(retention))]
         static CPU_RETENTION_MEMORY: CpuRetentionStorage = CpuRetentionStorage::new();
 
         // Keeping the cache tags makes the wake faster, because the cache stays warm.
         #[cfg(feature = "esp32s3")]
-        #[ram(reclaimed, unstable(zeroed))]
+        #[ram(unstable(retention))]
         static CACHE_TAGMEM: esp_hal::rtc_cntl::CacheTagRetentionStorage =
             esp_hal::rtc_cntl::CacheTagRetentionStorage::new();
 
-        /// The reclaimed RAM that CPU power-down takes from the heap. The 16 bytes per buffer
-        /// cover its alignment.
-        const CPU_POWERDOWN_RAM: usize = size_of::<CpuRetentionStorage>()
-            + 16
-            + cfg_select! {
-                feature = "esp32s3" => {
-                    size_of::<esp_hal::rtc_cntl::CacheTagRetentionStorage>() + 16
-                }
-                _ => 0,
-            };
+        /// The reclaimed RAM that CPU power-down takes from the heap. Retention memory is in
+        /// reclaimed RAM on the ESP32-C3 and ESP32-S3 only. The 16 bytes per buffer cover its
+        /// alignment.
+        const CPU_POWERDOWN_RAM: usize = cfg_select! {
+            feature = "esp32c3" => size_of::<CpuRetentionStorage>() + 16,
+            feature = "esp32s3" => {
+                size_of::<CpuRetentionStorage>()
+                    + 16
+                    + size_of::<esp_hal::rtc_cntl::CacheTagRetentionStorage>()
+                    + 16
+            }
+            _ => 0,
+        };
 
         fn enable_cpu_powerdown(sleep: &mut esp_rtos::sleep::Sleep) {
             sleep

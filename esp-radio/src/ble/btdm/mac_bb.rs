@@ -48,8 +48,8 @@ static STATE: AtomicU32 = AtomicU32::new(0);
 
 /// Storage for [`RetentionMemory`].
 ///
-/// This storage must be placed in `#[ram(reclaimed, unstable(zeroed))]`, then a static mutable
-/// reference to [`RetentionMemory`] can be taken out of it.
+/// Place this storage in `#[ram(unstable(retention))]`, then a static mutable reference to
+/// [`RetentionMemory`] can be taken out of it.
 #[instability::unstable]
 pub type RetentionStorage = esp_hal::rtc_cntl::RetentionStorage<BUFFER_SIZE>;
 
@@ -87,7 +87,7 @@ static ALLOCATIONS: NonReentrantMutex<Allocations> = NonReentrantMutex::new(Allo
 /// # {before_snippet}
 /// use esp_radio::ble::{RetentionStorage, install_retention_memory};
 ///
-/// #[esp_hal::ram(reclaimed, unstable(zeroed))]
+/// #[esp_hal::ram(unstable(retention))]
 /// static RETENTION: RetentionStorage = RetentionStorage::new();
 ///
 /// install_retention_memory(RETENTION.take())?;

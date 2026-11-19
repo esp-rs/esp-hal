@@ -85,9 +85,14 @@ mod unified_main;
 /// - `reclaimed`: Memory reclaimed from the esp-idf bootloader.
 /// - `uncached`: Use internal SRAM through the L1-bypass address range. The CPU does not cache this
 ///   memory. Only available on ESP32-P4.
+/// - `retention`: Place a `static` where light sleep can use it as retention memory, for example
+///   `esp_hal::rtc_cntl::CpuRetentionStorage`. The memory is zeroed, as with `zeroed`. On the
+///   ESP32-C3 and ESP32-S3 it is inside the range that the retention DMA reaches, with either
+///   bootloader.
 ///
 /// Using both `rtc_fast` and `rtc_slow`, or `persistent` and `zeroed`, together is an error.
-/// `checked` on a `static`, or with `rtc_fast` or `rtc_slow`, is also an error.
+/// `checked` on a `static`, or with `rtc_fast` or `rtc_slow`, is also an error. `retention` takes
+/// no other option, and works on a `static` only.
 ///
 /// ## `persistent`
 ///
@@ -124,6 +129,9 @@ mod unified_main;
 ///
 /// #[ram(unstable(uncached, zeroed))]
 /// static mut UNCACHE_BSS: [u8; 8] = [0; 8];
+///
+/// #[ram(unstable(retention))]
+/// static CPU_RETENTION: CpuRetentionStorage = CpuRetentionStorage::new();
 /// ```
 ///
 /// See the `ram` example in `examples/qa` of the esp-hal repository for a full usage example.

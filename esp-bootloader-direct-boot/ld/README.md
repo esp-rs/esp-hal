@@ -38,6 +38,11 @@ and the entry stub copies without a stack. On chips with two cores, RAM ends bel
 core's ROM stack: the ROM runs on it when esp-hal starts that core. `dram2_seg` is empty, as
 `#[ram(reclaimed)]` is not available.
 
+`.retention.bss` (`#[ram(unstable(retention))]` statics) is at the top of RAM, and the stack ends
+below it. The top of RAM is inside the range that the CPU retention DMA reaches on the ESP32-C3,
+which the rest of RAM is not. The `_dram2_uninit_bss_*` symbols mark this section, so the runtime
+zeroes it.
+
 The RAM sections come before `.text` in the scripts. The linker assigns an input section to the
 first output section in the script that matches it, so this way `.rwtext` claims what esp-hal's
 `esp_hal_rwtext.x` places in RAM before the `.text` catch-all does.

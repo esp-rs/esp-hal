@@ -424,12 +424,12 @@ fn deep_sleep_config() -> RtcSleepConfig {
 }
 
 #[cfg(supports_cpu_power_down)]
-#[esp_hal::ram(reclaimed, unstable(zeroed))]
+#[esp_hal::ram(unstable(retention))]
 static CPU_RETENTION_MEMORY: esp_hal::rtc_cntl::CpuRetentionStorage =
     esp_hal::rtc_cntl::CpuRetentionStorage::new();
 
 #[cfg(supports_tagmem_power_down)]
-#[esp_hal::ram(reclaimed, unstable(zeroed))]
+#[esp_hal::ram(unstable(retention))]
 static CACHE_TAGMEM: esp_hal::rtc_cntl::CacheTagRetentionStorage =
     esp_hal::rtc_cntl::CacheTagRetentionStorage::new();
 

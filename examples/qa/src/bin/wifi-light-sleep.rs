@@ -62,7 +62,7 @@ cfg_select! {
         fn install_wifi_retention_memory() {
             use esp_radio::wifi::{RetentionStorage, install_retention_memory};
 
-            #[ram(reclaimed, unstable(zeroed))]
+            #[ram(unstable(retention))]
             static WIFI_RETENTION_MEMORY: RetentionStorage = RetentionStorage::new();
 
             install_retention_memory(WIFI_RETENTION_MEMORY.take()).unwrap();

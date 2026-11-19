@@ -3,6 +3,9 @@ SECTIONS {
     .dram2_uninit.bss (NOLOAD) : ALIGN(4) {
         _dram2_uninit_bss_start = ABSOLUTE(.);
         *(.dram2_uninit.bss .dram2_uninit.bss.*)
+        /* `#[ram(unstable(retention))]`: on the chips that emit it, this RAM is inside the range
+           that the CPU retention DMA reaches. */
+        *(.retention.bss .retention.bss.*)
         _dram2_uninit_bss_end = ABSOLUTE(.);
     } > dram2_seg
 

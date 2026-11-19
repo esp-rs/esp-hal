@@ -251,7 +251,7 @@ fn require_no_retention(_board: &Board<'_>) -> Result<(), &'static str> {
 }
 
 #[cfg(supports_cpu_power_down)]
-#[esp_hal::ram(reclaimed, unstable(zeroed))]
+#[esp_hal::ram(unstable(retention))]
 static CPU_RETENTION_MEMORY: esp_hal::rtc_cntl::CpuRetentionStorage =
     esp_hal::rtc_cntl::CpuRetentionStorage::new();
 
