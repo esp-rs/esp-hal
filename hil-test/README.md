@@ -218,20 +218,25 @@ If the test is supported by all the targets, you can omit the header. See [`xtas
 
 ## Logging in tests
 
-The tests can use [defmt] to print logs. To enable log output, add the `defmt` feature to the test
-you want to run. Eg:
+The tests print [defmt] logs. The default `log-serial` feature prints them through `esp-println`,
+on the USB-Serial-JTAG port if the chip has one and a USB host is attached, and on UART0 if not.
+`probe-rs run` reads the serial port of the probe and decodes the logs. It shows the log of a test
+only if the test fails. Use `--nocapture` to see the logs of all tests.
 
-```rust
-//! AES Test
+If the serial port of the probe is not connected to the chip, for example an ESP-Prog with the
+UART of the chip on a separate USB cable, set the port in the probe-rs configuration file:
 
-//% CHIP_FILTER: esp32 || esp32c3 || esp32c6 || esp32h2 || esp32s2 || esp32s3
-//% FEATURES: defmt
+```toml
+[probes."0403:6010".serial]
+port = "/dev/ttyUSB2" # or `usb = "VID:PID[:serial]"`
 ```
 
-Make sure to remove this addition before you commit any modifications.
+A test that uses UART0 or the USB-Serial-JTAG port for itself logs over RTT instead. Polling RTT
+halts the cores, so use it only for these tests:
 
-> NOTE: log output is disabled by default. Enabling it can introduce some timing issues, which
-makes some tests fail randomly. This issue affects all Xtensa devices, as well as ESP32-C2 and
-ESP32-C3 currently.
+```rust
+//% FEATURES: log-rtt
+//% DEFAULT-FEATURES: false
+```
 
 [defmt]: https://github.com/knurling-rs/defmt
