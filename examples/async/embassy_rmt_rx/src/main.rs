@@ -54,18 +54,15 @@ async fn main(spawner: Spawner) {
         .with_tick_rate(Rate::from_mhz(1))
         .with_idle_ns(10_000_000);
 
-    let channel = cfg_select! {
-        any(feature = "esp32", feature = "esp32s2") => rmt
-            .async_rx_channel(peripherals.RMT_CH0, rx_config)
-            .unwrap(),
-        any(feature = "esp32s3", feature = "esp32s31", feature = "esp32p4") => rmt
-            .async_rx_channel(peripherals.RMT_CH7, rx_config)
-            .unwrap(),
-        _ => rmt
-            .async_rx_channel(peripherals.RMT_CH2, rx_config)
-            .unwrap(),
+    let rx_channel = cfg_select! {
+        any(feature = "esp32", feature = "esp32s2") => peripherals.RMT_CH0,
+        any(feature = "esp32s3", feature = "esp32s31", feature = "esp32p4") => peripherals.RMT_CH7,
+        _ => peripherals.RMT_CH2,
     };
-    let mut channel = channel.with_pin(peripherals.GPIO4);
+    let mut channel = rmt
+        .async_rx_channel(rx_channel, rx_config)
+        .unwrap()
+        .with_pin(peripherals.GPIO4);
 
     spawner.spawn(
         signal_task(Output::new(
