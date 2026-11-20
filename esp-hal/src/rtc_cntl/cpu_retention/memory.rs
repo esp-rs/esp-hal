@@ -55,6 +55,10 @@ impl LowPower<'_> {
     /// the driver for the life of the program, and a second call is an error, because the sleep
     /// path can hold one buffer only.
     ///
+    /// The power-down makes each wakeup from light sleep longer. For example, on the ESP32-C6, a
+    /// timer wakeup takes approximately 1.0 ms instead of 0.7 ms, because the CPU restores its
+    /// state from this memory, and then runs with an empty cache.
+    ///
     /// # Errors
     ///
     /// Returns [`CpuRetentionMemoryError`] if the driver holds a buffer already, or if the buffer

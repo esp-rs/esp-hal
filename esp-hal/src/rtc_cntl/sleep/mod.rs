@@ -386,6 +386,8 @@ impl<'d> LowPower<'d> {
 
         let mut config = config;
         config.set_sleep_kind(kind);
+        #[cfg(modem_retention = "regdma")]
+        crate::rtc_cntl::regdma::prepare_sleep(kind == SleepKind::Light);
 
         // The slow clock drifts after the calibration at boot, and a deep sleep can be long. The
         // calibration comes before the entry hooks, because a wakeup source that limits the sleep

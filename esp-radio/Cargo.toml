@@ -381,6 +381,7 @@ csi = ["__has_unstable_feature_enabled"]
 ## ⚠️ This feature is considered unstable.
 ieee802154 = [
     "dep:byte",
+    "dep:enumset",
     "dep:ieee802154",
     "__has_unstable_feature_enabled",
     "esp-wifi-sys-esp32c5?/ieee802154",
