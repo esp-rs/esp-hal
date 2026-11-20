@@ -258,12 +258,15 @@ pub fn enable_sdio_pll() {
 /// Switches the SD IO signalling rail (`LDO_VO4` → `VDDPST_5`/SD_VREF and the
 /// bus pull-ups) to **1.8 V** for UHS-I operation.
 ///
-/// With `tieh = 0` the LDO output is `Vref(dref) * (1 + 0.25*mul)`; `dref = 6`,
-/// `mul = 5` gives `0.8 V * 2.25 = 1.8 V` (see esp-idf `ldo_ll.h`). Only the
+/// With `tieh = 0` the LDO output is `Vref(dref) * (1 + 0.25*mul)`. `dref` and
+/// `mul` are chosen by the eFuse-calibrated `ldo_ll_voltage_to_dref_mul`
+/// equivalent for 1800 mV; uncalibrated parts fall back to the nominal
+/// `dref = 6`, `mul = 5` (`0.8 V * 2.25 = 1.8 V`). Only the
 /// `tieh`/`dref`/`mul` fields are touched, matching
 /// `esp_ldo_channel_adjust_voltage`; the regulator stays enabled.
 pub fn set_io_voltage_1v8() {
     let pmu = crate::peripherals::PMU::regs();
+    let (dref, mul) = crate::efuse::implem::ldo_vo4_1v8_dref_mul();
 
     pmu.ext_ldo_p1_0p2a().modify(|_, w| {
         w._0p2a_force_tieh_sel_1().set_bit(); // software owns the mux
@@ -271,8 +274,8 @@ pub fn set_io_voltage_1v8() {
         w._0p2a_tieh_1().clear_bit() // 0 = Vref * Mul
     });
     pmu.ext_ldo_p1_0p2a_ana().modify(|_, w| unsafe {
-        w.ana_0p2a_dref_1().bits(6);
-        w.ana_0p2a_mul_1().bits(5)
+        w.ana_0p2a_dref_1().bits(dref);
+        w.ana_0p2a_mul_1().bits(mul)
     });
 }
 
