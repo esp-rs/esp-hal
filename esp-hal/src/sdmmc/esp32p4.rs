@@ -1,8 +1,12 @@
-//! Module clock is engine-wide (`SdHostController::new`); per-slot card clock
-//! is programmed by `EngineSession` on engine acquire.
+//! The module clock's source is engine-wide (`SdHostController::new`), while
+//! its first-stage divider follows the slot being programmed: `EngineSession`
+//! picks the divider for the slot's frequency on every engine acquire, so the
+//! controller's own card divider can stay bypassed for every card clock. See
+//! [`clock_dividers`].
 use super::*;
 
-/// Powers the SD card / SD IO domain from on-chip LDO channel 4 at 3.3 V.
+/// Powers the SD card / SD IO domain from on-chip LDO channel 4, at 3.3 V or
+/// 1.8 V depending on the current UHS state.
 ///
 /// On the ESP32-P4 the dedicated SD IO pins (GPIO39-44) and the card VDD are
 /// supplied by internal LDO channel 4 (analog unit `ext_ldo[4]`), which must
@@ -20,6 +24,21 @@ use super::*;
 pub fn chip_setup() {
     let pmu = crate::peripherals::PMU::regs();
 
+    // Which rail this bring-up targets. `set_io_power(false)` is the only
+    // place that removes the rail, and it clears `UHS_1V8_ACTIVE`; a flag that
+    // is still set therefore means the rail was never cut and the card on it
+    // is still in 1.8 V signalling. Driving 3.3 V into that card would change
+    // its signalling environment without a power cycle.
+    //
+    // This is *not* the card-state detection: a card that was power-cycled by
+    // other means, or an MCU reset (the flag lives in RAM), looks like 1.8 V
+    // is gone and the rail starts at 3.3 V. Recovering UHS after such a reset
+    // is the job of the CMD6-selected mode in `MmcBus::set_bus`.
+    #[cfg(sdmmc_uhs)]
+    let v18 = super::UHS_1V8_ACTIVE.load(core::sync::atomic::Ordering::Relaxed);
+    #[cfg(not(sdmmc_uhs))]
+    let v18 = false;
+
     // Limit inrush current while the output cap charges; keep ripple
     // suppression (voltage detector) enabled.
     pmu.ext_ldo_p1_0p2a_ana().modify(|_, w| {
@@ -27,11 +46,16 @@ pub fn chip_setup() {
         w.ana_0p2a_en_vdet_1().set_bit()
     });
 
-    // Software-controlled, 3.3 V rail, then enable the regulator.
+    // Program the reference first, then enable the regulator, so a 1.8 V
+    // target never passes through the 3.3 V tie.
+    if v18 {
+        set_io_voltage_1v8();
+    } else {
+        set_io_voltage_3v3();
+    }
     pmu.ext_ldo_p1_0p2a().modify(|_, w| {
         w._0p2a_force_tieh_sel_1().set_bit();
         unsafe { w._0p2a_tieh_sel_1().bits(0) };
-        w._0p2a_tieh_1().set_bit();
         w._0p2a_xpd_1().set_bit()
     });
 
@@ -44,24 +68,93 @@ pub fn chip_setup() {
 }
 
 /// Programs the module clock in `HP_SYS_CLKRST` (P4 keeps the divider/source
-/// outside the SDHOST block; see `sdmmc_ll`). Source fixed at PLL160M.
-pub fn set_module_clock(_source: ClockSource, div: u8) {
+/// outside the SDHOST block; see `sdmmc_ll`).
+///
+/// Two sources are supported: [`ClockSource::Pll160m`] (the default, 160 MHz --
+/// enough for Default/High Speed) and [`ClockSource::SdioPll`] (the dedicated
+/// 200 MHz SDIO PLL, required for the UHS-I SDR50 mode). `div` is the smallest
+/// first-stage divider, i.e. the divider that yields the fastest card clock;
+/// [`clock_dividers`] raises it per slot when a lower frequency is asked for,
+/// so the module clock is the upper bound for every card clock.
+pub fn set_module_clock(source: ClockSource, div: u8) {
     let c = crate::peripherals::HP_SYS_CLKRST::regs();
 
-    // Enable the PLL_F160M reference clock that feeds the SDMMC LS clock
-    // (esp-idf `esp_clk_tree_enable_src`). Without this gate `cclk_in` stays at
-    // 0, the controller never clocks, and every command times out.
-    c.ref_clk_ctrl2()
-        .modify(|_, w| w.ref_160m_clk_en().set_bit());
+    // PLL_F160M is always available; the SDIO PLL must be powered up first.
+    let use_sdio_pll = match source {
+        ClockSource::SdioPll => {
+            enable_sdio_pll();
+            true
+        }
+        _ => {
+            // Enable the PLL_F160M reference clock that feeds the SDMMC LS clock
+            // (esp-idf `esp_clk_tree_enable_src`). Without this gate `cclk_in` stays
+            // at 0, the controller never clocks, and every command times out.
+            c.ref_clk_ctrl2()
+                .modify(|_, w| w.ref_160m_clk_en().set_bit());
+            false
+        }
+    };
 
     c.peri_clk_ctrl01().modify(|_, w| {
-        w.sdio_ls_clk_src_sel().bit(false); // PLL_F160M
+        w.sdio_ls_clk_src_sel().bit(use_sdio_pll);
         w.sdio_ls_clk_en().set_bit()
     });
 
-    // Low-speed clock divider edges (`h`/`l`/`n`); `div == 1` bypasses the
-    // divider via `sdio_hs_mode`.
+    set_clock_div(div);
+
+    // Enable the drive (output), sample (input) and self (core) clocks. Without
+    // these the controller never drives the card clock out, so commands never
+    // complete.
+    //
+    // The drive edge is 1. Which divider stage produces the card clock decides
+    // where the launch lands relative to the card clock edge, so keeping the
+    // division in the first stage and the controller's card divider bypassed
+    // leaves one edge valid for every card clock; only the sample edge moves,
+    // and only when `EngineSession` tunes it.
+    //
+    // `clock_dividers` falls back to the controller's card divider when the
+    // first stage cannot divide far enough (`hz < source_hz / 16`, the
+    // low-frequency probe). Those clocks are long enough that the launch shift
+    // of half a module clock cycle stays a small fraction of a card period, so
+    // the edge stays 1 there too.
+    //
+    // See https://github.com/espressif/esp-idf/blob/f761a647c833a5df9771cf794f1279ae5d41fb72/components/hal/esp32p4/include/hal/sdmmc_ll.h#L256-L267.
+    c.peri_clk_ctrl02().modify(|_, w| unsafe {
+        w.sdio_ls_drv_clk_en().set_bit();
+        w.sdio_ls_sam_clk_en().set_bit();
+        w.sdio_ls_slf_clk_en().set_bit();
+        w.sdio_ls_drv_clk_edge_sel().bits(1);
+        w.sdio_ls_sam_clk_edge_sel().bits(0);
+        w.sdio_ls_slf_clk_edge_sel().bits(0)
+    });
+
+    // Commit the divider/phase edge configuration.
+    c.peri_clk_ctrl02()
+        .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
+    c.peri_clk_ctrl02()
+        .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
+}
+
+/// Largest divider the first stage can produce (`sdio_ls_clk_edge_l` is 4 bits).
+const FIRST_STAGE_DIV_MAX: u8 = 16;
+
+/// Programs the module clock's first-stage divider.
+///
+/// `div == 1` bypasses the divider through `sdio_hs_mode`, otherwise `h`/`l`/`n`
+/// generate the low/high edge pattern the divided clock is made of. Callers
+/// program a divider with the card clock of the slot they are serving gated off,
+/// because the first stage is shared by both slots.
+///
+/// See https://github.com/espressif/esp-idf/blob/f761a647c833a5df9771cf794f1279ae5d41fb72/components/hal/esp32p4/include/hal/sdmmc_ll.h#L200-L214.
+pub fn set_clock_div(div: u8) {
+    let c = crate::peripherals::HP_SYS_CLKRST::regs();
+
     if div > 1 {
+        // Make sure the divider is not bypassed: a previous `div == 1` session
+        // leaves `sdio_hs_mode` set, which would otherwise make the card clock
+        // run at the module rate regardless of the divisor programmed here.
+        c.peri_clk_ctrl01()
+            .modify(|_, w| w.sdio_hs_mode().clear_bit());
         let h = div / 2 - 1;
         let l = div - 1;
         let n = div - 1;
@@ -80,20 +173,6 @@ pub fn set_module_clock(_source: ClockSource, div: u8) {
         });
     }
 
-    // Enable the drive (output), sample (input) and self (core) clocks with
-    // their default edge phases (drive=1, sample=0, self=0). Without these the
-    // controller never drives the card clock out, so commands never complete.
-    // Mirrors esp-idf `sdmmc_ll_init_phase_delay`.
-    c.peri_clk_ctrl02().modify(|_, w| unsafe {
-        w.sdio_ls_drv_clk_en().set_bit();
-        w.sdio_ls_sam_clk_en().set_bit();
-        w.sdio_ls_slf_clk_en().set_bit();
-        w.sdio_ls_drv_clk_edge_sel().bits(1);
-        w.sdio_ls_sam_clk_edge_sel().bits(0);
-        w.sdio_ls_slf_clk_edge_sel().bits(0)
-    });
-
-    // Commit the divider/phase edge configuration.
     c.peri_clk_ctrl02()
         .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
     c.peri_clk_ctrl02()
@@ -102,6 +181,39 @@ pub fn set_module_clock(_source: ClockSource, div: u8) {
 
 /// Card-clock frequency at which the P4 DLL delay path is used (SDR104).
 const SDR104_HZ: u32 = 200_000_000;
+
+/// Splits a card clock between the module clock's first stage and the
+/// controller's card divider, as `(first-stage divider, card divider)`.
+///
+/// Dividing in the first stage and leaving the controller's card divider
+/// bypassed keeps the drive-clock launch phase the same for every frequency
+/// (see `set_module_clock`), at the cost of the coarser steps the first stage
+/// can make. The controller's card divider only comes in when the first stage
+/// cannot divide far enough (`div > 16`), which is the low-frequency probe.
+///
+/// `module_div` is the smallest divider used, so a slot never runs faster than
+/// the configured module clock.
+///
+/// Both slots share the first stage. Frequencies at or above `source_hz / 16`
+/// use the first stage directly, so a slot can reprogram it and change the
+/// other slot's idle clock. Frequencies below that use `module_div` plus the
+/// controller's per-slot card divider. A second slot that needs a continuous
+/// clock should therefore stay in the fallback range (e.g. 10 MHz with the
+/// 200 MHz source and `module_div = 2`).
+///
+/// See https://github.com/espressif/esp-idf/blob/f761a647c833a5df9771cf794f1279ae5d41fb72/components/esp_driver_sdmmc/src/sdmmc_host.c#L225-L269.
+pub fn clock_dividers(module: Config, hz: u32) -> (u8, u8) {
+    let base = source_hz(module.clock_source);
+    let hz = hz.max(1);
+    let want = base.div_ceil(hz).max(module.module_div as u32);
+
+    if want <= FIRST_STAGE_DIV_MAX as u32 {
+        (want as u8, 0)
+    } else {
+        let first = module.module_div;
+        (first, freq_to_card_div(base / first as u32, hz))
+    }
+}
 
 /// Programs the input sampling delay phase (LS edge select below SDR104, DLL above).
 pub fn set_input_delay_phase(phase: DelayPhase, hz: u32) {
@@ -128,4 +240,125 @@ pub fn set_input_delay_phase(phase: DelayPhase, hz: u32) {
         .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
     c.peri_clk_ctrl02()
         .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
+}
+
+/// Powers up the dedicated 200 MHz SDIO PLL and gates its clock tree.
+///
+/// The SDIO PLL is a normally-off PLL (unlike PLL_F160M); it must be enabled
+/// before it can be selected as the SDMMC source. Mirrors esp-idf
+/// `sdmmc_ll_enable_sdio_pll()`. Idempotent.
+pub fn enable_sdio_pll() {
+    let pmu = crate::peripherals::PMU::regs();
+
+    // Power on the PLL.
+    pmu.rf_pwc().modify(|_, w| w.sdio_pll_xpd().set_bit());
+
+    // Tie the PLL power/clock gates high. `PMU_IMM_HP_CK_POWER` bits 20, 26 and
+    // 30 (GLOBAL_SDIOPLL_ICG / XPD_SDIOPLL_I2C / XPD_SDIOPLL) are not modelled
+    // by the PAC, so set them with a raw read-modify-write.
+    let p = pmu.imm_hp_ck_power().as_ptr();
+    unsafe {
+        const GLOBAL_SDIOPLL_ICG: u32 = 1 << 20;
+        const XPD_SDIOPLL_I2C: u32 = 1 << 26;
+        const XPD_SDIOPLL: u32 = 1 << 30;
+        p.write_volatile(p.read_volatile() | GLOBAL_SDIOPLL_ICG | XPD_SDIOPLL_I2C | XPD_SDIOPLL);
+    }
+
+    // Enable the three PLL output clock branches.
+    crate::peripherals::LP_AON_CLKRST::regs()
+        .lp_aonclkrst_hp_clk_ctrl()
+        .modify(|_, w| {
+            w.lp_aonclkrst_hp_sdio_pll0_clk_en().set_bit();
+            w.lp_aonclkrst_hp_sdio_pll1_clk_en().set_bit();
+            w.lp_aonclkrst_hp_sdio_pll2_clk_en().set_bit()
+        });
+
+    // Give the PLL time to power up and lock before the source is selected.
+    //
+    // 10 ms, not the 100 us esp-idf uses: on a *cold* start the PLL has not been
+    // powered before, and if the module clock is not running yet the SDHOST
+    // produces no events at all -- a command issued then never completes and the
+    // driver waits for an interrupt that can never arrive (a hang that a warm
+    // reset hides, because the PLL is already locked by then).
+    crate::rom::ets_delay_us(10_000);
+}
+
+/// Switches the SD IO signalling rail (`LDO_VO4` → `VDDPST_5`/SD_VREF and the
+/// bus pull-ups) to **1.8 V** for UHS-I operation.
+///
+/// With `tieh = 0` the LDO output is `Vref(dref) * (1 + 0.25*mul)`. `dref` and
+/// `mul` are chosen by the eFuse-calibrated `ldo_ll_voltage_to_dref_mul`
+/// equivalent for 1800 mV; uncalibrated parts fall back to the nominal
+/// `dref = 6`, `mul = 5` (`0.8 V * 2.25 = 1.8 V`). Only the
+/// `tieh`/`dref`/`mul` fields are touched, matching
+/// `esp_ldo_channel_adjust_voltage`; the regulator stays enabled.
+pub fn set_io_voltage_1v8() {
+    let pmu = crate::peripherals::PMU::regs();
+    let (dref, mul) = crate::efuse::implem::ldo_vo4_1v8_dref_mul();
+
+    pmu.ext_ldo_p1_0p2a().modify(|_, w| {
+        w._0p2a_force_tieh_sel_1().set_bit(); // software owns the mux
+        unsafe { w._0p2a_tieh_sel_1().bits(0) }; // follow `tieh`
+        w._0p2a_tieh_1().clear_bit() // 0 = Vref * Mul
+    });
+    pmu.ext_ldo_p1_0p2a_ana().modify(|_, w| unsafe {
+        w.ana_0p2a_dref_1().bits(dref);
+        w.ana_0p2a_mul_1().bits(mul)
+    });
+}
+
+/// Restores the SD IO signalling rail to the **3.3 V** rail.
+///
+/// `tieh = 1` ties the LDO output directly to the 3.3 V rail, so `dref`/`mul`
+/// do not matter and are left untouched.
+pub fn set_io_voltage_3v3() {
+    let pmu = crate::peripherals::PMU::regs();
+
+    pmu.ext_ldo_p1_0p2a().modify(|_, w| {
+        w._0p2a_force_tieh_sel_1().set_bit();
+        unsafe { w._0p2a_tieh_sel_1().bits(0) };
+        w._0p2a_tieh_1().set_bit() // tie to the 3.3 V rail
+    });
+}
+
+/// Enables or removes power from the SD IO rail (`LDO_VO4` -> `VDDPST_5`).
+///
+/// On boards that tie the SD DAT/CMD pull-ups to this rail, removing power also
+/// removes the pull-ups. That matters for a software card power cycle: cutting
+/// the card's own VDD switch while the rail stays up leaves the card back-fed
+/// through its IO clamp diodes, so it stays partially alive and keeps its 1.8 V
+/// signalling latch. With the rail down too the card loses VDD and returns to
+/// 3.3 V.
+///
+/// `true` re-runs the `chip_setup` bring-up (inrush limit, enable, settle). A
+/// power cycle always comes back at 3.3 V, because `enabled = false` clears the
+/// 1.8 V state.
+///
+/// This function is not synchronized with the transfer engine; call it only
+/// while no engine operation is in flight (for example before card detection,
+/// or from a board-level card-power sequence).
+///
+/// After re-enabling the rail, run `init_idle` (or otherwise re-identify the
+/// card) before issuing commands: the cached slot clock belongs to the old
+/// power state.
+pub fn set_io_power(enabled: bool) {
+    let pmu = crate::peripherals::PMU::regs();
+    if enabled {
+        chip_setup();
+    } else {
+        pmu.ext_ldo_p1_0p2a()
+            .modify(|_, w| w._0p2a_xpd_1().clear_bit());
+        // The rail is gone and comes back at 3.3 V (`chip_setup` ties it to the
+        // 3.3 V rail), so any card on it lost its 1.8 V state too.
+        #[cfg(sdmmc_uhs)]
+        {
+            super::UHS_1V8_ACTIVE.store(false, core::sync::atomic::Ordering::Relaxed);
+            super::clear_pending_rail_moves();
+            super::invalidate_slots();
+            // Do not touch the SDHOST registers here: `set_io_power(false)` is
+            // called before `SdHostController::new` on some boards, while the
+            // peripheral clock is still gated. The UHS.VOLT bits are synced in
+            // `SdHostController::new` and `init_idle` instead.
+        }
+    }
 }
