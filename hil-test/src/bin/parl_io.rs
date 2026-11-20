@@ -850,14 +850,20 @@ mod tx {
         // Count the clock edges in a window after the start of the transfer.
         let start = Instant::now();
         while start.elapsed() < Duration::from_micros(200) {}
-        clock_unit.clear();
-        let start = Instant::now();
-        while start.elapsed() < Duration::from_micros(1000) {}
-        let edges = clock_unit.value() as u64;
-        let elapsed = start.elapsed().as_micros();
+        // The first window runs code that is not in the cache yet. On the H4 the stall between
+        // `clear` and `Instant::now()` adds about 1% of edges outside the timed window, so only
+        // the second window counts.
+        let mut khz = 0;
+        for _ in 0..2 {
+            clock_unit.clear();
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(1000) {}
+            let edges = clock_unit.value() as u64;
+            let elapsed = start.elapsed().as_micros();
+            khz = edges * 1000 / elapsed;
+        }
         _ = xfer.wait();
 
-        let khz = edges * 1000 / elapsed;
         info!("clock frequency: {} kHz", khz);
         assert!((15840..=16160).contains(&khz), "clock is {} kHz", khz);
     }
