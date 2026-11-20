@@ -6,13 +6,10 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-println?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-> **Deprecated.** Use [embedded-log](https://crates.io/crates/embedded-log) instead. It provides a
-> `log` and `defmt` backend over any `embedded_io::Write`, for example esp-hal's `UsbSerialJtag` or
-> `UartTx`, constructed after `esp_hal::init`. These drivers require the `unstable` feature of
-> `esp-hal`.
->
-> esp-hal no longer keeps UART0 enabled for esp-println, so its UART output stops after
-> `esp_hal::init`.
+> **Deprecated.** Use [esp-log](https://github.com/esp-rs/esp-hal/tree/main/esp-log) instead. It
+> provides a `log` and `defmt` backend on esp-hal's UART or USB-Serial-JTAG driver, which
+> `esp_log::init_uart!` or `esp_log::init_usb!` creates after `esp_hal::init`. These drivers require
+> the `unstable` feature of `esp-hal`.
 
 A library that provides `print!`, `println!`, `dbg!` implementations and
 logging capabilities for Espressif devices.

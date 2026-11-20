@@ -141,13 +141,13 @@ peripheral_clocks = { templates = [
     #{ name = "Adc2Arb" },
     { name = "Systimer", keep_enabled = true },
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
-    { name = "UartMem" },
+    { name = "UartMem", keep_enabled = true }, # The deprecated esp-println writes to UART0 without a driver.
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true },
     { name = "Ledc" },
     { name = "I2cExt0" },
     { name = "Spi2" },
     { name = "Uart1" },
-    { name = "Uart0", template_params = { peripheral = "uart" } },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

@@ -137,7 +137,7 @@ async fn main(spawner: Spawner) {
     // Enable logging from the ESP_LOG environment variable (set at build time)
     // Example: ESP_LOG=warn,esp_rtos=trace,esp_radio=info
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     // Provide a heap for components that allocate (esp-rtos/esp-radio, etc.)
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);

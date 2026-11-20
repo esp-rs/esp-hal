@@ -23,16 +23,13 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    Blocking,
     gpio::{Event, Input, InputConfig, Pull},
     peripherals,
     rtc_cntl::WakeLock,
     system::wakeup_cause,
     time::Instant,
     timer::timg::TimerGroup,
-    uart::UartTx,
 };
-use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -144,22 +141,7 @@ async fn main(spawner: Spawner) {
     let p = esp_hal::init(esp_hal::Config::default());
 
     // Log on UART0's default TX pin: USB-Serial-JTAG disconnects while the chip sleeps.
-    let log_tx = cfg_select! {
-        feature = "esp32" => p.GPIO1,
-        feature = "esp32c2" => p.GPIO20,
-        feature = "esp32c3" => p.GPIO21,
-        any(feature = "esp32c5", feature = "esp32c61") => p.GPIO11,
-        feature = "esp32c6" => p.GPIO16,
-        any(feature = "esp32h2", feature = "esp32h4") => p.GPIO24,
-        feature = "esp32p4" => p.GPIO37,
-        feature = "esp32s31" => p.GPIO58,
-        any(feature = "esp32s2", feature = "esp32s3") => p.GPIO43,
-    };
-    let log_writer = UartTx::new(p.UART0, Default::default())
-        .unwrap()
-        .with_tx(log_tx);
-    static LOG_WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
-    embedded_log::init(LOG_WRITER.init(log_writer));
+    esp_log::init_uart!(p);
 
     let timg0 = TimerGroup::new(p.TIMG0);
 
@@ -204,6 +186,7 @@ async fn main(spawner: Spawner) {
     {
         use esp_hal::system::Stack;
         use esp_rtos::embassy::Executor;
+        use static_cell::StaticCell;
 
         static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
         let app_core_stack = APP_CORE_STACK.init(Stack::new());

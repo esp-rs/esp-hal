@@ -1,15 +1,14 @@
 [package]
-name          = "embedded-log"
+name          = "esp-log"
 version       = "0.1.0"
 edition       = "2024"
-rust-version  = "1.95.0"
-description   = "`log` and `defmt` backend that writes to any `embedded_io::Write`"
-documentation = "https://docs.espressif.com/projects/rust/embedded-log/latest/"
-keywords      = ["defmt", "embedded", "log", "logging", "no-std"]
-categories    = ["embedded", "no-std"]
+rust-version  = "1.100.0"
+description   = "`log` and `defmt` backend for Espressif chips that writes to UART, USB-Serial-JTAG or any `embedded_io::Write`"
+keywords      = ["defmt", "embedded", "esp32", "espressif", "logging"]
+categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
-links         = "embedded-log"
+links         = "esp-log"
 
 [package.metadata.espressif]
 doc-config = { features = ["log-04", "timestamp"] }
@@ -29,8 +28,8 @@ host-test-configs = [
 ]
 
 [package.metadata.docs.rs]
-default-target = "riscv32imc-unknown-none-elf"
-features       = ["log-04", "timestamp"]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6", "log-04", "timestamp"]
 
 [lib]
 bench = false
@@ -48,7 +47,8 @@ log-04 = { package = "log", version = "0.4", optional = true }
 [build-dependencies]
 log-04 = { package = "log", version = "0.4" }
 
-[dev-dependencies]
+# Only the host tests use these. On the chips, `std` does not exist.
+[target.'cfg(not(any(target_arch = "riscv32", target_arch = "xtensa")))'.dev-dependencies]
 critical-section = { version = "1.2", features = ["std"] }
 log-04           = { package = "log", version = "0.4" }
 
@@ -80,22 +80,52 @@ colors = []
 ##
 ## ```rust,ignore
 ## unsafe extern "Rust" {
-##     fn _embedded_log_timestamp() -> u64;
+##     fn _esp_log_timestamp() -> u64;
 ## }
 ## ```
 ##
 ## This function should return the current timestamp in milliseconds since power on.
-## When using `esp-hal`, you can define this function as follows:
+## With `esp-hal`, you can define this function as follows:
 ##
 ## ```rust,ignore
 ## #[unsafe(no_mangle)]
-## pub extern "Rust" fn _embedded_log_timestamp() -> u64 {
+## pub extern "Rust" fn _esp_log_timestamp() -> u64 {
 ##     esp_hal::time::Instant::now()
 ##         .duration_since_epoch()
 ##         .as_millis()
 ## }
 ## ```
 timestamp = []
+
+#! ### Chip selection
+#! The `init_uart!` and `init_usb!` macros need one of the following features, which selects the
+#! default pins. The macros create esp-hal's unstable UART and USB-Serial-JTAG drivers in the
+#! application, so the application also enables esp-hal's `unstable` feature.
+
+##
+esp32    = []
+##
+esp32c2  = []
+##
+esp32c3  = []
+##
+esp32c5  = []
+##
+esp32c6  = []
+##
+esp32c61 = []
+##
+esp32h2  = []
+##
+esp32h4  = []
+##
+esp32p4  = []
+##
+esp32s2  = []
+##
+esp32s3  = []
+##
+esp32s31 = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }

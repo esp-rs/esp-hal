@@ -1,6 +1,6 @@
 #![no_std]
 
-// The tests log through embedded-log, on the serial port that probe-rs reads. Logging over the
+// The tests log through esp-log, on the serial port that probe-rs reads. Logging over the
 // serial port does not halt the cores, as RTT polling does.
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -21,7 +21,7 @@ unsafe impl defmt::Logger for Logger {
 
 #[cfg(feature = "log-serial")]
 #[doc(hidden)]
-pub use embedded_log;
+pub use esp_log;
 
 /// Installs the logger on the USB-Serial-JTAG port, which probe-rs reads. Moves the fields it uses
 /// out of `$peripherals`.
@@ -35,24 +35,9 @@ macro_rules! init_logger {
         #[cfg(not(all(feature = "log-serial", feature = "unstable")))]
         let _ = &$peripherals;
     };
-    (@install $peripherals:expr) => {{
-        // Order: (D+, D-)
-        let (dp, dm) = cfg_select! {
-            esp32c6 => ($peripherals.GPIO13, $peripherals.GPIO12),
-            esp32s3 => ($peripherals.GPIO20, $peripherals.GPIO19),
-        };
-        static WRITER: static_cell::StaticCell<
-            esp_hal::usb::usb_serial_jtag::UsbSerialJtag<'static, esp_hal::Blocking>,
-        > = static_cell::StaticCell::new();
-        let writer = esp_hal::usb::usb_serial_jtag::UsbSerialJtag::new(
-            $peripherals.USB_DEVICE,
-            dp,
-            dm,
-            Default::default(),
-        )
-        .unwrap();
-        $crate::embedded_log::init(WRITER.init(writer));
-    }};
+    (@install $peripherals:expr) => {
+        $crate::esp_log::init_usb!($peripherals)
+    };
 }
 
 #[cfg(feature = "defmt")]

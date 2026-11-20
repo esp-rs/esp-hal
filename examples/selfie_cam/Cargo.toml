@@ -24,7 +24,7 @@ esp-backtrace = { path = "../../esp-backtrace", features = [
 ] }
 esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
-embedded-log = { path = "../../embedded-log", features = ["log-04"] }
+esp-log = { path = "../../esp-log", features = ["log-04"] }
 log = "0.4"
 esp-rtos = { path = "../../esp-rtos", features = ["embassy", "log-04"] }
 gt911 = "0.3.0"
@@ -36,6 +36,7 @@ zune-jpeg = { version = "0.5", default-features = false }
 
 [features]
 esp32s31 = [
+    "esp-log/esp32s31",
     "esp-alloc/esp32s31",
     "esp-backtrace/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",

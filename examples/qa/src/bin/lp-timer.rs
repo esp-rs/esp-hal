@@ -26,7 +26,7 @@ fn main() -> ! {
     // }
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(cpu_clock_config));
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     let rtc = Rtc::new(peripherals.RTC_TIMER);
 

@@ -374,7 +374,7 @@ fn main() -> ! {
         .map_or(Clock::Default, |check| check.clock);
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(clock.cpu_clock()));
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     report!(
         "sleep-checks: reset={:?}, CPU clock {:?}",

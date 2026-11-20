@@ -263,7 +263,7 @@ For initial bring-up, you may also need to add support in:
 
 These crates are mostly platform-independent. In many cases, adding a feature flag in `Cargo.toml` is enough. Where chip-specific adjustments are required (e.g., `esp-bootloader-esp-idf`), verify values against ESP-IDF.
 
-For a basic "Hello World", `embedded-log` needs no chip support: it logs over the HAL's `Uart` or `UsbSerialJtag` driver once that driver works. The examples log on UART0's default TX pin, so add the new chip's default TX pin to them.
+For a basic "Hello World", `esp-log` logs over the HAL's `Uart` or `UsbSerialJtag` driver once that driver works. Add the chip feature and the default UART0 and USB-Serial-JTAG pins of the new chip to `esp-log/src/macros.rs`.
 
 ### Interrupts
 

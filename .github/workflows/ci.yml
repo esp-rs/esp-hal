@@ -442,7 +442,6 @@ jobs:
         uses: bnjbvr/cargo-machete@v0.9.2
         with:
           args: >
-            embedded-log
             esp-alloc
             esp-backtrace
             esp-bootloader-direct-boot
@@ -451,6 +450,7 @@ jobs:
             esp-hal
             esp-hal-procmacros
             esp-lp-hal
+            esp-log
             esp-metadata
             esp-phy
             esp-println

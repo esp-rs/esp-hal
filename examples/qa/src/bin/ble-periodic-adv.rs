@@ -93,7 +93,7 @@ fn send_cmd(connector: &mut BleConnector, name: &str, ogf: u8, ocf: u16, params:
 #[esp_hal::main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 

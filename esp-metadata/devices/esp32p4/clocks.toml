@@ -248,7 +248,7 @@ peripheral_clocks = { templates = [
 ], peripheral_clocks = [
     # Ref: TRM v0.5 Ch 12 (Reset and Clock), Ch 22 (System Registers).
     # UARTs -- sys_clk + apb_clk; reset asserts both core+apb together.
-    { name = "Uart0", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },
+    { name = "Uart0", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" }, keep_enabled = true },
     { name = "Uart1", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },
     { name = "Uart2", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },
     { name = "Uart3", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },

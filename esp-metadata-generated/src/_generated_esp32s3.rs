@@ -5317,6 +5317,8 @@ macro_rules! implement_peripheral_clocks {
                 Self::SarAdc,
                 Self::Systimer,
                 Self::Timg0,
+                Self::Uart0,
+                Self::UartMem,
                 Self::UsbDevice,
             ];
             const COUNT: usize = Self::ALL.len();

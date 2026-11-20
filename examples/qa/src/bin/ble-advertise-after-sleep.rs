@@ -54,7 +54,7 @@ struct BatteryService {
 async fn main(_s: Spawner) {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 72 * 1024);

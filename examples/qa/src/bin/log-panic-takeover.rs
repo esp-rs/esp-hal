@@ -1,6 +1,6 @@
 //! Checks that a panic in the middle of a log write still prints the panic report.
 //!
-//! The log writer wraps UART0 and panics in the middle of the third record, while `embedded-log`
+//! The log writer wraps UART0 and panics in the middle of the third record, while `esp-log`
 //! holds the writer. esp-backtrace then logs the panic report through the same logger.
 //!
 //! Expected output on UART0:
@@ -63,7 +63,7 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     static WRITER: StaticCell<PanicMidRecord> = StaticCell::new();
-    embedded_log::init(WRITER.init(PanicMidRecord {
+    esp_log::init(WRITER.init(PanicMidRecord {
         uart: qa_test::console_uart!(peripherals),
         armed: true,
     }));

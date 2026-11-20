@@ -1,20 +1,32 @@
-//! A `log` and `defmt` backend that writes to any [`embedded_io::Write`].
+//! A `log` and `defmt` backend for Espressif chips.
 //!
-//! The crate does not know about any particular hardware. You construct the transport (for
-//! example an esp-hal `Uart` or `UsbSerialJtag`) and hand it to [`init`]:
+//! [`init_uart!`](crate::init_uart) and [`init_usb!`](crate::init_usb) install the logger on UART0
+//! or USB-Serial-JTAG, with the default pins of the chip:
 //!
 //! ```rust,ignore
 //! let peripherals = esp_hal::init(esp_hal::Config::default());
-//! // UART0 on the default TX pin of the ESP32-C6.
-//! let uart = UartTx::new(peripherals.UART0, Default::default())
-//!     .unwrap()
-//!     .with_tx(peripherals.GPIO16);
-//! static WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
-//! embedded_log::init(WRITER.init(uart));
+//! esp_log::init_uart!(peripherals);
 //! log::info!("Hello");
 //! ```
 //!
-//! Output produced before [`init`] is dropped.
+//! [`init_uart_split!`](crate::init_uart_split) and [`init_usb_split!`](crate::init_usb_split) also
+//! return the receiver of the port. The macros create the esp-hal drivers through the `esp_hal`
+//! crate of the application. If the application renames that dependency, pass the name as the
+//! second argument, for example `esp_log::init_uart!(peripherals, hal)`. The macros need the chip
+//! feature of this crate, and esp-hal's `unstable` feature, because they use the unstable UART and
+//! USB-Serial-JTAG drivers.
+//!
+//! [`init`] takes any other [`embedded_io::Write`], for example a UART on other pins:
+//!
+//! ```rust,ignore
+//! let uart = UartTx::new(peripherals.UART1, Default::default())
+//!     .unwrap()
+//!     .with_tx(peripherals.GPIO5);
+//! static WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
+//! esp_log::init(WRITER.init(uart));
+//! ```
+//!
+//! Output produced before the logger is installed is dropped.
 //!
 //! ## Filtering
 //!
@@ -43,6 +55,7 @@ mod defmt;
 mod frame;
 #[cfg(feature = "log-04")]
 mod logger;
+mod macros;
 #[cfg(test)]
 mod tests;
 
@@ -197,8 +210,46 @@ fn with_writer(f: impl FnOnce(&mut dyn ErasedWrite, bool)) {
 #[cfg(feature = "timestamp")]
 fn timestamp() -> u64 {
     unsafe extern "Rust" {
-        fn _embedded_log_timestamp() -> u64;
+        fn _esp_log_timestamp() -> u64;
     }
     // Safety: the `timestamp` feature requires the application to provide this function.
-    unsafe { _embedded_log_timestamp() }
+    unsafe { _esp_log_timestamp() }
+}
+
+#[doc(hidden)]
+pub mod __private {
+    use core::{cell::UnsafeCell, mem::MaybeUninit};
+
+    /// Storage for the driver that the logger writes to. The macros declare one per call site.
+    pub struct Slot<T> {
+        value: UnsafeCell<MaybeUninit<T>>,
+        used: UnsafeCell<bool>,
+    }
+
+    // Safety: `used` is only accessed in a critical section, and `value` is written once.
+    unsafe impl<T> Sync for Slot<T> {}
+
+    impl<T> Slot<T> {
+        #[allow(clippy::new_without_default)]
+        pub const fn new() -> Self {
+            Self {
+                value: UnsafeCell::new(MaybeUninit::uninit()),
+                used: UnsafeCell::new(false),
+            }
+        }
+
+        /// Stores `writer` and installs it as the output of the logger.
+        pub fn install(&'static self, writer: T)
+        where
+            T: embedded_io::Write + Send,
+        {
+            let used = critical_section::with(|_| {
+                // Safety: we are in a critical section.
+                unsafe { self.used.get().replace(true) }
+            });
+            assert!(!used, "the logger is already installed by this call");
+            // Safety: `used` makes this the only reference to `value`.
+            crate::init(unsafe { (*self.value.get()).write(writer) });
+        }
+    }
 }

@@ -42,7 +42,7 @@ static mut UNCACHE_BSS: [u8; 8] = [0; 8];
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     let delay = Delay::new();
 

@@ -1,6 +1,6 @@
 #![no_std]
 
-// By default, the tests log through embedded-log on the serial port that probe-rs reads, because
+// By default, the tests log through esp-log on the serial port that probe-rs reads, because
 // polling RTT halts the cores. The tests that use UART0 or the USB-Serial-JTAG port for themselves
 // log over RTT.
 
@@ -11,10 +11,10 @@ compile_error!(
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+use esp_hal as _;
 #[cfg(feature = "log-serial")]
 #[doc(hidden)]
-pub use embedded_log;
-use esp_hal as _;
+pub use esp_log;
 
 /// Installs the logger on the serial port that probe-rs reads: USB-Serial-JTAG where the chip has
 /// it, otherwise UART0 on its default TX pin. Moves the fields it uses out of `$peripherals`.
@@ -31,26 +31,21 @@ macro_rules! init_logger {
     };
     (@install $peripherals:expr) => {{
         cfg_select! {
+            // `esp_log::init_usb!` uses the pins of the default PHY, but the eFuse of some boards
+            // selects the other one.
             soc_has_usb_device => {
                 static WRITER: static_cell::StaticCell<
-                    esp_hal::usb::usb_serial_jtag::UsbSerialJtag<'static, esp_hal::Blocking>,
+                    esp_hal::usb::usb_serial_jtag::UsbSerialJtagTx<'static, esp_hal::Blocking>,
                 > = static_cell::StaticCell::new();
-                let writer = $crate::usb_serial_jtag!($peripherals, Default::default()).unwrap();
+                let (_, tx) = $crate::usb_serial_jtag!($peripherals, Default::default())
+                    .unwrap()
+                    .split();
+                $crate::esp_log::init(WRITER.init(tx));
             }
             _ => {
-                static WRITER: static_cell::StaticCell<
-                    esp_hal::uart::UartTx<'static, esp_hal::Blocking>,
-                > = static_cell::StaticCell::new();
-                let writer = esp_hal::uart::UartTx::new($peripherals.UART0, Default::default())
-                    .unwrap()
-                    .with_tx(cfg_select! {
-                        esp32 => $peripherals.GPIO1,
-                        esp32c2 => $peripherals.GPIO20,
-                        esp32s2 => $peripherals.GPIO43,
-                    });
+                $crate::esp_log::init_uart!($peripherals);
             }
         }
-        $crate::embedded_log::init(WRITER.init(writer));
     }};
 }
 

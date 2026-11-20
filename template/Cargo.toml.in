@@ -120,8 +120,7 @@ embassy-time = { version = "0.5.0", features = ["log"] }
 #%if !option("defmt") && !option("log")
 #+embassy-time     = "0.5.0"
 #%endif
-#%endif embassy
-#%if option("embassy") || (!option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace")))
+
 static_cell = "2.1.1"
 #%endif
 critical-section = "1.2.0"
@@ -167,23 +166,24 @@ features = [
 ]
 
 #%if !option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace"))
-# Logs to the transport that `main` constructs. Using an esp-hal driver as the transport requires
-# esp-hal's `unstable` feature.
-[dependencies.embedded-log]
+# The logger macros use the unstable UART and USB-Serial-JTAG drivers of esp-hal, so esp-hal enables
+# `unstable` above.
+[dependencies.esp-log]
 #%if template_origin == "repository"
-path = "{{ template_repo }}/embedded-log"
+path = "{{ template_repo }}/esp-log"
 #%else
 #+git = "{{ template_url }}"
 #+rev = "{{ template_commit }}"
 #%endif
 features = [
+    "{{ chip.name }}",
     #%if option("defmt")
     #+    "defmt",
     #%else
     "log-04",
     #%endif
 ]
-#%endif embedded-log
+#%endif esp-log
 
 #%if option("esp-backtrace")
 [dependencies.esp-backtrace]

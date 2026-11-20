@@ -149,7 +149,7 @@ const HEAP_SIZE: usize = {
 async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: HEAP_SIZE);
     // add some more RAM

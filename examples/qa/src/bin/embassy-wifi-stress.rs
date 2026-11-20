@@ -36,7 +36,7 @@ const PASSWORD: &str = env!("PASSWORD");
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let mut peripherals = initialize_esp_hal(EspConfig::default().with_cpu_clock(CpuClock::max()));
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     // only have one memory region to make it easier to spot leaks
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);

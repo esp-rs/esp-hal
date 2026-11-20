@@ -21,21 +21,7 @@ static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    // Log on UART0's default TX pin.
-    let log_tx = cfg_select! {
-        feature = "esp32c2" => peripherals.GPIO20,
-        feature = "esp32c3" => peripherals.GPIO21,
-        any(feature = "esp32c5", feature = "esp32c61") => peripherals.GPIO11,
-        feature = "esp32c6" => peripherals.GPIO16,
-        feature = "esp32h2" => peripherals.GPIO24,
-        feature = "esp32s3" => peripherals.GPIO43,
-    };
-    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
-        .unwrap()
-        .with_tx(log_tx);
-    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
-        static_cell::StaticCell::new();
-    embedded_log::init(LOG_WRITER.init(log_writer));
+    esp_log::init_uart!(peripherals);
 
     let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
     da.set_interrupt_handler(interrupt_handler);

@@ -19,7 +19,7 @@ esp-backtrace = { path = "../../esp-backtrace", features = [
 esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
 esp-metadata-generated = { path = "../../esp-metadata-generated" }
-embedded-log = { path = "../../embedded-log", features = ["log-04"] }
+esp-log = { path = "../../esp-log", features = ["log-04"] }
 esp-rtos = { path = "../../esp-rtos", features = ["embassy", "log-04"] }
 esp-sr = { git = "https://github.com/SergioGasquez/esp-sr", rev = "e56a9c6" }
 log = "0.4.27"
@@ -27,6 +27,7 @@ static_cell = "2.1.0"
 
 [features]
 esp32s31 = [
+    "esp-log/esp32s31",
     "esp-alloc/esp32s31",
     "esp-backtrace/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",

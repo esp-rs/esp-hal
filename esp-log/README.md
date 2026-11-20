@@ -1,29 +1,24 @@
-# embedded-log
+# esp-log
 
-[![Crates.io](https://img.shields.io/crates/v/embedded-log?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/embedded-log)
-[![docs.rs](https://img.shields.io/docsrs/embedded-log?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/embedded-log/latest/)
-![MSRV](https://img.shields.io/badge/MSRV-1.95.0-blue?labelColor=1C2C2E&style=flat-square)
-![Crates.io](https://img.shields.io/crates/l/embedded-log?labelColor=1C2C2E&style=flat-square)
+![MSRV](https://img.shields.io/badge/MSRV-1.100.0-blue?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-A [`log`] and [`defmt`] backend that writes to any [`embedded_io::Write`]. It replaces
-`esp-println`.
+A [`log`] and [`defmt`] backend for Espressif chips. It replaces `esp-println`.
 
-The crate does not depend on a HAL. You construct the transport, for example esp-hal's `Uart` or
-`UsbSerialJtag`, and hand it to the logger:
+The logger writes to an esp-hal driver that you create after `esp_hal::init`. The `init_uart!` and
+`init_usb!` macros create UART0 or USB-Serial-JTAG on the default pins of the chip:
 
 ```rust,ignore
 let peripherals = esp_hal::init(esp_hal::Config::default());
-// UART0 on the default TX pin of the ESP32-C6.
-let uart = UartTx::new(peripherals.UART0, Default::default())
-    .unwrap()
-    .with_tx(peripherals.GPIO16);
-static WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
-embedded_log::init(WRITER.init(uart));
+esp_log::init_uart!(peripherals);
 log::info!("Hello");
 ```
 
-Using esp-hal's `Uart` or `UsbSerialJtag` as the transport requires esp-hal's `unstable` feature.
+`init_uart_split!` and `init_usb_split!` also return the receiver of the port. `esp_log::init` takes
+any other [`embedded_io::Write`], for example a UART on other pins.
+
+Enable the chip feature of this crate, and esp-hal's `unstable` feature: the macros use the unstable
+UART and USB-Serial-JTAG drivers.
 
 Enable exactly one of the `log-04` and `defmt` features. With `log-04`, `init` filters records using
 the `ESP_LOG` environment variable at build time, for example `ESP_LOG=info,my_crate::net=debug`.
@@ -32,7 +27,7 @@ the `ESP_LOG` environment variable at build time, for example `ESP_LOG=info,my_c
 The crate records the output format in the `.espressif.metadata` section, so espflash picks the
 right decoder. defmt output uses rzCOBS framing and can only be decoded by espflash.
 
-Nothing is printed before `init`. Use RTT if you need output before the transport exists.
+Nothing is printed before the logger is installed. Use RTT if you need output before that.
 
 [`log`]: https://github.com/rust-lang/log
 [`defmt`]: https://github.com/knurling-rs/defmt

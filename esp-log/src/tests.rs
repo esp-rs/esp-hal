@@ -49,7 +49,7 @@ fn output() -> Vec<u8> {
 
 #[cfg(feature = "timestamp")]
 #[unsafe(no_mangle)]
-extern "Rust" fn _embedded_log_timestamp() -> u64 {
+extern "Rust" fn _esp_log_timestamp() -> u64 {
     1234
 }
 

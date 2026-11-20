@@ -77,7 +77,7 @@ cfg_select! {
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: RECLAIMED_HEAP_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);

@@ -146,7 +146,7 @@ fn measure_psram_to_psram(dst: &mut [u8], src: &[u8]) {
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 

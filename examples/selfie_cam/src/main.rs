@@ -144,14 +144,7 @@ async fn main(spawner: Spawner) -> ! {
         esp_hal::Config::default().with_cpu_clock(ClockConfig::from(CpuClock::max())),
     );
 
-    // Log on UART0's default TX pin.
-    let log_tx = peripherals.GPIO58;
-    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
-        .unwrap()
-        .with_tx(log_tx);
-    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
-        static_cell::StaticCell::new();
-    embedded_log::init(LOG_WRITER.init(log_writer));
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
     esp_alloc::heap_allocator!(size: 128 * 1024);

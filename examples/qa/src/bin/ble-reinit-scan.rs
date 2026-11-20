@@ -52,7 +52,7 @@ const INACTIVE_PHASE: Duration = Duration::from_secs(10);
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 

@@ -51,14 +51,7 @@ fn interrupt_handler() {
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    // Log on UART0's default TX pin.
-    let log_tx = peripherals.GPIO1;
-    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
-        .unwrap()
-        .with_tx(log_tx);
-    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
-        static_cell::StaticCell::new();
-    embedded_log::init(LOG_WRITER.init(log_writer));
+    esp_log::init_uart!(peripherals);
 
     let mut rtc = Rtc::new(peripherals.RTC_TIMER);
     rtc.set_interrupt_handler(interrupt_handler);

@@ -1592,9 +1592,10 @@ pub struct PeripheralClock {
     template_params: HashMap<String, String>,
 
     /// When true, prevents resetting and disabling the peripheral on startup.
-    // TODO: we should do something better, as we keep too many things running. USB stays enabled
-    // because disabling or resetting it drops a USB-JTAG connection, TIMG0 is not necessary outside
-    // of clock calibrations when the device has Systimer.
+    // TODO: we should do something better, as we keep too many things running. UART0 and the UART
+    // memory stay enabled because the deprecated esp-println writes to UART0 without a driver. USB
+    // stays enabled because disabling or resetting it drops a USB-JTAG connection. TIMG0 is not
+    // necessary outside of clock calibrations when the device has Systimer.
     #[serde(default)]
     keep_enabled: bool,
 }

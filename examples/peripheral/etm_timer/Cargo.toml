@@ -11,17 +11,17 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
-embedded-log = { path = "../../../embedded-log", features = ["log-04"] }
-log = "0.4"
-static_cell = "2.1.1"
+esp-log = { path = "../../../esp-log", features = ["log-04"] }
 
 [features]
 esp32c6 = [
+    "esp-log/esp32c6",
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
 ]
 esp32h2 = [
+    "esp-log/esp32h2",
     "esp-backtrace/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-hal/esp32h2",

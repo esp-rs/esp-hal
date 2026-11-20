@@ -13,81 +13,82 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 # Only chips with USB-Serial-JTAG log; the example drives the UART0 pins.
-embedded-log = { path = "../../../embedded-log", features = ["log-04"], optional = true }
+esp-log = { path = "../../../esp-log", features = ["log-04"], optional = true }
 log = "0.4"
-static_cell = { version = "2.1.1", optional = true }
 
 [features]
-esp32 = ["esp-backtrace/esp32", "esp-bootloader-esp-idf/esp32", "esp-hal/esp32"]
+esp32 = ["esp-backtrace/esp32", "esp-bootloader-esp-idf/esp32", "esp-hal/esp32", "esp-log?/esp32"]
 esp32c2 = [
+    "esp-log?/esp32c2",
     "esp-backtrace/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-hal/esp32c2",
 ]
 esp32c3 = [
-    "dep:embedded-log",
-    "dep:static_cell",
+    "esp-log?/esp32c3",
+    "dep:esp-log",
     "esp-backtrace/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-hal/esp32c3",
 ]
 esp32c6 = [
-    "dep:embedded-log",
-    "dep:static_cell",
+    "esp-log?/esp32c6",
+    "dep:esp-log",
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
 ]
 esp32h2 = [
-    "dep:embedded-log",
-    "dep:static_cell",
+    "esp-log?/esp32h2",
+    "dep:esp-log",
     "esp-backtrace/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-hal/esp32h2",
 ]
 esp32h4 = [
-    "dep:embedded-log",
-    "dep:static_cell",
+    "esp-log?/esp32h4",
+    "dep:esp-log",
     "esp-backtrace/esp32h4",
     "esp-bootloader-esp-idf/esp32h4",
     "esp-hal/esp32h4",
 ]
 esp32s2 = [
+    "esp-log?/esp32s2",
     "esp-backtrace/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-hal/esp32s2",
 ]
 esp32s3 = [
-    "dep:embedded-log",
-    "dep:static_cell",
+    "esp-log?/esp32s3",
+    "dep:esp-log",
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",
 ]
 esp32s31 = [
-    "dep:embedded-log",
-    "dep:static_cell",
+    "esp-log?/esp32s31",
+    "dep:esp-log",
     "esp-backtrace/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",
     "esp-hal/esp32s31",
 ]
 esp32c5 = [
-    "dep:embedded-log",
-    "dep:static_cell",
+    "esp-log?/esp32c5",
+    "dep:esp-log",
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-hal/esp32c5",
 ]
 esp32c61 = [
-    "dep:embedded-log",
-    "dep:static_cell",
+    "esp-log?/esp32c61",
+    "dep:esp-log",
     "esp-backtrace/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-hal/esp32c61",
 ]
 esp32p4 = [
-    "dep:embedded-log",
-    "dep:static_cell",
+    "esp-log?/esp32p4",
+    "dep:esp-log",
     "esp-backtrace/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
     "esp-hal/esp32p4",

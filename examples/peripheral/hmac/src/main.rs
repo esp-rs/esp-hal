@@ -80,19 +80,7 @@ type HmacSha256 = HmacSw<Sha256>;
 fn main() -> ! {
     let mut peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
-    // Log on UART0's default TX pin.
-    let log_tx = cfg_select! {
-        feature = "esp32c3" => peripherals.GPIO21,
-        feature = "esp32c6" => peripherals.GPIO16,
-        any(feature = "esp32h2", feature = "esp32h4") => peripherals.GPIO24,
-        any(feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO43,
-    };
-    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
-        .unwrap()
-        .with_tx(log_tx);
-    static LOG_WRITER: static_cell::StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
-        static_cell::StaticCell::new();
-    embedded_log::init(LOG_WRITER.init(log_writer));
+    esp_log::init_uart!(peripherals);
 
     let mut sha_backend = ShaBackend::new(peripherals.SHA.reborrow());
 

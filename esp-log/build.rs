@@ -7,7 +7,7 @@ fn main() {
     let defmt = cfg!(feature = "defmt");
     assert!(
         log != defmt,
-        "Enable exactly one of the `log-04` and `defmt` features of `embedded-log`."
+        "Enable exactly one of the `log-04` and `defmt` features of `esp-log`."
     );
 
     if env::var("ESP_LOGLEVEL").is_ok() || env::var("ESP_LOGFILTER").is_ok() {

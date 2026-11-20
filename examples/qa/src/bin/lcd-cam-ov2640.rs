@@ -46,7 +46,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     let dma_rx_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
 

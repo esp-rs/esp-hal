@@ -67,7 +67,7 @@ fn print_head_samples(data: &[u8], count: usize) {
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     log::info!("embassy_i2s_pdm_rx: init");
     let timg0 = TimerGroup::new(peripherals.TIMG0);

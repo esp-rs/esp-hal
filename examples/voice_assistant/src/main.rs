@@ -99,13 +99,7 @@ async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    // Log on UART0's default TX pin.
-    let log_writer = esp_hal::uart::UartTx::new(peripherals.UART0, Default::default())
-        .unwrap()
-        .with_tx(peripherals.GPIO58);
-    static LOG_WRITER: StaticCell<esp_hal::uart::UartTx<'static, esp_hal::Blocking>> =
-        StaticCell::new();
-    embedded_log::init(LOG_WRITER.init(log_writer));
+    esp_log::init_uart!(peripherals);
 
     // Large buffers are allocated explicitly in PSRAM, everything else in internal RAM.
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);

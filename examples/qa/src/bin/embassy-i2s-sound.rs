@@ -52,7 +52,7 @@ const SINE: [i16; 64] = [
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     log::info!("Init!");
     let timg0 = TimerGroup::new(peripherals.TIMG0);

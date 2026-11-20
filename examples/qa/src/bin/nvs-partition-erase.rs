@@ -38,7 +38,7 @@ const SECTOR_SIZE: u32 = 4096;
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
 

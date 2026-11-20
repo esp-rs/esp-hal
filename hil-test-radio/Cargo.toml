@@ -56,7 +56,7 @@ esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
 esp-metadata-generated = { path = "../esp-metadata-generated" }
-embedded-log       = { path = "../embedded-log", default-features = false, features = ["defmt"], optional = true }
+esp-log       = { path = "../esp-log", default-features = false, features = ["defmt"], optional = true }
 esp-rtos           = { path = "../esp-rtos", optional = true }
 esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
@@ -93,7 +93,7 @@ unstable = ["esp-hal/unstable"]
 
 # Logs on the serial port of the probe. Only tests that enable `unstable` log, because the
 # logger uses the unstable UART and USB-Serial-JTAG drivers.
-log-serial = ["dep:embedded-log", "defmt"]
+log-serial = ["dep:esp-log", "defmt"]
 # Enabled by `log-serial`.
 defmt = ["embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
@@ -102,6 +102,7 @@ embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 rtos-radio-driver = ["dep:esp-rtos", "esp-rtos/esp-radio", "dep:esp-radio-rtos-driver"]
 
 esp32c6 = [
+    "esp-log?/esp32c6",
     "esp-hal/esp32c6",
     "esp-alloc?/esp32c6",
     "esp-radio?/esp32c6",
@@ -110,6 +111,7 @@ esp32c6 = [
     "esp-rtos?/esp32c6",
 ]
 esp32s3 = [
+    "esp-log?/esp32s3",
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s3",
     "esp-alloc?/esp32s3",

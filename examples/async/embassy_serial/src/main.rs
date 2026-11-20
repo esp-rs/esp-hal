@@ -70,32 +70,7 @@ async fn main(spawner: Spawner) {
     // This example drives UART0, so it logs on USB-Serial-JTAG. The ESP32, C2 and S2 don't have one
     // and print nothing.
     #[cfg(not(any(feature = "esp32", feature = "esp32c2", feature = "esp32s2")))]
-    {
-        let (log_dp, log_dm) = cfg_select! {
-            feature = "esp32c3" => (peripherals.GPIO19, peripherals.GPIO18),
-            any(feature = "esp32c5", feature = "esp32h4") => {
-                (peripherals.GPIO14, peripherals.GPIO13)
-            }
-            any(feature = "esp32c6", feature = "esp32c61") => {
-                (peripherals.GPIO13, peripherals.GPIO12)
-            }
-            feature = "esp32h2" => (peripherals.GPIO27, peripherals.GPIO26),
-            feature = "esp32p4" => (peripherals.GPIO25, peripherals.GPIO24),
-            feature = "esp32s3" => (peripherals.GPIO20, peripherals.GPIO19),
-            feature = "esp32s31" => (peripherals.GPIO34, peripherals.GPIO33),
-        };
-        let log_writer = esp_hal::usb::usb_serial_jtag::UsbSerialJtag::new(
-            peripherals.USB_DEVICE,
-            log_dp,
-            log_dm,
-            Default::default(),
-        )
-        .unwrap();
-        static LOG_WRITER: StaticCell<
-            esp_hal::usb::usb_serial_jtag::UsbSerialJtag<'static, esp_hal::Blocking>,
-        > = StaticCell::new();
-        embedded_log::init(LOG_WRITER.init(log_writer));
-    }
+    esp_log::init_usb!(peripherals);
 
     log::info!("Init!");
 

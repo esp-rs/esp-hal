@@ -135,11 +135,7 @@ mod blocking_tests {
         );
     }
 
-    #[init]
-    fn init() -> Context<Blocking> {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
-        hil_test::init_logger!(peripherals);
-
+    fn started_controller(peripherals: esp_hal::peripherals::Peripherals) -> Context<Blocking> {
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let mut canfd = CanFd::new(peripherals.TWAI0, config())
@@ -149,6 +145,18 @@ mod blocking_tests {
         canfd.start().unwrap();
 
         Context { canfd }
+    }
+
+    #[init]
+    fn init() -> Context<Blocking> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+        started_controller(peripherals)
+    }
+
+    // The USB-Serial-JTAG driver of the logger holds a `WakeLock`, which this test must not see.
+    fn init_without_logger() -> Context<Blocking> {
+        started_controller(esp_hal::init(esp_hal::Config::default()))
     }
 
     #[test]
@@ -480,7 +488,7 @@ mod blocking_tests {
         );
     }
 
-    #[test]
+    #[test(init = init_without_logger)]
     fn the_chip_stays_awake_exactly_while_the_controller_is_on_the_bus(mut ctx: Context<Blocking>) {
         assert!(ctx.canfd.is_started());
         assert!(WakeLock::is_active(), "started in init, yet asleep");

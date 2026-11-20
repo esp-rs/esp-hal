@@ -49,7 +49,7 @@ const CASES: &[(u32, usize)] = &[(0, 4), (0, 8), (0, 12), (16, 4), (16, 8), (16,
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     assert!(
         esp_hal::efuse::flash_encryption(),

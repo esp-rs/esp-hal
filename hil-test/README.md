@@ -218,7 +218,7 @@ If the test is supported by all the targets, you can omit the header. See [`xtas
 
 ## Logging in tests
 
-The tests print [defmt] logs. The default `log-serial` feature prints them through `embedded-log`,
+The tests print [defmt] logs. The default `log-serial` feature prints them through `esp-log`,
 on the USB-Serial-JTAG port if the chip has one, and on UART0's default TX pin if not.
 `probe-rs run` reads the serial port of the probe and decodes the logs. It shows the log of a test
 only if the test fails. Use `--nocapture` to see the logs of all tests.

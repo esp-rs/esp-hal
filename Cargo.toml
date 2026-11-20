@@ -2,7 +2,6 @@
 resolver = "2"
 members  = ["xtask", "xtask-mcp-macros"]
 exclude  = [
-    "embedded-log",
     "esp-alloc",
     "esp-backtrace",
     "esp-bootloader-direct-boot",
@@ -13,6 +12,7 @@ exclude  = [
     "esp-hal-procmacros",
     "esp-rom-sys",
     "esp-lp-hal",
+    "esp-log",
     "esp-metadata",
     "esp-metadata-generated",
     "esp-phy",

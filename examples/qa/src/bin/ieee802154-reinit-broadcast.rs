@@ -50,7 +50,7 @@ const FRAME_INTERVAL_MS: u32 = 500;
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 24 * 1024);
 

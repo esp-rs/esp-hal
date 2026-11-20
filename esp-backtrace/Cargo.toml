@@ -74,7 +74,7 @@ esp32s31 = ["esp-println?/esp32s31", "esp-metadata-generated/esp32s31"]
 
 #! ### Output
 #! Enable exactly one of the features below. `log-04` and `defmt` print through the `log` or
-#! `defmt` frontend, so the application has to install a logger, for example `embedded-log`.
+#! `defmt` frontend, so the application has to install a logger, for example `esp-log`.
 
 ## Print through `log` 0.4.
 log-04 = ["dep:log-04"]

@@ -12,9 +12,8 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
-embedded-log = { path = "../../../embedded-log", features = ["log-04"] }
+esp-log = { path = "../../../esp-log", features = ["log-04"] }
 log = "0.4"
-static_cell = "2.1.1"
 esp-radio = { path = "../../../esp-radio", features = [
     "ieee802154",
     "unstable",
@@ -23,6 +22,7 @@ ieee802154 = "0.6.1"
 
 [features]
 esp32c5 = [
+    "esp-log/esp32c5",
     "esp-alloc/esp32c5",
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
@@ -30,6 +30,7 @@ esp32c5 = [
     "esp-radio/esp32c5",
 ]
 esp32c6 = [
+    "esp-log/esp32c6",
     "esp-alloc/esp32c6",
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
@@ -37,6 +38,7 @@ esp32c6 = [
     "esp-radio/esp32c6",
 ]
 esp32h2 = [
+    "esp-log/esp32h2",
     "esp-alloc/esp32h2",
     "esp-backtrace/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
@@ -44,6 +46,7 @@ esp32h2 = [
     "esp-radio/esp32h2",
 ]
 esp32h4 = [
+    "esp-log/esp32h4",
     "esp-alloc/esp32h4",
     "esp-backtrace/esp32h4",
     "esp-bootloader-esp-idf/esp32h4",
@@ -51,6 +54,7 @@ esp32h4 = [
     "esp-radio/esp32h4",
 ]
 esp32s31 = [
+    "esp-log/esp32s31",
     "esp-alloc/esp32s31",
     "esp-backtrace/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",

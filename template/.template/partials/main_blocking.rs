@@ -12,17 +12,6 @@ use esp_hal::{
     main,
     time::{Duration, Instant},
 };
-//%if !option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace"))
-//%if chip.soc_has_usb_device
-use esp_hal::{Blocking, usb::usb_serial_jtag::UsbSerialJtag};
-//%else
-//+use esp_hal::{
-//+    Blocking,
-//+    uart::{self, UartTx},
-//+};
-//%endif
-use static_cell::StaticCell;
-//%endif
 //%if option("defmt")
 //+use defmt::info;
 //%if !group_selected("panic-handler")
@@ -118,40 +107,12 @@ fn main() -> ! {
 
     //%if !option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace"))
     //%if chip.soc_has_usb_device
-    // Log on USB-Serial-JTAG. To log on UART0 instead, construct an `esp_hal::uart::UartTx` on
-    // the chip's default TX pin.
-    //%if chip.name == "esp32c3"
-    //+    let (usb_dp, usb_dm) = (peripherals.GPIO19, peripherals.GPIO18);
-    //%else if chip.name == "esp32c5" || chip.name == "esp32h4"
-    //+    let (usb_dp, usb_dm) = (peripherals.GPIO14, peripherals.GPIO13);
-    //%else if chip.name == "esp32h2"
-    //+    let (usb_dp, usb_dm) = (peripherals.GPIO27, peripherals.GPIO26);
-    //%else if chip.name == "esp32p4"
-    //+    let (usb_dp, usb_dm) = (peripherals.GPIO25, peripherals.GPIO24);
-    //%else if chip.name == "esp32s3"
-    //+    let (usb_dp, usb_dm) = (peripherals.GPIO20, peripherals.GPIO19);
-    //%else if chip.name == "esp32s31"
-    //+    let (usb_dp, usb_dm) = (peripherals.GPIO34, peripherals.GPIO33);
+    // Logs on USB-Serial-JTAG. `esp_log::init_uart!` logs on UART0 instead.
+    esp_log::init_usb!(peripherals);
     //%else
-    let (usb_dp, usb_dm) = (peripherals.GPIO13, peripherals.GPIO12);
+    //+    // Logs on UART0's default TX pin.
+    //+    esp_log::init_uart!(peripherals);
     //%endif
-    let log_writer =
-        UsbSerialJtag::new(peripherals.USB_DEVICE, usb_dp, usb_dm, Default::default()).unwrap();
-    static LOG_WRITER: StaticCell<UsbSerialJtag<'static, Blocking>> = StaticCell::new();
-    //%else
-    //+    // Log on UART0's default TX pin.
-    //+    let log_writer = UartTx::new(peripherals.UART0, uart::Config::default())
-    //+        .unwrap()
-    //%if chip.name == "esp32"
-    //+        .with_tx(peripherals.GPIO1);
-    //%else if chip.name == "esp32c2"
-    //+        .with_tx(peripherals.GPIO20);
-    //%else
-    //+        .with_tx(peripherals.GPIO43);
-    //%endif
-    //+    static LOG_WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
-    //%endif
-    embedded_log::init(LOG_WRITER.init(log_writer));
     //%endif
 
     {{ reserved_gpio_code }}

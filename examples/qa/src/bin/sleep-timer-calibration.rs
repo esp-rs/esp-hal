@@ -38,7 +38,7 @@ static mut PRE_SLEEP_US: u64 = 0;
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     let rtc = Rtc::new(peripherals.RTC_TIMER);
     let mut lpwr = LowPower::new(peripherals.LPWR);

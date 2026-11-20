@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if cfg!(feature = "println") {
         print_warning(
-            "The `println` feature of esp-backtrace is deprecated. Use `log-04` or `defmt` with a logger such as `embedded-log`.",
+            "The `println` feature of esp-backtrace is deprecated. Use `log-04` or `defmt` with a logger such as `esp-log`.",
         );
     }
 

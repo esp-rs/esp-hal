@@ -248,7 +248,7 @@ peripheral_clocks = { templates = [
     { name = "no_rst",                value = "let _ = reset;" },
     { name = "uart_rst",              value = ".core_rst_en().bit(reset).apb_rst_en().bit(reset)" },
 ], peripheral_clocks = [
-    { name = "Uart0", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(0)" } },
+    { name = "Uart0", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(0)" }, keep_enabled = true },
     { name = "Uart1", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(1)" } },
     { name = "Uart2", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(2)" } },
     { name = "Uart3", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(3)" } },

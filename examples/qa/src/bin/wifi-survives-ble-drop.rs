@@ -51,7 +51,7 @@ const PASSWORD: &str = env!("PASSWORD");
 async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     // COEX needs more RAM - add some more
     #[cfg(feature = "esp32")]

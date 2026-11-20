@@ -34,7 +34,7 @@ static SIGNAL: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
     let p = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
-    qa_test::init_logger!(p);
+    esp_log::init_uart!(p);
 
     let mut enc_a = Flex::new(unsafe { p.GPIO2.clone_unchecked() });
     let enc_a_clone = Flex::new(p.GPIO2);

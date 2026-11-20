@@ -920,7 +920,7 @@ fn main() -> ! {
     let phase = Phase::get(index);
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(phase.cpu_clock()));
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     report!(
         "light-sleep-stress: reset={:?}, CPU clock {:?}",

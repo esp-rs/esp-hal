@@ -104,7 +104,7 @@ fn init_heap() {
 async fn main(_s: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     init_heap();
 

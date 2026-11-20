@@ -53,7 +53,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     let (sclk, miso, mosi, sio2, sio3, cs) = cfg_select! {
         feature = "esp32" => (

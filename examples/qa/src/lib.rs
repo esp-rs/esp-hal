@@ -10,9 +10,7 @@ use esp_hal::{
     flash::Flash,
     rtc_cntl::{SocResetReason, reset_reason},
     system::Cpu,
-    uart::UartTx,
 };
-use static_cell::StaticCell;
 
 /// Bytes in `.dram2_uninit` for the selected chip.
 pub const DRAM2_UNINIT_SIZE: usize = {
@@ -59,21 +57,6 @@ macro_rules! console_uart {
                 any(feature = "esp32s2", feature = "esp32s3") => $peripherals.GPIO43,
             })
     };
-}
-
-/// Installs the logger on UART0's default TX pin. Takes the `Peripherals` returned by
-/// `esp_hal::init`, and moves the fields it needs out of it.
-#[macro_export]
-macro_rules! init_logger {
-    ($peripherals:ident) => {
-        $crate::log_on_uart($crate::console_uart!($peripherals))
-    };
-}
-
-#[doc(hidden)]
-pub fn log_on_uart(tx: UartTx<'static, Blocking>) {
-    static WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
-    embedded_log::init(WRITER.init(tx));
 }
 
 /// The progress of a run of checks or phases, kept across resets in a [`ProgressWord`].

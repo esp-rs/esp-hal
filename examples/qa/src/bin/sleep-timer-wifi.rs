@@ -38,7 +38,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[main]
 async fn main(_spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
 

@@ -445,7 +445,7 @@ fn main() -> ! {
         hal_config = hal_config.with_cpu_clock(CpuClock::max());
     }
     let peripherals = esp_hal::init(hal_config);
-    qa_test::init_logger!(peripherals);
+    esp_log::init_uart!(peripherals);
 
     #[cfg(psram_driver_supported)]
     let psram_words: &mut [u32] = {
