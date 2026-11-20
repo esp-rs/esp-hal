@@ -1,5 +1,12 @@
 use super::{Config, ConfigError, Driver, RegisterBlock, configure_clock};
 
+/// Largest value of the 14-bit `SCL_LOW_PERIOD`, `SCL_HIGH_PERIOD` and
+/// `SCL_STOP_HOLD` fields.
+const PERIOD_MAX: u32 = 0x3FFF;
+/// Largest value of the 10-bit `SDA_HOLD`, `SDA_SAMPLE`, `SCL_RSTART_SETUP`,
+/// `SCL_STOP_SETUP` and `SCL_START_HOLD` fields.
+const TIME_MAX: u32 = 0x3FF;
+
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
 /// i2c_ll_set_bus_timing in ESP-IDF.
@@ -20,7 +27,9 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
 
     // SCL period. According to the TRM, we should always subtract 1 to SCL low
     // period
-    let scl_low = scl_low - 1;
+    let scl_low = scl_low
+        .checked_sub(1)
+        .ok_or(ConfigError::FrequencyOutOfRange)?;
     // Still according to the TRM, if filter is not enabled, we have to subtract 7,
     // if SCL filter is enabled, we have to subtract:
     //   8 if SCL filter is between 0 and 2 (included)
@@ -32,7 +41,9 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
 
     // FIXME since we always set the filter threshold to 7 we don't need conditional
     // code here once that changes we need the conditional code here
-    scl_high -= 7 + 6;
+    scl_high = scl_high
+        .checked_sub(7 + 6)
+        .ok_or(ConfigError::FrequencyOutOfRange)?;
 
     // if (filter_cfg_en) {
     //     if (thres <= 2) {
@@ -47,15 +58,23 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
 
     let scl_high_period = scl_high;
     let scl_low_period = scl_low;
+    // The SCL periods set the bus frequency, so they cannot be clamped.
+    if scl_low_period > PERIOD_MAX {
+        return Err(ConfigError::FrequencyOutOfRange);
+    }
+
+    // The fields below are narrower than the SCL periods. Clamp them instead of
+    // letting the register write truncate them. The setup and hold times stay
+    // above the minimums of the I2C specification at the field maximum.
     // sda sample
-    let sda_hold_time = sda_hold;
-    let sda_sample_time = sda_sample;
+    let sda_hold_time = sda_hold.min(TIME_MAX);
+    let sda_sample_time = sda_sample.min(TIME_MAX);
     // setup
-    let scl_rstart_setup_time = setup;
-    let scl_stop_setup_time = setup;
+    let scl_rstart_setup_time = setup.min(TIME_MAX);
+    let scl_stop_setup_time = setup.min(TIME_MAX);
     // hold
-    let scl_start_hold_time = hold;
-    let scl_stop_hold_time = hold;
+    let scl_start_hold_time = hold.min(TIME_MAX);
+    let scl_stop_hold_time = hold.min(PERIOD_MAX);
 
     configure_clock(
         driver.info,
