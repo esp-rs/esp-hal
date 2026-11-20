@@ -150,7 +150,7 @@ impl RegisterAccess for SpiDmaTxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, SpiDmaChannel(any::Inner::Spi2(_)))
+        self.0.can_access_psram()
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
@@ -347,7 +347,7 @@ impl RegisterAccess for SpiDmaRxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, SpiDmaChannel(any::Inner::Spi2(_)))
+        self.0.can_access_psram()
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
@@ -494,6 +494,8 @@ impl SpiDmaChannel<'_> {
             fn register_block(&self) -> &SpiRegisterBlock;
             fn info(&self) -> &'static ChannelInfo;
             fn state(&self) -> &'static ChannelState;
+            #[cfg(dma_can_access_psram)]
+            fn can_access_psram(&self) -> bool;
         }
     }
 }
@@ -515,6 +517,11 @@ for_each_dma_channel_peri_pair! {
     ("SPI_DMA", $dma_peri:ident, $peri:ident) => {
         use $crate::peripherals::$dma_peri;
         impl $dma_peri<'_> {
+            #[cfg(dma_can_access_psram)]
+            pub(super) fn can_access_psram(&self) -> bool {
+                property!("dma.channel_can_access_psram", $dma_peri)
+            }
+
             pub(super) fn info(&self) -> &'static ChannelInfo {
                 #[crate::handler(priority = crate::interrupt::Priority::max())]
                 fn interrupt_handler() {

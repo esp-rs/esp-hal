@@ -131,8 +131,7 @@ ext_mem_configurable_block_size = true
 engines = [
     {
         name = "SPI_DMA",
-        internal_ram_burst_sizes = [0, 4],
-        burst_sizes = [16, 32, 64],
+        can_access_psram = true,
         drivers = ["spi_master", "spi_slave"],
         peripheral_instances = [
             { name = "SPI2", dma_id = 0 },
@@ -140,13 +139,12 @@ engines = [
         ],
         channels = [
             { name = "DMA_SPI2", pac = "SPI2", interrupt = "SPI2_DMA", compatible_with = ["SPI2"] },
-            { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA", compatible_with = ["SPI3"] },
+            { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA", compatible_with = ["SPI3"], can_access_psram = false },
         ]
     },
     {
         name = "I2S_DMA",
-        internal_ram_burst_sizes = [0, 4],
-        burst_sizes = [16, 32, 64],
+        can_access_psram = true,
         drivers = ["i2s"],
         peripheral_instances = [
             { name = "I2S0", dma_id = 0 },
@@ -157,8 +155,7 @@ engines = [
     },
     {
         name = "CRYPTO_DMA",
-        internal_ram_burst_sizes = [0, 4],
-        burst_sizes = [16, 32, 64],
+        can_access_psram = true,
         drivers = ["aes", "sha"],
         peripheral_instances = [
             { name = "AES", dma_id = 0 },

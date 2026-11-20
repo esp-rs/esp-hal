@@ -138,7 +138,7 @@ impl RegisterAccess for I2sDmaTxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, I2sDmaChannel(any::Inner::I2s0(_)))
+        property!("dma.engine_can_access_psram", I2S_DMA)
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
@@ -319,7 +319,7 @@ impl RegisterAccess for I2sDmaRxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, I2sDmaChannel(any::Inner::I2s0(_)))
+        property!("dma.engine_can_access_psram", I2S_DMA)
     }
 
     fn compatible_peripherals(&self) -> &[u8] {

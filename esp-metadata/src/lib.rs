@@ -513,8 +513,7 @@ impl Config {
         }
 
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
-            dma.engines
-                .validate_mem2mem(dma.mem2mem_requires_peripheral)?;
+            dma.validate()?;
         }
 
         if let Some(adc) = &self.device.peri_config.adc

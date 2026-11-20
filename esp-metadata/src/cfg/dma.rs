@@ -5,7 +5,11 @@ use convert_case::{Case, Casing};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::{cfg::GenericProperty, generate_for_each_macro, number};
+use crate::{
+    cfg::{DmaProperties, GenericProperty, Value},
+    generate_for_each_macro,
+    number,
+};
 
 /// A single DMA channel definition.
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -13,6 +17,9 @@ use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 pub struct DmaChannelDef {
     /// The name of the peripheral singleton for this channel.
     pub name: String,
+    /// Overrides the engine's PSRAM access for this channel.
+    #[serde(default)]
+    pub can_access_psram: Option<bool>,
     /// Whether this channel supports memory-to-memory transfers.
     #[serde(default)]
     pub mem2mem: bool,
@@ -52,6 +59,16 @@ pub struct DmaPeripheralInstance {
     pub dma_id: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum AhbBurstMode {
+    Single,
+    Incr,
+    Incr4,
+    Incr8,
+    Incr16,
+}
+
 /// A single DMA engine with its channels.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -59,17 +76,24 @@ pub struct DmaEngineDef {
     /// The name of the engine (e.g. `"AHB_GDMA"`, `"SPI_DMA"`, `"I2S_DMA"`).
     pub name: String,
 
+    /// Register backend version, required for AHB GDMA.
+    #[serde(default)]
+    pub version: Option<u32>,
+
+    /// AHB GDMA data burst modes. Silicon revisions can impose further restrictions.
+    #[serde(default)]
+    data_burst_modes: Vec<AhbBurstMode>,
+
     #[serde(default)]
     pub max_priority: Option<u32>,
 
-    /// Configurable internal RAM burst sizes, when they differ from external RAM.
+    /// Whether channels of this DMA engine can access PSRAM by default.
     #[serde(default)]
-    #[expect(dead_code)]
-    pub internal_ram_burst_sizes: Vec<u32>,
+    pub can_access_psram: bool,
 
-    /// Configurable burst sizes, when supported. Implies `can_access_psram = true`.
+    /// Supported AXI GDMA data burst sizes in bytes.
     #[serde(default)]
-    pub burst_sizes: Vec<u32>,
+    pub data_burst_sizes: Vec<u32>,
 
     /// Driver config names whose peripherals can use this engine
     /// (e.g. `"aes"`, `"sha"`, `"spi_master"`, `"spi_slave"`, `"rmt"`).
@@ -84,13 +108,109 @@ pub struct DmaEngineDef {
     pub channels: Vec<DmaChannelDef>,
 }
 
+impl DmaEngineDef {
+    fn channel_can_access_psram(&self, channel: &DmaChannelDef) -> bool {
+        channel.can_access_psram.unwrap_or(self.can_access_psram)
+    }
+}
+
 /// All DMA engines on a device.
 #[derive(Debug, Default, Clone, serde::Deserialize)]
 #[serde(transparent)]
 pub struct DmaEngines(pub Vec<DmaEngineDef>);
 
+impl DmaProperties {
+    pub(crate) fn validate(&self) -> Result<()> {
+        self.engines
+            .validate_mem2mem(self.mem2mem_requires_peripheral)?;
+        self.engines.validate_ahb()?;
+        self.engines.validate_axi()
+    }
+
+    pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
+        self.engines
+            .0
+            .iter()
+            .find(|engine| engine.name == "AHB_GDMA")
+            .map(|engine| ("dma.gdma_version", false, Value::from(engine.version)))
+            .into_iter()
+    }
+}
+
 impl DmaEngines {
-    pub(crate) fn validate_mem2mem(&self, requires_peripheral: bool) -> Result<()> {
+    fn validate_ahb(&self) -> Result<()> {
+        let mut has_ahb = false;
+        for engine in &self.0 {
+            if engine.name == "AHB_GDMA" {
+                ensure!(!has_ahb, "Duplicate AHB_GDMA engine");
+                ensure!(
+                    matches!(engine.version, Some(1..=3)),
+                    "AHB_GDMA requires a supported version (1, 2 or 3)"
+                );
+                let modes: HashSet<_> = engine.data_burst_modes.iter().copied().collect();
+                ensure!(
+                    modes.len() == engine.data_burst_modes.len(),
+                    "AHB_GDMA data_burst_modes contains duplicate modes"
+                );
+                ensure!(
+                    modes.contains(&AhbBurstMode::Single),
+                    "AHB_GDMA data_burst_modes requires single"
+                );
+                if engine.version == Some(1) {
+                    ensure!(
+                        modes.len() == 2 && modes.contains(&AhbBurstMode::Incr),
+                        "AHB_GDMA v1 requires single and incr"
+                    );
+                } else {
+                    ensure!(
+                        !modes.contains(&AhbBurstMode::Incr),
+                        "AHB_GDMA fixed incr mode requires v1"
+                    );
+                }
+                has_ahb = true;
+            } else {
+                ensure!(
+                    engine.version.is_none() && engine.data_burst_modes.is_empty(),
+                    "DMA engine '{}': version and data_burst_modes are only valid for AHB_GDMA",
+                    engine.name
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_axi(&self) -> Result<()> {
+        for engine in &self.0 {
+            let sizes = &engine.data_burst_sizes;
+            if engine.name != "AXI_GDMA" {
+                ensure!(
+                    sizes.is_empty(),
+                    "DMA engine '{}': data_burst_sizes is only valid for AXI_GDMA",
+                    engine.name
+                );
+                continue;
+            }
+            ensure!(
+                sizes.contains(&8),
+                "AXI_GDMA requires the default 8-byte burst"
+            );
+            let mut seen = HashSet::new();
+            for &size in sizes {
+                ensure!(
+                    matches!(size, 8 | 16 | 32 | 64 | 128),
+                    "AXI_GDMA: invalid data burst size {size}"
+                );
+                ensure!(
+                    seen.insert(size),
+                    "AXI_GDMA: duplicate data burst size {size}"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_mem2mem(&self, requires_peripheral: bool) -> Result<()> {
         for engine in &self.0 {
             let mut seen_ids = std::collections::HashSet::new();
             for channel in &engine.channels {
@@ -160,10 +280,22 @@ impl GenericProperty for DmaEngines {
             }
         }
 
-        if self.0.iter().any(|engine| !engine.burst_sizes.is_empty()) {
-            // TODO: this symbol encodes whether _any_ engine can access PSRAM
-            // and can be used to enable relevant API.
+        if self.0.iter().any(|engine| {
+            engine
+                .channels
+                .iter()
+                .any(|channel| engine.channel_can_access_psram(channel))
+        }) {
             cfgs.push("dma.can_access_psram".to_string());
+        }
+
+        if let Some(axi) = self.0.iter().find(|engine| engine.name == "AXI_GDMA") {
+            cfgs.push("dma.has_axi_gdma".to_string());
+            cfgs.extend(
+                axi.data_burst_sizes
+                    .iter()
+                    .map(|size| format!("dma.axi_data_burst=\"{size}\"")),
+            );
         }
 
         // TODO: temporary
@@ -173,6 +305,33 @@ impl GenericProperty for DmaEngines {
         }
 
         Some(cfgs)
+    }
+
+    fn property_macro_branches(&self) -> TokenStream {
+        self.0
+            .iter()
+            .flat_map(|engine| {
+                let engine_name = format_ident!("{}", engine.name);
+                let can_access_psram = engine.can_access_psram;
+                let uniform = engine
+                    .channels
+                    .iter()
+                    .all(|channel| engine.channel_can_access_psram(channel) == can_access_psram);
+                let engine_property = uniform.then(|| {
+                    quote! {
+                        ("dma.engine_can_access_psram", #engine_name) => { #can_access_psram };
+                    }
+                });
+                let channel_properties = engine.channels.iter().map(|channel| {
+                    let name = format_ident!("{}", channel.name);
+                    let can_access_psram = engine.channel_can_access_psram(channel);
+                    quote! {
+                        ("dma.channel_can_access_psram", #name) => { #can_access_psram };
+                    }
+                });
+                engine_property.into_iter().chain(channel_properties)
+            })
+            .collect()
     }
 
     fn macros(&self) -> Option<proc_macro2::TokenStream> {

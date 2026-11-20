@@ -163,15 +163,16 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 
 [device.dma]
 support_status = { status = "partial", issue = 6754 }
-gdma_version = 2
 separate_in_out_interrupts = true
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
     {
         name = "AHB_GDMA",
+        version = 2,
+        data_burst_modes = ["single", "incr4", "incr8"],
         max_priority = 5,
-        burst_sizes = [4, 16, 32],
+        can_access_psram = true,
         drivers = ["sha", "spi_master", "spi_slave", "i2s"],
         peripheral_instances = [
             { name = "SPI2", dma_id = 1 },

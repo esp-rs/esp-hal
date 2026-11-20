@@ -315,14 +315,15 @@ instances = [
 
 [device.dma]
 support_status = { status = "partial", issue = 6754 }
-gdma_version = 3
 separate_in_out_interrupts = true
 # TODO: add LP_GDMA engine
 engines = [
     {
         name = "AHB_GDMA",
+        version = 3,
+        data_burst_modes = ["single", "incr4", "incr8", "incr16"],
         max_priority = 15,
-        burst_sizes = [0, 4, 16, 32, 64],
+        can_access_psram = true,
         drivers = ["uhci", "i2s"],
         peripheral_instances = [
             { name = "UHCI0", dma_id = 0 },
@@ -340,7 +341,8 @@ engines = [
     {
         name = "AXI_GDMA",
         max_priority = 15,
-        burst_sizes = [8, 16, 32, 64, 128],
+        can_access_psram = true,
+        data_burst_sizes = [8, 16, 32, 64, 128],
         drivers = ["spi_master", "spi_slave", "aes", "lcd_cam", "parl_io"],
         peripheral_instances = [
             { name = "LCD_CAM", dma_id = 0 },

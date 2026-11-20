@@ -138,18 +138,18 @@ cfg_select! {
             }
         }
 
-        /// Burst transfer configuration.
+        /// Buffer alignment and burst transfer configuration.
+        #[cfg_attr(
+            dma_has_axi_gdma,
+            doc = "\nOn AXI GDMA, this configuration only affects buffer alignment. Set data burst sizes with [`AxiBurstConfig`](super::AxiBurstConfig)."
+        )]
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct BurstConfig {
-            /// Configures the burst size for PSRAM transfers.
-            ///
-            /// Burst mode is always enabled for PSRAM transfers.
+            /// PSRAM buffer alignment and, where supported, the memory block size.
             pub external_memory: ExternalBurstConfig,
 
-            /// Enables or disables the burst mode for internal memory transfers.
-            ///
-            /// The burst size is not configurable.
+            /// SRAM buffer alignment and, where supported, the data burst enable switch.
             pub internal_memory: InternalBurstConfig,
         }
 

@@ -11,8 +11,8 @@ use crate::{
 
 for_each_dma_engine! {
     ("AHB_GDMA") => {
-        mod gdma;
-        pub use gdma::*;
+        mod ahb_gdma;
+        pub use ahb_gdma::*;
     };
     ("AXI_GDMA") => {
         mod axi_gdma;

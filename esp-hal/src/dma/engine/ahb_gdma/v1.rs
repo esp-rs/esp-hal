@@ -102,7 +102,7 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        true
+        property!("dma.engine_can_access_psram", AHB_GDMA)
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
@@ -345,7 +345,7 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        true
+        property!("dma.engine_can_access_psram", AHB_GDMA)
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
