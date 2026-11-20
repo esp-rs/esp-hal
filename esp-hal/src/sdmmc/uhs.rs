@@ -8,10 +8,33 @@ use core::sync::atomic::AtomicBool;
 
 use super::*;
 
-/// Set when the slot has completed the UHS-I CMD11 voltage switch, i.e. the bus
-/// really is at 1.8 V. Only then may the card clock go past the 3.3 V ceiling
-/// (50 MHz High Speed); 100 MHz is only in spec at 1.8 V.
+/// Set when the SD IO rail is at 1.8 V, either because CMD11 completed or
+/// because the deferred rail move restored it after a warm reset. Only then may
+/// the card clock go past the 3.3 V ceiling (50 MHz High Speed); 100 MHz is
+/// only in spec at 1.8 V.
 pub(super) static UHS_1V8_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Sets or clears the controller's per-slot 1.8 V bit.
+///
+/// The P4 register description says this bit does nothing (the rail is
+/// controlled through the LDO API), but esp-idf still maintains it for parity
+/// with the DesignWare controller, and other `sdmmc_uhs` chips may use it.
+pub(super) fn set_uhs_volt(slot: SlotId, enabled: bool) {
+    let bit = 1u32 << slot.index();
+    SDHOST::regs().uhs().modify(|rd, w| unsafe {
+        let bits = if enabled {
+            rd.bits() | bit
+        } else {
+            rd.bits() & !bit
+        };
+        w.bits(bits)
+    });
+}
+
+/// Clears every slot's 1.8 V bit, e.g. when the shared rail is powered off.
+pub(super) fn clear_uhs_volt_all() {
+    SDHOST::regs().uhs().modify(|_, w| unsafe { w.bits(0) });
+}
 
 /// `RINTSTS` bit 10: the DesignWare voltage-switch completion interrupt.
 ///
@@ -69,6 +92,53 @@ fn wait_volt_sw(timeout: Duration) -> Result<u32, Error> {
     }
 }
 
+/// Best-effort restore of the clock gating and interrupt state if the CMD11
+/// handshake exits early.
+///
+/// The handshake disables low-power clock gating (and, from stage 2 on, the
+/// card clock) before the rail move. On an error path the next operation would
+/// otherwise run with the clock stopped or `EVT_VOLT_SW` still pending.
+///
+/// `INTMASK`/`IDINTEN` are left at the idle mask here; the next command or
+/// transfer path reprograms them.
+struct Cmd11Cleanup {
+    slot: SlotId,
+    armed: bool,
+}
+
+impl Cmd11Cleanup {
+    fn new(slot: SlotId) -> Self {
+        Self { slot, armed: true }
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for Cmd11Cleanup {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+
+        let r = SDHOST::regs();
+        let mask = 1u8 << self.slot.index();
+        r.clkena().modify(|rd, w| unsafe {
+            w.cclk_enable().bits(rd.cclk_enable().bits() | mask);
+            w.lp_enable().bits(rd.lp_enable().bits() | mask)
+        });
+        // Drop cannot propagate the error; the next command path will report
+        // any real failure.
+        let _ = clock_update_command(self.slot, false);
+        set_uhs_volt(
+            self.slot,
+            UHS_1V8_ACTIVE.load(core::sync::atomic::Ordering::Relaxed),
+        );
+        r.rintsts().write(|w| unsafe { w.bits(EVT_VOLT_SW) });
+    }
+}
+
 /// The SD UHS-I 1.8 V voltage-switch sequence for CMD11, ported from esp-idf
 /// (`sd_host_slot_sdmmc_do_transaction` / `handle_voltage_switch_stage{1,2,3}`
 /// in `sd_trans_sdmmc.c`, with `handle_voltage_switch_stage{1,2,3}` in
@@ -98,7 +168,10 @@ pub(super) fn cmd11_voltage_switch(slot: SlotId) -> Result<[u32; 4], Error> {
     let idx = slot.index();
     // The CLKENA fields are 2 bits wide (u8); UHS/VOLT is a raw u32 write.
     let clk_mask = 1u8 << idx;
-    let bit = 1u32 << idx;
+
+    // Restore the clock gating/clock enable and clear a lingering VOLT_SW if
+    // any stage below returns early.
+    let mut cleanup = Cmd11Cleanup::new(slot);
 
     // Poll RINTSTS by hand: keep VOLT_SW out of INTMASK so the (card-detect) ISR
     // cannot write-1-clear it before we observe it, and clear any stale copy.
@@ -136,12 +209,16 @@ pub(super) fn cmd11_voltage_switch(slot: SlotId) -> Result<[u32; 4], Error> {
     clock_update_command(slot, true)?;
     crate::rom::ets_delay_us(100);
     chip_specific::set_io_voltage_1v8();
-    r.uhs().modify(|rd, w| unsafe { w.bits(rd.bits() & !bit) });
+    // The rail is at 1.8 V from here on, even if the rest of the handshake
+    // fails (the second VOLT_SW can time out). Recording it now keeps a later
+    // init from forcing 3.3 V into a card that already switched.
+    UHS_1V8_ACTIVE.store(true, core::sync::atomic::Ordering::Relaxed);
+    set_uhs_volt(slot, false);
     crate::rom::ets_delay_us(10_000);
     r.clkena()
         .modify(|rd, w| unsafe { w.cclk_enable().bits(rd.cclk_enable().bits() | clk_mask) });
     clock_update_command(slot, true)?;
-    r.uhs().modify(|rd, w| unsafe { w.bits(rd.bits() | bit) });
+    set_uhs_volt(slot, true);
 
     // Second VOLT_SW: back to low-power clock gating.
     let sts = wait_volt_sw(Duration::from_millis(1_000))?;
@@ -152,5 +229,6 @@ pub(super) fn cmd11_voltage_switch(slot: SlotId) -> Result<[u32; 4], Error> {
         .modify(|rd, w| unsafe { w.lp_enable().bits(rd.lp_enable().bits() | clk_mask) });
     clock_update_command(slot, false)?;
 
+    cleanup.disarm();
     Ok([resp0, 0, 0, 0])
 }

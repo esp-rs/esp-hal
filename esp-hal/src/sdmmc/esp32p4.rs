@@ -5,7 +5,8 @@
 //! [`clock_dividers`].
 use super::*;
 
-/// Powers the SD card / SD IO domain from on-chip LDO channel 4 at 3.3 V.
+/// Powers the SD card / SD IO domain from on-chip LDO channel 4, at 3.3 V or
+/// 1.8 V depending on the current UHS state.
 ///
 /// On the ESP32-P4 the dedicated SD IO pins (GPIO39-44) and the card VDD are
 /// supplied by internal LDO channel 4 (analog unit `ext_ldo[4]`), which must
@@ -23,6 +24,21 @@ use super::*;
 pub fn chip_setup() {
     let pmu = crate::peripherals::PMU::regs();
 
+    // Which rail this bring-up targets. `set_io_power(false)` is the only
+    // place that removes the rail, and it clears `UHS_1V8_ACTIVE`; a flag that
+    // is still set therefore means the rail was never cut and the card on it
+    // is still in 1.8 V signalling. Driving 3.3 V into that card would change
+    // its signalling environment without a power cycle.
+    //
+    // This is *not* the card-state detection: a card that was power-cycled by
+    // other means, or an MCU reset (the flag lives in RAM), looks like 1.8 V
+    // is gone and the rail starts at 3.3 V. Recovering UHS after such a reset
+    // is the job of the CMD6-selected mode in `MmcBus::set_bus`.
+    #[cfg(sdmmc_uhs)]
+    let v18 = super::UHS_1V8_ACTIVE.load(core::sync::atomic::Ordering::Relaxed);
+    #[cfg(not(sdmmc_uhs))]
+    let v18 = false;
+
     // Limit inrush current while the output cap charges; keep ripple
     // suppression (voltage detector) enabled.
     pmu.ext_ldo_p1_0p2a_ana().modify(|_, w| {
@@ -30,11 +46,16 @@ pub fn chip_setup() {
         w.ana_0p2a_en_vdet_1().set_bit()
     });
 
-    // Software-controlled, 3.3 V rail, then enable the regulator.
+    // Program the reference first, then enable the regulator, so a 1.8 V
+    // target never passes through the 3.3 V tie.
+    if v18 {
+        set_io_voltage_1v8();
+    } else {
+        set_io_voltage_3v3();
+    }
     pmu.ext_ldo_p1_0p2a().modify(|_, w| {
         w._0p2a_force_tieh_sel_1().set_bit();
         unsafe { w._0p2a_tieh_sel_1().bits(0) };
-        w._0p2a_tieh_1().set_bit();
         w._0p2a_xpd_1().set_bit()
     });
 
@@ -173,6 +194,13 @@ const SDR104_HZ: u32 = 200_000_000;
 /// `module_div` is the smallest divider used, so a slot never runs faster than
 /// the configured module clock.
 ///
+/// Both slots share the first stage. Frequencies at or above `source_hz / 16`
+/// use the first stage directly, so a slot can reprogram it and change the
+/// other slot's idle clock. Frequencies below that use `module_div` plus the
+/// controller's per-slot card divider. A second slot that needs a continuous
+/// clock should therefore stay in the fallback range (e.g. 10 MHz with the
+/// 200 MHz source and `module_div = 2`).
+///
 /// See https://github.com/espressif/esp-idf/blob/f761a647c833a5df9771cf794f1279ae5d41fb72/components/esp_driver_sdmmc/src/sdmmc_host.c#L225-L269.
 pub fn clock_dividers(module: Config, hz: u32) -> (u8, u8) {
     let base = source_hz(module.clock_source);
@@ -302,8 +330,17 @@ pub fn set_io_voltage_3v3() {
 /// signalling latch. With the rail down too the card loses VDD and returns to
 /// 3.3 V.
 ///
-/// `true` re-runs the `chip_setup` bring-up (inrush limit, 3.3 V tie, enable,
-/// settle), so the rail comes back as at boot.
+/// `true` re-runs the `chip_setup` bring-up (inrush limit, enable, settle). A
+/// power cycle always comes back at 3.3 V, because `enabled = false` clears the
+/// 1.8 V state.
+///
+/// This function is not synchronized with the transfer engine; call it only
+/// while no engine operation is in flight (for example before card detection,
+/// or from a board-level card-power sequence).
+///
+/// After re-enabling the rail, run `init_idle` (or otherwise re-identify the
+/// card) before issuing commands: the cached slot clock belongs to the old
+/// power state.
 pub fn set_io_power(enabled: bool) {
     let pmu = crate::peripherals::PMU::regs();
     if enabled {
@@ -311,5 +348,17 @@ pub fn set_io_power(enabled: bool) {
     } else {
         pmu.ext_ldo_p1_0p2a()
             .modify(|_, w| w._0p2a_xpd_1().clear_bit());
+        // The rail is gone and comes back at 3.3 V (`chip_setup` ties it to the
+        // 3.3 V rail), so any card on it lost its 1.8 V state too.
+        #[cfg(sdmmc_uhs)]
+        {
+            super::UHS_1V8_ACTIVE.store(false, core::sync::atomic::Ordering::Relaxed);
+            super::clear_pending_rail_moves();
+            super::invalidate_slots();
+            // Do not touch the SDHOST registers here: `set_io_power(false)` is
+            // called before `SdHostController::new` on some boards, while the
+            // peripheral clock is still gated. The UHS.VOLT bits are synced in
+            // `SdHostController::new` and `init_idle` instead.
+        }
     }
 }

@@ -82,7 +82,7 @@ mod uhs;
 #[cfg(esp32p4)]
 pub use chip_specific::set_io_power;
 #[cfg(sdmmc_uhs)]
-use uhs::{UHS_1V8_ACTIVE, cmd11_voltage_switch};
+use uhs::{UHS_1V8_ACTIVE, cmd11_voltage_switch, set_uhs_volt};
 
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
 mod bounce;
@@ -196,12 +196,25 @@ pub struct SlotConfig {
     /// Write-protect signal polarity (active-high or active-low).
     wp_active_high: bool,
 
-    /// Advertise and perform the UHS-I 1.8 V signalling switch on this slot.
+    /// Advertise and perform the UHS-I 1.8 V signalling switch on card slot 0.
     ///
     /// When set, the slot reports 1.8 V support to the SD stack, and a
     /// `VOLTAGE_SWITCH` (CMD11) moves the SD I/O rail to 1.8 V. Only
     /// meaningful when the board feeds the SD I/O rail from a switchable
-    /// regulator and the module clock is fast enough for SDR50.
+    /// regulator and the controller uses [`ClockSource::SdioPll`]; with the
+    /// default 160 MHz PLL the driver reports the normal 40 MHz ceiling and
+    /// never selects a UHS mode.
+    ///
+    /// Only slot 0 is supported. The rail is shared by the controller, so do
+    /// not enable this while another slot uses 3.3 V signalling on the same
+    /// IO rail.
+    ///
+    /// Warm-reset and card-swap caveats: if the MCU resets while the card
+    /// stays powered, the driver restarts at 3.3 V and relies on the card
+    /// accepting identification at 3.3 V until CMD6 selects a UHS mode again;
+    /// cards that do not must be power-cycled externally. Inserting a 3.3 V
+    /// card while the rail is still at 1.8 V also needs a card-detect or
+    /// power-cycle path, because the driver cannot infer that event.
     #[cfg(sdmmc_uhs)]
     uhs_1v8: bool,
 }
@@ -526,6 +539,48 @@ impl EngineSession {
         Ok(())
     }
 
+    /// Returns whether a deferred 1.8 V rail move is still owed for `slot`.
+    #[cfg(sdmmc_uhs)]
+    fn pending_rail_move(&self, slot: SlotId) -> bool {
+        SETTINGS.with(|s| s.slots[slot.index() as usize].uhs_pending)
+            && !UHS_1V8_ACTIVE.load(Ordering::Relaxed)
+    }
+
+    /// Clears the deferred move once it has been handled (or is unnecessary).
+    #[cfg(sdmmc_uhs)]
+    fn clear_pending_rail_move(&self, slot: SlotId) {
+        SETTINGS.with(|s| s.slots[slot.index() as usize].uhs_pending = false);
+    }
+
+    /// Stops `slot`'s card clock and moves the shared SD IO rail to 1.8 V.
+    ///
+    /// The clock stays gated until `select_and_apply` re-programs it, so the
+    /// rail changes while the card is not being clocked, as in
+    /// `cmd11_voltage_switch`. The caller is responsible for the LDO settle
+    /// delay: async paths yield, blocking paths use a ROM delay.
+    #[cfg(sdmmc_uhs)]
+    fn move_rail_to_1v8(&mut self, slot: SlotId) -> Result<(), Error> {
+        self.disable_card_clock(slot)?;
+        // Match the CMD11 sequence: let the card see the stopped clock before
+        // the rail changes.
+        crate::rom::ets_delay_us(100);
+        chip_specific::set_io_voltage_1v8();
+        // Inert on the P4, but keep the controller's per-slot bit in sync for
+        // parity with CMD11 and for future `sdmmc_uhs` chips.
+        set_uhs_volt(slot, true);
+        Ok(())
+    }
+
+    /// Gates `slot`'s card clock off and commits the clock update.
+    fn disable_card_clock(&mut self, id: SlotId) -> Result<(), Error> {
+        let r = SDHOST::regs();
+        r.clkena().modify(|rd, w| unsafe {
+            w.cclk_enable()
+                .bits(rd.cclk_enable().bits() & !(1 << id.index()))
+        });
+        self.apply_clock_update(id)
+    }
+
     fn program_slot_hw(
         &mut self,
         slot: SlotId,
@@ -538,17 +593,30 @@ impl EngineSession {
         // controller's card divider bypassed -- the arrangement the host->card
         // drive clock edge is calibrated for; the others keep the module clock
         // as configured and divide the rest out in the controller.
+        // Re-apply the 3.3 V ceiling at programming time. `set_slot_bus` does
+        // this when caching the request, but the rail can be powered off (or a
+        // staged move discarded) between that call and the next engine
+        // acquire, leaving a cached UHS frequency behind.
+        #[cfg(sdmmc_uhs)]
+        let hz = if cached.uhs && !UHS_1V8_ACTIVE.load(Ordering::Relaxed) {
+            cached.hz.min(50_000_000)
+        } else {
+            cached.hz
+        };
+        #[cfg(not(sdmmc_uhs))]
+        let hz = cached.hz;
+
         let (first_div, card_div) = cfg_select! {
-            sdmmc_uhs => chip_specific::clock_dividers(module, cached.hz),
+            sdmmc_uhs => chip_specific::clock_dividers(module, hz),
             _ => (
                 module.module_div,
-                freq_to_card_div(module_hz(module.clock_source, module.module_div), cached.hz),
+                freq_to_card_div(module_hz(module.clock_source, module.module_div), hz),
             ),
         };
         self.set_card_clock(slot, first_div, card_div)?;
         #[cfg(sdmmc_delay_phase_num_is_set)]
-        if cached.hz > 25_000_000 {
-            chip_specific::set_input_delay_phase(cached.input_delay_phase, cached.hz);
+        if hz > 25_000_000 {
+            chip_specific::set_input_delay_phase(cached.input_delay_phase, hz);
         }
         Ok(())
     }
@@ -580,10 +648,7 @@ impl EngineSession {
         let slot = id.index();
         let r = SDHOST::regs();
 
-        r.clkena().modify(|rd, w| unsafe {
-            w.cclk_enable().bits(rd.cclk_enable().bits() & !(1 << slot))
-        });
-        self.apply_clock_update(id)?;
+        self.disable_card_clock(id)?;
 
         r.clksrc().modify(|rd, w| unsafe {
             let mut v = rd.clksrc().bits();
@@ -1018,12 +1083,22 @@ impl Settings {
         let mut hz = hz;
         let uhs_at_3v3 = cfg_select! {
             sdmmc_uhs => {
-                self.slots[idx].uhs && hz > 50_000_000 && !UHS_1V8_ACTIVE.load(Ordering::Relaxed)
+                self.slots[idx].uhs
+                    && !self.slots[idx].uhs_pending
+                    && hz > 50_000_000
+                    && !UHS_1V8_ACTIVE.load(Ordering::Relaxed)
             }
             _ => false,
         };
         if uhs_at_3v3 {
             hz = 50_000_000;
+        }
+        // A frequency that does not need the rail clears a stale stage, so a
+        // request lowered before the next engine acquire does not move the
+        // rail anyway.
+        #[cfg(sdmmc_uhs)]
+        if hz <= 50_000_000 {
+            self.slots[idx].uhs_pending = false;
         }
         if hz == 0 || hz > cap {
             return Err(Error::Unsupported);
@@ -1035,6 +1110,34 @@ impl Settings {
     }
 }
 
+/// Drops any staged rail move, e.g. when the IO rail is powered off and the
+/// card is no longer in 1.8 V mode.
+#[cfg(sdmmc_uhs)]
+pub(super) fn clear_pending_rail_moves() {
+    SETTINGS.with(|s| {
+        for slot in &mut s.slots {
+            slot.uhs_pending = false;
+        }
+    });
+}
+
+/// Clears the controller's per-slot 1.8 V bits.
+#[cfg(sdmmc_uhs)]
+pub(super) fn clear_uhs_volt() {
+    uhs::clear_uhs_volt_all();
+}
+
+/// Forces the next engine acquire to re-program every slot, e.g. after the
+/// shared rail was powered off and its cached clock is no longer valid.
+#[cfg(sdmmc_uhs)]
+pub(super) fn invalidate_slots() {
+    SETTINGS.with(|s| {
+        for slot in &mut s.slots {
+            slot.dirty = true;
+        }
+    });
+}
+
 #[derive(Clone, Copy)]
 struct SlotSettings {
     hz: u32,
@@ -1042,6 +1145,11 @@ struct SlotSettings {
     dirty: bool,
     /// Whether this slot opted into UHS-I (raises the clock ceiling).
     uhs: bool,
+    /// A UHS clock was requested while the card is already in 1.8 V signalling;
+    /// the host rail move is deferred to the next engine acquire, where it runs
+    /// under the engine guard (the rail is controller-wide, not per-slot).
+    #[cfg(sdmmc_uhs)]
+    uhs_pending: bool,
     #[cfg(sdmmc_delay_phase_num_is_set)]
     input_delay_phase: DelayPhase,
 }
@@ -1052,6 +1160,8 @@ impl SlotSettings {
         width: BusWidth::Bit1,
         dirty: true,
         uhs: false,
+        #[cfg(sdmmc_uhs)]
+        uhs_pending: false,
         #[cfg(sdmmc_delay_phase_num_is_set)]
         input_delay_phase: DelayPhase::_0,
     };
@@ -1067,12 +1177,38 @@ fn with_engine_try<R>(
     f: impl FnOnce(&mut EngineSession) -> Result<R, Error>,
 ) -> Result<R, BlockingError> {
     let mut session = ENGINE.try_lock().map_err(|_| BlockingError::Busy)?;
+    #[cfg(sdmmc_uhs)]
+    if session.pending_rail_move(slot) {
+        session.move_rail_to_1v8(slot).map_err(BlockingError::Op)?;
+        // Blocking callers cannot yield; asynchronous paths use
+        // `wait_rail_settle` instead.
+        crate::rom::ets_delay_us(10_000);
+        UHS_1V8_ACTIVE.store(true, Ordering::Relaxed);
+    }
+    #[cfg(sdmmc_uhs)]
+    session.clear_pending_rail_move(slot);
     session.select_and_apply(slot).map_err(BlockingError::Op)?;
     f(&mut session).map_err(BlockingError::Op)
 }
 
+#[cfg(sdmmc_uhs)]
+async fn wait_rail_settle() {
+    let deadline = Instant::now() + Duration::from_millis(10);
+    while Instant::now() < deadline {
+        yield_now().await;
+    }
+}
+
 async fn lock_engine(slot: SlotId) -> Result<MutexGuard<'static, RawMutex, EngineSession>, Error> {
     let mut guard = ENGINE.lock().await;
+    #[cfg(sdmmc_uhs)]
+    if guard.pending_rail_move(slot) {
+        guard.move_rail_to_1v8(slot)?;
+        wait_rail_settle().await;
+        UHS_1V8_ACTIVE.store(true, Ordering::Relaxed);
+    }
+    #[cfg(sdmmc_uhs)]
+    guard.clear_pending_rail_move(slot);
     guard.select_and_apply(slot)?;
     Ok(guard)
 }
@@ -1395,7 +1531,23 @@ impl<'d> SdHostController<'d> {
         chip_specific::set_module_clock(config.clock_source, config.module_div);
         this.reset_engine();
 
-        SETTINGS.with(|s| s.module = config);
+        // The SDHOST clock is running now. `set_io_power(false)` may have run
+        // before this point (while the peripheral clock was gated), so sync the
+        // controller's per-slot 1.8 V bit to the rail state here. Inert on the
+        // P4, but keeps the register coherent for parity.
+        #[cfg(sdmmc_uhs)]
+        {
+            clear_uhs_volt();
+            set_uhs_volt(SlotId::_0, UHS_1V8_ACTIVE.load(Ordering::Relaxed));
+        }
+
+        SETTINGS.with(|s| {
+            s.module = config;
+            // Per-slot state is controller-instance state even though the
+            // storage is static: do not let `hz`, `width`, `uhs` or a staged
+            // rail move leak from a previous controller.
+            s.slots = [SlotSettings::INIT; SLOT_COUNT];
+        });
         let r = SDHOST::regs();
         r.tmout().write(|w| unsafe {
             w.response_timeout().bits(0xFF);
@@ -1448,7 +1600,7 @@ impl<'d> SdHostController<'d> {
         SETTINGS.with(|s| {
             s.slots[idx].dirty = true;
             s.slots[idx].uhs = cfg_select! {
-                sdmmc_uhs => config.uhs_1v8,
+                sdmmc_uhs => config.uhs_1v8 && S == 0,
                 _ => false,
             };
             #[cfg(sdmmc_delay_phase_num_is_set)]
@@ -1753,6 +1905,10 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     }
 
     /// Caches bus width and card clock; HW is programmed on the next engine op.
+    ///
+    /// On a UHS-capable slot, a request above 50 MHz is clamped to 50 MHz until
+    /// the 1.8 V rail is active, unless the `sdio` path staged a deferred rail
+    /// move first.
     pub fn set_bus_low_level(&mut self, width: BusWidth, hz: u32) -> Result<(), Error> {
         SETTINGS.with(|s| s.set_slot_bus(slot_id(S), width, hz))
     }
@@ -1784,6 +1940,11 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     ) -> Result<[u32; 4], BlockingError> {
         if !self.is_card_present() {
             return Err(BlockingError::Op(Error::NoCard));
+        }
+        // CMD11 must run through the DesignWare `volt_switch` handshake; a
+        // plain CMD11 leaves the card holding DAT low (see `send_command`).
+        if index == 11 {
+            return Err(BlockingError::Op(Error::Unsupported));
         }
         let slot = slot_id(S);
         with_engine_try(slot, |session| {
@@ -1920,6 +2081,11 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         session: &mut EngineSession,
         cmd: &C,
     ) -> Result<C::Resp<'a>, Error> {
+        // The generic path must never send CMD11: the callers that support it
+        // dispatch to `cmd11_voltage_switch` first.
+        if C::INDEX == 11 {
+            return Err(Error::Unsupported);
+        }
         let slot = slot_id(S);
         let resp_len = match <C::Resp<'a> as sdio::Response>::LEN {
             sdio::ResponseLen::Zero => ResponseLen::None,
@@ -1960,10 +2126,9 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         // path above (`cmd_async` would wait for CDONE forever). See
         // [`cmd11_voltage_switch`] for the full esp-idf port.
         #[cfg(sdmmc_uhs)]
-        if C::INDEX == 11 && self.config.uhs_1v8 {
+        if C::INDEX == 11 && S == 0 && self.config.uhs_1v8 {
             let slot = slot_id(S);
             let words = cmd11_voltage_switch(slot).map_err(MmcError::from)?;
-            UHS_1V8_ACTIVE.store(true, Ordering::Relaxed);
             return Ok(<C::Resp<'a> as sdio::Response>::from_words(&words));
         }
 
@@ -2064,16 +2229,44 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
     async fn init_idle(&mut self, hz: u32) -> Result<(), MmcError> {
         let mut session = ENGINE.lock().await;
         self.validate_pins().map_err(|_| MmcError::Other)?;
-        // Every session starts on the 3.3 V rail; CMD11 moves the bus to 1.8 V
-        // only if the card agrees. This also recovers the rail after a previous
-        // session left it at 1.8 V (e.g. a UHS card was swapped for a legacy
-        // one).
+        // Keep the rail where the previous session left it. A card that was
+        // not power-cycled stays in 1.8 V signalling and does not re-advertise
+        // S18A, so forcing 3.3 V here makes identification impossible.
+        //
+        // A card that lost power comes back in 3.3 V mode: `set_io_power(false)`
+        // clears the rail state when the LDO is cut, and the rail is re-enabled
+        // at 3.3 V. The case this does not cover is a card swapped in while the
+        // rail stays up -- the new card is in 3.3 V mode but the rail is still
+        // at 1.8 V. Boards that wire card-detect can clear the state on insert;
+        // this driver has no other signal.
+        //
+        // One hole remains: the flag lives in RAM, so after an MCU reset it is
+        // false while the card may still be in 1.8 V mode. Identification then
+        // runs at 3.3 V until the CMD6-selected mode brings the rail back.
+        // Covering that needs a power-control API that guarantees a cold card,
+        // or a CMD6 probe.
+        //
+        // With the flag false the rail should already be at 3.3 V (host
+        // creation ties it there); the call is a guard, not a transition.
         #[cfg(sdmmc_uhs)]
-        if self.config.uhs_1v8 {
+        if S == 0 && self.config.uhs_1v8 && !UHS_1V8_ACTIVE.load(Ordering::Relaxed) {
             chip_specific::set_io_voltage_3v3();
-            UHS_1V8_ACTIVE.store(false, Ordering::Relaxed);
+            set_uhs_volt(slot_id(S), false);
         }
         self.set_bus_low_level(BusWidth::Bit1, hz)?;
+        // Normally `hz` is the 400 kHz probe and `set_bus_low_level` has
+        // already cleared any stale stage. Handle the >50 MHz case too, so a
+        // direct `init_idle` caller still gets the rail moved under the guard.
+        #[cfg(sdmmc_uhs)]
+        if session.pending_rail_move(slot_id(S)) {
+            session
+                .move_rail_to_1v8(slot_id(S))
+                .map_err(MmcError::from)?;
+            wait_rail_settle().await;
+            UHS_1V8_ACTIVE.store(true, Ordering::Relaxed);
+        }
+        #[cfg(sdmmc_uhs)]
+        session.clear_pending_rail_move(slot_id(S));
         session.select_and_apply(slot_id(S))?;
         session.send_init_sequence(slot_id(S))?;
         Ok(())
@@ -2091,7 +2284,33 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         if matches!(w, BusWidth::Bit8) && self.data_pins < 8 {
             return Err(MmcError::Unsupported);
         }
-        self.set_bus_low_level(w, hz)?;
+        // `sdio` requests a UHS frequency only after CMD6 selected a UHS mode,
+        // so the card is already in 1.8 V signalling even if the rail is not
+        // (it survived a reset in that mode and does not re-advertise S18A,
+        // which is why CMD11 cannot run again). Stage the rail move for the
+        // next engine acquire: this method is called without the engine guard,
+        // and the rail is a controller-wide resource, so writing it here could
+        // change it under a transfer in flight. Public callers of
+        // `set_bus_low_level` never stage it and keep the 3.3 V clamp.
+        //
+        // UHS-I is slot 0 only, like `supports_1v8`/`supports_frequency`.
+        // Require the same predicate as `supports_1v8`: a slot that cannot
+        // actually switch to 1.8 V must not stage a rail move just because the
+        // requested frequency is above 50 MHz.
+        #[cfg(sdmmc_uhs)]
+        let stage_rail_move = S == 0 && self.supports_1v8() && hz > 50_000_000;
+        #[cfg(sdmmc_uhs)]
+        if stage_rail_move {
+            SETTINGS.with(|s| s.slots[0].uhs_pending = true);
+        }
+        let result = self.set_bus_low_level(w, hz);
+        // If the request is rejected, do not leave a rail move staged for the
+        // next engine acquire.
+        #[cfg(sdmmc_uhs)]
+        if stage_rail_move && result.is_err() {
+            SETTINGS.with(|s| s.slots[0].uhs_pending = false);
+        }
+        result?;
         Ok(())
     }
 
@@ -2129,11 +2348,14 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         // active.
         cfg_select! {
             sdmmc_uhs => {
-                if self.config.uhs_1v8 && S == 0 {
-                    return module_hz(
-                        SETTINGS.with(|s| s.module.clock_source),
-                        SETTINGS.with(|s| s.module.module_div),
-                    );
+                // Report >50 MHz only when the slot can actually complete the
+                // 1.8 V switch. In particular, `uhs_1v8` with the default
+                // `Pll160m` source must not make `sdio` ask for SDR50 while
+                // CMD11 is unavailable.
+                if self.config.uhs_1v8 && S == 0 && self.supports_1v8() {
+                    let (source, div) =
+                        SETTINGS.with(|s| (s.module.clock_source, s.module.module_div));
+                    return module_hz(source, div);
                 }
             }
             _ => {}
@@ -2171,7 +2393,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         #[cfg(sdmmc_delay_phase_num_is_set)]
         {
             let uhs = cfg_select! {
-                sdmmc_uhs => self.config.uhs_1v8 && S == 0,
+                sdmmc_uhs => self.supports_1v8(),
                 _ => false,
             };
             if uhs && hz > 50_000_000 {
