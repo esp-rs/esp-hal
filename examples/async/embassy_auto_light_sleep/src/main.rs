@@ -12,7 +12,14 @@
 //! observe the chip waking from light sleep via the timer (`WakeupSource::Timer`)
 //! or via the BOOT button (`WakeupSource::Gpio`).
 //!
-//! Use the UART port for this example - USB Serial/JTAG will break when the device enters sleep.
+//! The USB Serial/JTAG console keeps working while a USB host is connected.
+//! ESP32-C3, ESP32-H4 and ESP32-S3 then stay out of light sleep, and the other
+//! chips' light sleep draws more current. A debugger session also keeps working
+//! across light sleep, but a debugger connects only while the chip is awake.
+//! Set `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` to `false` to let
+//! light sleep disconnect the console instead. A host that connects after boot
+//! gets the console only while the chip stays awake, for example while
+//! `wake_lock_demo` holds its wake lock.
 
 //% CHIP_FILTER: sleep_driver_supported && sleep_light_sleep
 
@@ -88,6 +95,9 @@ cfg_select! {
     }
     feature = "esp32p4" => {
         use peripherals::GPIO35 as BOOT_GPIO;
+    }
+    feature = "esp32s31" => {
+        use peripherals::GPIO61 as BOOT_GPIO;
     }
     // esp32c3, esp32c6, esp32c61, esp32h2
     _ => {
@@ -172,6 +182,7 @@ async fn main(spawner: Spawner) {
         feature = "esp32c5" => p.GPIO28,
         feature = "esp32h4" => p.GPIO34,
         feature = "esp32p4" => p.GPIO35,
+        feature = "esp32s31" => p.GPIO61,
         // esp32c2, esp32c3, esp32c6, esp32c61, esp32h2
         _ => p.GPIO9,
     };

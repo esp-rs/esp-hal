@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    peripherals::{HP_APM, LP_AON, PMU},
+    peripherals::{HP_APM, PMU},
     rtc_cntl::{
         Rtc,
         rtc::{
@@ -761,10 +761,8 @@ impl RtcSleepConfig {
 
         // like esp-idf pmu_sleep_start()
 
-        // lp_aon_hal_inform_wakeup_type - tells ROM which wakeup stub to run
-        LP_AON::regs()
-            .store8()
-            .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
+        // lp_aon_hal_inform_wakeup_type
+        super::pmu_common::set_sleep_mode(self.deep);
 
         // pmu_ll_hp_set_wakeup_enable
         PMU::regs()
@@ -789,7 +787,10 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl4()
             .write(|w| w.slp_reject_cause_clr().bit(true));
 
+        let usb_serial_jtag = (!self.deep).then(super::usb_serial_jtag::disconnect);
+
         SavedState {
+            usb_serial_jtag,
             hp_root_clk,
             cpu_clk,
             ahb_clk,
@@ -822,6 +823,7 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
+    usb_serial_jtag: Option<super::usb_serial_jtag::Disconnected>,
     hp_root_clk: Option<HpRootClkConfig>,
     cpu_clk: Option<CpuClkConfig>,
     ahb_clk: Option<AhbClkConfig>,
@@ -830,6 +832,9 @@ pub(crate) struct SavedState {
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
+        if let Some(usb_serial_jtag) = self.usb_serial_jtag {
+            usb_serial_jtag.reconnect();
+        }
         ClockTree::with(|clocks| {
             clocks::reconfigure_pll(clocks);
             // AHB_CLK may not exceed 32 MHz, so the dividers change before the root clock.

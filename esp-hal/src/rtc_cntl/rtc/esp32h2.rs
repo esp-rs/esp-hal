@@ -118,6 +118,9 @@ pub enum SocResetReason {
     CorePwrGlitch = 0x17,
 }
 
+pub(crate) const HP_SYSCLK_XTAL: u8 = 0;
+pub(crate) const HP_SYSCLK_PLL: u8 = 1;
+
 bitfield::bitfield! {
     /// Representation of `PMU_HP_{ACTIVE,SLEEP}_DIG_POWER_REG` registers.
     #[derive(Clone, Copy, Default)]
@@ -137,6 +140,8 @@ bitfield::bitfield! {
 
     pub bool, i2c_iso_en   , set_i2c_iso_en   : 26;
     pub bool, i2c_retention, set_i2c_retention: 27;
+    pub bool, xpd_bb_i2c   , set_xpd_bb_i2c   : 28;
+    pub bool, xpd_bbpll_i2c, set_xpd_bbpll_i2c: 29;
     pub bool, xpd_bbpll    , set_xpd_bbpll    : 30;
 }
 

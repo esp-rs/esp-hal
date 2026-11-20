@@ -16,8 +16,9 @@
 //!   more current, but it makes the sleep and the wake slower. Only the ESP32-C3, -C5, -C6, -C61,
 //!   -S3 and -S31 support this. On other chips the constant has no effect.
 //!
-//! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
-//! the output.
+//! While a USB host is connected to USB Serial/JTAG, the ESP32-C3 and ESP32-S3 do not enter light
+//! sleep, so `LIGHT_SLEEP` saves no current there. Use the UART port, or set
+//! `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` to `false`, to measure the saving.
 
 //% CHIP_FILTER: wifi_driver_supported
 

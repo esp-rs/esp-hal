@@ -10,6 +10,36 @@ pub enum PhyPads {
     UsbFs,
 }
 
+impl PhyPads {
+    /// Returns the GPIOs of the D- and D+ pads.
+    pub(crate) fn gpios(self) -> [u8; 2] {
+        let mut gpios = [0; 2];
+        for_each_analog_function! {
+            (USJ_DM, $gpio:ident) => {
+                if self == Self::Usj {
+                    gpios[0] = peripherals::$gpio::NUMBER;
+                }
+            };
+            (USJ_DP, $gpio:ident) => {
+                if self == Self::Usj {
+                    gpios[1] = peripherals::$gpio::NUMBER;
+                }
+            };
+            (USB_FS_DM, $gpio:ident) => {
+                if self == Self::UsbFs {
+                    gpios[0] = peripherals::$gpio::NUMBER;
+                }
+            };
+            (USB_FS_DP, $gpio:ident) => {
+                if self == Self::UsbFs {
+                    gpios[1] = peripherals::$gpio::NUMBER;
+                }
+            };
+        }
+        gpios
+    }
+}
+
 /// Returns the pad group of `gpio`, if the pin is a D+ or D- pin of an internal USB PHY.
 fn pads_of(gpio: u8) -> Option<PhyPads> {
     for_each_analog_function! {

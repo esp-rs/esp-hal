@@ -475,6 +475,12 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.keeps_usb_serial_jtag") => {
+        true
+    };
+    ("sleep.keeps_cpu_powered_for_usb_serial_jtag") => {
+        true
+    };
     ("sleep.idle_frequency_scaling") => {
         true
     };
