@@ -15,6 +15,9 @@
 //! - `CPU_POWERDOWN` lets light sleep power the CPU down, and retains its state in RAM. This saves
 //!   more current, but it makes the sleep and the wake slower. Only the ESP32-C3, -C5, -C6, -C61,
 //!   -S3 and -S31 support this. On other chips the constant has no effect.
+//! - `MAC_BB_POWERDOWN` lets light sleep power the Wi-Fi MAC and baseband down, and retains their
+//!   state in RAM. Only the ESP32-C3, -C5, -C6, -C61, -S3 and -S31 support this. On other chips the
+//!   constant has no effect.
 //!
 //! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
 //! the output.
@@ -102,6 +105,9 @@ const POWER_SAVE: PowerSaveMode = PowerSaveMode::Minimum;
 const LIGHT_SLEEP: bool = true;
 /// Whether light sleep powers the CPU down. Requires [`LIGHT_SLEEP`] to be enabled.
 const CPU_POWERDOWN: bool = true;
+/// Whether light sleep powers the Wi-Fi MAC and baseband down. Requires [`LIGHT_SLEEP`] to be
+/// enabled.
+const MAC_BB_POWERDOWN: bool = true;
 
 // An example reads no chip capability, so this condition lists the chips that support CPU
 // power-down.
@@ -153,20 +159,55 @@ cfg_select! {
     }
 }
 
+cfg_select! {
+    any(
+        feature = "esp32c3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32s3",
+        feature = "esp32s31",
+    ) => {
+        use esp_radio::wifi::{RetentionStorage, install_retention_memory};
+
+        #[ram(reclaimed, unstable(zeroed))]
+        static WIFI_RETENTION_MEMORY: RetentionStorage = RetentionStorage::new();
+
+        /// The reclaimed RAM that MAC and baseband power-down takes from the heap. The 16 bytes
+        /// cover its alignment.
+        const MAC_BB_POWERDOWN_RAM: usize = size_of::<RetentionStorage>() + 16;
+
+        fn enable_mac_bb_powerdown() {
+            install_retention_memory(WIFI_RETENTION_MEMORY.take()).unwrap();
+        }
+    }
+    _ => {
+        const MAC_BB_POWERDOWN_RAM: usize = 0;
+
+        fn enable_mac_bb_powerdown() {}
+    }
+}
+
+/// The reclaimed RAM that the retention memories take from the heap.
+const RETENTION_RAM: usize = CPU_POWERDOWN_RAM + MAC_BB_POWERDOWN_RAM;
+
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE - CPU_POWERDOWN_RAM);
-    esp_alloc::heap_allocator!(size: 36 * 1024 + CPU_POWERDOWN_RAM);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE - RETENTION_RAM);
+    esp_alloc::heap_allocator!(size: 36 * 1024 + RETENTION_RAM);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     if LIGHT_SLEEP {
         let mut sleep = esp_rtos::sleep::configure(peripherals.LPWR);
         if CPU_POWERDOWN {
             enable_cpu_powerdown(&mut sleep);
+        }
+        if MAC_BB_POWERDOWN {
+            enable_mac_bb_powerdown();
         }
         esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
     } else {
