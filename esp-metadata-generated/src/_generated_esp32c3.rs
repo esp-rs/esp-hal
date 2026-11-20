@@ -205,6 +205,9 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("i2c_slave.needs_trans_start_after_stop") => {
+        false
+    };
     ("spi_master.version") => {
         3
     };

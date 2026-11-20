@@ -513,7 +513,12 @@ driver_configs![
         I2cSlaveProperties {
             driver: i2c_slave,
             name: "I2C slave",
-            properties: {}
+            properties: {
+                /// Whether the controller NACKs the address of each request after the first one,
+                /// unless software sets `TRANS_START` while the bus is idle.
+                #[serde(default)]
+                needs_trans_start_after_stop: bool,
+            }
         },
         I3cMasterProperties {
             driver: i3c_master,

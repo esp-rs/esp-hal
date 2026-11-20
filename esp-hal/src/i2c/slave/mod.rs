@@ -15,6 +15,13 @@
 //! Operations reset the controller before returning [`Error::Timeout`] or
 //! [`Error::ArbitrationLost`]. This releases the slave's outputs and discards pending requests.
 //! The master must retry these requests.
+#![cfg_attr(
+    i2c_slave_needs_trans_start_after_stop,
+    doc = "",
+    doc = "## Interrupts",
+    doc = "",
+    doc = "The controller accepts a request only if software prepares it after the preceding STOP. The driver does this in the I2C interrupt handler, in [`Blocking`] and [`Async`] modes, at the highest interrupt priority. A request that starts before the handler runs, for example while interrupts are disabled, is NACKed."
+)]
 
 use core::{
     future::Future,
@@ -225,6 +232,10 @@ impl<'d> I2cSlave<'d, Blocking> {
             scl_pin,
         };
 
+        #[cfg(i2c_slave_needs_trans_start_after_stop)]
+        slave
+            .i2c
+            .set_interrupt_handler(slave.driver().info.async_handler);
         slave.apply_config(&config)?;
         Ok(slave)
     }
@@ -235,6 +246,8 @@ impl<'d> I2cSlave<'d, Blocking> {
     pub fn into_async(self) -> I2cSlave<'d, Async> {
         self.i2c
             .set_interrupt_handler(self.driver().info.async_handler);
+        #[cfg(i2c_slave_needs_trans_start_after_stop)]
+        Driver::watch_for_stop(self.driver().regs());
 
         I2cSlave {
             i2c: self.i2c,
@@ -252,6 +265,8 @@ impl<'d> I2cSlave<'d, Async> {
     ///
     /// Pending requests are preserved.
     pub fn into_blocking(self) -> I2cSlave<'d, Blocking> {
+        // The blocking driver also needs the STOP interrupt.
+        #[cfg(not(i2c_slave_needs_trans_start_after_stop))]
         self.i2c.disable_peri_interrupt();
 
         I2cSlave {
@@ -532,12 +547,21 @@ impl Future for I2cSlaveFuture<'_> {
 impl Drop for I2cSlaveFuture<'_> {
     fn drop(&mut self) {
         self.regs.int_ena().write(|w| unsafe { w.bits(0) });
+        #[cfg(i2c_slave_needs_trans_start_after_stop)]
+        Driver::watch_for_stop(self.regs);
     }
 }
 
 #[ram]
 fn async_handler(info: &Info, state: &State) {
-    info.regs().int_ena().write(|w| unsafe { w.bits(0) });
+    let regs = info.regs();
+    #[cfg(i2c_slave_needs_trans_start_after_stop)]
+    if regs.int_raw().read().trans_complete().bit_is_set() {
+        Driver::accept_next_request(regs);
+    }
+    regs.int_ena().write(|w| unsafe { w.bits(0) });
+    #[cfg(i2c_slave_needs_trans_start_after_stop)]
+    Driver::watch_for_stop(regs);
     state.waker.wake();
 }
 
@@ -754,6 +778,8 @@ impl Driver<'_> {
         regs.scl_stretch_conf()
             .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
         self.update_registers();
+        #[cfg(i2c_slave_needs_trans_start_after_stop)]
+        Self::watch_for_stop(regs);
 
         Ok(())
     }
@@ -827,6 +853,29 @@ impl Driver<'_> {
             self.recover();
         } else {
             self.reset_tx_fifo();
+            #[cfg(i2c_slave_needs_trans_start_after_stop)]
+            Self::accept_next_request(self.regs());
+        }
+    }
+
+    // After a reset the controller accepts one request. It accepts each later request only if
+    // `TRANS_START` is set while the bus is idle, before the request's START. Otherwise it NACKs
+    // the address. `TRANS_START` during a transaction does not carry over to the next one.
+    // See <https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/esp_driver_i2c/i2c_slave.c#L190-L197>.
+    #[cfg(i2c_slave_needs_trans_start_after_stop)]
+    fn accept_next_request(regs: &RegisterBlock) {
+        if regs.sr().read().bus_busy().bit_is_clear() {
+            regs.ctr().modify(|_, w| w.trans_start().set_bit());
+        }
+    }
+
+    // The interrupt handler accepts the next request at STOP, before the master can send the
+    // next START. A set STOP flag keeps the interrupt pending, so the interrupt stays disabled
+    // until the driver clears the flag.
+    #[cfg(i2c_slave_needs_trans_start_after_stop)]
+    fn watch_for_stop(regs: &RegisterBlock) {
+        if regs.int_raw().read().trans_complete().bit_is_clear() {
+            regs.int_ena().modify(|_, w| w.trans_complete().set_bit());
         }
     }
 
@@ -845,6 +894,8 @@ impl Driver<'_> {
             w.trans_complete().bit(ints.trans_complete().bit());
             w.det_start().bit(ints.det_start().bit())
         });
+        #[cfg(i2c_slave_needs_trans_start_after_stop)]
+        Self::watch_for_stop(regs);
         ints
     }
 
@@ -864,6 +915,8 @@ impl Driver<'_> {
             ints = self.take_receive_events(&mut boundary);
             status = regs.sr().read();
         }
+        #[cfg(i2c_slave_needs_trans_start_after_stop)]
+        Self::accept_next_request(regs);
 
         let fifo_overflow = ints.rxfifo_ovf().bit_is_set();
         let stretched = ints.slave_stretch().bit_is_set();
@@ -955,6 +1008,8 @@ impl Driver<'_> {
             w.bits(0x3fff);
             w.det_start().clear_bit_by_one()
         });
+        #[cfg(i2c_slave_needs_trans_start_after_stop)]
+        Self::watch_for_stop(regs);
         self.release_stretch();
     }
 
@@ -1021,7 +1076,12 @@ for_each_i2c_master!(
                 fn parts(&self) -> (&'static Info, &'static State) {
                     // `#[ram]` names the section after the function, and the linker keeps or
                     // drops a section whole, so each instance needs a handler with a unique name.
-                    #[handler]
+                    // The STOP handler must run before the master can send the next START.
+                    #[cfg_attr(
+                        i2c_slave_needs_trans_start_after_stop,
+                        handler(priority = crate::interrupt::Priority::max())
+                    )]
+                    #[cfg_attr(not(i2c_slave_needs_trans_start_after_stop), handler)]
                     #[ram]
                     pub(super) fn [<i2c $id _irq_handler>]() {
                         async_handler(&PERIPHERAL, &STATE);
