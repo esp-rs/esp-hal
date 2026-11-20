@@ -267,22 +267,20 @@ impl SchedulerState {
         }
     }
 
-    fn run_scheduler(&mut self, task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext)) {
+    /// Selects the next task of the current CPU.
+    ///
+    /// The scheduler runs on the switch stack of the CPU. `current_sp` is the stack pointer of the
+    /// interrupted context.
+    fn run_scheduler(
+        &mut self,
+        current_sp: u32,
+        task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext),
+    ) {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_begin(TraceEvents::RunSchedule as u32);
 
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
-
-        let current_sp: u32;
-        cfg_select! {
-            xtensa => unsafe {
-                core::arch::asm!("mov {0}, sp", out(reg) current_sp);
-            },
-            _ => unsafe {
-                core::arch::asm!("mv {0}, sp", out(reg) current_sp);
-            },
-        }
 
         if !self.per_cpu[cpu as usize].to_delete.is_empty() {
             self.delete_marked_tasks(cpu, current_sp as usize);
@@ -344,9 +342,9 @@ impl SchedulerState {
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::task_exec_end(); // FIXME: rtos-trace should take the task ID for multi-core
 
-                // TODO: the SMP scheduler relies on at least the context saving to happen within
-                // the scheduler's critical section. We can't run the scheduler on the other core
-                // while it might try to restore a partially saved context.
+                // The other CPU can take this task as soon as the scheduler releases its lock. The
+                // context of the task is complete before that, and this CPU does not use the stack
+                // of the task after `task_switch`: the scheduler runs on the switch stack.
                 #[cfg(multi_core)]
                 let current_ref = unsafe { current.as_ref() };
                 #[cfg(multi_core)]
@@ -433,18 +431,19 @@ impl SchedulerState {
         rtos_trace::trace::marker_end(TraceEvents::RunSchedule as u32);
     }
 
-    pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
-        self.run_scheduler(|current_context, next_context| {
+    /// Runs the scheduler, and calls `task_switch` with the context of the current task (null if
+    /// the task deleted itself) and the context of the next task, if they differ.
+    pub(crate) fn switch_task(
+        &mut self,
+        current_sp: u32,
+        task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext),
+    ) {
+        self.run_scheduler(current_sp, |current_context, next_context| {
             trace!(
                 "Task switch: {:x} -> {:x}",
                 current_context as usize, next_context as usize
             );
-            task::task_switch(
-                current_context,
-                next_context,
-                #[cfg(xtensa)]
-                trap_frame,
-            )
+            task_switch(current_context, next_context)
         });
     }
 

@@ -21,6 +21,24 @@
 //! In various places call0 are used as long jump: `j.l` syntax is not supported
 //! and `call0` can always be expanded to `mov a0,label; call a0`. Care must be
 //! taken since A0 is overwritten.
+//!
+//! ## Level 1 interrupt exit
+//!
+//! After `__level_1_interrupt` returns, the level 1 interrupt handler calls
+//! `__level_1_interrupt_exit` with `call0`, then restores the context that `a1`
+//! points to. An RTOS can define this symbol to switch tasks after all level 1
+//! handlers ran. Exceptions do not call it. The default returns at once.
+//!
+//! On entry, `a1` points to the [`Context`] of the interrupted code, on the
+//! interrupted stack. `PS` has `INTLEVEL` 1, `EXCM` clear, and `WOE` and `UM`
+//! set. The function:
+//!
+//! - must keep `a0`, and return with `ret`,
+//! - can change `a2` to `a15`, because the handler restores them from the [`Context`],
+//! - must return from each windowed call that it makes before it returns,
+//! - returns with `a1` pointing to the [`Context`] to restore. Interrupts above level 3 can occur
+//!   while the handler restores it, and save their own [`Context`] below `a1`, so the memory below
+//!   `a1` must be free stack.
 
 mod asm;
 mod context;
