@@ -3314,7 +3314,7 @@ impl WifiController<'_> {
     /// the controller is stopped, unless an ESP-NOW or sniffer instance is alive. In that case,
     /// Wi-Fi keeps running.
     ///
-    /// Changing the mode restarts Wi-Fi, which briefly pauses ESP-NOW traffic.
+    /// Changing the mode restarts Wi-Fi, which briefly pauses ESP-NOW and sniffer traffic.
     ///
     /// ## Example
     ///
@@ -3564,7 +3564,12 @@ ignored."
         set_station_state(WifiStationState::Starting);
 
         // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
-        esp_wifi_result!(unsafe { esp_wifi_start() })
+        esp_wifi_result!(unsafe { esp_wifi_start() })?;
+
+        #[cfg(feature = "sniffer")]
+        sniffer::restore_promiscuous_mode();
+
+        Ok(())
     }
 
     fn stop_impl() -> Result<(), WifiError> {
