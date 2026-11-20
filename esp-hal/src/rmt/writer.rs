@@ -1,60 +1,46 @@
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
 
-use super::{DynChannelAccess, Error, PulseCode, Tx};
+use super::{DynChannelAccess, PulseCode, Tx, TxError};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(super) enum WriterState {
     // There's still data left to write
     Active,
-
-    // An error occurred, and either
-    // - no data was written (and transmission was never started), or
-    // - some data was written and the last code written is an end marker, such that transmission
-    //   will eventually stop
-    Error(Error),
-
-    // Completed without errors
+    // All data and the final end marker are in channel RAM
     Done,
-}
-
-impl WriterState {
-    pub(super) fn is_ok(self) -> bool {
-        !matches!(self, Self::Error(_))
-    }
-
-    pub(super) fn to_result(self) -> Result<(), Error> {
-        match self {
-            // tx ended but writer wasn't done yet
-            Self::Active => Err(Error::TransmissionError),
-            Self::Error(e) => Err(e),
-            Self::Done => Ok(()),
-        }
-    }
 }
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(super) struct RmtWriter {
-    // The position in channel RAM to continue writing at; must be either
-    // 0 or half the available RAM size if there's further data.
-    // The position may be invalid if there's no data left.
+    // Position of the driver's end marker in channel RAM. The next code goes here.
     offset: u16,
 
-    written: usize,
-
-    last_code: PulseCode,
+    // Once `Done`: the hardware read position after a stop at the code that ends the data.
+    stop_offset: u16,
 
     state: WriterState,
+}
+
+// Copies `src` into the channel RAM ring, starting at `start` and wrapping at `memsize`.
+#[inline(always)]
+unsafe fn copy_to_ring(ram: *mut PulseCode, memsize: usize, start: usize, src: &[PulseCode]) {
+    let first = (memsize - start).min(src.len());
+    for (i, code) in src[..first].iter().enumerate() {
+        unsafe { ram.add(start + i).write_volatile(*code) };
+    }
+    for (i, code) in src[first..].iter().enumerate() {
+        unsafe { ram.add(i).write_volatile(*code) };
+    }
 }
 
 impl RmtWriter {
     pub(super) fn new() -> Self {
         Self {
             offset: 0,
-            written: 0,
-            last_code: PulseCode::default(),
+            stop_offset: 0,
             state: WriterState::Active,
         }
     }
@@ -64,10 +50,15 @@ impl RmtWriter {
         self.state
     }
 
-    // Copy from `data` to the hardware buffer, advancing the `data` slice accordingly.
+    // Copies codes from `data` to the channel RAM and advances `data`.
     //
-    // If `initial` is set, fill the entire buffer. Otherwise, append half the buffer's length from
-    // `data`.
+    // An end marker always follows the last written code. If `initial` is set, this fills the
+    // RAM except for that end marker. Otherwise, it appends half the RAM. The first new code
+    // replaces the old end marker, and it is written last: the hardware reads either the old end
+    // marker and stops, or the new code and continues. So a late call ends the transmission
+    // cleanly instead of sending old RAM contents.
+    //
+    // The transmission ends at the first code with a zero length, so nothing after it is copied.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub(super) fn write(
         &mut self,
@@ -81,73 +72,53 @@ impl RmtWriter {
 
         debug_assert!(!initial || self.offset == 0);
 
-        let ram_start = raw.channel_ram_start();
+        let ram = raw.channel_ram_start();
         let memsize = raw.memsize().codes();
-        let ram_end = unsafe { ram_start.add(memsize) };
 
-        let max_count = if initial { memsize } else { memsize / 2 };
-        let count = data.len().min(max_count);
+        let max_count = if initial { memsize - 1 } else { memsize / 2 };
+        let mut count = data.len().min(max_count);
+        let end = data[..count].iter().position(|code| code.is_end_marker());
+        if let Some(index) = end {
+            count = index + 1;
+        }
 
-        let mut ram_ptr = unsafe { ram_start.add(self.offset as usize) };
-
-        let mut data_ptr = data.as_ptr();
-        let data_end = unsafe { data_ptr.add(count) };
-
-        let mut last_code = self.last_code;
-        while data_ptr < data_end {
-            // SAFETY: The iteration `count` is smaller than both `max_count` and `data.len()` such
-            // that incrementing both pointers cannot advance them beyond their allocation's end.
+        let offset = self.offset as usize;
+        if count > 0 {
             unsafe {
-                last_code = data_ptr.read();
-                ram_ptr.write_volatile(last_code);
-                ram_ptr = ram_ptr.add(1);
-                data_ptr = data_ptr.add(1);
+                copy_to_ring(ram, memsize, (offset + 1) % memsize, &data[1..count]);
+                ram.add((offset + count) % memsize)
+                    .write_volatile(PulseCode::end_marker());
+                ram.add(offset).write_volatile(data[0]);
             }
         }
 
-        self.last_code = last_code;
-        self.written += count;
-
-        // If the input data was not exhausted, update offset as
-        //
-        // | initial | offset      | max_count   | new offset  |
-        // | ------- + ----------- + ----------- + ----------- |
-        // | true    | 0           | memsize     | 0           |
-        // | false   | 0           | memsize / 2 | memsize / 2 |
-        // | false   | memsize / 2 | memsize / 2 | 0           |
-        //
-        // Otherwise, the new position is invalid but the new slice is empty and we won't use the
-        // offset again. In either case, the unsigned subtraction will not underflow.
-        self.offset = memsize as u16 - max_count as u16 - self.offset;
+        let new_offset = (offset + count) % memsize;
+        self.offset = new_offset as u16;
 
         // The panic can never trigger since count <= data.len()!
         data.split_off(..count).unwrap();
-        if data.is_empty() {
-            self.state = if self.written == 0 {
-                // data was empty
-                WriterState::Error(Error::InvalidArgument)
-            } else if last_code.is_end_marker() {
-                // Do not check for end markers in the inner loop above since this would
-                // substantially increase the instruction count there. Instead, only check the last
-                // code to report on error.
-                WriterState::Done
-            } else {
-                // Write an extra end marker to prevent looping forever with wrapping tx.
-                if ram_ptr < ram_end {
-                    unsafe { ram_ptr.write_volatile(PulseCode::end_marker()) };
-                    WriterState::Error(Error::EndMarkerMissing)
-                } else {
-                    // The buffer is full, and we can't easily write an end marker. (Short of
-                    // overwriting some other code, which might be ok since hitting this error case
-                    // always indicates a bug in user code.)
-                    // Thus, remain in Active state. On the next Event::Threshold, this function
-                    // will be called again, with data already exhausted, and hit the other arm of
-                    // this conditional.
-                    WriterState::Active
-                }
-            };
-        }
 
-        debug_assert!(self.offset == 0 || self.offset as usize == memsize / 2);
+        if end.is_some() || data.is_empty() {
+            self.state = WriterState::Done;
+
+            // The hardware stops at the last copied code if it ends the data, otherwise at the
+            // driver's end marker. After the stop, its read position is one code further.
+            let stop = if end.is_some() {
+                (new_offset + memsize - 1) % memsize
+            } else {
+                new_offset
+            };
+            self.stop_offset = ((stop + 1) % memsize) as u16;
+        }
+    }
+
+    // Checks, after the end of the transmission, that the hardware stopped at the end of the
+    // data and not at an earlier end marker because a refill came too late.
+    pub(super) fn finish(&self, raw: DynChannelAccess<Tx>) -> Result<(), TxError> {
+        if self.state == WriterState::Done && raw.hw_offset() == self.stop_offset as usize {
+            Ok(())
+        } else {
+            Err(TxError::Underrun)
+        }
     }
 }

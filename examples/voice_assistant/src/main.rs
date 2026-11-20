@@ -199,7 +199,7 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(touch::run(i2c).unwrap());
 
-    let mut led = Led::new(peripherals.RMT, peripherals.GPIO37);
+    let mut led = Led::new(peripherals.RMT, peripherals.RMT_CH0, peripherals.GPIO37);
     led.set(Color::OFF).await;
 
     assistant(led).await

@@ -11,24 +11,22 @@
 #![no_main]
 
 use esp_hal::{
-    Blocking,
     delay::Delay,
-    gpio::{AnyPin, Level, interconnect::PeripheralInput},
+    gpio::{AnyPin, Level},
     peripherals::{RMT, SDM_CH0},
-    rmt::{CHANNEL_RAM_SIZE, Channel, PulseCode, Rmt, Rx, RxChannelConfig, RxChannelCreator},
+    rmt::{AnyRmtRxChannel, CHANNEL_RAM_SIZE, PulseCode, Rmt, RmtConfig, RxConfig, RxError},
     sdm::{Channel as SdmChannel, ChannelConfig},
-    time::Rate,
+    time::{Duration, Instant, Rate},
 };
 use hil_test as _;
 
-// Configure a 1 MHz RMT clock on every supported chip.
-const RMT_DIVIDER: u8 = if cfg!(any(esp32h2, esp32h4)) { 32 } else { 80 };
-const RMT_FREQUENCY: Rate = Rate::from_mhz(RMT_DIVIDER as u32);
+// A 1 MHz RMT tick on every supported chip.
+const RMT_TICK_RATE: Rate = Rate::from_mhz(1);
 
 const SDM_FREQUENCY: Rate = Rate::from_khz(500);
 const SDM_WARM_UP_US: u32 = 1_000;
 const SAMPLE_TIME_US: u32 = 200;
-const RMT_IDLE_THRESHOLD: u16 = 100;
+const RMT_IDLE_NS: u32 = 100_000;
 const RX_LEN: usize = CHANNEL_RAM_SIZE;
 const DEBUG_WAVE_MAX_CHARS: usize = 200;
 const DUTY_MIN: u8 = 10;
@@ -40,16 +38,16 @@ const DUTY_RATIO_TOLERANCE_PER_MILLE: u32 = 20;
 
 cfg_select! {
     any(esp32, esp32s3, esp32s31, esp32p4) => {
-        macro_rules! rx_channel_creator {
-            ($rmt:expr) => {
-                $rmt.channel4
+        macro_rules! rx_channel {
+            ($peripherals:expr) => {
+                $peripherals.RMT_CH4
             };
         }
     }
     _ => {
-        macro_rules! rx_channel_creator {
-            ($rmt:expr) => {
-                $rmt.channel2
+        macro_rules! rx_channel {
+            ($peripherals:expr) => {
+                $peripherals.RMT_CH2
             };
         }
     }
@@ -58,6 +56,7 @@ cfg_select! {
 struct Context {
     sdm_ch0: SDM_CH0<'static>,
     rmt: RMT<'static>,
+    rmt_rx: AnyRmtRxChannel<'static>,
     sdm_pin: AnyPin<'static>,
     rmt_pin: AnyPin<'static>,
 }
@@ -150,20 +149,6 @@ impl Measurement {
     }
 }
 
-fn configure_rx_channel<'a>(
-    rmt: Rmt<'a, Blocking>,
-    pin: impl PeripheralInput<'a>,
-) -> Channel<'a, Blocking, Rx> {
-    rx_channel_creator!(rmt)
-        .configure_rx(
-            &RxChannelConfig::default()
-                .with_clk_divider(RMT_DIVIDER)
-                .with_idle_threshold(RMT_IDLE_THRESHOLD),
-        )
-        .unwrap()
-        .with_pin(pin)
-}
-
 fn high_ratio_per_mille(data: &[PulseCode], count: usize) -> u32 {
     let mut levels = [(Level::Low, 0_u16); 2 * RX_LEN];
     let mut len = 0;
@@ -215,7 +200,7 @@ fn expected_ratio_per_mille(duty: u8) -> u32 {
     (u32::from(duty) * 1_000 + 128) / 256
 }
 
-fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
+async fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
     let config = ChannelConfig::new()
         .with_frequency(SDM_FREQUENCY)
         .unwrap()
@@ -224,21 +209,45 @@ fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
 
     Delay::new().delay_micros(SDM_WARM_UP_US);
 
-    let rmt = Rmt::new(ctx.rmt.reborrow(), RMT_FREQUENCY).unwrap();
-    let rx_channel = configure_rx_channel(rmt, ctx.rmt_pin.reborrow());
+    let rmt = Rmt::new(ctx.rmt.reborrow(), RmtConfig::default())
+        .unwrap()
+        .into_async();
+    let mut rx_channel = rmt
+        .async_rx_channel(
+            ctx.rmt_rx.reborrow(),
+            RxConfig::default()
+                .with_tick_rate(RMT_TICK_RATE)
+                .with_idle_ns(RMT_IDLE_NS),
+        )
+        .unwrap()
+        .with_pin(ctx.rmt_pin.reborrow());
     let mut rx_data = [PulseCode::end_marker(); RX_LEN];
-    let rx_transaction = rx_channel.receive(&mut rx_data).unwrap();
 
-    Delay::new().delay_micros(SAMPLE_TIME_US);
+    let (rx_result, ()) =
+        embassy_futures::join::join(rx_channel.receive_async(&mut rx_data), async {
+            // Busy-wait instead of a timer: without RX wrap (ESP32, ESP32-S2), the frame must fit
+            // in the channel RAM, and a late timer wake-up lets it overflow.
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(SAMPLE_TIME_US as u64) {
+                embassy_futures::yield_now().await;
+            }
 
-    // send idle signal so that RMT will stop recording pulses
-    channel.set_duty(0);
-    let (count, _rx_channel) = rx_transaction.wait().unwrap();
+            // Send an idle signal, so that the RMT stops recording pulses.
+            channel.set_duty(0);
+        })
+        .await;
+
+    // A longer capture fills the buffer, which is enough for the measurement.
+    let count = match rx_result {
+        Ok(count) => count,
+        Err(RxError::BufferTooSmall) => RX_LEN,
+        Err(e) => panic!("RMT receive error {:?}", e),
+    };
 
     Measurement::new(&rx_data, count)
 }
 
-#[embedded_test::tests(default_timeout = 3)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use hil_test::assert;
 
@@ -252,17 +261,18 @@ mod tests {
         Context {
             sdm_ch0: peripherals.SDM_CH0,
             rmt: peripherals.RMT,
+            rmt_rx: rx_channel!(peripherals).into(),
             sdm_pin: AnyPin::from(sdm_pin),
             rmt_pin: AnyPin::from(rmt_pin),
         }
     }
 
     #[test]
-    fn duties_have_expected_high_ratios(mut ctx: Context) {
+    async fn duties_have_expected_high_ratios(mut ctx: Context) {
         let mut duty = DUTY_MIN;
 
         loop {
-            let measurement = measure_high_ratio(&mut ctx, duty);
+            let measurement = measure_high_ratio(&mut ctx, duty).await;
             let expected = expected_ratio_per_mille(duty);
             let error = measurement.ratio.abs_diff(expected);
             let pulses = measurement.valid_pulses();
@@ -288,13 +298,13 @@ mod tests {
     }
 
     #[test]
-    fn higher_duties_have_higher_high_ratios(mut ctx: Context) {
+    async fn higher_duties_have_higher_high_ratios(mut ctx: Context) {
         let mut previous_duty = DUTY_MIN;
-        let mut previous = measure_high_ratio(&mut ctx, previous_duty);
+        let mut previous = measure_high_ratio(&mut ctx, previous_duty).await;
         let mut duty = previous_duty.saturating_add(DUTY_STEP).min(DUTY_MAX);
 
         while duty != previous_duty {
-            let current = measure_high_ratio(&mut ctx, duty);
+            let current = measure_high_ratio(&mut ctx, duty).await;
             let previous_pulses = previous.valid_pulses();
             let current_pulses = current.valid_pulses();
 

@@ -3,14 +3,13 @@
 use esp_hal::{
     Async,
     gpio::Level,
-    peripherals::{GPIO37, RMT},
-    rmt::{Channel, PulseCode, Rmt, Tx, TxChannelConfig, TxChannelCreator},
-    time::Rate,
+    peripherals::{GPIO37, RMT, RMT_CH0},
+    rmt::{PulseCode, Rmt, RmtConfig, TxChannel, TxConfig},
 };
+use static_cell::StaticCell;
 
-/// The RMT clock. One tick is 12.5 ns.
-const RMT_CLOCK_MHZ: u32 = 80;
 /// The pulses of a 0 and a 1 bit: 0.4 µs high and 0.85 µs low, or 0.8 µs high and 0.45 µs low.
+/// One tick of the default 80 MHz RMT clock is 12.5 ns.
 const ZERO: PulseCode = PulseCode::new(Level::High, 32, Level::Low, 68);
 const ONE: PulseCode = PulseCode::new(Level::High, 64, Level::Low, 36);
 
@@ -37,34 +36,32 @@ impl Color {
 }
 
 pub struct Led {
-    channel: Channel<'static, Async, Tx>,
+    channel: TxChannel<'static, Async>,
 }
 
 impl Led {
-    pub fn new(rmt: RMT<'static>, pin: GPIO37<'static>) -> Self {
-        let rmt = Rmt::new(rmt, Rate::from_mhz(RMT_CLOCK_MHZ))
+    pub fn new(rmt: RMT<'static>, channel: RMT_CH0<'static>, pin: GPIO37<'static>) -> Self {
+        static RMT: StaticCell<Rmt<'static, Async>> = StaticCell::new();
+        let rmt = RMT.init(Rmt::new(rmt, RmtConfig::default()).unwrap().into_async());
+        let channel = rmt
+            .async_tx_channel(channel, TxConfig::default())
             .unwrap()
-            .into_async();
-        let config = TxChannelConfig::default()
-            .with_clk_divider(1)
-            .with_idle_output_level(Level::Low)
-            .with_idle_output(true);
-        let channel = rmt.channel0.configure_tx(&config).unwrap().with_pin(pin);
+            .with_pin(pin);
         Self { channel }
     }
 
     /// Sends the color: 24 bits in green, red, blue order, most significant bit first.
     pub async fn set(&mut self, color: Color) {
         let bits = u32::from_be_bytes([0, color.green, color.red, color.blue]);
-        let mut pulses = [PulseCode::end_marker(); 25];
-        for (index, pulse) in pulses[..24].iter_mut().enumerate() {
+        let mut pulses = [ZERO; 24];
+        for (index, pulse) in pulses.iter_mut().enumerate() {
             *pulse = if bits & (1 << (23 - index)) != 0 {
                 ONE
             } else {
                 ZERO
             };
         }
-        if let Err(error) = self.channel.transmit(&pulses).await {
+        if let Err(error) = self.channel.transmit_async(&pulses).await {
             log::error!("Failed to set the LED: {error:?}");
         }
     }
