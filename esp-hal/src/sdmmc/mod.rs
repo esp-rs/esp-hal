@@ -2128,7 +2128,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         #[cfg(sdmmc_uhs)]
         if C::INDEX == 11 && S == 0 && self.config.uhs_1v8 {
             let slot = slot_id(S);
-            let words = cmd11_voltage_switch(slot).map_err(MmcError::from)?;
+            let words = cmd11_voltage_switch(slot).await.map_err(MmcError::from)?;
             return Ok(<C::Resp<'a> as sdio::Response>::from_words(&words));
         }
 

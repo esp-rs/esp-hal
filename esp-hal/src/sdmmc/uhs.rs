@@ -77,18 +77,22 @@ fn clock_update_command(slot: SlotId, volt_switch: bool) -> Result<(), Error> {
 
 /// Waits for the voltage-switch completion interrupt (or a command error) and
 /// returns the full `rintsts` snapshot.
-fn wait_volt_sw(timeout: Duration) -> Result<u32, Error> {
+///
+/// Yields between polls: the controller can take a long time to signal and
+/// CMD11 keeps the engine guard, so spinning here would starve the executor
+/// for up to a second.
+async fn wait_volt_sw(timeout: Duration) -> Result<u32, Error> {
     let r = SDHOST::regs();
-    let start = Instant::now();
+    let deadline = Instant::now() + timeout;
     loop {
         let sts = r.rintsts().read().bits();
         if sts & (EVT_VOLT_SW | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE) != 0 {
             return Ok(sts);
         }
-        if start.elapsed() >= timeout {
+        if Instant::now() >= deadline {
             return Err(Error::Timeout);
         }
-        core::hint::spin_loop();
+        yield_now().await;
     }
 }
 
@@ -154,8 +158,8 @@ impl Drop for Cmd11Cleanup {
 ///    and then raises the **VOLT_SW** interrupt (it never raises CDONE for a `volt_switch`
 ///    command);
 /// 3. on VOLT_SW: stop the card clock (`cclk_enable = 0`, pushed with a **`volt_switch`** clock
-///    update), wait 100 us, move the SD I/O rail to 1.8 V, wait 10 ms for it to settle, then
-///    restart the clock (pushed with another **`volt_switch`** clock update);
+///    update), wait 100 us, move the SD I/O rail to 1.8 V, wait 10 ms for it to settle (yielding to
+///    the executor), then restart the clock (pushed with another **`volt_switch`** clock update);
 /// 4. on a second VOLT_SW: restore `CLKENA.LOW_PWR` with a plain clock update.
 ///
 /// Completion is the pair of VOLT_SW interrupts, *not* `STATUS.data_busy`:
@@ -163,7 +167,7 @@ impl Drop for Cmd11Cleanup {
 /// handshake's completion signal on this controller). `UHS.VOLT` is written for
 /// parity but has no effect on the rail, which is controlled separately by the
 /// chip-specific code.
-pub(super) fn cmd11_voltage_switch(slot: SlotId) -> Result<[u32; 4], Error> {
+pub(super) async fn cmd11_voltage_switch(slot: SlotId) -> Result<[u32; 4], Error> {
     let r = SDHOST::regs();
     let idx = slot.index();
     // The CLKENA fields are 2 bits wide (u8); UHS/VOLT is a raw u32 write.
@@ -198,7 +202,7 @@ pub(super) fn cmd11_voltage_switch(slot: SlotId) -> Result<[u32; 4], Error> {
 
     // The controller's CMD11 handshake is slow (Linux budgets ~130 ms before the
     // interrupt), so allow a generous 1 s.
-    let sts = wait_volt_sw(Duration::from_millis(1_000))?;
+    let sts = wait_volt_sw(Duration::from_millis(1_000)).await?;
     map_rintsts(sts & !EVT_VOLT_SW)?;
     let resp0 = r.resp0().read().bits();
 
@@ -214,14 +218,14 @@ pub(super) fn cmd11_voltage_switch(slot: SlotId) -> Result<[u32; 4], Error> {
     // init from forcing 3.3 V into a card that already switched.
     UHS_1V8_ACTIVE.store(true, core::sync::atomic::Ordering::Relaxed);
     set_uhs_volt(slot, false);
-    crate::rom::ets_delay_us(10_000);
+    super::wait_rail_settle().await;
     r.clkena()
         .modify(|rd, w| unsafe { w.cclk_enable().bits(rd.cclk_enable().bits() | clk_mask) });
     clock_update_command(slot, true)?;
     set_uhs_volt(slot, true);
 
     // Second VOLT_SW: back to low-power clock gating.
-    let sts = wait_volt_sw(Duration::from_millis(1_000))?;
+    let sts = wait_volt_sw(Duration::from_millis(1_000)).await?;
     map_rintsts(sts & !EVT_VOLT_SW)?;
 
     r.rintsts().write(|w| unsafe { w.bits(EVT_VOLT_SW) });
