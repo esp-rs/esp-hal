@@ -111,11 +111,11 @@ use self::{
     private::PacketBuffer,
     scan::{
         AccessPointInfo,
+        FreeApListOnDrop,
         ScanConfig,
         ScanResults,
         ScanTypeConfig,
         convert_ap_info,
-        free_ap_list_on_drop,
     },
     sta::StationConfig,
     state::*,
@@ -3603,7 +3603,7 @@ ignored."
         esp_wifi_result!(wifi_start_scan(false, *config))?;
 
         // Prevents memory leak if `scan_async`'s future is dropped.
-        let guard = free_ap_list_on_drop();
+        let guard = FreeApListOnDrop;
 
         loop {
             let event = subscriber.next_message_pure().await;
@@ -3617,7 +3617,7 @@ ignored."
             }
         }
 
-        guard.defuse();
+        core::mem::forget(guard);
 
         let limit = config.max.unwrap_or(usize::MAX);
         Ok(ScanResults::new(self)?.take(limit).collect::<Vec<_>>())

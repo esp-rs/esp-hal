@@ -162,10 +162,7 @@ mod tests {
         // connects.
         let disconnect = controller.wait_for_disconnect_async();
         let result = select(disconnect, Timer::after(Duration::from_secs(5))).await;
-        assert!(
-            matches!(result, Either::Second(())),
-            "The station was disconnected"
-        );
+        hil_test::assert_matches!(result, Either::Second(()), "The station was disconnected");
     }
 
     #[test]

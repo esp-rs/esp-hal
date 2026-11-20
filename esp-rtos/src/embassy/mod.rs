@@ -40,7 +40,7 @@ impl<T> SchedulerLocked<T> {
     fn with<'s>(&'s self, _scheduler: &'s mut SchedulerState) -> &'s mut T {
         // Safety: The `_scheduler` parameter proves the caller holds the scheduler lock,
         // so exclusive access to the contained value is safe.
-        unsafe { &mut *self.inner.get() }
+        unsafe { self.inner.as_mut_unchecked() }
     }
 }
 
@@ -272,7 +272,7 @@ impl Executor {
         mut hooks: impl Callbacks,
     ) -> ! {
         let executor = unsafe {
-            (&mut *self.executor.get()).write(raw::Executor::new(
+            self.executor.as_mut_unchecked().write(raw::Executor::new(
                 (flags as *const ThreadFlag).cast::<()>().cast_mut(),
             ))
         };
@@ -407,7 +407,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
         self.interrupt
             .set_interrupt_handler(InterruptHandler::new(swi_handler, priority));
 
-        let executor = unsafe { (*self.executor.get()).assume_init_ref() };
+        let executor = unsafe { self.executor.as_ref_unchecked().assume_init_ref() };
         executor.spawner().make_send()
     }
 
@@ -426,7 +426,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
         {
             panic!("InterruptExecutor::spawner() called on uninitialized executor.");
         }
-        let executor = unsafe { (*self.executor.get()).assume_init_ref() };
+        let executor = unsafe { self.executor.as_ref_unchecked().assume_init_ref() };
         executor.spawner().make_send()
     }
 }

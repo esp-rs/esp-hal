@@ -422,10 +422,10 @@ mod tests {
         let guard = start_ipc_app_core(&mut CpuControl::new(p.CPU_CTRL));
         drop(guard);
 
-        hil_test::assert!(matches!(
+        hil_test::assert_matches!(
             Ipc::new(p.IPC).post(Cpu::AppCpu, &REQUEST),
             Err(IpcError::Offline)
-        ));
+        );
     }
 
     #[test]

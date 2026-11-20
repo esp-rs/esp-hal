@@ -2,7 +2,7 @@
 name          = "esp-lp-hal"
 version       = "0.3.0"
 edition       = "2024"
-rust-version  = "1.95.0"
+rust-version  = "1.100.0"
 description   = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-lp-hal/latest/"
 keywords      = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
@@ -97,6 +97,10 @@ required-features = ["esp32c6"]
 [[example]]
 name              = "uart"
 required-features = ["esp32c6"]
+
+[lints.cargo]
+# False positives for dependencies that only some configurations use.
+unused_dependencies = "allow"
 
 [lints.rust]
 unexpected_cfgs = "allow"

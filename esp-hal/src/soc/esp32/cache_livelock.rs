@@ -199,7 +199,7 @@ fn init_handler_state(cycles_per_us: u32) {
     let regs = TIMG1::regs();
     let source = Interrupt::TG1_WDT_LEVEL as usize;
     // SAFETY: CPU interrupt 24 is not mapped yet, so the handler does not run.
-    let state = unsafe { &mut *STATE.0.get() };
+    let state = unsafe { STATE.0.as_mut_unchecked() };
     state.wdt_wprotect = regs.wdtwprotect().as_ptr();
     state.wdt_feed = regs.wdtfeed().as_ptr();
     state.int_clr = regs.int_clr().as_ptr();

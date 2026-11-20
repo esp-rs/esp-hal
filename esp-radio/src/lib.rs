@@ -244,8 +244,6 @@ mod compiler_rt_abi;
     all(feature = "wifi", feature = "unstable", modem_retention = "backup_dma"),
 ))]
 mod counting_lock;
-#[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "btdm2")))]
-mod drop_guard;
 mod interrupt_dispatch;
 #[cfg(all(
     modem_retention = "backup_dma",

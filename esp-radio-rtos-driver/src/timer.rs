@@ -513,7 +513,7 @@ mod implementation {
         }
 
         fn get_mut<'a>(&'a self, _q: &'a mut TimerQueueInner) -> &'a mut T {
-            unsafe { &mut *self.0.get() }
+            unsafe { self.0.as_mut_unchecked() }
         }
     }
 

@@ -276,11 +276,7 @@ pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
 }
 
 fn check_channel_configured(configured: &[bool; NUM_ATTENS], channel: u8) -> Result<(), Error> {
-    if configured[channel as usize] {
-        Ok(())
-    } else {
-        Err(Error::ChannelNotConfigured(channel))
-    }
+    configured[channel as usize].ok_or(Error::ChannelNotConfigured(channel))
 }
 
 impl<'d, ADCX> Adc<'d, ADCX, Blocking>

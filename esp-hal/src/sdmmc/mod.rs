@@ -32,6 +32,7 @@ use core::{
     cell::UnsafeCell,
     future::poll_fn,
     marker::PhantomData,
+    mem::DropGuard,
     pin::Pin,
     sync::atomic::Ordering,
     task::{Context, Poll},
@@ -61,7 +62,6 @@ use crate::{
         interconnect::{self, PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, SDHOST},
-    private::DropGuard,
     system::{Peripheral, PeripheralGuard},
     time::{Duration, Instant},
 };
@@ -468,7 +468,7 @@ unsafe impl Sync for DescRing {}
 static DESC_RING: DescRing = DescRing(UnsafeCell::new(InternalMemory::new([Desc::ZERO; RING_LEN])));
 
 fn ring() -> DmaAlignedMut<'static, [Desc; RING_LEN]> {
-    unsafe { &mut *DESC_RING.0.get() }.get_mut()
+    unsafe { DESC_RING.0.as_mut_unchecked() }.get_mut()
 }
 
 /// Exclusive engine session: bounce scratch and last HW-programmed slot.
@@ -747,7 +747,7 @@ impl EngineSession {
         if flags.busy {
             wait_busy_poll().await?;
         }
-        guard.defuse();
+        DropGuard::dismiss(guard);
         Ok(resp)
     }
 
@@ -790,7 +790,7 @@ impl EngineSession {
         }
         disable_idmac();
         let resp = read_response(ResponseLen::Short);
-        guard.defuse();
+        DropGuard::dismiss(guard);
         Ok(resp)
     }
 
@@ -1059,7 +1059,7 @@ fn slot_state(id: SlotId) -> &'static SlotState {
 /// Exclusive access to a slot's pin guards (builder-time only).
 #[cfg(sdmmc_has_gpio_matrix)]
 fn slot_pins(id: SlotId) -> &'static mut SlotPins {
-    unsafe { &mut *slot_state(id).pins.get() }
+    unsafe { slot_state(id).pins.as_mut_unchecked() }
 }
 
 /// Immutable per-slot routing: SDIO card-interrupt bit plus the input/output

@@ -124,8 +124,7 @@ fn default_gpio_interrupt_handler() {
 
             // Disable the remaining interrupts.
             let mut intrs = intrs & !async_pins;
-            while intrs != 0 {
-                let pin_pos = intrs.trailing_zeros();
+            while let Some(pin_pos) = intrs.lowest_one() {
                 intrs -= 1 << pin_pos;
 
                 let pin_nr = pin_pos as u8 + bank.offset();
@@ -229,8 +228,7 @@ fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {
 #[cfg(single_core)]
 fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
     let mut async_intrs = async_pins & intrs;
-    while async_intrs != 0 {
-        let pin_pos = async_intrs.trailing_zeros();
+    while let Some(pin_pos) = async_intrs.lowest_one() {
         async_intrs -= 1 << pin_pos;
 
         let pin_nr = pin_pos as u8 + bank.offset();
@@ -260,8 +258,7 @@ fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
     // flags, the PinFuture destructor may try to take a critical section which
     // isn't necessary.
     let mut async_intrs = async_pins & intrs;
-    while async_intrs != 0 {
-        let pin_pos = async_intrs.trailing_zeros();
+    while let Some(pin_pos) = async_intrs.lowest_one() {
         async_intrs -= 1 << pin_pos;
 
         let pin_nr = pin_pos as u8 + bank.offset();
@@ -288,8 +285,7 @@ fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
     // waken, but the Future wouldn't actually be resolved, and so it might
     // never wake again.
     let mut async_intrs = async_pins & intrs;
-    while async_intrs != 0 {
-        let pin_pos = async_intrs.trailing_zeros();
+    while let Some(pin_pos) = async_intrs.lowest_one() {
         async_intrs -= 1 << pin_pos;
 
         let pin_nr = pin_pos as u8 + bank.offset();

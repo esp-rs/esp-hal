@@ -9,7 +9,7 @@
 //! millisecond.
 
 use core::{
-    mem::{size_of, transmute},
+    mem::{DropGuard, size_of, transmute},
     ptr::NonNull,
     sync::atomic::{AtomicU16, AtomicU32, Ordering},
 };
@@ -37,7 +37,6 @@ use crate::{
         semaphore,
     },
     counting_lock::CountingLock,
-    drop_guard::DropGuard,
     hal::ram,
     sys::{
         c_types::{c_char, c_void},
@@ -461,8 +460,8 @@ fn esp_bt_controller_enable(_mode: esp_bt_mode_t) -> esp_err_t {
         return ESP_FAIL as _;
     }
 
-    hci_fc.defuse();
-    ble_stack.defuse();
+    DropGuard::dismiss(hci_fc);
+    DropGuard::dismiss(ble_stack);
 
     set_controller_status(esp_bt_controller_status_t_ESP_BT_CONTROLLER_STATUS_ENABLED);
     0

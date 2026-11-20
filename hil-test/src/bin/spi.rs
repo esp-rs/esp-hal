@@ -958,10 +958,7 @@ mod tests {
             }
         };
         let result = select(op(&mut spi, ctx.rx_buffer, ctx.tx_buffer), cancel).await;
-        assert!(
-            matches!(result, Either::Second(_)),
-            "Operation was not cancelled"
-        );
+        hil_test::assert_matches!(result, Either::Second(_), "Operation was not cancelled");
 
         // A transfer waits for the peripheral to become idle before it starts. If a
         // chunk was left over, its rest (~4.6 ms) is clocked out before this transfer's

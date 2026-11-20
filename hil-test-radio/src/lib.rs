@@ -34,6 +34,17 @@ macro_rules! assert_eq {
     ($($t:tt)*) => { defmt::assert_eq!($($t)*) }
 }
 
+#[cfg(feature = "defmt")]
+#[macro_export]
+macro_rules! assert_matches {
+    ($left:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?))
+    };
+    ($left:expr, $pattern:pat $(if $guard:expr)?, $($arg:tt)+) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?), $($arg)+)
+    };
+}
+
 #[cfg(not(feature = "defmt"))]
 #[macro_export]
 macro_rules! assert {
@@ -44,6 +55,12 @@ macro_rules! assert {
 #[macro_export]
 macro_rules! assert_eq {
     ($($t:tt)*) => { ::core::assert_eq!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! assert_matches {
+    ($($t:tt)*) => { ::core::assert_matches!($($t)*) }
 }
 
 /// Signal to the radio HIL runner that harness firmware is ready.
