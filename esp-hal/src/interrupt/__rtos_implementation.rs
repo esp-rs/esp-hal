@@ -5,20 +5,13 @@
 //! handler here, then asks a CPU to run the handler.
 //!
 //! These functions are not part of the application API.
-#![cfg_attr(
-    context_switch_source = "software0",
-    doc = "\nA CPU switches its own tasks through the `Software0` CPU-internal interrupt. The HAL
-    defines the handler of that interrupt."
-)]
-#![cfg_attr(
-    context_switch_source = "clint",
-    doc = "\nA CPU switches its own tasks through the machine software interrupt of the CLINT."
-)]
-#![cfg_attr(
-    context_switch_source = "from_cpu",
-    doc = "\nA CPU switches its own tasks through the `FROM_CPU_INTR0` interrupt. The HAL reserves
-    that interrupt."
-)]
+#![doc = ""]
+#![doc = cfg_select! {
+    context_switch_source = "software0" => "A CPU switches its own tasks through the `Software0` CPU-internal interrupt. The HAL defines the handler of that interrupt.",
+    context_switch_source = "clint" => "A CPU switches its own tasks through the machine software interrupt of the CLINT.",
+    context_switch_source = "from_cpu" => "A CPU switches its own tasks through the `FROM_CPU_INTR0` interrupt. The HAL reserves that interrupt.",
+    _ => "",
+}]
 #![cfg_attr(
     multi_core,
     doc = "\nA CPU switches the tasks of the other CPU through [`Ipc`][super::ipc::Ipc]."
