@@ -577,6 +577,7 @@ mod i2c_slave {
     ];
     const TIMEOUT_CASES: [(bool, u8); 4] = [(false, 14), (true, 14), (false, 22), (true, 22)];
     const MAX_LEFTOVER_BYTES: usize = u16::MAX as usize;
+    const SCL_RISE_TIME: time::Duration = time::Duration::from_micros(10);
     static LONG_RESPONSE: [u8; MAX_LEFTOVER_BYTES + 2] = [0x5a; MAX_LEFTOVER_BYTES + 2];
     static MASTER_DONE: AtomicBool = AtomicBool::new(false);
     static MASTER_PAUSED: AtomicBool = AtomicBool::new(false);
@@ -755,6 +756,9 @@ mod i2c_slave {
                 self.pause_on_read_stretch = false;
                 pause_master().await;
             }
+            // SCL can read low for SCL_RISE_TIME after release. That low level is not a stretch.
+            let released = time::Instant::now();
+            while self.scl.is_low() && released.elapsed() < SCL_RISE_TIME {}
             while self.scl.is_low() {
                 Timer::after_micros(50).await;
             }
