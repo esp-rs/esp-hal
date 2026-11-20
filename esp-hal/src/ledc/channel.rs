@@ -106,6 +106,9 @@ where
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error>;
 
     /// Starts a duty-cycle fade.
+    ///
+    /// If both percentages map to the same PWM duty value, this sets that
+    /// duty immediately without a fade.
     fn start_duty_fade(
         &self,
         start_duty_pct: u8,
@@ -248,11 +251,16 @@ where
         let start_duty_value = (duty_range * start_duty_pct as u32) / 100;
         let end_duty_value = (duty_range * end_duty_pct as u32) / 100;
 
+        let abs_duty_diff = end_duty_value.abs_diff(start_duty_value);
+        if abs_duty_diff == 0 {
+            self.set_duty_hw(end_duty_value);
+            return Ok(());
+        }
+
         // NB: since we do the multiplication first here, there's no loss of
         // precision from using milliseconds instead of (e.g.) nanoseconds.
         let pwm_cycles = (duration_ms as u32) * frequency / 1000;
 
-        let abs_duty_diff = end_duty_value.abs_diff(start_duty_value);
         let duty_steps: u32 = u16::try_from(abs_duty_diff).unwrap_or(65535).into();
         // This conversion may fail if duration_ms is too big, and if either
         // duty_steps gets truncated, or the fade is over a short range of duty

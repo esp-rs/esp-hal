@@ -746,6 +746,43 @@ mod ledc {
         // 20 ms at 1 kHz is 20 rising edges.
         hil_test::assert!((19..=21).contains(&edges), "counted {} edges", edges);
     }
+
+    #[test]
+    fn fade_with_equal_pwm_duties_sets_duty_immediately(ctx: Context<'static>) {
+        let mut ledc = Ledc::new(ctx.ledc);
+        ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
+
+        let mut timer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
+        timer0
+            .configure(timer::config::Config {
+                duty: timer::config::Duty::Duty4Bit,
+                clock_source: timer::LSClockSource::APBClk,
+                frequency: Rate::from_khz(20),
+            })
+            .unwrap();
+
+        let mut channel0 = ledc.channel(channel::Number::Channel0, ctx.output);
+        channel0
+            .configure(channel::config::Config {
+                timer: &timer0,
+                duty_pct: 100,
+                drive_mode: DriveMode::PushPull,
+            })
+            .unwrap();
+
+        let input = Input::new(ctx.input, InputConfig::default().with_pull(Pull::Down));
+        let delay = esp_hal::delay::Delay::new();
+        for end_duty in [0, 1] {
+            channel0.set_duty(100).unwrap();
+            delay.delay_micros(200);
+            hil_test::assert!(input.is_high());
+
+            // Both 0% and 1% map to a raw duty of zero at 4-bit resolution.
+            channel0.start_duty_fade(0, end_duty, 100).unwrap();
+            delay.delay_micros(200);
+            hil_test::assert!(input.is_low());
+        }
+    }
 }
 
 #[cfg(systimer_driver_supported)]
