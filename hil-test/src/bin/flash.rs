@@ -3,6 +3,9 @@
 //! Assumes a certain (i.e. default) partition table layout.
 //% CHIP_FILTER: flash_driver_supported
 //% FEATURES: unstable
+//% FEATURES(code_in_flash):
+//% CHIP_FILTER(code_in_psram): flash_driver_supported && psram_code_in_psram
+//% ENV(code_in_psram): ESP_HAL_CONFIG_CODE_IN_PSRAM=true
 //% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "--cfg=__test_flash" ]
 //% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "--cfg=__test_flash" ]
 //% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = ["-Z", "stack-protector=all"]
@@ -280,7 +283,7 @@ mod tests {
 
         let mapped = addr_of!(SCRATCH.0[0]);
         // Warm D-cache; do not use `SCRATCH.0[0]` as a value (const-folded).
-        let _cached = unsafe { read_volatile(mapped) };
+        let cached = unsafe { read_volatile(mapped) };
 
         let pattern = [0x5A5A_5A5Au32; 1];
         // SAFETY: `SCRATCH` is a dedicated mapped sector, not firmware.
@@ -294,7 +297,12 @@ mod tests {
         assert_eq!(via_rom, pattern);
 
         let via_cache = unsafe { read_volatile(mapped) };
-        assert_eq!(via_cache, pattern[0]);
+        if option_env!("ESP_HAL_CONFIG_CODE_IN_PSRAM") == Some("true") {
+            // `.rodata` is a copy in PSRAM, which a flash write does not change.
+            assert_eq!(via_cache, cached);
+        } else {
+            assert_eq!(via_cache, pattern[0]);
+        }
     }
 
     #[cfg(multi_core)]
@@ -458,10 +466,13 @@ mod tests {
         .unwrap();
 
         let mut buf = [0u32; 1];
-        assert_eq!(
-            flash.read(APP_DESC_OFFSET, &mut buf),
+        // With code in PSRAM, nothing fetches from flash, so the strategy is not relevant.
+        let expected = if option_env!("ESP_HAL_CONFIG_CODE_IN_PSRAM") == Some("true") {
+            Ok(())
+        } else {
             Err(Error::OtherCoreRunning)
-        );
+        };
+        assert_eq!(flash.read(APP_DESC_OFFSET, &mut buf), expected);
     }
 
     /// HIL boards have no encryption key burned, so `read_encrypted` returns
@@ -661,11 +672,20 @@ mod tests {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
         let drom = flash_mmu_drom_entries();
 
-        // The linker scripts put the app's rodata at the start of the DROM window.
-        assert_eq!(
-            flash_mmu_entry_offset(drom.start),
-            Some(APP_DESC_OFFSET - 0x20)
-        );
+        if option_env!("ESP_HAL_CONFIG_CODE_IN_PSRAM") == Some("true") {
+            // The start-up unmaps flash, and keeps the offset of the app's first page.
+            assert_eq!(flash_mmu_entry_offset(drom.start), None);
+            assert_eq!(
+                flash_mmu_entry_offset(drom.end - 1),
+                Some(APP_DESC_OFFSET - 0x20)
+            );
+        } else {
+            // The linker scripts put the app's rodata at the start of the DROM window.
+            assert_eq!(
+                flash_mmu_entry_offset(drom.start),
+                Some(APP_DESC_OFFSET - 0x20)
+            );
+        }
         assert_eq!(flash_mmu_entry_offset(drom.end), None);
     }
 }

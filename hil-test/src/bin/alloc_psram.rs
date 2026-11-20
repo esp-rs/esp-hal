@@ -5,6 +5,10 @@
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 // Just below 512 KiB, so that only the second-level rounding of TLSF needs the next size class.
 //% ENV(tlsf): ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION=524256
+// This configuration tests the heap after code in PSRAM, without a PSRAM static, on a chip where
+// code and PSRAM share the flash MMU window.
+//% CHIP_FILTER(code_in_psram): psram_code_in_psram && !psram_separate_window
+//% ENV(code_in_psram): ESP_HAL_CONFIG_CODE_IN_PSRAM=true
 // The default 64KB leaves nothing to reclaim, see the dcache_reclaimed tests below.
 //% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
 //% FEATURES: unstable esp-alloc/nightly

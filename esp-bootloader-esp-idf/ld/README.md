@@ -22,8 +22,9 @@ name with them:
 - `hal-defaults.x`: interrupt and runtime defaults, includes the PAC's `device.x`.
 - `esp_hal_config.x`: esp-hal's configuration as symbols, plus `__stack_chk_guard` and the main stack
   size check. It defines `ESP_HAL_INSTRUCTION_CACHE_SIZE`, `ESP_HAL_DATA_CACHE_SIZE` and
-  `ESP_HAL_L2_CACHE_SIZE` (bytes of RAM used as cache) and, on the ESP32,
-  `ESP_HAL_BT_RESERVED_DRAM`.
+  `ESP_HAL_L2_CACHE_SIZE` (bytes of RAM used as cache), `ESP_HAL_CODE_IN_PSRAM` (1 if `.text`
+  and `.rodata` run from PSRAM, else 0), and, on the ESP32, `ESP_HAL_BT_RESERVED_DRAM`. On the
+  ESP32-S31, `ESP_HAL_CODE_IN_PSRAM` moves `ROM` from the flash window to the PSRAM window.
 - `esp_hal_rwtext.x` / `esp_hal_rwdata.x`: input sections that esp-hal's configuration places in
   RAM. They contain input section descriptions only.
 - `esp_hal_rwtext_sections.x`: output sections in `RWTEXT` that esp-hal defines.
@@ -64,6 +65,11 @@ A bootloader support crate provides `linkall.x`, which must:
   memory) and `_uncached_*` (ESP32-P4).
 - Place the input sections esp-hal and the runtime crates emit, including `.trap*`, `.rwtext*`,
   `.rtc_fast.*` / `.rtc_slow.*`, `.dram2_uninit*`, `.uncached.*` and `.espressif.metadata`.
+- A crate that supports the `code-in-psram` option of esp-hal (ESP32-C5 and ESP32-S31) also
+  defines `_psram_bss_start` and `_psram_bss_end`, and places `.bss.psram*` after the code, in the
+  window that the code runs from, before `.bss` takes `.bss.*`. `.bss.psram*` must be empty
+  unless `ESP_HAL_CODE_IN_PSRAM` is 1. A crate that does not support the option must fail the
+  link when `ESP_HAL_CODE_IN_PSRAM` is 1.
 - Respect the memory protection esp-hal sets up from these symbols (below).
 
 ### Memory protection

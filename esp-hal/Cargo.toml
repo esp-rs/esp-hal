@@ -29,6 +29,7 @@ check-configs = [
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_USE_XTAL32K = "true" }, if = 'soc_has_clock_node_xtal32k_clk' },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_IDLE_FREQUENCY_SCALING = "true" }, if = 'sleep_idle_frequency_scaling' },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_APB_FREQUENCY_REDUCTION = "4" }, if = 'soc_has_apb_frequency_reduction' },
+    { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_CODE_IN_PSRAM = "true" }, if = 'psram_code_in_psram' },
     { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
     { features = ["unstable", "rt", "__sdmmc"],     if = 'sdmmc_driver_supported' },
@@ -44,6 +45,8 @@ clippy-configs = [
         { if = 'sdmmc_driver_supported', features = ["__sdmmc"] },
         { if = 'sleep_idle_frequency_scaling', env = { ESP_HAL_CONFIG_IDLE_FREQUENCY_SCALING = "true" } },
     ] },
+    # Code in PSRAM replaces code paths that the run above checks, so it gets a run of its own.
+    { features = ["unstable", "rt", "embassy-time-05"], env = { ESP_HAL_CONFIG_CODE_IN_PSRAM = "true" }, if = 'psram_code_in_psram' },
 ]
 
 [package.metadata.docs.rs]

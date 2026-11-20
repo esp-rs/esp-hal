@@ -19,6 +19,10 @@ name              = "alloc_psram"
 harness           = false
 
 [[bin]]
+name              = "code_in_psram"
+harness           = false
+
+[[bin]]
 name              = "crypto"
 harness           = false
 
