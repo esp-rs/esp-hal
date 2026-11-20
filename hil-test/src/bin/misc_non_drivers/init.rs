@@ -131,7 +131,8 @@ mod tests {
 
     #[test]
     fn test_init_disables_watchdogs() {
-        esp_hal::init(Config::default());
+        let peripherals = esp_hal::init(Config::default());
+        hil_test::init_logger!(peripherals);
 
         let delay = Delay::new();
         delay.delay(Duration::from_millis(1000));
@@ -139,7 +140,9 @@ mod tests {
 
     #[test]
     fn test_rom_delay_matches_cpu_clock() {
-        esp_hal::init(Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()));
+        let peripherals =
+            esp_hal::init(Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()));
+        hil_test::init_logger!(peripherals);
 
         let start = esp_hal::time::Instant::now();
         esp_hal::rom::ets_delay_us(1000);

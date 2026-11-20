@@ -67,6 +67,7 @@ mod tests {
     #[cfg(systimer_driver_supported)]
     #[test]
     async fn test_systimer_async_delay_ns(ctx: Context) {
+        hil_test::init_logger!(ctx.peripherals);
         let alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
 
         test_async_delay_ns(OneShotTimer::new(alarms.alarm0).into_async(), 10_000).await;
@@ -75,6 +76,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     #[test]
     async fn test_timg0_async_delay_ns(ctx: Context) {
+        hil_test::init_logger!(ctx.peripherals);
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
 
         test_async_delay_ns(OneShotTimer::new(timg0.timer0).into_async(), 10_000).await;
@@ -85,6 +87,7 @@ mod tests {
     #[cfg(timergroup_timg1)]
     #[test]
     async fn test_timg1_async_delay_ns(ctx: Context) {
+        hil_test::init_logger!(ctx.peripherals);
         let timg1 = TimerGroup::new(ctx.peripherals.TIMG1);
 
         test_async_delay_ns(OneShotTimer::new(timg1.timer0).into_async(), 10_000).await;
@@ -95,6 +98,7 @@ mod tests {
     #[cfg(systimer_driver_supported)]
     #[test]
     async fn test_systimer_async_delay_us(ctx: Context) {
+        hil_test::init_logger!(ctx.peripherals);
         let alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
 
         test_async_delay_us(OneShotTimer::new(alarms.alarm0).into_async(), 10).await;
@@ -103,6 +107,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     #[test]
     async fn test_timg0_async_delay_us(ctx: Context) {
+        hil_test::init_logger!(ctx.peripherals);
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
 
         test_async_delay_us(OneShotTimer::new(timg0.timer0).into_async(), 10).await;
@@ -113,6 +118,7 @@ mod tests {
     #[cfg(timergroup_timg1)]
     #[test]
     async fn test_timg1_async_delay_us(ctx: Context) {
+        hil_test::init_logger!(ctx.peripherals);
         let timg1 = TimerGroup::new(ctx.peripherals.TIMG1);
 
         test_async_delay_us(OneShotTimer::new(timg1.timer0).into_async(), 10).await;
@@ -123,6 +129,7 @@ mod tests {
     #[cfg(systimer_driver_supported)]
     #[test]
     async fn test_systimer_async_delay_ms(ctx: Context) {
+        hil_test::init_logger!(ctx.peripherals);
         let alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
 
         test_async_delay_ms(OneShotTimer::new(alarms.alarm0).into_async(), 1).await;
@@ -131,6 +138,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     #[test]
     async fn test_timg0_async_delay_ms(ctx: Context) {
+        hil_test::init_logger!(ctx.peripherals);
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
 
         test_async_delay_ms(OneShotTimer::new(timg0.timer0).into_async(), 1).await;
@@ -141,6 +149,7 @@ mod tests {
     #[cfg(timergroup_timg1)]
     #[test]
     async fn test_timg1_async_delay_ms(ctx: Context) {
+        hil_test::init_logger!(ctx.peripherals);
         let timg1 = TimerGroup::new(ctx.peripherals.TIMG1);
 
         test_async_delay_ms(OneShotTimer::new(timg1.timer0).into_async(), 1).await;

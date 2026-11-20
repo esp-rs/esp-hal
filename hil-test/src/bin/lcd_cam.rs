@@ -401,6 +401,7 @@ mod camera_tests {
     #[test]
     fn test_camera_configuration(ctx: Context) {
         let peripherals = ctx.peripherals;
+        hil_test::init_logger!(peripherals);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let dma_channel = cfg_select! {
             lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
@@ -426,6 +427,7 @@ mod camera_tests {
         GpioInputSignal<'static>,
     ) {
         let peripherals = ctx.peripherals;
+        hil_test::init_logger!(peripherals);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let dma_channel = cfg_select! {
             lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
@@ -713,6 +715,7 @@ mod camera_tests {
     #[test]
     fn test_dpi_vsync_blocking(ctx: Context) {
         let peripherals = ctx.peripherals;
+        hil_test::init_logger!(peripherals);
         let dma = cfg_select! {
             lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
             lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,

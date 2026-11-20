@@ -28,6 +28,7 @@ mod tests {
     }
 
     fn software_interrupt_fires_before_returning(p: Peripherals) {
+        hil_test::init_logger!(p);
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         extern "C" fn increment() {
@@ -58,7 +59,8 @@ mod tests {
     }
 
     #[test]
-    fn critical_section_is_reentrant() {
+    fn critical_section_is_reentrant(p: Peripherals) {
+        hil_test::init_logger!(p);
         let mut flag = false;
 
         critical_section::with(|_| {
@@ -71,7 +73,8 @@ mod tests {
     }
 
     #[test]
-    fn non_reentrant_mutex_can_provide_mutable_access() {
+    fn non_reentrant_mutex_can_provide_mutable_access(p: Peripherals) {
+        hil_test::init_logger!(p);
         let flag = NonReentrantMutex::new(false);
 
         flag.with(|f| {
@@ -84,7 +87,8 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn non_reentrant_mutex_is_not_reentrant() {
+    fn non_reentrant_mutex_is_not_reentrant(p: Peripherals) {
+        hil_test::init_logger!(p);
         let flag = NonReentrantMutex::new(false);
 
         flag.with(|_f| {

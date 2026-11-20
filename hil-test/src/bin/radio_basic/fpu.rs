@@ -207,7 +207,8 @@ mod tests {
     }
 
     #[test]
-    fn fpu_is_enabled() {
+    fn fpu_is_enabled(p: Peripherals) {
+        hil_test::init_logger!(p);
         let result = run_float_calc(2.0);
         assert_eq!(result, 4.0);
     }

@@ -2543,6 +2543,7 @@ mod work_queue_concurrency_tests {
     /// still below what the queue's critical section masks.
     #[test]
     fn test_wait_at_higher_priority_during_gcm(p: Peripherals) {
+        hil_test::init_logger!(p);
         static HANDLER_RESULT: AtomicU8 = AtomicU8::new(NOT_DONE);
 
         extern "C" fn high_priority() {
@@ -2599,6 +2600,7 @@ mod work_queue_concurrency_tests {
     #[test]
     #[cfg(all(multi_core, soc_has_cpu_ctrl))]
     fn test_two_cores(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::system::{CpuControl, Stack};
         use portable_atomic::AtomicBool;
 
