@@ -1,0 +1,158 @@
+[package]
+name          = "esp-provisioning"
+version       = "0.1.0"
+edition       = "2024"
+rust-version  = "1.95.0"
+description   = "ESP-IDF Wi-Fi provisioning protocol (protocomm sec1 + wifi config/scan) for bare-metal Rust"
+documentation = "https://docs.espressif.com/projects/rust/esp-provisioning/latest/"
+keywords      = ["esp32", "espressif", "no-std", "provisioning", "protocomm"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+exclude       = ["MIGRATING-*", "CHANGELOG.md"]
+
+[package.metadata.espressif]
+check-configs = [
+    { features = [] },
+    { features = ["log-04"] },
+    { features = ["defmt"] },
+    { features = ["debug", "log-04"] },
+    { features = ["log-04", "softap", "ble", "esp32c6"], if = 'wifi_driver_supported && bt_driver_supported' },
+]
+clippy-configs = [{ features = ["defmt"] }]
+host-test-configs = [
+    { features = [], cargo-args = ["--no-default-features", "--lib", "--tests"] },
+]
+
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+
+[lib]
+bench = false
+test  = true
+
+[dependencies]
+aes                    = { version = "0.8", default-features = false }
+bt-hci-transport       = { version = "0.1.0", optional = true }
+ctr                    = { version = "0.9", default-features = false }
+document-features      = "0.2"
+embedded-io            = { version = "0.7", default-features = false, optional = true }
+edge-dhcp              = { version = "0.8.0", optional = true }
+edge-nal               = { version = "0.7.0", optional = true }
+edge-nal-embassy       = { version = "0.9.0", optional = true }
+embassy-executor       = { version = "0.10.0", optional = true }
+embassy-futures        = { version = "0.1", optional = true }
+embassy-net            = { version = "0.9.0", optional = true, features = [
+    "dhcpv4",
+    "medium-ethernet",
+    "tcp",
+    "udp",
+    "dns",
+] }
+embassy-sync           = { version = "0.8", optional = true }
+embassy-time           = { version = "0.5.1", optional = true }
+embedded-io-async      = { version = "0.7", optional = true }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated" }
+esp-radio              = { path = "../esp-radio", optional = true, default-features = false }
+heapless               = { version = "0.9", default-features = false }
+instability            = "0.3.12"
+rand_core              = { version = "0.6", default-features = false }
+rand_core09            = { package = "rand_core", version = "0.9", default-features = false }
+sha2                   = { version = "0.10", default-features = false }
+static_cell            = { version = "2.1.0", optional = true }
+trouble-host           = { version = "0.8.0", optional = true, features = [
+    "default-packet-pool-mtu-255",
+    "derive",
+] }
+x25519-dalek           = { version = "2.0", default-features = false, features = ["static_secrets"] }
+
+# Logging interfaces, they are mutually exclusive so they need to be behind separate features.
+defmt  = { version = "1.1", optional = true }
+log-04 = { package = "log", version = "0.4", optional = true }
+
+[build-dependencies]
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
+
+[features]
+default = ["softap", "ble"]
+
+#! ### Transport Feature Flags
+## SoftAP HTTP provisioning (DHCP, DNS, protocomm over HTTP).
+softap = [
+    "dep:edge-dhcp",
+    "dep:edge-nal",
+    "dep:edge-nal-embassy",
+    "dep:embassy-executor",
+    "dep:embassy-futures",
+    "dep:embassy-net",
+    "dep:embassy-sync",
+    "dep:embassy-time",
+    "dep:embedded-io-async",
+    "dep:esp-radio",
+    "dep:static_cell",
+    "esp-radio/wifi",
+    "esp-radio/requires-unstable",
+    "unstable",
+]
+## BLE GATT provisioning (protocomm over GATT notify).
+ble = [
+    "dep:bt-hci-transport",
+    "dep:embedded-io",
+    "dep:embassy-futures",
+    "dep:embassy-sync",
+    "dep:embassy-time",
+    "dep:esp-radio",
+    "dep:trouble-host",
+    "esp-radio/ble",
+    "esp-radio/requires-unstable",
+    "unstable",
+]
+
+#! ### Chip Support Feature Flags
+## Target the ESP32.
+esp32 = ["esp-metadata-generated/esp32", "esp-radio?/esp32"]
+## Target the ESP32-C2.
+esp32c2 = ["esp-metadata-generated/esp32c2", "esp-radio?/esp32c2"]
+## Target the ESP32-C3.
+esp32c3 = ["esp-metadata-generated/esp32c3", "esp-radio?/esp32c3"]
+## Target the ESP32-C5.
+esp32c5 = ["esp-metadata-generated/esp32c5", "esp-radio?/esp32c5"]
+## Target the ESP32-C6.
+esp32c6 = ["esp-metadata-generated/esp32c6", "esp-radio?/esp32c6"]
+## Target the ESP32-C61.
+esp32c61 = ["esp-metadata-generated/esp32c61", "esp-radio?/esp32c61"]
+## Target the ESP32-H2.
+esp32h2 = ["esp-metadata-generated/esp32h2", "esp-radio?/esp32h2"]
+## Target the ESP32-H4.
+esp32h4 = ["esp-metadata-generated/esp32h4", "esp-radio?/esp32h4"]
+## Target the ESP32-P4 (protocol-only; no `esp-radio` chip feature).
+esp32p4 = ["esp-metadata-generated/esp32p4"]
+## Target the ESP32-S2.
+esp32s2 = ["esp-metadata-generated/esp32s2", "esp-radio?/esp32s2"]
+## Target the ESP32-S3.
+esp32s3 = ["esp-metadata-generated/esp32s3", "esp-radio?/esp32s3"]
+## Target the ESP32-S31.
+esp32s31 = ["esp-metadata-generated/esp32s31", "esp-radio?/esp32s31"]
+
+#! ### Logging Feature Flags
+## Enable logging output using version 0.4 of the `log` crate.
+log-04 = ["dep:log-04", "esp-radio?/log-04"]
+
+## Enable logging output using `defmt`.
+defmt = ["dep:defmt", "esp-radio?/defmt"]
+
+#! ### Extra Feature Flags
+## Verbose sec1 / protocomm protocol logs (requires a logging feature for output).
+debug = []
+
+## Unlock unstable APIs of this crate (all public items are unstable until deliberately stabilized).
+## SoftAP/BLE also need `esp-radio`'s unstable surface (BLE module); apps that only want
+## protocol helpers can omit SoftAP/BLE and this feature.
+unstable = ["esp-radio?/unstable"]
+
+## Libraries that depend on `esp-provisioning` should enable this feature to indicate their use of unstable APIs.
+## They must **not** enable the `unstable` feature themselves.
+requires-unstable = []
+
+[package.metadata.cargo-machete]
+ignored = ["esp-metadata-generated", "embassy-executor"]
