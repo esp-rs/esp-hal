@@ -1,30 +1,98 @@
 //! Minimal VDMA abstraction for MIPI-DSI video streaming.
 
-use crate::{peripherals::VDMA, private::Sealed, reg_access::VolatileCell};
+use crate::{
+    mipi_dw_gdma::{
+        ChannelConfig,
+        DwGdmaChannel,
+        HandshakeSelect,
+        LlPointerMasterSelect,
+        enable_controller,
+    },
+    private::Sealed,
+    reg_access::VolatileCell,
+};
 
 /// Implemented by VDMA channel singletons (`VDMA_CH0`–`VDMA_CH3`).
 ///
 /// Provides the hardware channel index without exposing the full DMA trait
 /// surface, since VDMA uses DW-GDMA linked-list mode which is incompatible
 /// with the standard GDMA channel traits.
-pub trait VdmaDmaChannel: Sealed {
+pub trait VdmaDmaChannel: Sealed + IntoOwnedVdmaChannel {
     /// Zero-based hardware channel index (0–3).
     fn channel_id(&self) -> u8;
 }
 
+/// Internal conversion from a concrete channel singleton to a type-erased
+/// owned token.
+///
+/// This trait is intentionally hidden. It is `pub` only because
+/// [`VdmaDmaChannel`] is public and needs this as a supertrait.
+#[doc(hidden)]
+pub trait IntoOwnedVdmaChannel: Sealed {
+    /// Converts the concrete singleton into a type-erased owned token.
+    fn into_owned_vdma_channel<'d>(self) -> OwnedVdmaChannel<'d>
+    where
+        Self: Sized + 'd;
+}
+
+#[allow(non_camel_case_types)]
+#[doc(hidden)]
+#[allow(
+    dead_code,
+    reason = "Singleton token is intentionally held to preserve exclusive ownership"
+)]
+pub enum OwnedVdmaChannel<'d> {
+    VDMA_CH0(crate::peripherals::VDMA_CH0<'d>),
+    VDMA_CH1(crate::peripherals::VDMA_CH1<'d>),
+    VDMA_CH2(crate::peripherals::VDMA_CH2<'d>),
+    VDMA_CH3(crate::peripherals::VDMA_CH3<'d>),
+}
+
+impl OwnedVdmaChannel<'_> {
+    #[inline]
+    pub(crate) const fn channel_id(&self) -> u8 {
+        match self {
+            Self::VDMA_CH0(_) => 0,
+            Self::VDMA_CH1(_) => 1,
+            Self::VDMA_CH2(_) => 2,
+            Self::VDMA_CH3(_) => 3,
+        }
+    }
+}
+
 for_each_dma_channel! {
     ("VDMA", $ch:ident, $num:literal, compatible = [$($compatible:ident),*]) => {
+        impl IntoOwnedVdmaChannel for crate::peripherals::$ch<'_> {
+            #[inline]
+            fn into_owned_vdma_channel<'d>(self) -> OwnedVdmaChannel<'d>
+            where
+                Self: Sized + 'd,
+            {
+                OwnedVdmaChannel::$ch(self)
+            }
+        }
+
         impl VdmaDmaChannel for crate::peripherals::$ch<'_> {
             #[inline]
-            fn channel_id(&self) -> u8 { $num }
+            fn channel_id(&self) -> u8 {
+                $num
+            }
         }
     };
+}
+
+pub(crate) fn take_owned_vdma_channel<'d>(
+    channel: impl VdmaDmaChannel + 'd,
+) -> (OwnedVdmaChannel<'d>, u8) {
+    let owned: OwnedVdmaChannel<'d> = channel.into_owned_vdma_channel();
+    let channel_id = owned.channel_id();
+    (owned, channel_id)
 }
 
 /// Fixed write destination for all DSI DMA transfers (DSI bridge pixel FIFO).
 pub(super) const DSI_BRG_MEM_BASE: u32 = 0x5010_5000;
 
-const PORT_MEMORY: u32 = 1;
+const PORT_MEMORY: u32 = LlPointerMasterSelect::Memory.raw();
 const PORT_DSI: u32 = 0;
 
 /// CTL0 value for mem → DSI transfers (constant across all frame buffers):
@@ -43,7 +111,35 @@ const CTRL_LO: u32 = PORT_MEMORY        // bit  0: sms
 /// CTL1 base: arlen_en=1, arlen=16, awlen_en=1, awlen=16.
 const CTRL_HI_BASE: u32 = (1 << 6) | (16 << 7) | (1 << 15) | (16 << 16);
 
+/// CTL1 `IOC_BlkTfr`: latch `BLOCK_TFR_DONE` when this LLI's block completes.
+const IOC_BLK_TFR: u32 = 1 << 26;
+
 const LLI_VALID: u32 = 1 << 31;
+
+/// CTL1 of a ready LLI. `LLI_LAST` is never set, so the ring loops forever.
+const CTRL_HI: u32 = CTRL_HI_BASE | IOC_BLK_TFR | LLI_VALID;
+
+/// The only channel interrupt source DSI uses. The reset value of the signal
+/// enable also routes the per-burst transaction-done sources, one per line.
+pub(super) const BLOCK_TFR_DONE: u32 = 1 << 0;
+
+const DSI_CHANNEL_CONFIG: ChannelConfig = ChannelConfig {
+    src_multblk_type: 3,
+    dst_multblk_type: 3,
+    // M→P, DMA as flow controller
+    transfer_type_flow_control: 1,
+    src_handshake: HandshakeSelect::Hardware,
+    dst_handshake: HandshakeSelect::Hardware,
+    src_peripheral: 0,
+    // DSI bridge handshake peripheral = 0
+    dst_peripheral: 0,
+    src_status_fetch_addr: 0,
+    dst_status_fetch_addr: 0,
+    priority: 1,
+    // Outstanding: src = 5 (4+1), dst = 2 (1+1)
+    src_outstanding_limit: 4,
+    dst_outstanding_limit: 1,
+};
 
 /// One VDMA link-list item (LLI).
 #[repr(C)]
@@ -96,7 +192,6 @@ impl VdmaLinkItem {
     pub(super) fn configure(&self, src_addr: u32, fb_size: usize, next: *const VdmaLinkItem) {
         debug_assert!(fb_size.is_multiple_of(8), "fb_size must be a multiple of 8");
         let block_ts = (fb_size / 8) as u32 - 1;
-        let ctrl_hi = CTRL_HI_BASE | LLI_VALID; // no LLI_LAST → loop forever
         self.sar_lo.set(src_addr);
         self.sar_hi.set(0);
         self.dar_lo.set(DSI_BRG_MEM_BASE);
@@ -108,7 +203,7 @@ impl VdmaLinkItem {
         self.llp_lo.set(next as u32 | PORT_MEMORY);
         self.llp_hi.set(0);
         self.ctrl_lo.set(CTRL_LO);
-        self.ctrl_hi.set(ctrl_hi);
+        self.ctrl_hi.set(CTRL_HI);
         self.sstat.set(0);
         self.dstat.set(0);
         self.status_lo.set(0);
@@ -134,13 +229,13 @@ impl VdmaLinkItem {
     /// **just-consumed** LLI from the ping-pong pair while the DMA is busy
     /// with the other one.
     pub(super) fn rearm(&self) {
-        self.ctrl_hi.set(CTRL_HI_BASE | LLI_VALID);
+        self.ctrl_hi.set(CTRL_HI);
     }
 }
 
 /// Handles for a single VDMA channel dedicated to the DSI bridge.
 pub(super) struct VdmaChannel {
-    channel_id: u8,
+    channel: DwGdmaChannel,
 }
 
 impl VdmaChannel {
@@ -149,59 +244,37 @@ impl VdmaChannel {
     ///
     /// The caller must hold the `Vdma` peripheral guard before calling this.
     pub(super) fn new(channel_id: u8) -> Self {
-        VDMA::regs().reset0().write(|w| w.dmac_rst().set_bit());
-        while VDMA::regs().reset0().read().dmac_rst().bit_is_set() {}
-        VDMA::regs().cfg0().modify(|_, w| {
-            w.dmac_en().set_bit();
-            w.int_en().set_bit()
-        });
+        enable_controller();
 
-        let ch = VDMA::regs().ch(channel_id as usize);
+        let channel = DwGdmaChannel::new(channel_id);
+        channel.configure(DSI_CHANNEL_CONFIG);
+        Self { channel }
+    }
 
-        // linked-list multi-block for both source and destination
-        ch.cfg0().write(|w| unsafe {
-            w.ch1_src_multblk_type().bits(3);
-            w.ch1_dst_multblk_type().bits(3)
-        });
-
-        // M→P, DMA as flow controller (tt_fc = 1 = DW_GDMA_LL_FLOW_M2P_DMAC)
-        // HW handshake on both ends; dst handshake peripheral = DSI (0)
-        // channel priority = 1; outstanding: src = 5 (4+1), dst = 2 (1+1)
-        ch.cfg1().write(|w| unsafe {
-            w.ch1_tt_fc().bits(1);
-            w.ch1_hs_sel_src().clear_bit();
-            w.ch1_hs_sel_dst().clear_bit();
-            w.ch1_dst_per().bits(0);
-            w.ch1_ch_prior().bits(1);
-            w.ch1_src_osr_lmt().bits(4);
-            w.ch1_dst_osr_lmt().bits(1)
-        });
-
-        Self { channel_id }
+    /// Creates an unconfigured handle for channel-local operations such as
+    /// interrupt acknowledge/disable and stop.
+    pub(super) const fn from_channel_id(channel_id: u8) -> Self {
+        Self {
+            channel: DwGdmaChannel::new(channel_id),
+        }
     }
 
     /// Points the channel's LLP at `item` and enables the channel.
-    pub(super) fn start(&mut self, item: &VdmaLinkItem) {
+    pub(super) fn start(&self, item: &VdmaLinkItem) {
         let addr = item as *const VdmaLinkItem as u32;
-        debug_assert_eq!(addr & 0x3F, 0, "LLI must be 64-byte aligned");
-        let dma = VDMA::regs();
-        let ch = dma.ch(self.channel_id as usize);
-
-        // LLP0: lms = MEMORY, loc0 = addr >> 6
-        ch.llp0()
-            .write(|w| unsafe { w.ch1_lms().bit(PORT_MEMORY != 0).ch1_loc0().bits(addr >> 6) });
-        unsafe { ch.llp1().write_with_zero(|w| w) };
-
-        self.ch_enable(true);
+        self.channel
+            .start_link_list_transfer(addr, LlPointerMasterSelect::Memory);
     }
 
-    fn ch_enable(&self, en: bool) {
-        let shift = self.channel_id;
-        let val: u32 = if en {
-            0x0101 << shift // ch_en bit + ch_en_we bit
-        } else {
-            0x0100 << shift // ch_en_we only (clears ch_en)
-        };
-        unsafe { VDMA::regs().chen0().write(|w| w.bits(val)) };
+    pub(super) fn set_block_done_interrupt(&self, enabled: bool) {
+        self.channel.set_block_done_interrupt(enabled);
+    }
+
+    pub(super) fn clear_all_interrupts(&self) {
+        self.channel.clear_all_interrupts();
+    }
+
+    pub(super) fn stop(&self) {
+        self.channel.set_enabled(false);
     }
 }

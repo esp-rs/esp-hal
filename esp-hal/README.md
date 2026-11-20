@@ -126,7 +126,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | Driver            | Status |
 | ----------------- |:------:|
 | Camera interface  | 🚧     |
-| MIPI-CSI          | ❌     |
+| MIPI-CSI          | 🚧     |
 | MIPI-DSI          | 🚧     |
 | RGB display       | 🚧     |
 | SPI LCD interface | [❌][5374] [^1] |
