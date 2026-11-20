@@ -818,8 +818,14 @@ impl Driver<'_> {
     }
 
     fn recover(&self) {
-        let address = self.regs().slave_addr().read().slave_addr().bits() as u8;
+        let regs = self.regs();
+        let address = regs.slave_addr().read().slave_addr().bits() as u8;
+        // setup writes the driver default into the bus timeout.
+        let timeout = regs.to().read().time_out_value().bits();
         self.setup(&Config::new(address)).ok();
+        regs.to()
+            .modify(|_, w| unsafe { w.time_out_value().bits(timeout) });
+        self.update_registers();
     }
 
     fn start_listen(&self) {

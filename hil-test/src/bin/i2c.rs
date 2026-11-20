@@ -1690,6 +1690,7 @@ mod i2c_slave {
             } else {
                 assert_eq!(slave.listen(&mut [0]).await, Err(Error::Timeout));
             }
+            assert_eq!(regs.to().read().time_out_value().bits(), timeout);
             wait_for_pause().await;
             MASTER_PAUSED.store(false, Ordering::SeqCst);
             // Keep the next listen from recovering the controller before the bus check.
