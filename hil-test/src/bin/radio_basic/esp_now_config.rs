@@ -3,7 +3,14 @@ mod tests {
     use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
     use esp_radio::{
         esp_now::{BROADCAST_ADDRESS, Error, EspNowError, EspNowWifiInterface, PeerInfo},
-        wifi::{ControllerConfig, WifiController},
+        wifi::{
+            Config,
+            ControllerConfig,
+            WifiController,
+            WifiError,
+            ap::AccessPointConfig,
+            sta::StationConfig,
+        },
     };
 
     const PMK: [u8; 16] = [0x42; 16];
@@ -96,6 +103,61 @@ mod tests {
         drop(esp_now);
 
         let _controller = WifiController::new(wifi, Default::default()).unwrap();
+    }
+
+    #[test]
+    fn new_controller_must_match_live_esp_now(p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        let mut wifi = p.WIFI;
+        let controller = WifiController::new(wifi.reborrow(), Default::default()).unwrap();
+        let mut esp_now = controller.esp_now();
+        drop(controller);
+
+        let other_buffers = ControllerConfig::default().with_static_rx_buf_num(4);
+        assert_eq!(
+            WifiController::new(wifi.reborrow(), other_buffers.clone()).err(),
+            Some(WifiError::InitConfigMismatch)
+        );
+
+        let controller = WifiController::new(wifi.reborrow(), Default::default()).unwrap();
+        drop(controller);
+
+        esp_now
+            .send(&BROADCAST_ADDRESS, b"hello")
+            .unwrap()
+            .wait()
+            .unwrap();
+
+        drop(esp_now);
+
+        let _controller = WifiController::new(wifi, other_buffers).unwrap();
+    }
+
+    #[test]
+    fn failed_set_config_keeps_esp_now_running(p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        let mut controller = WifiController::new(p.WIFI, Default::default()).unwrap();
+        let mut esp_now = controller.esp_now();
+
+        // The default world safe country doesn't allow channel 13, so applying the access point
+        // configuration fails after the mode change has stopped Wi-Fi.
+        assert_eq!(
+            controller.set_config(&Config::AccessPointStation(
+                StationConfig::default(),
+                AccessPointConfig::default().with_channel(13),
+            )),
+            Err(WifiError::InvalidArguments)
+        );
+
+        esp_now
+            .send(&BROADCAST_ADDRESS, b"hello")
+            .unwrap()
+            .wait()
+            .unwrap();
     }
 
     #[test]

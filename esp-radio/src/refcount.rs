@@ -61,6 +61,13 @@ impl Refcount {
         }
     }
 
+    /// Returns whether more than one user holds the resource.
+    #[cfg(feature = "wifi")]
+    pub fn is_shared(&self) -> bool {
+        // A single user is stored as 2, see the note on refcount 1 above.
+        self.0.load(Ordering::Acquire) > 2
+    }
+
     pub fn decrement(&self, on_last: impl FnOnce()) {
         loop {
             let op = self
