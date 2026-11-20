@@ -1148,6 +1148,9 @@ pub enum WifiError {
 
     /// Station still in disconnect status.
     NotConnected,
+
+    /// Wi-Fi is already initialized with different init-only settings.
+    InitConfigMismatch,
 }
 
 impl WifiError {
@@ -2849,6 +2852,58 @@ impl ControllerConfig {
             warn!("ESP-NOW max encrypted peers should be at most the number of hardware keys.");
         }
     }
+
+    fn to_raw(&self) -> wifi_init_config_t {
+        wifi_init_config_t {
+            osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+
+            wpa_crypto_funcs: unsafe { g_wifi_default_wpa_crypto_funcs },
+            static_rx_buf_num: self.static_rx_buf_num as _,
+            dynamic_rx_buf_num: self.dynamic_rx_buf_num as _,
+            tx_buf_type: crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
+            static_tx_buf_num: self.static_tx_buf_num as _,
+            dynamic_tx_buf_num: self.dynamic_tx_buf_num as _,
+            rx_mgmt_buf_type: crate::sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
+            rx_mgmt_buf_num: crate::sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
+            cache_tx_buf_num: crate::sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
+            csi_enable: cfg!(feature = "csi") as i32,
+            ampdu_rx_enable: self.ampdu_rx_enable as _,
+            ampdu_tx_enable: self.ampdu_tx_enable as _,
+            amsdu_tx_enable: self.amsdu_tx_enable as _,
+            nvs_enable: 0,
+            nano_enable: 0,
+            rx_ba_win: self.rx_ba_win as _,
+            wifi_task_core_id: Cpu::current() as _,
+            beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
+            mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
+            feature_caps: wifi_init_feature_caps(),
+            sta_disconnected_pm: self.sta_disconnected_pm as _,
+            espnow_max_encrypt_num: self.espnow_max_encrypt_num as _,
+
+            tx_hetb_queue_num: 3,
+            dump_hesigb_enable: false,
+
+            // WIFI_INIT_CONFIG_DEFAULT: both are off unless the matching sdkconfig is set.
+            privacy_enhancements: false,
+            rmac_auto_reset_int: 0,
+
+            magic: WIFI_INIT_CONFIG_MAGIC as i32,
+        }
+    }
+}
+
+/// Compares the [`ControllerConfig`] settings that only take effect at initialization.
+fn init_only_settings_match(a: &wifi_init_config_t, b: &wifi_init_config_t) -> bool {
+    a.static_rx_buf_num == b.static_rx_buf_num
+        && a.dynamic_rx_buf_num == b.dynamic_rx_buf_num
+        && a.static_tx_buf_num == b.static_tx_buf_num
+        && a.dynamic_tx_buf_num == b.dynamic_tx_buf_num
+        && a.ampdu_rx_enable == b.ampdu_rx_enable
+        && a.ampdu_tx_enable == b.ampdu_tx_enable
+        && a.amsdu_tx_enable == b.amsdu_tx_enable
+        && a.rx_ba_win == b.rx_ba_win
+        && a.sta_disconnected_pm == b.sta_disconnected_pm
+        && a.espnow_max_encrypt_num == b.espnow_max_encrypt_num
 }
 
 static WIFI_REFCOUNT: Refcount = Refcount::new();
@@ -2929,6 +2984,11 @@ impl<'d> WifiController<'d> {
     /// Dropping the controller deinitializes Wi-Fi unless an ESP-NOW or sniffer
     /// instance created from it is still alive.
     ///
+    /// While such an instance keeps Wi-Fi initialized, the init-only settings (buffer counts,
+    /// AMPDU/AMSDU, `rx_ba_win`, `sta_disconnected_pm` and `espnow_max_encrypt_num`) must
+    /// match the ones Wi-Fi was initialized with, otherwise [`WifiError::InitConfigMismatch`]
+    /// is returned.
+    ///
     /// Create [`Interface`]s separately via [`Interface::station()`] /
     /// [`Interface::access_point()`].
     /// # {esp_now}
@@ -2965,54 +3025,13 @@ impl<'d> WifiController<'d> {
 
         let radio_guard = RadioRefGuard::without_wake_lock();
 
+        let init_config = config.to_raw();
+
         let first = WIFI_REFCOUNT.try_increment(|| -> Result<(), WifiError> {
-            unsafe {
-                internal::G_CONFIG = wifi_init_config_t {
-                    osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+            unsafe { internal::G_CONFIG = init_config };
 
-                    wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
-                    static_rx_buf_num: config.static_rx_buf_num as _,
-                    dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
-                    tx_buf_type: crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
-                    static_tx_buf_num: config.static_tx_buf_num as _,
-                    dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
-                    rx_mgmt_buf_type: crate::sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF
-                        as i32,
-                    rx_mgmt_buf_num: crate::sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF
-                        as i32,
-                    cache_tx_buf_num: crate::sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
-                    csi_enable: cfg!(feature = "csi") as i32,
-                    ampdu_rx_enable: config.ampdu_rx_enable as _,
-                    ampdu_tx_enable: config.ampdu_tx_enable as _,
-                    amsdu_tx_enable: config.amsdu_tx_enable as _,
-                    nvs_enable: 0,
-                    nano_enable: 0,
-                    rx_ba_win: config.rx_ba_win as _,
-                    wifi_task_core_id: Cpu::current() as _,
-                    beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
-                    mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
-                    feature_caps: wifi_init_feature_caps(),
-                    sta_disconnected_pm: config.sta_disconnected_pm as _,
-                    espnow_max_encrypt_num: config.espnow_max_encrypt_num as _,
-
-                    tx_hetb_queue_num: 3,
-                    dump_hesigb_enable: false,
-
-                    // WIFI_INIT_CONFIG_DEFAULT: both are off unless the matching sdkconfig is set.
-                    privacy_enhancements: false,
-                    rmac_auto_reset_int: 0,
-
-                    magic: WIFI_INIT_CONFIG_MAGIC as i32,
-                };
-            }
-
-            #[cfg(wifi_softap_support)]
-            DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
-            DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
             #[cfg(wifi_tx_retry)]
             tx_retry::init()?;
-
-            TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
 
             crate::wifi::wifi_init(device)?;
 
@@ -3030,21 +3049,24 @@ impl<'d> WifiController<'d> {
             Ok(())
         })?;
 
-        if !first {
-            warn!(
-                "Wi-Fi is already initialized; init-only ControllerConfig settings were ignored: \
-                 static_rx_buf_num, dynamic_rx_buf_num, static_tx_buf_num, dynamic_tx_buf_num, \
-                 rx_queue_size, tx_queue_size, rx_ba_win, espnow_max_encrypt_num, \
-                 ampdu_rx_enable, ampdu_tx_enable, amsdu_tx_enable"
-            );
-        }
-
         let mut controller = WifiController {
             _guard: WifiRefGuard {
                 _radio_guard: radio_guard,
             },
             _phantom: Default::default(),
         };
+
+        if !first
+            && !init_only_settings_match(&init_config, unsafe { &*addr_of!(internal::G_CONFIG) })
+        {
+            return Err(WifiError::InitConfigMismatch);
+        }
+
+        #[cfg(wifi_softap_support)]
+        DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+        DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+
+        TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
 
         controller.set_country_info(&config.country_info)?;
         // Set a sane default power saving mode. The blob default is not the best for bandwidth.
@@ -3289,7 +3311,10 @@ impl WifiController<'_> {
     /// configured country (see [`ControllerConfig`]).
     ///
     /// If this function returns an error, the Wi-Fi mode is reset to `NULL` and
-    /// the controller is stopped.
+    /// the controller is stopped, unless an ESP-NOW or sniffer instance is alive. In that case,
+    /// Wi-Fi keeps running.
+    ///
+    /// Changing the mode restarts Wi-Fi, which briefly pauses ESP-NOW traffic.
     ///
     /// ## Example
     ///
@@ -3311,8 +3336,12 @@ impl WifiController<'_> {
     pub fn set_config(&mut self, conf: &Config) -> Result<(), WifiError> {
         // We/the driver might have applied a partial configuration so we better disable
         // AccessPoint/Station just in case the caller ignores the error we return here -
-        // they will run into further errors this way.
-        struct ResetModeOnDrop;
+        // they will run into further errors this way. ESP-NOW and sniffer instances hold the
+        // other Wi-Fi references and need Wi-Fi running, so while they are alive we restart
+        // Wi-Fi instead.
+        struct ResetModeOnDrop {
+            stopped: bool,
+        }
         impl ResetModeOnDrop {
             /// Prevent resetting the Wi-Fi mode when the guard is dropped.
             fn defuse(self) {
@@ -3321,12 +3350,18 @@ impl WifiController<'_> {
         }
         impl Drop for ResetModeOnDrop {
             fn drop(&mut self) {
-                unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
-                unwrap!(WifiController::stop_impl());
+                if !WIFI_REFCOUNT.is_shared() {
+                    unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
+                    unwrap!(WifiController::stop_impl());
+                } else if self.stopped
+                    && let Err(e) = WifiController::start_impl()
+                {
+                    warn!("Failed to restart Wi-Fi for ESP-NOW/sniffer: {:?}", e);
+                }
             }
         }
 
-        let reset_mode_on_error = ResetModeOnDrop;
+        let mut reset_mode_on_error = ResetModeOnDrop { stopped: false };
 
         conf.validate()?;
 
@@ -3343,8 +3378,10 @@ impl WifiController<'_> {
             Config::EapStation(_) => wifi_mode_t_WIFI_MODE_STA,
         };
 
-        if previous_mode != mode {
+        let restart = previous_mode != mode;
+        if restart {
             Self::stop_impl()?;
+            reset_mode_on_error.stopped = true;
         }
 
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
@@ -3377,12 +3414,9 @@ impl WifiController<'_> {
             sleep::set_station_only(mode == wifi_mode_t_WIFI_MODE_STA);
         }
 
-        if previous_mode != mode {
-            set_access_point_state(WifiAccessPointState::Starting);
-            set_station_state(WifiStationState::Starting);
-
-            // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
-            esp_wifi_result!(unsafe { esp_wifi_start() })?;
+        if restart {
+            Self::start_impl()?;
+            reset_mode_on_error.stopped = false;
 
             // Default for all scans, including connect scans. Requires a started station.
             // `wifi_start_scan` only overrides the active or passive time for a single scan and
@@ -3523,6 +3557,14 @@ ignored."
     #[instability::unstable]
     pub fn set_max_tx_power(&mut self, power: i8) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
+    }
+
+    fn start_impl() -> Result<(), WifiError> {
+        set_access_point_state(WifiAccessPointState::Starting);
+        set_station_state(WifiStationState::Starting);
+
+        // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
+        esp_wifi_result!(unsafe { esp_wifi_start() })
     }
 
     fn stop_impl() -> Result<(), WifiError> {
