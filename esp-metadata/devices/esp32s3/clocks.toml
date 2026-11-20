@@ -2,6 +2,7 @@ system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  values = "40",                          output = "VALUE * 1_000_000", always_on = true },
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480", output = "VALUE * 1_000_000", reject = "VALUE == 320_000_000 && CPU_PLL_DIV_OUT == 240_000_000" },
+    { name = "PLL_F80M",    type = "derived", from = "PLL_CLK",                       output = "80_000_000" },
     { name = "RC_FAST_CLK", type = "source",                                          output = "17_500_000", adjustable = "8_750_000..=26_250_000" },
 
     # Low-speed clocks
@@ -141,7 +142,7 @@ system_clocks = { clock_tree = [
     { group = "SPI", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
             { name = "XTAL", outputs = "XTAL_CLK" },
-            { name = "APB",  outputs = "APB_CLK", default = true }, # PLL_F80M?
+            { name = "APB",  outputs = "PLL_F80M", default = true },
         ] },
     ] },
     { group = "I2S",

@@ -4,10 +4,10 @@ use crate::{
 };
 
 impl SpiInstance {
-    // SPI_FUNCTION_CLOCK
+    pub(crate) fn enable_bbpll_mst_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {}
 
     pub(crate) fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _enable: bool) {
-        // SPI clock gates are managed by the peripheral clock infrastructure in system.rs
+        // The high-speed and master gates are enabled at reset.
     }
 
     pub(crate) fn configure_function_clock_impl(
@@ -16,31 +16,27 @@ impl SpiInstance {
         _old_config: Option<SpiFunctionClockConfig>,
         new_config: SpiFunctionClockConfig,
     ) {
-        let source = match new_config {
-            SpiFunctionClockConfig::Xtal => 0,
-            SpiFunctionClockConfig::RcFast => 1,
-            SpiFunctionClockConfig::Bbpll => 2,
+        // The high-speed and master clocks are limited to 160 MHz and 80 MHz, respectively.
+        // See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_hal_gpspi/esp32s31/include/hal/spi_ll.h#L228-L248>.
+        let (source, hs_div_num, mst_div_num) = match new_config {
+            SpiFunctionClockConfig::Xtal => (0, 0, 0),
+            SpiFunctionClockConfig::RcFast => (1, 0, 0),
+            SpiFunctionClockConfig::Bbpll => (2, 2, 1),
         };
-
-        // Programs `hs_clk_div_num`. The register value is divisor - 1, so 2 means /3
-        // (480 MHz BBPLL -> 160 MHz). Reset the divider when the node is released so XTAL/RC_FAST
-        // are not divided.
-        let div_num = match new_config {
-            SpiFunctionClockConfig::Xtal => 0,
-            SpiFunctionClockConfig::RcFast => 0,
-            SpiFunctionClockConfig::Bbpll => 2,
-        };
+        let regs = HP_SYS_CLKRST::regs();
         match self {
-            SpiInstance::Spi2 => {
-                HP_SYS_CLKRST::regs().gpspi2_ctrl0().modify(|_, w| unsafe {
+            Self::Spi2 => {
+                regs.gpspi2_ctrl0().modify(|_, w| unsafe {
                     w.clk_src_sel().bits(source);
-                    w.hs_clk_div_num().bits(div_num)
+                    w.hs_clk_div_num().bits(hs_div_num);
+                    w.mst_clk_div_num().bits(mst_div_num)
                 });
             }
-            SpiInstance::Spi3 => {
-                HP_SYS_CLKRST::regs().gpspi3_ctrl0().modify(|_, w| unsafe {
+            Self::Spi3 => {
+                regs.gpspi3_ctrl0().modify(|_, w| unsafe {
                     w.clk_src_sel().bits(source);
-                    w.hs_clk_div_num().bits(div_num)
+                    w.hs_clk_div_num().bits(hs_div_num);
+                    w.mst_clk_div_num().bits(mst_div_num)
                 });
             }
         }

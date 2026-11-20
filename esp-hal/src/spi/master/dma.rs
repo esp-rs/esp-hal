@@ -1427,18 +1427,12 @@ aligned, otherwise the driver requires copying the entire buffer."
         }
     }
 
-    #[doc_replace(
-        "max_frequency" => {
-            cfg(esp32h2) => "48MHz",
-            _ => "80MHz",
-        }
-    )]
     /// Changes the bus configuration.
     ///
     /// # Errors
     ///
-    /// [`ConfigError::FrequencyOutOfRange`] when frequency passed in config exceeds
-    /// __max_frequency__ or is below 70 kHz.
+    /// [`ConfigError::FrequencyOutOfRange`] when the requested frequency is
+    /// outside the range described in [`Config::with_frequency`].
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)

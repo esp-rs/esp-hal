@@ -1323,89 +1323,100 @@ mod tests {
 
     #[test]
     fn test_clock_calculation_accuracy(mut ctx: Context) {
+        use esp_hal::clock::ll::{ClockTree, SpiFunctionClockConfig, SpiInstance};
+
         #[track_caller]
-        fn assert_frequency_roundtrips(
-            ctx: &mut Context,
-            source: SpiFunctionClockConfig,
-            input: u32,
-        ) {
-            let f_mst = SpiInstance::function_clock_source_frequency(source);
-            ctx.spi
-                .apply_config(
-                    &Config::default()
-                        .with_frequency(Rate::from_hz(input))
-                        .with_clock_source(source),
-                )
-                .unwrap();
-
-            // Read back effective SCLK
-            let spi2 = unsafe { SPI2::steal() };
-
-            let clock = spi2.register_block().clock().read();
-
-            let n = clock.clkcnt_n().bits() as u32 + 1;
-            let pre = clock.clkdiv_pre().bits() as u32 + 1;
-
-            let actual = f_mst.div_ceil(n * pre);
-
-            assert_eq!(
-                actual, input,
-                "source: {:?} ({}), n={}, pre={}",
-                source, f_mst, n, pre
-            );
-        }
-
         fn check_typical_values(ctx: &mut Context, source: SpiFunctionClockConfig) {
-            esp_hal::clock::ll::ClockTree::with(|clocks| {
-                SpiInstance::Spi2.request_function_clock(clocks)
-            });
-            let f_min = SpiInstance::function_clock_source_frequency(source).div_ceil(1024);
-            for input in [0, f_min - 1] {
+            let config = Config::default().with_clock_source(source);
+            let source_hz = SpiInstance::function_clock_source_frequency(source);
+            let min_hz = source_hz.div_ceil(1024);
+            for requested in [0, min_hz - 1] {
                 assert_eq!(
-                    ctx.spi.apply_config(
-                        &Config::default()
-                            .with_clock_source(source)
-                            .with_frequency(Rate::from_hz(input)),
-                    ),
+                    ctx.spi
+                        .apply_config(&config.with_frequency(Rate::from_hz(requested))),
                     Err(esp_hal::spi::master::ConfigError::FrequencyOutOfRange),
                 );
             }
-            assert_frequency_roundtrips(ctx, source, f_min);
-            assert_frequency_roundtrips(
-                ctx,
-                source,
-                SpiInstance::function_clock_source_frequency(source),
-            );
 
-            if f_min < 100_000 {
-                assert_frequency_roundtrips(ctx, source, 100_000);
+            for requested in [min_hz, source_hz, 1_000_000, 2_000_000]
+                .into_iter()
+                .chain((min_hz < 100_000).then_some(100_000))
+            {
+                ctx.spi
+                    .apply_config(&config.with_frequency(Rate::from_hz(requested)))
+                    .unwrap();
+
+                let clock = ClockTree::with(|clocks| {
+                    let spi = SpiInstance::Spi2;
+                    spi.request_function_clock(clocks);
+                    let clock = SPI2::regs().clock().read();
+                    spi.release_function_clock(clocks);
+                    clock
+                });
+
+                let n = u32::from(clock.clkcnt_n().bits()) + 1;
+                let pre = u32::from(clock.clkdiv_pre().bits()) + 1;
+                assert_eq!(
+                    source_hz.div_ceil(n * pre),
+                    requested,
+                    "source: {source:?} ({source_hz} Hz), n={n}, pre={pre}"
+                );
             }
-            assert_frequency_roundtrips(ctx, source, 1_000_000);
-            assert_frequency_roundtrips(ctx, source, 2_000_000);
         }
 
-        use esp_hal::clock::ll::{SpiFunctionClockConfig, SpiInstance};
-
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        check_typical_values(&mut ctx, SpiFunctionClockConfig::Apb);
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
         check_typical_values(&mut ctx, SpiFunctionClockConfig::Xtal);
-        #[cfg(esp32c2)]
-        check_typical_values(&mut ctx, SpiFunctionClockConfig::Pll40m);
-        #[cfg(any(esp32h2, esp32h4))]
-        check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF48m);
-        #[cfg(esp32c3)]
-        check_typical_values(&mut ctx, SpiFunctionClockConfig::Pll80m);
-        #[cfg(esp32c6)]
-        check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF80m);
-        #[cfg(esp32c5)]
+        #[cfg(soc_has_clock_node_spi_pll_f120m_div2)]
         check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF120m);
-        #[cfg(any(esp32c5, esp32c61))]
-        check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF160m);
-        #[cfg(esp32p4)]
-        check_typical_values(&mut ctx, SpiFunctionClockConfig::Spll);
-        #[cfg(esp32s31)]
-        check_typical_values(&mut ctx, SpiFunctionClockConfig::Bbpll);
+        check_typical_values(&mut ctx, SpiFunctionClockConfig::default());
+    }
+
+    #[cfg(all(pcnt_driver_supported, spi_master_supports_dma))]
+    #[test]
+    fn test_sck_frequency_matches_configuration(ctx: Context) {
+        use esp_hal::spi::master::ClockSource;
+
+        const SCK: Rate = Rate::from_mhz(2);
+
+        let counter = set_up_pcnt!(ctx, sclk_input);
+        let mut spi = ctx.spi.with_dma(ctx.dma_channel);
+        let mut buffer = DmaTxBuf::new(
+            DmaAlignedMut::new(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.tx_buffer).unwrap(),
+        )
+        .unwrap();
+
+        let config = Config::default().with_frequency(SCK);
+        let expected_hz = u64::from(SCK.as_hz());
+        for source in [
+            // On C5, select XTAL before each PLL to reset the PCR pre-divider to /1.
+            #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
+            ClockSource::Xtal,
+            ClockSource::default(),
+            #[cfg(soc_has_clock_node_spi_pll_f120m_div2)]
+            ClockSource::Xtal,
+            #[cfg(soc_has_clock_node_spi_pll_f120m_div2)]
+            ClockSource::PllF120m,
+        ] {
+            spi.apply_config(&config.with_clock_source(source)).unwrap();
+            let transfer = spi.write_buffer(1024, buffer).map_err(|err| err.0).unwrap();
+            counter.clear();
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(500) {}
+            let pulses = u64::try_from(counter.value()).unwrap();
+            let elapsed_us = start.elapsed().as_micros();
+            assert!(
+                !transfer.is_done(),
+                "{source:?}: SPI transfer ended during SCK measurement"
+            );
+            (spi, buffer) = transfer.wait();
+
+            let actual_hz = pulses * 1_000_000 / elapsed_us;
+            assert!(
+                actual_hz.abs_diff(expected_hz) <= expected_hz / 20,
+                "{source:?}: SCK was {actual_hz} Hz, expected {expected_hz} Hz"
+            );
+        }
     }
 }
 
@@ -3402,15 +3413,22 @@ mod stable {
     #[test]
     fn max_output_frequency_is_attainable_by_default(mut ctx: Context) {
         let max_mhz = cfg_select! {
-            any(esp32, esp32c2) => 40,
+            esp32c2 => 40,
             any(esp32h2, esp32h4) => 48, // and H21
             any(
-                esp32c3, esp32c5, esp32c6, esp32c61, esp32p4, esp32s2, esp32s3, esp32s31
+                esp32, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4, esp32s2, esp32s3, esp32s31
             ) => 80,
         };
+        let max_frequency = Rate::from_mhz(max_mhz);
+        let config = Config::default();
         ctx.spi
-            .apply_config(&Config::default().with_frequency(Rate::from_mhz(max_mhz)))
+            .apply_config(&config.with_frequency(max_frequency))
             .unwrap();
+        assert_eq!(
+            ctx.spi
+                .apply_config(&config.with_frequency(Rate::from_hz(max_frequency.as_hz() + 1))),
+            Err(esp_hal::spi::master::ConfigError::FrequencyOutOfRange)
+        );
     }
 
     #[test]

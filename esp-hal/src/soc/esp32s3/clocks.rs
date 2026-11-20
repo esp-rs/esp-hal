@@ -269,6 +269,8 @@ fn configure_pll_clk_impl(
     // `enable_pll_clk_impl`.
 }
 
+fn enable_pll_f80m_impl(_clocks: &mut ClockTree, _en: bool) {}
+
 // RC_FAST_CLK
 
 fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {

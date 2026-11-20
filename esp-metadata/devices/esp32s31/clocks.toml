@@ -120,8 +120,9 @@ system_clocks = { clock_tree = [
         ] },
     ] },
     { group = "SPI", clocks = [
+        { name = "BBPLL_MST_CLOCK", type = "generic", output = "BBPLL_D3_CLOCK / 2" },
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "BBPLL",   outputs = "BBPLL_D3_CLOCK", default = true },
+            { name = "BBPLL",   outputs = "BBPLL_MST_CLOCK", default = true },
             { name = "XTAL",    outputs = "XTAL_CLK" },
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ] },

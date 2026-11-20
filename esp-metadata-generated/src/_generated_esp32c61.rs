@@ -1283,6 +1283,12 @@ macro_rules! for_each_sw_interrupt {
 ///     }
 /// }
 /// impl SpiInstance {
+///     // SPI_PLL_F160M_DIV2
+///
+///     fn enable_pll_f160m_div2_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
 ///     // SPI_FUNCTION_CLOCK
 ///
 ///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
@@ -1695,7 +1701,7 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL_CLK`.
             Xtal,
             #[default]
-            /// Selects `PLL_F160M`.
+            /// Selects `PLL_F160M_DIV2`.
             PllF160m,
             /// Selects `RC_FAST_CLK`.
             RcFast,
@@ -1853,6 +1859,7 @@ macro_rules! define_clock_tree_types {
             pub(crate) i2s_tx_clk_refcount: [u32; 1],
             pub(crate) i2s_rx_clk_refcount: [u32; 1],
             pub(crate) i2s_mclk_out_refcount: [u32; 1],
+            pub(crate) spi_pll_f160m_div2_refcount: [u32; 1],
             pub(crate) spi_function_clock_refcount: [u32; 1],
             pub(crate) timg_function_clock_refcount: [u32; 2],
             pub(crate) timg_wdt_clock_refcount: [u32; 2],
@@ -2016,6 +2023,7 @@ macro_rules! define_clock_tree_types {
                 i2s_tx_clk_refcount: [0; 1],
                 i2s_rx_clk_refcount: [0; 1],
                 i2s_mclk_out_refcount: [0; 1],
+                spi_pll_f160m_div2_refcount: [0; 1],
                 spi_function_clock_refcount: [0; 1],
                 timg_function_clock_refcount: [0; 2],
                 timg_wdt_clock_refcount: [0; 2],
@@ -3391,6 +3399,30 @@ macro_rules! define_clock_tree_types {
             }
         }
         impl SpiInstance {
+            pub fn request_pll_f160m_div2(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::PLL_F160M_DIV2", self);
+                if increment_reference_count(&mut clocks.spi_pll_f160m_div2_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::PLL_F160M_DIV2", self);
+                    request_pll_f160m(clocks);
+                    self.enable_pll_f160m_div2_impl(clocks, true);
+                }
+            }
+            pub fn release_pll_f160m_div2(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::PLL_F160M_DIV2", self);
+                if decrement_reference_count(&mut clocks.spi_pll_f160m_div2_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::PLL_F160M_DIV2", self);
+                    self.enable_pll_f160m_div2_impl(clocks, false);
+                    release_pll_f160m(clocks);
+                }
+            }
+            pub fn pll_f160m_div2_frequency(self) -> u32 {
+                (pll_f160m_frequency() / 2)
+            }
+            pub fn pll_f160m_div2_source_frequency() -> u32 {
+                pll_f160m_frequency()
+            }
             pub fn configure_function_clock(
                 self,
                 clocks: &mut ClockTree,
@@ -3402,7 +3434,7 @@ macro_rules! define_clock_tree_types {
                 if active {
                     match new_selector {
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
-                        SpiFunctionClockConfig::PllF160m => request_pll_f160m(clocks),
+                        SpiFunctionClockConfig::PllF160m => self.request_pll_f160m_div2(clocks),
                         SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
                     }
                 }
@@ -3410,7 +3442,7 @@ macro_rules! define_clock_tree_types {
                 if active && let Some(old_selector) = old_selector {
                     match old_selector {
                         SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
-                        SpiFunctionClockConfig::PllF160m => release_pll_f160m(clocks),
+                        SpiFunctionClockConfig::PllF160m => self.release_pll_f160m_div2(clocks),
                         SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
                     }
                 }
@@ -3428,7 +3460,7 @@ macro_rules! define_clock_tree_types {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
-                        SpiFunctionClockConfig::PllF160m => request_pll_f160m(clocks),
+                        SpiFunctionClockConfig::PllF160m => self.request_pll_f160m_div2(clocks),
                         SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
                     }
                     self.enable_function_clock_impl(clocks, true);
@@ -3442,15 +3474,15 @@ macro_rules! define_clock_tree_types {
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
-                        SpiFunctionClockConfig::PllF160m => release_pll_f160m(clocks),
+                        SpiFunctionClockConfig::PllF160m => self.release_pll_f160m_div2(clocks),
                         SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
                     }
                 }
             }
-            pub fn function_clock_config_frequency(config: SpiFunctionClockConfig) -> u32 {
+            pub fn function_clock_config_frequency(self, config: SpiFunctionClockConfig) -> u32 {
                 match config {
                     SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
-                    SpiFunctionClockConfig::PllF160m => pll_f160m_frequency(),
+                    SpiFunctionClockConfig::PllF160m => (pll_f160m_frequency() / 2),
                     SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
                 }
             }
@@ -3459,7 +3491,11 @@ macro_rules! define_clock_tree_types {
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
             pub fn function_clock_source_frequency(source: SpiFunctionClockConfig) -> u32 {
-                Self::function_clock_config_frequency(source)
+                match source {
+                    SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    SpiFunctionClockConfig::PllF160m => (pll_f160m_frequency() / 2),
+                    SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
+                }
             }
         }
         impl TimgInstance {
@@ -3988,7 +4024,7 @@ macro_rules! define_clock_tree_types {
         fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
             if let Some(config) = clocks.spi_function_clock[instance as usize] {
                 SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                    SpiInstance::function_clock_config_frequency(config),
+                    instance.function_clock_config_frequency(config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
