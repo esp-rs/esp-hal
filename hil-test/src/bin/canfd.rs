@@ -135,13 +135,12 @@ mod blocking_tests {
         );
     }
 
-    fn started_controller(peripherals: esp_hal::peripherals::Peripherals) -> Context<Blocking> {
-        let (rx, tx) = hil_test::common_test_pins!(peripherals);
-
-        let mut canfd = CanFd::new(peripherals.TWAI0, config())
-            .unwrap()
-            .with_rx(rx)
-            .with_tx(tx);
+    fn started_controller(
+        twai: esp_hal::peripherals::TWAI0<'static>,
+        rx: impl esp_hal::gpio::interconnect::PeripheralInput<'static>,
+        tx: impl esp_hal::gpio::interconnect::PeripheralOutput<'static>,
+    ) -> Context<Blocking> {
+        let mut canfd = CanFd::new(twai, config()).unwrap().with_rx(rx).with_tx(tx);
         canfd.start().unwrap();
 
         Context { canfd }
@@ -151,12 +150,15 @@ mod blocking_tests {
     fn init() -> Context<Blocking> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         hil_test::init_logger!(peripherals);
-        started_controller(peripherals)
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        started_controller(peripherals.TWAI0, rx, tx)
     }
 
     // The USB-Serial-JTAG driver of the logger holds a `WakeLock`, which this test must not see.
     fn init_without_logger() -> Context<Blocking> {
-        started_controller(esp_hal::init(esp_hal::Config::default()))
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        started_controller(peripherals.TWAI0, rx, tx)
     }
 
     #[test]
