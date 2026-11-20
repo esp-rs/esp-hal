@@ -33,17 +33,20 @@ impl Refcount {
         }
     }
 
+    /// Runs `on_first` and takes the first reference if nobody holds the resource.
+    ///
+    /// Returns `Ok(false)` without changing the count if the resource is already in use.
     #[cfg(feature = "wifi")]
-    pub fn try_increment<E>(&self, on_first: impl FnOnce() -> Result<(), E>) -> Result<bool, E> {
+    pub fn increment_if_unused<E>(
+        &self,
+        on_first: impl FnOnce() -> Result<(), E>,
+    ) -> Result<bool, E> {
         loop {
-            let op = self
+            match self
                 .0
-                .fetch_update(Ordering::Release, Ordering::Acquire, |old| {
-                    if old == 1 { None } else { Some(old + 1) }
-                });
-
-            match op {
-                Ok(0) => {
+                .compare_exchange(0, 1, Ordering::Acquire, Ordering::Acquire)
+            {
+                Ok(_) => {
                     return match on_first() {
                         Ok(()) => {
                             self.0.store(2, Ordering::Release);
@@ -55,10 +58,17 @@ impl Refcount {
                         }
                     };
                 }
-                Ok(_) => return Ok(false),
-                Err(_) => {}
+                Err(1) => {}
+                Err(_) => return Ok(false),
             }
         }
+    }
+
+    /// Returns whether more than one user holds the resource.
+    #[cfg(feature = "wifi")]
+    pub fn is_shared(&self) -> bool {
+        // A single user is stored as 2, see the note on refcount 1 above.
+        self.0.load(Ordering::Acquire) > 2
     }
 
     pub fn decrement(&self, on_last: impl FnOnce()) {
