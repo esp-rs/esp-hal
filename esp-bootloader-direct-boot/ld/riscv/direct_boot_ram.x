@@ -77,15 +77,24 @@ SECTIONS {
     _noinit_end = .;
   } > RWDATA
 
-  /* must be the last section in RWDATA */
+  /* Fills RWDATA up to `.retention.bss`. */
   .stack (NOLOAD) : AT(ADDR(.stack)) ALIGN(4)
   {
     _stack_end = ABSOLUTE(.);
     _stack_end_cpu0 = ABSOLUTE(.);
-    . = ORIGIN(RWDATA) + LENGTH(RWDATA);
-    . = ALIGN(4);
+    . = (ORIGIN(RWDATA) + LENGTH(RWDATA) - SIZEOF(.retention.bss)) & ~15;
     _stack_start = ABSOLUTE(.);
     _stack_start_cpu0 = ABSOLUTE(.);
+  } > RWDATA
+
+  /* `#[ram(unstable(retention))]` statics. The top of RAM is inside the range that the retention
+     DMA reaches on the ESP32-C3. `dram2_seg` is empty, so the `_dram2_uninit_bss_*` symbols mark
+     this section, and the runtime zeroes it. */
+  .retention.bss (NOLOAD) : AT(ADDR(.retention.bss)) ALIGN(16)
+  {
+    _dram2_uninit_bss_start = ABSOLUTE(.);
+    *(.retention.bss .retention.bss.*)
+    _dram2_uninit_bss_end = ABSOLUTE(.);
   } > RWDATA
 }
 

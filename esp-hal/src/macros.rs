@@ -11,7 +11,7 @@ macro_rules! before_snippet {
     () => {
         r#"
 # #![no_std]
-# use esp_hal::{interrupt::{self, InterruptConfigurable}, time::{Duration, Instant, Rate}};
+# use esp_hal::{__macro_implementation, interrupt::{self, InterruptConfigurable}, time::{Duration, Instant, Rate}};
 # macro_rules! println {
 #     ($($tt:tt)*) => { };
 # }

@@ -22,7 +22,7 @@ clippy-configs = [
 ]
 host-test-configs = [
     { features = [] },
-    { features = ["has-lp-core", "is-lp-core", "rtc-slow", "rtc-fast", "uncached"] },
+    { features = ["has-lp-core", "is-lp-core", "rtc-slow", "rtc-fast", "uncached", "retention-dma"] },
 ]
 
 [package.metadata.docs.rs]
@@ -53,6 +53,9 @@ dcache-reclaimed = []
 
 ## Indicates the target device can access internal SRAM through an L1-bypass address range.
 uncached = []
+
+## Indicates the target device retains the CPU state with a DMA that reaches only part of RAM.
+retention-dma = []
 
 #! ### Low-power Core Feature Flags
 ## Indicate that the SoC contains an LP core.

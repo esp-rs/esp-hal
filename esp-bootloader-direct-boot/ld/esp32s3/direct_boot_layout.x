@@ -170,15 +170,24 @@ SECTIONS {
     _noinit_end = .;
   } > RWDATA
 
-  /* must be the last section in RWDATA */
+  /* Fills RWDATA up to `.retention.bss`. */
   .stack (NOLOAD) : ALIGN(4)
   {
     _stack_end = ABSOLUTE(.);
     _stack_end_cpu0 = ABSOLUTE(.);
-    . = ORIGIN(RWDATA) + LENGTH(RWDATA);
-    . = ALIGN(4);
+    . = (ORIGIN(RWDATA) + LENGTH(RWDATA) - SIZEOF(.retention.bss)) & ~15;
     _stack_start = ABSOLUTE(.);
     _stack_start_cpu0 = ABSOLUTE(.);
+  } > RWDATA
+
+  /* `#[ram(unstable(retention))]` statics, at the top of RAM as on the RISC-V chips. All of
+     RWDATA is inside the range that the retention DMA reaches. `dram2_seg` is empty, so the
+     `_dram2_uninit_bss_*` symbols mark this section, and the runtime zeroes it. */
+  .retention.bss (NOLOAD) : ALIGN(16)
+  {
+    _dram2_uninit_bss_start = ABSOLUTE(.);
+    *(.retention.bss .retention.bss.*)
+    _dram2_uninit_bss_end = ABSOLUTE(.);
   } > RWDATA
 
   .rtc_fast.text ORIGIN(rtc_fast_seg) : AT(ALIGN(LOADADDR(.data) + SIZEOF(.data), 4))
@@ -275,13 +284,10 @@ SECTIONS {
     _rodata_end = ABSOLUTE(.);
   } > RODATA
 
-  /* `#[ram(reclaimed)]` is not available with direct boot, these stay empty. They define the
-     symbols the runtime reads. */
+  /* `#[ram(reclaimed)]` is not available with direct boot, these stay empty. */
   .dram2_uninit.bss (NOLOAD) : ALIGN(4)
   {
-    _dram2_uninit_bss_start = ABSOLUTE(.);
     *(.dram2_uninit.bss .dram2_uninit.bss.*)
-    _dram2_uninit_bss_end = ABSOLUTE(.);
   } > dram2_seg
 
   .dram2_uninit (NOLOAD) : ALIGN(4)

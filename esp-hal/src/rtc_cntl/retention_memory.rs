@@ -11,7 +11,7 @@ use static_cell::ConstStaticCell;
 
 /// Storage for [`RetentionMemory`].
 ///
-/// This storage must be placed in `#[ram(reclaimed, unstable(zeroed))]`, then a static mutable
+/// Place this storage in [`#[ram(unstable(retention))]`][crate::ram], then a static mutable
 /// reference to [`RetentionMemory`] can be taken out of it.
 #[instability::unstable]
 pub struct RetentionStorage<const SIZE: usize> {
@@ -55,8 +55,8 @@ unsafe impl<const SIZE: usize> bytemuck::Zeroable for RetentionStorage<SIZE> {}
 /// safe Rust.
 ///
 /// The memory must be in internal RAM that stays powered across light sleep. The
-/// [`#[ram(reclaimed)]`][crate::ram] attribute places a static inside the range that the
-/// retention DMA reaches, on chips that use the retention DMA.
+/// [`#[ram(unstable(retention))]`][crate::ram] attribute places a static there, inside the range
+/// that the retention DMA reaches on chips that use the retention DMA.
 #[repr(align(16))]
 #[instability::unstable]
 pub struct RetentionMemory<const SIZE: usize> {
@@ -86,7 +86,7 @@ impl core::fmt::Display for RetentionMemoryError {
             #[cfg(not(cpu_retention = "software"))]
             Self::OutOfRange => write!(
                 f,
-                "the retention DMA cannot reach the memory, place it in `#[ram(reclaimed)]`"
+                "the retention DMA cannot reach the memory, place it in `#[ram(unstable(retention))]`"
             ),
             Self::AlreadyInstalled => write!(f, "retention memory is installed already"),
         }

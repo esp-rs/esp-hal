@@ -1,11 +1,8 @@
 SECTIONS {
-  /* `#[ram(reclaimed)]` is not available with direct boot, these stay empty. They define the
-     symbols the runtime reads. */
+  /* `#[ram(reclaimed)]` is not available with direct boot, these stay empty. */
   .dram2_uninit.bss (NOLOAD) : ALIGN(4)
   {
-    _dram2_uninit_bss_start = ABSOLUTE(.);
     *(.dram2_uninit.bss .dram2_uninit.bss.*)
-    _dram2_uninit_bss_end = ABSOLUTE(.);
   } > dram2_seg
 
   .dram2_uninit (NOLOAD) : ALIGN(4)

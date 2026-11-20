@@ -27,8 +27,8 @@ static INSTALLED: RetentionSlot<BUFFER_SIZE> = RetentionSlot::new();
 
 /// Storage for [`CpuRetentionMemory`].
 ///
-/// This storage must be placed to `#[ram(reclaimed, unstable(zeroed))]`, then
-/// a static mutable reference to [`CpuRetentionMemory`] can be taken out of it.
+/// Place this storage in [`#[ram(unstable(retention))]`][crate::ram], then a static mutable
+/// reference to [`CpuRetentionMemory`] can be taken out of it.
 #[instability::unstable]
 pub type CpuRetentionStorage = RetentionStorage<BUFFER_SIZE>;
 
@@ -38,8 +38,9 @@ pub type CpuRetentionStorage = RetentionStorage<BUFFER_SIZE>;
 /// to read or write its contents through safe Rust.
 ///
 /// Install the buffer with [`LowPower::install_cpu_retention_memory`]. The buffer must live in
-/// internal RAM that stays powered across light sleep. The [`#[ram(reclaimed)]`][crate::ram]
-/// attribute places a static inside the reachable range on chips that use the retention DMA.
+/// internal RAM that stays powered across light sleep. The
+/// [`#[ram(unstable(retention))]`][crate::ram] attribute places a static there, inside the
+/// reachable range on chips that use the retention DMA.
 #[instability::unstable]
 pub type CpuRetentionMemory = RetentionMemory<BUFFER_SIZE>;
 
@@ -59,8 +60,7 @@ impl LowPower<'_> {
     ///
     /// Returns [`CpuRetentionMemoryError`] if the driver holds a buffer already, or if the buffer
     /// is not inside the range that retention needs. The
-    /// [`#[ram(reclaimed, unstable(zeroed))]`][crate::ram] attribute places a static inside that
-    /// range on DMA chips.
+    /// [`#[ram(unstable(retention))]`][crate::ram] attribute places a static inside that range.
     ///
     /// # Examples
     ///
@@ -68,7 +68,7 @@ impl LowPower<'_> {
     /// # {before_snippet}
     /// use esp_hal::rtc_cntl::{CpuRetentionStorage, sleep::LowPower};
     ///
-    /// // #[esp_hal::ram(reclaimed, unstable(zeroed))]
+    /// #[esp_hal::ram(unstable(retention))]
     /// static RETENTION: CpuRetentionStorage = CpuRetentionStorage::new();
     ///
     /// let mut lpwr = LowPower::new(peripherals.LPWR);

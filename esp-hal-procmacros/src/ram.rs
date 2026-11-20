@@ -15,6 +15,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut persistent = false;
     let mut zeroed = false;
     let mut uncached = false;
+    let mut retention = false;
 
     for attr_arg in &attr_args {
         match attr_arg {
@@ -45,6 +46,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                                 i if i == "dcache_reclaimed" => &mut dcache_reclaimed,
                                 i if i == "zeroed" => &mut zeroed,
                                 i if i == "uncached" => &mut uncached,
+                                i if i == "retention" => &mut retention,
                                 i => {
                                     return syn::Error::new(
                                         i.span(),
@@ -166,6 +168,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         (dram2_uninit, "reclaimed"),
         (dcache_reclaimed, "dcache_reclaimed"),
         (uncached, "uncached"),
+        (retention, "retention"),
         (persistent, "persistent"),
         (zeroed, "zeroed"),
     ]
@@ -187,6 +190,11 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 
         (false, ["uncached"]) => Ok(".uncached.data"),
         (false, ["uncached", "zeroed"]) => Ok(".uncached.bss"),
+
+        // The bootloader support crate places `.retention.bss` in RAM that the retention DMA
+        // reaches. Without the DMA, any RAM that stays powered in light sleep works.
+        (false, ["retention"]) if cfg!(feature = "retention-dma") => Ok(".retention.bss"),
+        (false, ["retention"]) => Ok(".bss"),
 
         (false, ["rtc_fast"]) => Ok(".rtc_fast.data"),
         (false, ["rtc_fast", "persistent"]) => Ok(".rtc_fast.persistent"),
@@ -233,7 +241,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    let trait_check = if zeroed {
+    let trait_check = if zeroed || retention {
         Some("zeroable")
     } else if persistent {
         Some("persistable")
@@ -635,6 +643,79 @@ mod tests {
                 #[unsafe (link_section = ::core::concat!(".rtc_slow.persistent.", ::core::module_path!(), ".", "FOO"))]
                 static mut FOO:[u8;10] = [0;10];
                 const _: () = crate::__macro_implementation::assert_is_persistable::<[u8; 10]>();
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_retention() {
+        let result = ram(
+            quote::quote! {
+                unstable(retention)
+            }
+            .into(),
+            quote::quote! {
+                static FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        let expectation = cfg_select! {
+            feature = "retention-dma" => quote::quote! {
+                #[unsafe(link_section = ::core::concat!(".retention.bss.", ::core::module_path!(), ".", "FOO"))]
+                static FOO: [u8; 10] = [0; 10];
+                const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 10]>();
+            },
+            _ => quote::quote! {
+                #[unsafe(link_section = ::core::concat!(".bss.", ::core::module_path!(), ".", "FOO"))]
+                static FOO: [u8; 10] = [0; 10];
+                const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 10]>();
+            },
+        };
+
+        assert_eq!(result.to_string(), expectation.to_string());
+    }
+
+    #[test]
+    fn test_retention_with_other_argument() {
+        let result = ram(
+            quote::quote! {
+                unstable(retention, zeroed)
+            }
+            .into(),
+            quote::quote! {
+                static FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "Invalid combination of ram arguments" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_retention_on_function() {
+        let result = ram(
+            quote::quote! {
+                unstable(retention)
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "Invalid combination of ram arguments" }
             }
             .to_string()
         );

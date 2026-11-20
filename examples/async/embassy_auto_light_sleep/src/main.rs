@@ -37,7 +37,7 @@ cfg_select! {
     feature = "esp32s3" => {
         use esp_hal::rtc_cntl::CacheTagRetentionStorage;
 
-        #[esp_hal::ram(reclaimed, unstable(zeroed))]
+        #[esp_hal::ram(unstable(retention))]
         static CACHE_TAGMEM: CacheTagRetentionStorage = CacheTagRetentionStorage::new();
     }
     _ => {}
@@ -58,7 +58,7 @@ cfg_select! {
     ) => {
         use esp_hal::rtc_cntl::CpuRetentionStorage;
 
-        #[esp_hal::ram(reclaimed, unstable(zeroed))]
+        #[esp_hal::ram(unstable(retention))]
         static CPU_RETENTION_MEMORY: CpuRetentionStorage = CpuRetentionStorage::new();
     }
     _ => {}

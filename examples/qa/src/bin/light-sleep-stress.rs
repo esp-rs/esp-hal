@@ -897,7 +897,7 @@ fn automatic_loop(core: usize, mut rng: Rng, mut controller: Option<Controller>)
 }
 
 #[cfg(supports_cpu_power_down)]
-#[esp_hal::ram(reclaimed, unstable(zeroed))]
+#[esp_hal::ram(unstable(retention))]
 static CPU_RETENTION_MEMORY: esp_hal::rtc_cntl::CpuRetentionStorage =
     esp_hal::rtc_cntl::CpuRetentionStorage::new();
 
