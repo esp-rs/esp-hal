@@ -1,7 +1,7 @@
 //! UART Test
 //!
-//! The tests drive UART0, which esp-println prints to if no USB host is attached, so they log over
-//! RTT.
+//! The tests drive UART0, which the serial logger uses on chips without USB-Serial-JTAG, so they
+//! log over RTT.
 
 //% CHIP_FILTER: uart_driver_supported
 //% FEATURES: unstable embassy log-rtt

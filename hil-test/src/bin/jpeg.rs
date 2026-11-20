@@ -50,6 +50,7 @@ mod tests {
         };
 
         let mut p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         #[cfg(esp32s31)]
         let initial = esp_hal::peripherals::HP_SYS::regs()
             .dma2d_mem_lp_ctrl()
@@ -93,6 +94,7 @@ mod tests {
     #[test]
     fn psram_encode_after_output_exhaustion() {
         let p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
         let mut jpeg = Encoder::new(p.JPEG, p.DMA2D_TX_CH0, p.DMA2D_RX_CH1);
 

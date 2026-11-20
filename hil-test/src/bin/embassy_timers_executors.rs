@@ -91,12 +91,14 @@ mod timers_executors {
     }
 
     fn set_up_embassy_with_timg0(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
     }
 
     #[cfg(not(feature = "esp32"))]
     fn set_up_embassy_with_systimer(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
         esp_rtos::start(systimer.alarm0);
     }
@@ -123,6 +125,7 @@ mod timers_executors {
 
     #[test]
     fn test_periodic_timg(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
 
         run_test_periodic_timer(timg0.timer0);
@@ -131,6 +134,7 @@ mod timers_executors {
     #[test]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_systimer(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
 
         run_test_periodic_timer(systimer.alarm0);
@@ -138,6 +142,7 @@ mod timers_executors {
 
     #[test]
     fn test_periodic_oneshot_timg(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let mut timg0 = TimerGroup::new(peripherals.TIMG0);
         run_test_periodic_timer(timg0.timer0.reborrow());
         run_test_oneshot_timer(timg0.timer0.reborrow());
@@ -146,6 +151,7 @@ mod timers_executors {
     #[test]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_oneshot_systimer(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
         run_test_periodic_timer(systimer.alarm0.reborrow());
         run_test_oneshot_timer(systimer.alarm0.reborrow());
@@ -169,6 +175,7 @@ mod timers_executors {
     /// Test that the ticker works in tasks ran by the interrupt executors.
     #[test]
     async fn test_interrupt_executor(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -320,6 +327,7 @@ mod interrupt_executor {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
@@ -492,6 +500,7 @@ mod interrupt_spi_dma {
     #[test]
     async fn dma_does_not_lock_up_when_used_in_different_executors() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
@@ -638,6 +647,7 @@ mod interrupt_spi_dma {
         }
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);

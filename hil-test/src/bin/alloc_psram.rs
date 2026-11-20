@@ -34,6 +34,7 @@ mod tests {
     fn init() {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
     }
 
@@ -175,7 +176,8 @@ mod dcache_reclaimed {
     #[init]
     fn init() {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-        let _p = esp_hal::init(config);
+        let peripherals = esp_hal::init(config);
+        hil_test::init_logger!(peripherals);
 
         esp_alloc::heap_allocator!(#[ram(unstable(dcache_reclaimed))] size: 32 * 1024);
     }
@@ -213,6 +215,7 @@ mod multi_core_tests {
     fn init() -> CPU_CTRL<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
         p.CPU_CTRL
@@ -274,6 +277,7 @@ mod multi_core_cache_tests {
     fn init() -> CPU_CTRL<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
         p.CPU_CTRL
@@ -385,6 +389,7 @@ mod flash_tests {
     fn init() -> Context<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
         Context { flash: p.FLASH }
@@ -470,6 +475,7 @@ mod normal_vaddr_mode_tests {
     fn init() -> Context {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
         let psram = Psram::new(
             p.PSRAM,
             PsramConfig {
@@ -590,6 +596,7 @@ mod mpll {
         let p = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(ClockConfig::from(CpuClock::max())),
         );
+        hil_test::init_logger!(p);
         let psram = Psram::new(p.PSRAM, PsramConfig::default());
 
         assert_mpll_programmed(400_000_000);
@@ -601,6 +608,7 @@ mod mpll {
         let mut clocks = ClockConfig::from(CpuClock::max());
         clocks.mpll_clk = Some(MpllClkConfig::_500);
         let p = esp_hal::init(esp_hal::Config::default().with_cpu_clock(clocks));
+        hil_test::init_logger!(p);
         let config = PsramConfig {
             timing: PsramTimingParams::MHZ_250,
             ..Default::default()

@@ -651,6 +651,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         // The reclaimed region (dram2_seg) is only 56 KiB on the H4.
         esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 48 * 1024);

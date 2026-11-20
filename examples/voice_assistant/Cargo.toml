@@ -14,12 +14,12 @@ embedded-text = "0.7.2"
 esp-alloc = { path = "../../esp-alloc" }
 esp-backtrace = { path = "../../esp-backtrace", features = [
     "panic-handler",
-    "println",
+    "log-04",
 ] }
 esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
 esp-metadata-generated = { path = "../../esp-metadata-generated" }
-esp-println = { path = "../../esp-println", features = ["log-04"] }
+embedded-log = { path = "../../embedded-log", features = ["log-04"] }
 esp-rtos = { path = "../../esp-rtos", features = ["embassy", "log-04"] }
 esp-sr = { git = "https://github.com/SergioGasquez/esp-sr", rev = "e56a9c6" }
 log = "0.4.27"

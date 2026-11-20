@@ -91,6 +91,7 @@ mod async_tests {
     #[init]
     async fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM).into_async();
         let dma_buf = dma_tx_buffer!(DATA_SIZE).unwrap();
         let dma_channel = cfg_select! {
@@ -142,6 +143,7 @@ mod blocking_tests {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let dma_buf = dma_tx_buffer!(DATA_SIZE).unwrap();
         let dma_channel = cfg_select! {
@@ -755,6 +757,7 @@ mod dpi_async_tests {
     #[init]
     async fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let dma = cfg_select! {
             lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
             lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,

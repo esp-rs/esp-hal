@@ -14,9 +14,12 @@ The crate does not depend on a HAL. You construct the transport, for example esp
 
 ```rust,ignore
 let peripherals = esp_hal::init(esp_hal::Config::default());
-let usj = UsbSerialJtag::new(peripherals.USB_DEVICE, Default::default()).unwrap();
-static WRITER: StaticCell<UsbSerialJtag<'static, Blocking>> = StaticCell::new();
-embedded_log::init(WRITER.init(usj));
+// UART0 on the default TX pin of the ESP32-C6.
+let uart = UartTx::new(peripherals.UART0, Default::default())
+    .unwrap()
+    .with_tx(peripherals.GPIO16);
+static WRITER: StaticCell<UartTx<'static, Blocking>> = StaticCell::new();
+embedded_log::init(WRITER.init(uart));
 log::info!("Hello");
 ```
 

@@ -120,7 +120,23 @@ fn main() -> ! {
     //%if chip.soc_has_usb_device
     // Log on USB-Serial-JTAG. To log on UART0 instead, construct an `esp_hal::uart::UartTx` on
     // the chip's default TX pin.
-    let log_writer = UsbSerialJtag::new(peripherals.USB_DEVICE, Default::default()).unwrap();
+    //%if chip.name == "esp32c3"
+    //+    let (usb_dp, usb_dm) = (peripherals.GPIO19, peripherals.GPIO18);
+    //%else if chip.name == "esp32c5" || chip.name == "esp32h4"
+    //+    let (usb_dp, usb_dm) = (peripherals.GPIO14, peripherals.GPIO13);
+    //%else if chip.name == "esp32h2"
+    //+    let (usb_dp, usb_dm) = (peripherals.GPIO27, peripherals.GPIO26);
+    //%else if chip.name == "esp32p4"
+    //+    let (usb_dp, usb_dm) = (peripherals.GPIO25, peripherals.GPIO24);
+    //%else if chip.name == "esp32s3"
+    //+    let (usb_dp, usb_dm) = (peripherals.GPIO20, peripherals.GPIO19);
+    //%else if chip.name == "esp32s31"
+    //+    let (usb_dp, usb_dm) = (peripherals.GPIO34, peripherals.GPIO33);
+    //%else
+    let (usb_dp, usb_dm) = (peripherals.GPIO13, peripherals.GPIO12);
+    //%endif
+    let log_writer =
+        UsbSerialJtag::new(peripherals.USB_DEVICE, usb_dp, usb_dm, Default::default()).unwrap();
     static LOG_WRITER: StaticCell<UsbSerialJtag<'static, Blocking>> = StaticCell::new();
     //%else
     //+    // Log on UART0's default TX pin.

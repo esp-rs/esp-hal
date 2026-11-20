@@ -27,8 +27,16 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // The frames go to the host on UART0, so log, for example a panic report, on USB-Serial-JTAG.
+    let (log_dp, log_dm) = cfg_select! {
+        any(feature = "esp32c5", feature = "esp32h4") => (peripherals.GPIO14, peripherals.GPIO13),
+        feature = "esp32c6" => (peripherals.GPIO13, peripherals.GPIO12),
+        feature = "esp32h2" => (peripherals.GPIO27, peripherals.GPIO26),
+        feature = "esp32s31" => (peripherals.GPIO34, peripherals.GPIO33),
+    };
     let log_writer = esp_hal::usb::usb_serial_jtag::UsbSerialJtag::new(
         peripherals.USB_DEVICE,
+        log_dp,
+        log_dm,
         Default::default(),
     )
     .unwrap();

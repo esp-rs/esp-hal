@@ -375,6 +375,7 @@ mod tests {
     #[test]
     fn test_aes_block_operation() {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(p);
         let mut aes = Aes::new(p.AES);
 
         aes_ll_roundtrip::<16>(
@@ -408,6 +409,7 @@ mod tests {
         };
 
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(p);
         let mut aes = Aes::new(p.AES);
 
         let clock_config = PeripheralClockConfig::with_frequency(Rate::from_mhz(32)).unwrap();
@@ -503,6 +505,7 @@ mod tests {
         let output = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         let peripherals = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(peripherals);
 
         let dma_channel = cfg_select! {
             aes_dma_engine = "CRYPTO_DMA" => peripherals.DMA_CRYPTO,
@@ -629,6 +632,7 @@ mod work_queue_tests {
     #[init]
     fn init() -> Context {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(p);
 
         esp_alloc::heap_allocator!(size: 32 * 1024);
 
@@ -1588,6 +1592,7 @@ mod gcm_tests {
     #[init]
     fn init() -> Context {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(p);
 
         gcm_heap();
 

@@ -23,6 +23,7 @@ mod tests {
 
     #[test]
     fn trng_is_available_while_radio_is_enabled(p: Peripherals) {
+        hil_test::init_logger!(p);
         assert!(Trng::try_new().is_err());
 
         let radio = Ieee802154::new(p.IEEE802154);

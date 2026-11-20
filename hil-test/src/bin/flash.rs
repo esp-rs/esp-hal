@@ -57,6 +57,7 @@ mod tests {
     fn flash_from_peripherals(
         peripherals: esp_hal::peripherals::Peripherals,
     ) -> Flash<'static, Blocking> {
+        hil_test::init_logger!(peripherals);
         Flash::new(peripherals.FLASH, Config::default()).unwrap()
     }
 
@@ -308,6 +309,7 @@ mod tests {
         static TICKS: AtomicU32 = AtomicU32::new(0);
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
         let stack = mk_static!(Stack<8192>, Stack::new());
         let _guard = cpu_control
@@ -346,6 +348,7 @@ mod tests {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
         let stack = mk_static!(Stack<8192>, Stack::new());
         let _guard = cpu_control
@@ -393,6 +396,7 @@ mod tests {
         static APP_CORE_DONE: AtomicBool = AtomicBool::new(false);
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let app_core_flash = unsafe { peripherals.FLASH.clone_unchecked() };
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
         let stack = mk_static!(Stack<8192>, Stack::new());
@@ -440,6 +444,7 @@ mod tests {
         static STARTED: AtomicBool = AtomicBool::new(false);
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
         let stack = mk_static!(Stack<8192>, Stack::new());
         let _guard = cpu_control
@@ -658,7 +663,8 @@ mod tests {
     fn test_drom_entry_offset_reads_the_window() {
         use esp_hal::flash::{flash_mmu_drom_entries, flash_mmu_entry_offset};
 
-        let _peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let drom = flash_mmu_drom_entries();
 
         // The linker scripts put the app's rodata at the start of the DROM window.

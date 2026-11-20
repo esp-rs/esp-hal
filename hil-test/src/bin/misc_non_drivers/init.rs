@@ -16,6 +16,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_feeding_timg0_wdt() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -39,6 +40,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_wdt0_uses_prescaler() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -60,6 +62,7 @@ mod tests {
     #[cfg(timergroup_timg1)]
     fn test_feeding_timg1_wdt() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg1 = TimerGroup::new(p.TIMG1);
         let mut wdt1 = timg1.wdt;
@@ -83,6 +86,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_feeding_timg0_wdt_max_clock() {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -105,6 +109,7 @@ mod tests {
     #[test]
     fn test_feeding_rtc_wdt() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let mut rtc = Rtc::new(p.RTC_TIMER);
 
@@ -146,6 +151,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_timg0_wdt_timeout_is_applied() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -167,6 +173,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_timg0_wdt_stage_action_is_applied() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -189,6 +196,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_timg0_wdt_disable_is_applied() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;

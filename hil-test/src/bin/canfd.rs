@@ -138,6 +138,7 @@ mod blocking_tests {
     #[init]
     fn init() -> Context<Blocking> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
@@ -707,6 +708,7 @@ mod two_node_tests {
     #[init]
     fn init() -> Nodes {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         // Each controller needs both signals on its own end of the wire.
         let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
@@ -840,6 +842,7 @@ mod async_tests {
     #[init]
     async fn init() -> Context<Async> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
@@ -1098,6 +1101,7 @@ mod contention_tests {
     #[init]
     async fn init() -> Nodes {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
         let (rx0, tx0) = unsafe { pin0.split() };
@@ -1446,6 +1450,7 @@ mod fault_tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
         let injector = Output::new(

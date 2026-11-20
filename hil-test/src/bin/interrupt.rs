@@ -73,6 +73,7 @@ mod tests {
     fn init() -> Context {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let peripherals = esp_hal::init(config);
+        hil_test::init_logger!(peripherals);
 
         let cpu_intr = cfg_select! {
             soc_has_intpri => &peripherals.INTPRI,

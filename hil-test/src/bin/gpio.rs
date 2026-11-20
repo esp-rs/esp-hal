@@ -147,6 +147,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         #[cfg(feature = "unstable")]
         let delay = Delay::new();
@@ -903,6 +904,7 @@ mod pad_hold {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (lp_pad, lp_probe) = hil_test::lp_test_pins!(peripherals);
         #[cfg(not(esp32))]

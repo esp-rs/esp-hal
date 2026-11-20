@@ -58,6 +58,7 @@ mod tsens {
 
     #[test]
     fn factory_calibration_and_recreation(mut p: Peripherals) {
+        hil_test::init_logger!(p);
         let config = Config::default().with_range(MeasurementRange::Minus10To80C);
         for _ in 0..32 {
             let mut sensor = TemperatureSensor::new(p.TSENS.reborrow(), config).unwrap();
@@ -91,6 +92,7 @@ mod tsens {
 
     #[test]
     fn stabilization_is_deferred_to_read(p: Peripherals) {
+        hil_test::init_logger!(p);
         let config = Config::default();
         let start = Instant::now();
         let mut sensor = TemperatureSensor::new(p.TSENS, config).unwrap();
@@ -105,6 +107,7 @@ mod tsens {
     #[cfg(soc_clock_node_tsens_sclk_is_configurable)]
     #[test]
     fn clock_change_during_stabilization(mut p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::tsens::ClockSource;
 
         let xtal = Config::default().with_clock_source(ClockSource::Xtal);
@@ -127,6 +130,7 @@ mod tsens {
 
     #[test]
     fn ranges_and_repeated_configurations(p: Peripherals) {
+        hil_test::init_logger!(p);
         let base = Config::default();
         assert_eq!(base.range(), MeasurementRange::Minus10To80C);
         let mut sensor = TemperatureSensor::new(p.TSENS, base).unwrap();
@@ -163,6 +167,7 @@ mod tsens {
     #[cfg(soc_clock_node_tsens_sclk_is_configurable)]
     #[test]
     fn clock_sources_preserve_calibration(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::tsens::ClockSource;
 
         let config = Config::default();
@@ -210,6 +215,7 @@ mod pcnt {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (din, dout) = hil_test::common_test_pins!(peripherals);
 
@@ -621,6 +627,7 @@ mod mcpwm {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (din, dout) = hil_test::common_test_pins!(peripherals);
 
@@ -697,6 +704,7 @@ mod ledc {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (din, dout) = hil_test::common_test_pins!(peripherals);
 
@@ -833,6 +841,7 @@ mod systimer {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
 
         Context {
@@ -943,6 +952,7 @@ mod twai {
         #[init]
         fn init() -> Context<Blocking> {
             let peripherals = esp_hal::init(esp_hal::Config::default());
+            hil_test::init_logger!(peripherals);
 
             let (loopback_pin, _) = hil_test::common_test_pins!(peripherals);
 
@@ -1059,6 +1069,7 @@ mod twai {
         // also for non-async
         fn test_write_into_the_void() {
             let peripherals = esp_hal::init(esp_hal::Config::default());
+            hil_test::init_logger!(peripherals);
 
             // The bus is permanently recessive, so every transmission attempt
             // fails immediately (a transmitted dominant bit reads back
@@ -1094,6 +1105,7 @@ mod twai {
         #[init]
         async fn init() -> Context<Async> {
             let peripherals = esp_hal::init(esp_hal::Config::default());
+            hil_test::init_logger!(peripherals);
 
             let (loopback_pin, _) = hil_test::common_test_pins!(peripherals);
 
@@ -1208,6 +1220,7 @@ mod twai {
         // Regression test for https://github.com/esp-rs/esp-hal/issues/5307
         async fn test_write_into_the_void() {
             let peripherals = esp_hal::init(esp_hal::Config::default());
+            hil_test::init_logger!(peripherals);
 
             let timg0 = TimerGroup::new(peripherals.TIMG0);
             esp_rtos::start(timg0.timer0);
@@ -1254,6 +1267,7 @@ mod lp_timekeeping {
     #[init]
     fn init() -> Rtc<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         Rtc::new(peripherals.RTC_TIMER)
     }
@@ -1310,6 +1324,7 @@ mod assist_debug {
 
     #[test]
     fn region_monitor_pc(p: Peripherals) {
+        hil_test::init_logger!(p);
         let address = mk_static!(u32, 0) as *mut u32 as u32;
         let mut da = DebugAssist::new(p.ASSIST_DEBUG);
         da.enable_region0_monitor(address, address + size_of::<u32>() as u32, false, true);
@@ -1326,6 +1341,7 @@ mod assist_debug {
     #[cfg(all(multi_core, soc_has_cpu_ctrl))]
     #[test]
     fn core1_region_monitor_pc(p: Peripherals) {
+        hil_test::init_logger!(p);
         let address = mk_static!(u32, 0) as *mut u32 as u32;
         let mut da = DebugAssist::new(p.ASSIST_DEBUG);
         da.enable_core1_region0_monitor(address, address + size_of::<u32>() as u32, false, true);
@@ -1398,6 +1414,7 @@ mod sdmmc {
     #[init]
     async fn init() -> SdCard {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
