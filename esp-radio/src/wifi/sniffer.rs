@@ -1,6 +1,7 @@
 //! Wi-Fi sniffer.
 
 use esp_sync::NonReentrantMutex;
+use portable_atomic::{AtomicBool, Ordering};
 
 use super::{RxControlInfo, SNIFFER_BIT, WifiRefGuard, release, try_acquire};
 use crate::{
@@ -82,6 +83,17 @@ unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: 
     }
 }
 
+static PROMISCUOUS: AtomicBool = AtomicBool::new(false);
+
+/// Re-enables promiscuous mode, which `esp_wifi_stop` turns off.
+pub(super) fn restore_promiscuous_mode() {
+    if PROMISCUOUS.load(Ordering::Relaxed)
+        && let Err(e) = esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(true) })
+    {
+        warn!("Failed to restore promiscuous mode: {:?}", e);
+    }
+}
+
 /// A Wi-Fi sniffer.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -111,6 +123,7 @@ impl Sniffer {
     #[instability::unstable]
     pub fn set_promiscuous_mode(&self, enabled: bool) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(enabled) })?;
+        PROMISCUOUS.store(enabled, Ordering::Relaxed);
         Ok(())
     }
 
@@ -155,6 +168,7 @@ impl Drop for Sniffer {
         // Clear the user callback first so the C trampoline becomes a no-op even
         // if it fires during the teardown window below.
         SNIFFER_CB.with(|callback| *callback = None);
+        PROMISCUOUS.store(false, Ordering::Relaxed);
         // Best-effort cleanup: log on failure but keep going so we still release
         // the singleton bit, otherwise a future Sniffer could never be created.
         if let Err(e) = esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(false) }) {
