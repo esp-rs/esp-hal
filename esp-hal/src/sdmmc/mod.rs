@@ -2184,10 +2184,17 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
                 ];
 
                 // Probe every coarse sampling phase with the card's CMD19
-                // tuning block and record which taps read back correctly.
+                // tuning block and record which taps read back correctly. The
+                // phase is published through `SETTINGS` and marked dirty, so
+                // `program_slot_hw` applies it under the engine guard; writing
+                // the shared phase register here would race another slot.
                 let mut good = [false; TAPS];
+                let idx = slot_id(S).index() as usize;
                 for (i, phase) in phases.iter().enumerate() {
-                    chip_specific::set_input_delay_phase(*phase, hz);
+                    SETTINGS.with(|s| {
+                        s.slots[idx].input_delay_phase = *phase;
+                        s.slots[idx].dirty = true;
+                    });
                     good[i] = op.exec(&mut *self).await.unwrap_or(false);
                 }
 
@@ -2213,12 +2220,15 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
                 } else {
                     phases[best_end - best_len / 2]
                 };
-                chip_specific::set_input_delay_phase(chosen, hz);
-                // Remember the tuned phase: otherwise a later engine
-                // re-program would revert it to the configured default.
+                // Publish and apply the tuned phase under the engine guard.
+                // Otherwise a later re-program would revert it to the
+                // configured default, and the final register write would happen
+                // outside the lock.
                 SETTINGS.with(|s| {
-                    s.slots[slot_id(S).index() as usize].input_delay_phase = chosen;
+                    s.slots[idx].input_delay_phase = chosen;
+                    s.slots[idx].dirty = true;
                 });
+                drop(lock_engine(slot_id(S)).await.map_err(MmcError::from)?);
             }
         }
         #[cfg(not(sdmmc_delay_phase_num_is_set))]
