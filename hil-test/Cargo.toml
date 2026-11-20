@@ -93,6 +93,11 @@ harness           = false
 required-features = ["unstable"]
 
 [[bin]]
+name              = "sdio_slave"
+harness           = false
+required-features = ["unstable"]
+
+[[bin]]
 name              = "spi"
 harness           = false
 
