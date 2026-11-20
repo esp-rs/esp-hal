@@ -15,7 +15,6 @@ use esp_hal::{
     flash::{Config, Flash},
     main,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -37,27 +36,29 @@ fn as_bytes_mut(words: &mut [u32]) -> &mut [u8] {
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
     let info = flash.chip_info();
-    println!(
+    log::info!(
         "Flash chip_id = {:#08x}, capacity = {}",
-        info.chip_id, info.capacity
+        info.chip_id,
+        info.capacity
     );
-    println!("Flash capacity  = {}", flash.capacity());
-    println!();
+    log::info!("Flash capacity  = {}", flash.capacity());
+    log::info!("");
     // The app descriptor sits in the first 256 bytes of an app image, after the
     // 24-byte image header and the 8-byte first section header.
     let mut app_desc = [0u32; 64];
     flash.read(APP_DESC_OFFSET, &mut app_desc).unwrap();
-    println!("App descriptor dump {:02x?}", as_bytes(&app_desc));
-    println!();
+    log::info!("App descriptor dump {:02x?}", as_bytes(&app_desc));
+    log::info!("");
 
     let mut words = [0u32; 8];
     flash.read(NVS_OFFSET, &mut words).unwrap();
-    println!("Read from {:x}:  {:02x?}", NVS_OFFSET, as_bytes(&words));
+    log::info!("Read from {:x}:  {:02x?}", NVS_OFFSET, as_bytes(&words));
 
     {
         let bytes = as_bytes_mut(&mut words);
@@ -80,14 +81,14 @@ fn main() -> ! {
             .unwrap();
         flash.write(NVS_OFFSET, &words).unwrap();
     }
-    println!("Written to {:x}: {:02x?}", NVS_OFFSET, as_bytes(&words));
+    log::info!("Written to {:x}: {:02x?}", NVS_OFFSET, as_bytes(&words));
 
     let mut reread = [0u32; 8];
     flash.read(NVS_OFFSET, &mut reread).unwrap();
-    println!("Read from {:x}:  {:02x?}", NVS_OFFSET, as_bytes(&reread));
+    log::info!("Read from {:x}:  {:02x?}", NVS_OFFSET, as_bytes(&reread));
 
-    println!();
-    println!("Reset (CTRL-R in espflash) to re-read the persisted data.");
+    log::info!("");
+    log::info!("Reset (CTRL-R in espflash) to re-read the persisted data.");
 
     loop {}
 }

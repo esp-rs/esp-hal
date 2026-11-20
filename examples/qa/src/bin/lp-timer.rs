@@ -12,14 +12,11 @@ use esp_hal::{
     rtc_cntl::Rtc,
     time::{Duration, Instant},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
-
     let cpu_clock_config: ll::ClockConfig = CpuClock::default().into();
 
     // FIXME: this fails clock calibration
@@ -29,6 +26,7 @@ fn main() -> ! {
     // }
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(cpu_clock_config));
+    esp_log::init_uart!(peripherals);
 
     let rtc = Rtc::new(peripherals.RTC_TIMER);
 
@@ -44,11 +42,12 @@ fn main() -> ! {
         let time_since_start = start.elapsed();
         let time_since_start_lp = Duration::from_micros(rtc.current_time_us());
 
-        println!(
+        log::info!(
             "Micros since start: system = {}, LP = {}",
-            time_since_start, time_since_start_lp
+            time_since_start,
+            time_since_start_lp
         );
-        println!(
+        log::info!(
             "Difference: {}",
             Duration::from_micros(
                 time_since_start_lp

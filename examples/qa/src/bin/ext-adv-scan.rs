@@ -19,7 +19,6 @@ use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::ble::controller::BleConnector;
 use trouble_host::prelude::*;
 
@@ -27,8 +26,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_s: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
@@ -43,7 +42,7 @@ async fn main(_s: Spawner) {
     // use e.g. the MAC 6 byte array as the address (how to get that varies by the platform).
     let address: Address = Address::random([0xff, 0x8f, 0x1b, 0x05, 0xe4, 0xff]);
 
-    println!("Our address = {:?}", address);
+    log::info!("Our address = {:?}", address);
 
     let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
         HostResources::new();
@@ -83,7 +82,7 @@ impl EventHandler for Printer {
     fn on_ext_adv_reports(&self, reports: LeExtAdvReportsIter<'_>) {
         for report in reports {
             let report = report.unwrap();
-            println!("ext adv {:?} {}", report.addr, report.data.len());
+            log::info!("ext adv {:?} {}", report.addr, report.data.len());
         }
     }
 }

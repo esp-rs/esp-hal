@@ -25,14 +25,14 @@ use esp_hal::{
     },
     time::Rate,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let sclk = peripherals.GPIO0;
     let miso_mosi = peripherals.GPIO2;
@@ -57,7 +57,7 @@ fn main() -> ! {
     loop {
         let mut data = [0xde, 0xca, 0xfb, 0xad];
         spi.transfer(&mut data).unwrap();
-        println!("{:x?}", data);
+        log::info!("{:x?}", data);
 
         delay.delay_millis(250);
     }

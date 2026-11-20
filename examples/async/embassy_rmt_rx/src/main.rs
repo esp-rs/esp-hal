@@ -17,8 +17,6 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::{print, println};
-
 esp_bootloader_esp_idf::esp_app_desc!();
 
 const WIDTH: usize = 80;
@@ -39,10 +37,11 @@ async fn signal_task(mut pin: Output<'static>) {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
-    println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
@@ -76,9 +75,9 @@ async fn main(spawner: Spawner) {
     let mut data = [PulseCode::default(); 48];
 
     loop {
-        println!("receive");
+        log::info!("receive");
         if channel.receive_async(&mut data).await.is_err() {
-            println!("receive error");
+            log::info!("receive error");
             continue;
         }
 
@@ -95,34 +94,37 @@ async fn main(spawner: Spawner) {
             total += entry.length2() as usize;
         }
 
-        for entry in &data[..data.len()] {
-            if entry.length1() == 0 {
-                break;
-            }
+        let waveform = core::fmt::from_fn(|f| {
+            for entry in &data[..data.len()] {
+                if entry.length1() == 0 {
+                    break;
+                }
 
-            let count = WIDTH / (total / entry.length1() as usize);
-            let c = match entry.level1() {
-                Level::High => '-',
-                Level::Low => '_',
-            };
-            for _ in 0..count + 1 {
-                print!("{}", c);
-            }
+                let count = WIDTH / (total / entry.length1() as usize);
+                let c = match entry.level1() {
+                    Level::High => '-',
+                    Level::Low => '_',
+                };
+                for _ in 0..count + 1 {
+                    write!(f, "{}", c)?;
+                }
 
-            if entry.length2() == 0 {
-                break;
-            }
+                if entry.length2() == 0 {
+                    break;
+                }
 
-            let count = WIDTH / (total / entry.length2() as usize);
-            let c = match entry.level2() {
-                Level::High => '-',
-                Level::Low => '_',
-            };
-            for _ in 0..count + 1 {
-                print!("{}", c);
+                let count = WIDTH / (total / entry.length2() as usize);
+                let c = match entry.level2() {
+                    Level::High => '-',
+                    Level::Low => '_',
+                };
+                for _ in 0..count + 1 {
+                    write!(f, "{}", c)?;
+                }
             }
-        }
+            Ok(())
+        });
 
-        println!();
+        log::info!("{waveform}");
     }
 }

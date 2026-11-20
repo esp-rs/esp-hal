@@ -109,6 +109,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let dma_channel = dma_channel!(peripherals);
 
@@ -742,6 +743,7 @@ mod tx {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (clock, _) = hil_test::common_test_pins!(peripherals);
         let valid = hil_test::unconnected_pin!(peripherals);
@@ -972,6 +974,7 @@ mod async_tx {
     #[init]
     async fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (clock, _) = hil_test::common_test_pins!(peripherals);
         let valid = hil_test::unconnected_pin!(peripherals);

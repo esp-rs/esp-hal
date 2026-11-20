@@ -135,19 +135,30 @@ mod blocking_tests {
         );
     }
 
-    #[init]
-    fn init() -> Context<Blocking> {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let (rx, tx) = hil_test::common_test_pins!(peripherals);
-
-        let mut canfd = CanFd::new(peripherals.TWAI0, config())
-            .unwrap()
-            .with_rx(rx)
-            .with_tx(tx);
+    fn started_controller(
+        twai: esp_hal::peripherals::TWAI0<'static>,
+        rx: impl esp_hal::gpio::interconnect::PeripheralInput<'static>,
+        tx: impl esp_hal::gpio::interconnect::PeripheralOutput<'static>,
+    ) -> Context<Blocking> {
+        let mut canfd = CanFd::new(twai, config()).unwrap().with_rx(rx).with_tx(tx);
         canfd.start().unwrap();
 
         Context { canfd }
+    }
+
+    #[init]
+    fn init() -> Context<Blocking> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        started_controller(peripherals.TWAI0, rx, tx)
+    }
+
+    // The USB-Serial-JTAG driver of the logger holds a `WakeLock`, which this test must not see.
+    fn init_without_logger() -> Context<Blocking> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        started_controller(peripherals.TWAI0, rx, tx)
     }
 
     #[test]
@@ -479,7 +490,7 @@ mod blocking_tests {
         );
     }
 
-    #[test]
+    #[test(init = init_without_logger)]
     fn the_chip_stays_awake_exactly_while_the_controller_is_on_the_bus(mut ctx: Context<Blocking>) {
         assert!(ctx.canfd.is_started());
         assert!(WakeLock::is_active(), "started in init, yet asleep");
@@ -707,6 +718,7 @@ mod two_node_tests {
     #[init]
     fn init() -> Nodes {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         // Each controller needs both signals on its own end of the wire.
         let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
@@ -840,6 +852,7 @@ mod async_tests {
     #[init]
     async fn init() -> Context<Async> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
@@ -1098,6 +1111,7 @@ mod contention_tests {
     #[init]
     async fn init() -> Nodes {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
         let (rx0, tx0) = unsafe { pin0.split() };
@@ -1446,6 +1460,7 @@ mod fault_tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
         let injector = Output::new(

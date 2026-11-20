@@ -62,6 +62,7 @@ mod tests {
     #[test]
     fn trigonometry() {
         let p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         let mut cordic = Cordic::new(p.CORDIC, Config::default()).unwrap();
         check_atan_q31(&mut cordic);
         check_q15(cordic.atan_q15(-0x4000).unwrap(), -4_836);
@@ -135,6 +136,7 @@ mod tests {
         let mut p = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(p);
         let default = Config::default();
         assert_eq!(
             Cordic::new(
@@ -205,6 +207,7 @@ mod tests {
     #[test]
     fn calculation_precision() {
         let p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         let config = Config::default()
             .with_clock_source(ClockSource::Xtal)
             .with_frequency(FRACTIONAL_XTAL_RATE);
@@ -231,6 +234,7 @@ mod tests {
     #[test]
     fn timeout_recovery() {
         let p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         let config = Config::default()
             .with_clock_source(ClockSource::Xtal)
             .with_frequency(FRACTIONAL_XTAL_RATE)
@@ -260,6 +264,7 @@ mod tests {
     #[test]
     fn square_root() {
         let p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         let default = Config::default();
         let mut cordic = Cordic::new(p.CORDIC, default).unwrap();
 
@@ -291,6 +296,7 @@ mod tests {
         const ATANH_FUNC: u8 = 7;
 
         let p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         let mut cordic = Cordic::new(p.CORDIC, Config::default()).unwrap();
 
         let input_q15 = -18_317;
@@ -336,6 +342,7 @@ mod tests {
         const LN_FUNC: u8 = 8;
 
         let p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         let mut cordic = Cordic::new(p.CORDIC, Config::default()).unwrap();
 
         // The logarithm's input ratio gives ln(x) / 4 = atanh(2 * ratio) / 2.

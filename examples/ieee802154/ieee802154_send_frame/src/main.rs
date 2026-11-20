@@ -5,7 +5,6 @@
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, main};
-use esp_println::println;
 use esp_radio::ieee802154::{Config, Frame, Ieee802154};
 use ieee802154::mac::{
     Address,
@@ -21,8 +20,9 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 24 * 1024);
 
@@ -64,7 +64,7 @@ fn main() -> ! {
             )
             .ok();
 
-        println!("Send frame with sequence number {seq_number}");
+        log::info!("Send frame with sequence number {seq_number}");
         delay.delay_millis(1000u32);
         seq_number = seq_number.wrapping_add(1);
     }

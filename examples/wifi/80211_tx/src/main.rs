@@ -12,7 +12,6 @@ use core::marker::PhantomData;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, delay::Delay, ram, time::Duration, timer::timg::TimerGroup};
-use esp_println::println;
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
@@ -36,9 +35,10 @@ const MAC_ADDRESS: [u8; 6] = [0x00, 0x80, 0x41, 0x13, 0x37, 0x42];
 
 #[esp_hal::main]
 async fn main(_spawner: embassy_executor::Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
@@ -105,7 +105,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     // Only use the actually written bytes.
     let beacon = &beacon[..length];
 
-    println!("Scan for WiFi networks and find `esp-radio 802.11 injection`");
+    log::info!("Scan for WiFi networks and find `esp-radio 802.11 injection`");
 
     loop {
         sniffer.send_raw_frame(true, beacon, false).unwrap();

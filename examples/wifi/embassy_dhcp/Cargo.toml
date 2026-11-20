@@ -17,12 +17,13 @@ enumset = { version = "1.0.0", optional = true }
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
-    "println",
+    "log-04",
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-metadata-generated = { path = "../../../esp-metadata-generated" }
-esp-println = { path = "../../../esp-println", features = ["log-04"] }
+esp-log = { path = "../../../esp-log", features = ["log-04"] }
+log = "0.4"
 esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
 esp-radio = { path = "../../../esp-radio", features = [
     "log-04",
@@ -34,6 +35,7 @@ static_cell = "2.1.0"
 
 [features]
 esp32 = [
+    "esp-log/esp32",
     "esp-alloc/esp32",
     "esp-backtrace/esp32",
     "esp-bootloader-esp-idf/esp32",
@@ -43,6 +45,7 @@ esp32 = [
     "esp-radio/esp32",
 ]
 esp32c2 = [
+    "esp-log/esp32c2",
     "esp-alloc/esp32c2",
     "esp-backtrace/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
@@ -52,6 +55,7 @@ esp32c2 = [
     "esp-radio/esp32c2",
 ]
 esp32c3 = [
+    "esp-log/esp32c3",
     "esp-alloc/esp32c3",
     "esp-backtrace/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
@@ -61,6 +65,7 @@ esp32c3 = [
     "esp-radio/esp32c3",
 ]
 esp32c5 = [
+    "esp-log/esp32c5",
     "esp-alloc/esp32c5",
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
@@ -70,6 +75,7 @@ esp32c5 = [
     "esp-radio/esp32c5",
 ]
 esp32c6 = [
+    "esp-log/esp32c6",
     "esp-alloc/esp32c6",
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
@@ -79,6 +85,7 @@ esp32c6 = [
     "esp-radio/esp32c6",
 ]
 esp32c61 = [
+    "esp-log/esp32c61",
     "esp-alloc/esp32c61",
     "esp-backtrace/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
@@ -88,6 +95,7 @@ esp32c61 = [
     "esp-radio/esp32c61",
 ]
 esp32s31 = [
+    "esp-log/esp32s31",
     "esp-alloc/esp32s31",
     "esp-backtrace/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",
@@ -97,6 +105,7 @@ esp32s31 = [
     "esp-radio/esp32s31",
 ]
 esp32s2 = [
+    "esp-log/esp32s2",
     "esp-alloc/esp32s2",
     "esp-backtrace/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
@@ -106,6 +115,7 @@ esp32s2 = [
     "esp-radio/esp32s2",
 ]
 esp32s3 = [
+    "esp-log/esp32s3",
     "esp-alloc/esp32s3",
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",

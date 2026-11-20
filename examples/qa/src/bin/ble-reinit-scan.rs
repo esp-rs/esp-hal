@@ -31,7 +31,6 @@ use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::ble::controller::BleConnector;
 use trouble_host::prelude::*;
 
@@ -52,15 +51,15 @@ const INACTIVE_PHASE: Duration = Duration::from_secs(10);
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    println!(
+    log::info!(
         "Waiting {}s (baseline power, radio never initialized)",
         STARTUP_DELAY.as_secs()
     );
@@ -95,7 +94,7 @@ async fn main(_spawner: Spawner) {
 
             let printer = Printer;
             let mut scanner = Scanner::new(&mut central);
-            println!(
+            log::info!(
                 "Iteration {iteration}: active for {}s",
                 ACTIVE_PHASE.as_secs()
             );
@@ -110,13 +109,13 @@ async fn main(_spawner: Spawner) {
                 };
                 match scanner.scan(&config).await {
                     Ok(_session) => Timer::after(ACTIVE_PHASE).await,
-                    Err(e) => println!("Iteration {iteration}: failed to start scan: {e:?}"),
+                    Err(e) => log::info!("Iteration {iteration}: failed to start scan: {e:?}"),
                 }
             })
             .await;
         }
 
-        println!(
+        log::info!(
             "Iteration {iteration}: received {} advertisements, inactive for {}s (measure power now)",
             ADV_COUNT.load(Ordering::Relaxed),
             INACTIVE_PHASE.as_secs()
@@ -131,7 +130,7 @@ struct Printer;
 impl EventHandler for Printer {
     fn on_adv_reports(&self, mut reports: LeAdvReportsIter<'_>) {
         while let Some(Ok(report)) = reports.next() {
-            println!("  adv {:?} len {}", report.addr, report.data.len());
+            log::info!("  adv {:?} len {}", report.addr, report.data.len());
             ADV_COUNT.store(ADV_COUNT.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
         }
     }

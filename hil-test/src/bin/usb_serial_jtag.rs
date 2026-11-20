@@ -1,6 +1,6 @@
 //! USB-Serial-JTAG Test
 //!
-//! The tests drive the USB-Serial-JTAG port, which esp-println prints to, so they log over RTT.
+//! The tests drive the USB-Serial-JTAG port, which the serial logger uses, so they log over RTT.
 
 //% CHIP_FILTER: usb_serial_jtag_driver_supported
 //% FEATURES: unstable log-rtt

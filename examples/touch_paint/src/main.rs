@@ -21,7 +21,6 @@ use esp_hal::{
     clock::{ClockConfig, CpuClock},
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 
 use crate::{
     display::Display,
@@ -72,11 +71,12 @@ assign_resources! {
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
-
     let peripherals = esp_hal::init(
         esp_hal::Config::default().with_cpu_clock(ClockConfig::from(CpuClock::max())),
     );
+
+    esp_log::init_uart!(peripherals);
+
     esp_alloc::heap_allocator!(size: 48 * 1024);
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
@@ -96,7 +96,7 @@ async fn main(_spawner: Spawner) -> ! {
     display.writeback(dirty);
 
     let mut touch = Touch::new(resources.touch).await;
-    println!("Touch Paint ready (Goodix at 0x{:02x})", touch.address());
+    log::info!("Touch Paint ready (Goodix at 0x{:02x})", touch.address());
 
     let mut adc_config = AdcConfig::new();
     let mut set_button = adc_config.enable_pin(peripherals.GPIO42, Attenuation::_11dB);
@@ -123,7 +123,7 @@ async fn main(_spawner: Spawner) -> ! {
                 display.writeback(dirty);
                 last_point = None;
                 set_latched = true;
-                println!("SET: restored demo picture");
+                log::info!("SET: restored demo picture");
             }
         } else {
             set_debounce = 0;

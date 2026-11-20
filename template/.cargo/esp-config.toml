@@ -2,6 +2,6 @@
 [env]
 #%if option("defmt")
 DEFMT_LOG="info"
-#%else if option("log")
+#%else if option("log") || option("esp-backtrace")
 ESP_LOG="info"
 #%endif

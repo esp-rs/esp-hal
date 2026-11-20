@@ -149,7 +149,7 @@ peripheral_clocks = { templates = [
     { name = "Spi3Dma" },
     #{ name = "Pwm3" },
     #{ name = "Pwm2" },
-    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
+    { name = "UartMem", keep_enabled = true }, # The deprecated esp-println writes to UART0 without a driver.
     { name = "UsbFs", template_params = { peripheral = "usb" } },
     { name = "Spi2Dma" },
     { name = "Mcpwm1", template_params = { peripheral = "pwm1" } },

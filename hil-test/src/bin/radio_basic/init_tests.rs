@@ -50,6 +50,7 @@ mod init_tests {
     #[timeout(6)]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_without_scheduler(p: Peripherals) {
+        hil_test::init_logger!(p);
         // esp-rtos must be initialized before esp-radio.
         let _ = esp_radio::wifi::WifiController::new(p.WIFI, Default::default());
     }
@@ -59,6 +60,7 @@ mod init_tests {
     #[timeout(6)]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_cs(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -72,6 +74,7 @@ mod init_tests {
     #[timeout(6)]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_interrupt_free(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -83,6 +86,7 @@ mod init_tests {
     #[timeout(6)]
     #[cfg(soc_has_wifi)]
     async fn test_init_fails_in_interrupt_executor_task(p: Peripherals) {
+        hil_test::init_logger!(p);
         static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<2>> = StaticCell::new();
         let executor_core0 = InterruptExecutor::new(p.FROM_CPU_INTR2);
         let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
@@ -102,6 +106,7 @@ mod init_tests {
     #[test]
     #[cfg(soc_has_wifi)]
     fn test_wifi_can_be_initialized(mut p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -119,6 +124,7 @@ mod init_tests {
     #[cfg(soc_has_wifi)]
     #[cfg(all(bt_driver_supported, feature = "esp-radio-unstable"))]
     fn test_init_and_drop(mut p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -138,6 +144,7 @@ mod init_tests {
     #[cfg(soc_has_wifi)]
     #[cfg(all(bt_driver_supported, feature = "esp-radio-unstable"))]
     fn test_create_ble_wifi_drop_ble_wifi_create_wifi_ble(mut p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 

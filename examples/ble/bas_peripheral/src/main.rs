@@ -116,8 +116,6 @@ cfg_select! {
 
 #[esp_hal::main]
 async fn main(_s: Spawner) {
-    esp_println::logger::init_logger_from_env();
-
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock({
         #[cfg_attr(feature = "esp32c2", allow(unused_mut))]
         let mut config = ClockConfig::from(CpuClock::max());
@@ -133,6 +131,8 @@ async fn main(_s: Spawner) {
 
         config
     }));
+
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 

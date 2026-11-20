@@ -15,6 +15,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let mem2mem = cfg_select! {
             esp32s2 => Mem2Mem::new(peripherals.DMA_COPY),

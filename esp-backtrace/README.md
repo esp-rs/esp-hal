@@ -15,6 +15,12 @@ you want to create a backtrace yourself (i.e. not using the panic handler).
 
 When using the panic handler make sure to include `use esp_backtrace as _;`.
 
+The panic handler prints through the `log` (feature `log-04`) or `defmt` frontend, so the
+application has to install a logger, for example [`esp-log`]. The `println` feature, which
+prints through `esp-println`, is deprecated.
+
+[`esp-log`]: https://github.com/esp-rs/esp-hal/tree/main/esp-log
+
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.

@@ -18,29 +18,29 @@ use esp_hal::{
     system::{Cpu, software_reset},
     time::Duration,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    let _peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
     let delay = Delay::new();
 
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
-    println!("reset reason: {:?}", reason);
+    log::info!("reset reason: {:?}", reason);
 
     match reason {
         SocResetReason::ChipPowerOn => {
-            println!("calling software_reset()...");
+            log::info!("calling software_reset()...");
         }
         // CoreUsbUart is produced when flashing via USB; treat as a fresh start.
         #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32c2")))]
         SocResetReason::CoreUsbUart => {
-            println!("calling software_reset()...");
+            log::info!("calling software_reset()...");
         }
         SocResetReason::CoreSw => {
-            println!("PASS");
+            log::info!("PASS");
         }
         other => {
             panic!("software_reset() failed; expected CoreSw, got {:?}", other);

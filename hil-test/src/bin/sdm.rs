@@ -256,6 +256,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let (sdm_pin, rmt_pin) = hil_test::common_test_pins!(peripherals);
 
         Context {

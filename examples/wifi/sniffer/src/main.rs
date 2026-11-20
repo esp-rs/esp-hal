@@ -18,7 +18,6 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
-use esp_println::println;
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -33,9 +32,10 @@ static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(B
 
 #[esp_hal::main]
 async fn main(_spawner: embassy_executor::Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
@@ -60,7 +60,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
                 if critical_section::with(|cs| {
                     KNOWN_SSIDS.borrow_ref_mut(cs).insert(ssid.to_string())
                 }) {
-                    println!("Found new AP with SSID: {ssid}");
+                    log::info!("Found new AP with SSID: {ssid}");
                 }
             }
         };

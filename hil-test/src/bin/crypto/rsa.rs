@@ -65,6 +65,7 @@ mod tests {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(peripherals);
 
         let rsa = Rsa::new(peripherals.RSA, esp_hal::rsa::Config::default()).unwrap();
 
@@ -388,6 +389,7 @@ mod work_queue_tests {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         #[allow(unused_mut)]
         let mut rsa = RsaBackend::new(peripherals.RSA);

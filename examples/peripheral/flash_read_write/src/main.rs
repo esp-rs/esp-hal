@@ -13,26 +13,26 @@ use esp_hal::{
     flash::{Config, Flash},
     main,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
+    esp_log::init_uart!(peripherals);
+
     let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
-    println!("Flash size = {}", flash.capacity());
+    log::info!("Flash size = {}", flash.capacity());
 
     let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
     let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();
 
     for i in 0..pt.len() {
         let raw = pt.get_partition(i).unwrap();
-        println!("{:?}", raw);
+        log::info!("{:?}", raw);
     }
-    println!();
+    log::info!("");
 
     // Factory app partition
     let factory = pt
@@ -53,15 +53,15 @@ fn main() -> ! {
         .as_auto_flash_region(&mut flash)
         .read(32, &mut app_desc)
         .unwrap();
-    println!("App descriptor dump {:02x?}", app_desc);
-    println!();
+    log::info!("App descriptor dump {:02x?}", app_desc);
+    log::info!("");
 
     // Image validation hash
-    println!(
+    log::info!(
         "Factory partition SHA-256: {:02x?}",
         factory.sha256(&mut flash).unwrap()
     );
-    println!();
+    log::info!("");
 
     let nvs = pt
         .find_partition(partitions::PartitionType::Data(
@@ -73,15 +73,15 @@ fn main() -> ! {
     let mut nvs_partition = nvs.as_flash_region(&mut flash).unwrap();
 
     let mut bytes = [0u8; 32];
-    println!("NVS partition size = {}", nvs_partition.capacity());
-    println!();
+    log::info!("NVS partition size = {}", nvs_partition.capacity());
+    log::info!("");
 
     let offset_in_nvs_partition = 0;
 
     nvs_partition
         .read(offset_in_nvs_partition, &mut bytes)
         .unwrap();
-    println!(
+    log::info!(
         "Read from {:x}:  {:02x?}",
         offset_in_nvs_partition,
         &bytes[..32]
@@ -104,7 +104,7 @@ fn main() -> ! {
     nvs_partition
         .write(offset_in_nvs_partition, &bytes)
         .unwrap();
-    println!(
+    log::info!(
         "Written to {:x}: {:02x?}",
         offset_in_nvs_partition,
         &bytes[..32]
@@ -112,14 +112,14 @@ fn main() -> ! {
 
     let mut reread_bytes = [0u8; 32];
     nvs_partition.read(0, &mut reread_bytes).unwrap();
-    println!(
+    log::info!(
         "Read from {:x}:  {:02x?}",
         offset_in_nvs_partition,
         &reread_bytes[..32]
     );
 
-    println!();
-    println!("Reset (CTRL-R in espflash) to re-read the persisted data.");
+    log::info!("");
+    log::info!("Reset (CTRL-R in espflash) to re-read the persisted data.");
 
     loop {}
 }

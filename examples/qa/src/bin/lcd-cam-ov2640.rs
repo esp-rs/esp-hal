@@ -41,13 +41,12 @@ use esp_hal::{
     main,
     time::Rate,
 };
-use esp_println::{print, println};
-
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
     let dma_rx_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
 
@@ -89,11 +88,11 @@ fn main() -> ! {
 
     // Checking camera address
     sccb.probe(OV2640_ADDRESS).unwrap();
-    println!("Probe successful!");
+    log::info!("Probe successful!");
 
     sccb.write(OV2640_ADDRESS, 0xFF, 0x01).unwrap(); // bank sensor
     let pid = sccb.read(OV2640_ADDRESS, 0x0A).unwrap();
-    println!("Found PID of {:#02X}, and was expecting 0x26", pid);
+    log::info!("Found PID of {:#02X}, and was expecting 0x26", pid);
 
     for (reg, value) in FIRST_BLOCK {
         sccb.write(OV2640_ADDRESS, *reg, *value).unwrap();
@@ -127,14 +126,14 @@ fn main() -> ! {
                 total_bytes += bytes_peeked;
                 if ends_with_eof {
                     // Found the end of the image/frame.
-                    println!("Skipped a {} byte image", total_bytes);
+                    log::info!("Skipped a {} byte image", total_bytes);
                     break;
                 }
             }
         }
     }
 
-    println!("Frame data (parse with `xxd -r -p <uart>.txt image.jpg`):");
+    log::info!("Frame data (parse with `xxd -r -p <uart>.txt image.jpg`):");
 
     // Note: JPEGs starts with "FF, D8, FF, E0" and end with "FF, D9".
     // The OV2640 also sends some trailing zeros after the JPEG. This is expected.
@@ -146,9 +145,13 @@ fn main() -> ! {
                 panic!("We were too slow to read from the DMA");
             }
         } else {
-            for b in data {
-                print!("{:02X}, ", b);
-            }
+            let hex = core::fmt::from_fn(|f| {
+                for b in data {
+                    write!(f, "{:02X}, ", b)?;
+                }
+                Ok(())
+            });
+            log::info!("{hex}");
             let bytes_peeked = data.len();
             transfer.consume(bytes_peeked);
 

@@ -1,6 +1,6 @@
 #![no_std]
 
-// The tests log through esp-println, on the serial port that probe-rs reads. Logging over the
+// The tests log through esp-log, on the serial port that probe-rs reads. Logging over the
 // serial port does not halt the cores, as RTT polling does.
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -20,7 +20,25 @@ unsafe impl defmt::Logger for Logger {
 }
 
 #[cfg(feature = "log-serial")]
-use esp_println as _;
+#[doc(hidden)]
+pub use esp_log;
+
+/// Installs the logger on the USB-Serial-JTAG port, which probe-rs reads. Moves the fields it uses
+/// out of `$peripherals`.
+///
+/// The driver is unstable, so this does nothing unless the test enables `unstable`.
+#[macro_export]
+macro_rules! init_logger {
+    ($peripherals:expr) => {
+        #[cfg(all(feature = "log-serial", feature = "unstable"))]
+        $crate::init_logger!(@install $peripherals);
+        #[cfg(not(all(feature = "log-serial", feature = "unstable")))]
+        let _ = &$peripherals;
+    };
+    (@install $peripherals:expr) => {
+        $crate::esp_log::init_usb!($peripherals)
+    };
+}
 
 #[cfg(feature = "defmt")]
 #[macro_export]

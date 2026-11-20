@@ -55,6 +55,6 @@ Register each binary in `Cargo.toml` with `harness = false` and `required-featur
 
 ## Logging
 
-The tests print [defmt] logs through `esp-println`, as in [`hil-test`](../hil-test/README.md#logging-in-tests). `probe-rs run` shows the log of a test only if the test fails.
+The tests print [defmt] logs through `esp-log` on the USB-Serial-JTAG port, as in [`hil-test`](../hil-test/README.md#logging-in-tests). `probe-rs run` shows the log of a test only if the test fails.
 
 [defmt]: https://github.com/knurling-rs/defmt
