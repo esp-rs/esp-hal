@@ -127,6 +127,10 @@ impl<'d> Hmac<'d> {
     /// HMAC and SHA must be set and the corresponding peripheral
     /// reset bits must be cleared.
     pub fn init(&mut self) {
+        // ESP-IDF's `hmac_hal_start` and `hmac_hal_configure` wait for idle before the start,
+        // before the parameters and before the error flag is read. Without these waits,
+        // `configure` can report a false `KeyPurposeMismatch` after a previous operation.
+        while self.is_busy() {}
         self.regs().set_start().write(|w| w.set_start().set_bit());
         self.alignment_helper.reset();
         self.byte_written = 64;
@@ -135,6 +139,7 @@ impl<'d> Hmac<'d> {
 
     /// Configures HMAC keys and key purposes.
     pub fn configure(&mut self, m: HmacPurpose, key_id: KeyId) -> nb::Result<(), Error> {
+        while self.is_busy() {}
         self.regs()
             .set_para_purpose()
             .write(|w| unsafe { w.purpose_set().bits(m as u8) });
@@ -144,6 +149,7 @@ impl<'d> Hmac<'d> {
         self.regs()
             .set_para_finish()
             .write(|w| w.set_para_end().set_bit());
+        while self.is_busy() {}
 
         let query_error = self.regs().query_error().read();
         let key_mismatch = cfg_select! {
@@ -152,6 +158,10 @@ impl<'d> Hmac<'d> {
         };
         if key_mismatch {
             return Err(nb::Error::Other(Error::KeyPurposeMismatch));
+        }
+
+        if m != HmacPurpose::ToUser {
+            while self.is_busy() {}
         }
 
         Ok(())
