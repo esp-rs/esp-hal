@@ -1,13 +1,25 @@
 const BUG_JURY_LABEL = "Bug Jury";
 const TRACKER_LABEL = "backlog-bot-do-not-remove";
+const DEFAULT_MIN_AGE_DAYS = 30;
 
-async function run({ github, context, core, batchSize, dryRun }) {
+function isOlderThanDays(issue, minAgeDays) {
+  const createdAt = Date.parse(issue.created_at);
+  if (Number.isNaN(createdAt)) return false;
+  const minAgeMs = minAgeDays * 24 * 60 * 60 * 1000;
+  return Date.now() - createdAt >= minAgeMs;
+}
+
+async function run({ github, context, core, batchSize, dryRun, minAgeDays }) {
   const owner = context.repo.owner;
   const repo = context.repo.repo;
+  const ageDays = Number.isFinite(minAgeDays) && minAgeDays > 0 ? minAgeDays : DEFAULT_MIN_AGE_DAYS;
 
-  core.info(`Starting bug-jury-labeler (dryRun=${dryRun}, batchSize=${batchSize})`);
+  core.info(
+    `Starting bug-jury-labeler (dryRun=${dryRun}, batchSize=${batchSize}, minAgeDays=${ageDays})`,
+  );
 
   const allIssues = [];
+  let skippedTooNew = 0;
   for await (const { data: issues } of github.paginate.iterator(
     github.rest.issues.listForRepo,
     {
@@ -22,14 +34,19 @@ async function run({ github, context, core, batchSize, dryRun }) {
   )) {
     for (const issue of issues) {
       if (issue.pull_request) continue;
+      if (!isOlderThanDays(issue, ageDays)) {
+        skippedTooNew++;
+        continue;
+      }
       allIssues.push(issue);
     }
   }
 
-  core.info(`Total open unassigned issues: ${allIssues.length}`);
+  core.info(`Open unassigned issues skipped (younger than ${ageDays} days): ${skippedTooNew}`);
+  core.info(`Open unassigned issues older than ${ageDays} days: ${allIssues.length}`);
 
   if (allIssues.length === 0) {
-    core.info("No unassigned issues found. Nothing to do.");
+    core.info(`No unassigned issues older than ${ageDays} days. Nothing to do.`);
     return;
   }
 
