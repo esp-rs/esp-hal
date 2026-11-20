@@ -5,20 +5,18 @@
 //! - RMT RX     => second common test pin
 
 //% CHIP_FILTER: sdm_driver_supported && rmt_driver_supported
-//% FEATURES: embassy unstable
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
 
-use embassy_time::Timer;
 use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, Level},
     peripherals::{RMT, SDM_CH0},
     rmt::{AnyRmtRxChannel, CHANNEL_RAM_SIZE, PulseCode, Rmt, RmtConfig, RxConfig, RxError},
     sdm::{Channel as SdmChannel, ChannelConfig},
-    time::Rate,
-    timer::timg::TimerGroup,
+    time::{Duration, Instant, Rate},
 };
 use hil_test as _;
 
@@ -27,7 +25,7 @@ const RMT_TICK_RATE: Rate = Rate::from_mhz(1);
 
 const SDM_FREQUENCY: Rate = Rate::from_khz(500);
 const SDM_WARM_UP_US: u32 = 1_000;
-const SAMPLE_TIME_US: u64 = 200;
+const SAMPLE_TIME_US: u32 = 200;
 const RMT_IDLE_NS: u32 = 100_000;
 const RX_LEN: usize = CHANNEL_RAM_SIZE;
 const DEBUG_WAVE_MAX_CHARS: usize = 200;
@@ -227,7 +225,12 @@ async fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
 
     let (rx_result, ()) =
         embassy_futures::join::join(rx_channel.receive_async(&mut rx_data), async {
-            Timer::after_micros(SAMPLE_TIME_US).await;
+            // Busy-wait instead of a timer: without RX wrap (ESP32, ESP32-S2), the frame must fit
+            // in the channel RAM, and a late timer wake-up lets it overflow.
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(SAMPLE_TIME_US as u64) {
+                embassy_futures::yield_now().await;
+            }
 
             // Send an idle signal, so that the RMT stops recording pulses.
             channel.set_duty(0);
@@ -253,8 +256,6 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        esp_rtos::start(TimerGroup::new(peripherals.TIMG0).timer0);
-
         let (sdm_pin, rmt_pin) = hil_test::common_test_pins!(peripherals);
 
         Context {
