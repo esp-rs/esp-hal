@@ -42,6 +42,14 @@ pub const RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT: u16 = 0x10;
 pub const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
 /// Default wait time for CK8M during startup.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
+/// Default wait for the XTL buffer, in RTC slow clock cycles.
+pub(super) const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u8 = 100;
+/// Wait time for the XTL buffer on a light sleep wakeup, in microseconds.
+pub(super) const RTC_CNTL_XTL_BUF_WAIT_SLP_US: u32 = 250;
+/// Wait time for the PLL buffer on a light sleep wakeup, in RTC slow clock cycles.
+pub(super) const RTC_CNTL_PLL_BUF_WAIT_SLP_CYCLES: u8 = 1;
+/// Wait time for CK8M on a light sleep wakeup, in RTC slow clock cycles.
+pub(super) const RTC_CNTL_CK8M_WAIT_SLP_CYCLES: u8 = 4;
 /// Minimum sleep value.
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 /// Deep sleep debug attenuation setting for ultra-low power mode.
