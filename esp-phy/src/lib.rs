@@ -148,7 +148,7 @@ struct PhyState {
     ref_count: usize,
     /// Has the PHY been calibrated since the chip was powered up.
     calibrated: bool,
-    /// Set while the PHY calibrates with interrupts enabled and [PHY_STATE] unlocked.
+    /// Set while the PHY calibrates with [PHY_STATE] unlocked.
     calibrating: bool,
     /// Last calibration result code.
     calibration_result: i32,
@@ -244,13 +244,18 @@ impl PhyState {
             sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
         };
         let init_data = &phy_init_data::PHY_INIT_DATA_DEFAULT;
-        unsafe {
-            sys::include::register_chipv7_phy(
-                init_data,
-                calibration_data.get_or_insert([0u8; PHY_CALIBRATION_DATA_LENGTH])
-                    as *mut PhyCalibrationData as *mut _,
-                calibration_mode,
-            )
+        let calibration_data = calibration_data.get_or_insert([0u8; PHY_CALIBRATION_DATA_LENGTH])
+            as *mut PhyCalibrationData as *mut _;
+        let register = || unsafe {
+            sys::include::register_chipv7_phy(init_data, calibration_data, calibration_mode)
+        };
+
+        // The ESP32 and ESP32-S2 PHY libraries do not call `phy_i2c_enter_critical`, and they
+        // access the analog I2C master without the lock during the calibration, so the calibration
+        // holds the lock throughout.
+        cfg_select! {
+            any(esp32, esp32s2) => common_adapter::with_regi2c_lock(register),
+            _ => register(),
         }
     }
 
@@ -415,8 +420,9 @@ impl Drop for PhyInitGuard<'_> {
 /// will involve a full RF calibration, unless you loaded previously backed up calibration
 /// data with [set_phy_calibration_data].
 ///
-/// The first initialization since power-up calibrates the PHY with interrupts enabled. Nothing
-/// else may use the PHY until the calibration finishes. Wake-up and shutdown mask interrupts.
+/// The first initialization since power-up calibrates the PHY with interrupts enabled, except on
+/// the ESP32 and ESP32-S2. Nothing else may use the PHY until the calibration finishes. Wake-up and
+/// shutdown mask interrupts.
 ///
 /// # Panics
 ///

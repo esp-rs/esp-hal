@@ -2,7 +2,6 @@
 mod init_tests {
 
     use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-    use embassy_time::{Duration, Instant, Timer};
     #[cfg(soc_has_wifi)]
     use esp_hal::peripherals::WIFI;
     #[cfg(riscv)]
@@ -21,7 +20,6 @@ mod init_tests {
     use esp_radio::wifi::WifiError;
     use esp_rtos::embassy::InterruptExecutor;
     use hil_test::mk_static;
-    use portable_atomic::{AtomicU32, Ordering};
     use static_cell::StaticCell;
 
     #[embassy_executor::task]
@@ -167,8 +165,11 @@ mod init_tests {
     }
 
     #[test]
-    #[cfg(soc_has_wifi)]
+    #[cfg(all(soc_has_wifi, not(any(esp32, esp32s2))))]
     fn interrupts_run_while_the_phy_calibrates(p: Peripherals) {
+        use embassy_time::{Duration, Instant, Timer};
+        use portable_atomic::{AtomicU32, Ordering};
+
         static LONGEST_GAP_US: AtomicU32 = AtomicU32::new(0);
 
         #[embassy_executor::task]
@@ -206,7 +207,9 @@ mod init_tests {
     #[test]
     #[timeout(6)]
     #[cfg(all(
-        any(esp32c5, esp32c6, esp32c61, esp32s31),
+        soc_has_wifi,
+        soc_has_bt,
+        soc_has_modem_syscon,
         feature = "esp-radio-unstable"
     ))]
     fn wifi_waits_for_ble_calibration(p: Peripherals) {

@@ -494,7 +494,8 @@ pub(crate) fn acquire_modem_domain() {
     });
 }
 
-/// Serializes radio bring-up, which calibrates the PHY with interrupts enabled.
+/// Serializes radio bring-up, which calibrates the PHY with interrupts enabled, except on the
+/// ESP32 and ESP32-S2.
 ///
 /// Threads block on a scheduler mutex instead of spinning on a [`Refcount`], which would starve a
 /// lower-priority thread that calibrates.
