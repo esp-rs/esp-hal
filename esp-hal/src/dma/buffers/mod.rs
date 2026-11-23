@@ -100,7 +100,7 @@ cfg_select! {
             Size32 = 32,
 
             /// 64 bytes
-            // TODO: investigate why ext_mem_bk_size = 2 causes corruption on S2
+            // The S2 EDMA only transfers the first 32 bytes of each 64-byte block.
             #[cfg(not(esp32s2))]
             Size64 = 64,
         }
