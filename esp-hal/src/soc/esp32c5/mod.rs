@@ -13,8 +13,15 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32c5 as pac;
 
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", not(code_in_psram)))]
 pub(crate) fn riscv_preinit() {}
+
+/// Copies the code into PSRAM. `_setup_interrupts` calls this function before anything else, after
+/// `_start` zeroes `.bss`.
+#[cfg(all(feature = "rt", code_in_psram))]
+pub(crate) fn riscv_preinit() {
+    crate::psram::code_in_psram::start();
+}
 
 pub(crate) fn pre_init() {
     // Reset TEE security modes. This allows unrestricted access to TEE masters, including DMA.

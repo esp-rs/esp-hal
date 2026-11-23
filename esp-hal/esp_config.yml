@@ -235,24 +235,35 @@ options:
       `psram-frequency` and copies both from flash before `esp_hal::init`. Flash operations then
       keep the caches on and do not park the other core. A light sleep returns `Refused` while a
       core holds the flash lock. With flash encryption, the copy in PSRAM is plaintext and can be
-      read from the PSRAM pins. Where PSRAM has its own address window, as on the ESP32-S31,
-      esp-hal must be built at opt-level 2 or 3. See [Optimization level](#optimization-level).
-      esp-storage is not compatible with this option."
+      read from the PSRAM pins. esp-hal must be built at opt-level 2 or 3, as the Optimization
+      level section of the esp-hal documentation states. esp-storage is not compatible with this
+      option."
     default:
       - value: false
     active: "psram_supports_code_in_psram"
 
   - name: psram-frequency
     description: "The PSRAM frequency when `code-in-psram` is on. The start-up then starts PSRAM
-      before `ClockConfig` and `PsramConfig` apply. On the ESP32-S31, 200 MHz runs the MPLL at
+      before `ClockConfig` and `PsramConfig` apply, and `PsramConfig::default()` follows the
+      option. On the ESP32-C5, the values are 40 MHz and 80 MHz, and the default is 80 MHz. On
+      the ESP32-S31, the values are 200 MHz and 250 MHz, the default is 200 MHz, and the
+      `CpuClock` presets also follow the option. On the ESP32-S31, 200 MHz runs the MPLL at
       400 MHz, which limits RGMII Ethernet to 100 Mbit/s, and 250 MHz runs it at 500 MHz.
-      `ClockConfig::mpll_clk` cannot change the MPLL: `esp_hal::init` keeps the start-up's rate
-      and warns. The `CpuClock` presets and `PsramConfig::default()` follow the option. Without
-      `code-in-psram`, `ClockConfig::mpll_clk` and `PsramConfig` set the frequency. On other chips
-      the option is inactive."
+      On the ESP32-S31, `ClockConfig::mpll_clk` cannot change the MPLL with `code-in-psram`: `esp_hal::init`
+      keeps the start-up's rate and warns.
+      When `code-in-psram` is off, `PsramConfig` sets the frequency, and on the ESP32-S31
+      `ClockConfig::mpll_clk` sets the MPLL rate."
     default:
+      - value: '"80MHz"'
+        if: "esp32c5"
       - value: '"200MHz"'
     constraints:
+      - if: "esp32c5"
+        type:
+          validator: enumeration
+          value:
+            - "40MHz"
+            - "80MHz"
       - if: "esp32s31"
         type:
           validator: enumeration

@@ -1,8 +1,10 @@
-//! Code in PSRAM: the firmware's code and read-only data run from the PSRAM window.
+//! Code in PSRAM: the firmware's code and read-only data run from PSRAM.
 
-//% CHIP_FILTER(at_200mhz, at_250mhz): psram_supports_code_in_psram
+//% CHIP_FILTER(at_200mhz, at_250mhz): psram_supports_code_in_psram && psram_separate_window
+//% CHIP_FILTER(at_40mhz, at_80mhz): psram_supports_code_in_psram && !psram_separate_window
 //% ENV: ESP_HAL_CONFIG_CODE_IN_PSRAM=true
 //% ENV(at_250mhz): ESP_HAL_CONFIG_PSRAM_FREQUENCY=250MHz
+//% ENV(at_40mhz): ESP_HAL_CONFIG_PSRAM_FREQUENCY=40MHz
 //% FEATURES: unstable esp-alloc embassy
 
 #![no_std]
@@ -24,30 +26,87 @@ static RODATA: [u32; 4] = [0x5053_524D; 4];
 static mut DATA: u32 = 0x4441_5441;
 static mut BSS: u32 = 0;
 
+// Statics in PSRAM need a separate PSRAM window, which the S31 has.
+
 // 256 KiB, so the static spans several MMU pages.
+#[cfg(psram_separate_window)]
 #[esp_hal::psram(zeroed)]
 static mut PSRAM_BSS: [u32; 0x1_0000] = [0; 0x1_0000];
 
+#[cfg(psram_separate_window)]
 struct PsramState {
     waker: Mutex<RefCell<Option<core::task::Waker>>>,
     flag: core::sync::atomic::AtomicBool,
 }
 
+#[cfg(psram_separate_window)]
 #[esp_hal::psram(zeroed)]
 static PSRAM_STATE: PsramState = PsramState {
     waker: Mutex::new(RefCell::new(None)),
     flag: core::sync::atomic::AtomicBool::new(false),
 };
 
+#[cfg(psram_separate_window)]
 #[repr(C, align(64))]
 struct DmaBlock([u8; 4096]);
 
+#[cfg(psram_separate_window)]
 #[esp_hal::psram(zeroed)]
 static mut DMA_SOURCE: DmaBlock = DmaBlock([0; 4096]);
 
+#[cfg(psram_separate_window)]
 unsafe extern "C" {
     static _psram_code_end: u8;
     static _psram_bss_end: u8;
+}
+
+const WINDOW: u32 = property!("psram.extmem_origin");
+const PAGE: u32 = property!("mmu.page_size");
+const ENTRIES: u32 = property!("mmu.entry_num");
+
+/// The MMU entry for the virtual page at `addr`, in the window that holds the code.
+fn entry_of(addr: u32) -> u32 {
+    let spi0 = esp_hal::peripherals::SPI0::regs();
+    spi0.mmu_item_index()
+        .write(|w| unsafe { w.bits((addr - WINDOW) / PAGE) });
+    spi0.mmu_item_content().read().bits()
+}
+
+/// Returns whether entry `i` maps flash. On the ESP32-S31, this MMU maps only flash, and bit 12
+/// marks an entry valid. On the ESP32-C5, flash and PSRAM share the MMU: bit 10 marks an entry
+/// valid, and bit 9 selects PSRAM.
+fn maps_flash(i: u32) -> bool {
+    let entry = entry_of(WINDOW + i * PAGE);
+    cfg_select! {
+        psram_separate_window => entry & (1 << 12) != 0,
+        _ => entry & (1 << 10) != 0 && entry & (1 << 9) == 0,
+    }
+}
+
+/// Returns whether the code or data at `addr` comes from PSRAM.
+fn in_psram(addr: u32) -> bool {
+    // The ESP32-S31's code links in the PSRAM window, which only PSRAM backs. On the ESP32-C5, the
+    // entry decides.
+    if !(WINDOW..WINDOW + ENTRIES * PAGE).contains(&addr) {
+        return false;
+    }
+    cfg_select! {
+        psram_separate_window => true,
+        _ => {
+            let entry = entry_of(addr);
+            entry & (1 << 10) != 0 && entry & (1 << 9) != 0
+        }
+    }
+}
+
+/// The PSRAM bytes the code takes below `heap`, the start of the heap, by the MMU entries that map
+/// PSRAM.
+#[cfg(not(psram_separate_window))]
+fn code_bytes(heap: u32) -> u32 {
+    (0..(heap - WINDOW) / PAGE)
+        .filter(|&i| in_psram(WINDOW + i * PAGE))
+        .count() as u32
+        * PAGE
 }
 
 /// A random 64 KiB block after the image in the booted partition, so that each run wears another.
@@ -171,13 +230,12 @@ mod tests {
 
     use esp_bootloader_esp_idf::partitions::{self, AppPartitionSubType, PartitionType};
     #[cfg(feature = "esp32s31")]
-    use esp_hal::{
-        clock::{
-            ClockConfig,
-            ll::{ClockTree, mpll_clk_frequency, request_mpll_clk},
-        },
-        psram::PsramTimingParams,
+    use esp_hal::clock::{
+        ClockConfig,
+        ll::{ClockTree, mpll_clk_frequency, request_mpll_clk},
     };
+    #[cfg(feature = "esp32s31")]
+    use esp_hal::psram::PsramTimingParams;
     use esp_hal::{
         flash::{Config, Flash},
         interrupt::{InterruptHandler, Priority},
@@ -186,12 +244,10 @@ mod tests {
 
     use super::*;
 
-    const WINDOW: u32 = property!("psram.extmem_origin");
-    const WINDOW_SIZE: u32 = property!("mmu.entry_num") * property!("mmu.page_size");
     const PATTERN: u32 = 0xA5C3_5A3C;
 
     fn in_window(addr: u32) -> bool {
-        (WINDOW..WINDOW + WINDOW_SIZE).contains(&addr)
+        (WINDOW..WINDOW + ENTRIES * PAGE).contains(&addr)
     }
 
     fn booted_app_offset(flash: &mut Flash<'_, esp_hal::Blocking>) -> u32 {
@@ -204,7 +260,7 @@ mod tests {
     fn test_code_in_psram() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
 
-        assert!(in_window(in_text as *const () as u32));
+        assert!(in_psram(in_text as *const () as u32));
         assert_eq!(in_text(), 0x5053_524D);
     }
 
@@ -212,7 +268,7 @@ mod tests {
     fn test_rodata_in_psram() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
 
-        assert!(in_window(addr_of!(RODATA) as u32));
+        assert!(in_psram(addr_of!(RODATA) as u32));
         // A volatile read, so the compiler cannot answer from the initializer.
         assert_eq!(
             unsafe { addr_of!(RODATA).read_volatile() },
@@ -281,12 +337,16 @@ mod tests {
         let (start, size) = psram.raw_parts();
         assert!(start as u32 > in_text as *const () as u32);
         assert!(start as u32 > addr_of!(RODATA) as u32);
-        // The heap starts at the page after the code and the statics, as the linker placed them.
-        let used = (addr_of!(_psram_code_end) as u32).max(addr_of!(_psram_bss_end) as u32);
-        assert_eq!(
-            start as u32,
-            used.next_multiple_of(property!("mmu.page_size"))
-        );
+        cfg_select! {
+            // The heap starts at the page after the code and the statics, as the linker placed
+            // them.
+            psram_separate_window => {
+                let used = (addr_of!(_psram_code_end) as u32).max(addr_of!(_psram_bss_end) as u32);
+                assert_eq!(start as u32, used.next_multiple_of(PAGE));
+            }
+            // The MMU entries that map PSRAM hold the code and the heap, and PSRAM's size.
+            _ => assert_eq!(psram.size(), code_bytes(start as u32) as usize + size),
+        }
 
         let words = size / 4;
         let heap = unsafe { core::slice::from_raw_parts_mut(start as *mut u32, words) };
@@ -300,6 +360,7 @@ mod tests {
     }
 
     // PSRAM keeps its content across a reset, so the zeros come from the start-up, at every boot.
+    #[cfg(psram_separate_window)]
     #[test]
     fn test_psram_static_is_zeroed_above_the_code() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
@@ -314,6 +375,7 @@ mod tests {
         assert_pattern(words, PATTERN, "PSRAM_BSS");
     }
 
+    #[cfg(psram_separate_window)]
     #[test]
     fn test_psram_static_holds_none_and_false() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
@@ -331,7 +393,7 @@ mod tests {
     // The CPU writes the source through the cache just before the transfer, so the DMA reads the
     // written bytes only if the driver treats the static as PSRAM and writes the cache back.
     // Outside `psram_range`, the driver rejects the buffer.
-    #[cfg(all(dma_can_access_psram, dma_supports_mem2mem))]
+    #[cfg(all(psram_separate_window, dma_can_access_psram, dma_supports_mem2mem))]
     #[test]
     fn test_dma_reads_psram_static() {
         use esp_hal::dma::{BurstConfig, ExternalBurstConfig, Mem2Mem};
@@ -354,7 +416,7 @@ mod tests {
             .unwrap();
 
         let source = unsafe { &mut (*addr_of_mut!(DMA_SOURCE)).0 };
-        assert!(in_window(source.as_ptr() as u32));
+        assert!(in_psram(source.as_ptr() as u32));
         for (i, byte) in source.iter_mut().enumerate() {
             *byte = (i as u8).wrapping_mul(31).wrapping_add(7);
         }
@@ -370,6 +432,7 @@ mod tests {
         }
     }
 
+    #[cfg(psram_separate_window)]
     #[test]
     fn test_heap_after_psram_statics() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -410,7 +473,7 @@ mod tests {
         critical_section::with(|cs| SWINT.borrow_ref(cs).as_ref().unwrap().raise());
 
         while INTERRUPTS.load(Ordering::Relaxed) == 0 {}
-        assert!(in_window(swint_handler as *const () as u32));
+        assert!(in_psram(swint_handler as *const () as u32));
     }
 
     /// The MPLL rate that the hardware is set to, from the ESP32-S31's MPLL feedback divider, with
@@ -440,19 +503,12 @@ mod tests {
         assert_eq!(mpll_in_hardware(), expected);
     }
 
-    #[cfg(psram_separate_window)]
     #[test]
     fn test_no_flash_page_mapped() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
-        let spi0 = esp_hal::peripherals::SPI0::regs();
 
-        for i in 0..1024 {
-            spi0.mmu_item_index().write(|w| unsafe { w.bits(i) });
-            assert!(
-                !spi0.mmu_item_content().read().valid().bit_is_set(),
-                "entry {} is mapped",
-                i
-            );
+        for i in 0..ENTRIES {
+            assert!(!maps_flash(i), "entry {} maps flash", i);
         }
     }
 
@@ -491,7 +547,8 @@ mod tests {
         assert_pattern(heap, seed, "the heap after the MPLL request");
     }
 
-    #[cfg(soc_has_clock_node_mpll_clk)]
+    // No metadata names the ESP32-S31's 200 and 250 MHz PSRAM timings.
+    #[cfg(feature = "esp32s31")]
     #[test]
     fn test_psram_new_with_another_frequency() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -794,6 +851,12 @@ mod flash_operations {
         ctx.assert_psram_kept("read");
     }
 
+    /// Asserts that no MMU entry maps flash, as after the start-up.
+    fn assert_no_flash_mapped(after: &str) {
+        let mapped = (0..ENTRIES).find(|&i| maps_flash(i));
+        assert_eq!(mapped, None, "an entry maps flash after {after}");
+    }
+
     // A page left mapped, or its old cache lines, would return the old words to the second
     // `read_encrypted`. The new words differ from the old ones in every bit.
     #[test]
@@ -806,6 +869,7 @@ mod flash_operations {
 
         flash.read(block, &mut plain).unwrap();
         flash.read_encrypted(block, &mut through_mmu).unwrap();
+        assert_no_flash_mapped("the first read_encrypted");
         assert_eq!(plain, through_mmu);
 
         let data = plain.map(|word| !word);
@@ -815,6 +879,7 @@ mod flash_operations {
             flash.write(block, &data).unwrap();
         }
         flash.read_encrypted(block, &mut through_mmu).unwrap();
+        assert_no_flash_mapped("the second read_encrypted");
         assert_eq!(through_mmu, data);
     }
 

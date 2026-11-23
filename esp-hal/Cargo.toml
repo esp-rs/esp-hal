@@ -31,6 +31,7 @@ check-configs = [
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_APB_FREQUENCY_REDUCTION = "4" }, if = 'soc_has_apb_frequency_reduction' },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_CODE_IN_PSRAM = "true" }, if = 'psram_supports_code_in_psram' },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_CODE_IN_PSRAM = "true", ESP_HAL_CONFIG_PSRAM_FREQUENCY = "250MHz" }, if = 'psram_supports_code_in_psram && psram_separate_window' },
+    { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_CODE_IN_PSRAM = "true", ESP_HAL_CONFIG_PSRAM_FREQUENCY = "40MHz" }, if = 'psram_supports_code_in_psram && !psram_separate_window' },
     { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
     { features = ["unstable", "rt", "__sdmmc"],     if = 'sdmmc_driver_supported' },

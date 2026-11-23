@@ -70,9 +70,15 @@
 ## With `code-in-psram`
 
 Nothing fetches from flash, so a flash operation leaves interrupts enabled, the caches on, and the
-other core running. The limits above on the cache and the other core do not apply.
-[`MultiCoreStrategy`] has no effect.
-
+other core running. The limits above on the cache and the other core do not apply."
+)]
+#![cfg_attr(
+    all(psram_supports_code_in_psram, multi_core),
+    doc = "[`MultiCoreStrategy`] has no effect."
+)]
+#![cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "
 These limits apply:
 
 - Don't map flash during an erase or a write.

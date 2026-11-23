@@ -180,13 +180,19 @@ fn main() -> ! {
 //! With `-Z stack-protector`, the code of these operations is instrumented too. If it detects
 //! stack corruption while the caches are suspended, the panic handler cannot run, because it lives
 //! in flash, and the chip locks up instead of reporting the corruption.
+#![cfg_attr(psram_supports_code_in_psram, doc = "")]
+#![cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "With the `code-in-psram` option, every application uses these operations, so esp-hal \
+           must be built at `opt-level` 2 or 3."
+)]
 #![cfg_attr(psram_separate_window, doc = "")]
 #![cfg_attr(
     psram_separate_window,
     doc = "The `code-in-psram` option adds a second rule. The start-up runs before the code is in \
            PSRAM, so it must not call code outside RAM. The link fails with `prohibited cross \
            reference from '.boot.code_in_psram'` when the start-up refers to a function in \
-           `.text` or `.rwtext`. esp-hal must be built at `opt-level` 2 or 3, as above."
+           `.text` or `.rwtext`."
 )]
 #![doc = ""]
 //! ## Don't use `core::mem::forget`
