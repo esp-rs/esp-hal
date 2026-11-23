@@ -33,6 +33,49 @@ pub(crate) extern "C" fn idle_hook() -> ! {
     }
 }
 
+/// The size of the stack that the scheduler of each CPU runs on.
+const SWITCH_STACK_SIZE: usize =
+    esp_config::esp_config_int!(usize, "ESP_RTOS_CONFIG_SWITCH_STACK_SIZE");
+
+const _: () = core::assert!(
+    SWITCH_STACK_SIZE.is_multiple_of(16),
+    "ESP_RTOS_CONFIG_SWITCH_STACK_SIZE must be a multiple of 16"
+);
+
+const SWITCH_STACK_GUARD: u32 = 0xDEED_BAAD;
+
+/// The stacks that the scheduler runs on, one for each CPU.
+///
+/// When the scheduler releases its lock, the other CPU can take the task that this CPU switched
+/// away from, and run it on its stack. The CPU therefore runs the scheduler here, and does not use
+/// the stack of that task after the scheduler selects the next task.
+#[repr(C, align(16))]
+struct SwitchStacks([[u8; SWITCH_STACK_SIZE]; Cpu::COUNT]);
+
+static mut SWITCH_STACKS: SwitchStacks = SwitchStacks([[0; SWITCH_STACK_SIZE]; Cpu::COUNT]);
+
+/// Returns the switch stack of `cpu`.
+#[cfg(xtensa)]
+fn switch_stack(cpu: Cpu) -> *mut [u8] {
+    unsafe { &raw mut SWITCH_STACKS.0[cpu as usize] }
+}
+
+/// Writes the guard word at the bottom of the switch stack of the current CPU.
+fn init_switch_stack() {
+    let bottom = unsafe { (&raw mut SWITCH_STACKS.0[Cpu::current() as usize]).cast::<u32>() };
+    unsafe { bottom.write_volatile(SWITCH_STACK_GUARD) };
+}
+
+/// Panics if the scheduler of the current CPU wrote over the guard word of its switch stack.
+#[inline(always)]
+fn check_switch_stack() {
+    let bottom = unsafe { (&raw const SWITCH_STACKS.0[Cpu::current() as usize]).cast::<u32>() };
+    assert!(
+        unsafe { bottom.read_volatile() } == SWITCH_STACK_GUARD,
+        "Switch stack overflow. Increase ESP_RTOS_CONFIG_SWITCH_STACK_SIZE."
+    );
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum TaskState {
