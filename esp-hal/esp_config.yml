@@ -289,15 +289,10 @@ options:
     active: "soc_has_apb_frequency_reduction"
 
   - name: keep-usb-serial-jtag-connected
-    description: "Keeps USB Serial/JTAG connected to a USB host across light sleep. While a host
-      is connected, light sleep keeps USB Serial/JTAG running at a higher current on the ESP32-C5,
-      ESP32-C6, ESP32-C61, ESP32-H2, ESP32-P4 and ESP32-S31, and also keeps the CPU powered on the
-      ESP32-C6, ESP32-H2 and ESP32-P4. While a debugger is attached, such a light sleep keeps the
-      CPU powered on the other chips too, and keeps clocks that JTAG needs on the ESP32-C5,
-      ESP32-C6 and ESP32-C61, which increases the current until the next chip reset. On the
-      ESP32-C3, ESP32-H4 and ESP32-S3, automatic light sleep does not start while a host is
-      connected, and other light sleeps disconnect USB Serial/JTAG. When disabled, every light sleep
-      disconnects USB Serial/JTAG from the host."
+    description: "Keeps USB Serial/JTAG connected to a USB host across light sleep, which can
+      increase the light-sleep current. The `rtc_cntl::sleep` module documentation describes the
+      behavior of each chip. When disabled, every light sleep disconnects USB Serial/JTAG from the
+      host."
     default:
       - value: true
     active: "soc_has_usb_device && sleep_driver_supported"

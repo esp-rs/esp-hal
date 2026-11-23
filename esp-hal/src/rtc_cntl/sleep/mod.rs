@@ -13,6 +13,50 @@
 //!    * `touch`
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
+#![doc = cfg_select! {
+    sleep_keeps_usb_serial_jtag => r#"
+## USB Serial/JTAG
+
+The `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option, enabled by default, keeps USB
+Serial/JTAG connected to a USB host across light sleep, so that the console and the debugger keep
+working. When the option is disabled, every light sleep disconnects USB Serial/JTAG from the host.
+"#,
+    soc_has_usb_device => r#"
+## USB Serial/JTAG
+
+Light sleep cannot keep USB Serial/JTAG running on this chip, so every light sleep disconnects it
+from the host. The `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option, enabled by default,
+keeps automatic light sleep from starting while a host is connected, so that the console and the
+debugger keep working. When the option is disabled, automatic light sleep also starts while a host
+is connected.
+"#,
+    _ => "",
+}]
+#![doc = cfg_select! {
+    esp32c6 => r#"
+While a host is connected, light sleep keeps USB Serial/JTAG running and the CPU powered, even if
+CPU power-down is enabled, which increases the light-sleep current. While a debugger is attached,
+such a light sleep also keeps the clocks that JTAG needs. The debug module stays active after the
+debugger disconnects, so the higher current remains until the next chip reset.
+"#,
+    sleep_keeps_cpu_powered_for_usb_serial_jtag => r#"
+While a host is connected, light sleep keeps USB Serial/JTAG running and the CPU powered, even if
+CPU power-down is enabled, which increases the light-sleep current.
+"#,
+    any(esp32c5, esp32c61) => r#"
+While a host is connected, light sleep keeps USB Serial/JTAG running, which increases the
+light-sleep current. While a debugger is attached, such a light sleep also keeps the CPU powered
+and the clocks that JTAG needs. The debug module stays active after the debugger disconnects, so
+the higher current remains until the next chip reset.
+"#,
+    sleep_keeps_usb_serial_jtag => r#"
+While a host is connected, light sleep keeps USB Serial/JTAG running, which increases the
+light-sleep current. While a debugger is attached, such a light sleep also keeps the CPU powered.
+The debug module stays active after the debugger disconnects, so the higher current remains until
+the next chip reset.
+"#,
+    _ => "",
+}]
 
 use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 
@@ -486,23 +530,9 @@ impl<'d> LowPower<'d> {
         //
         // The buffer is read once, because the save of the APP CPU and the power-down must agree on
         // it. A buffer that another core installs during this sleep serves the next one.
-        //
-        // On some chips, a powered-down CPU does not reliably come back from a sleep that keeps
-        // USB Serial/JTAG connected. On the others, such a sleep keeps the CPU powered while a
-        // debugger is attached, because powering it down loses the debug module.
         #[cfg(supports_cpu_power_down)]
         let retention_buffer = match kind {
-            #[cfg(sleep_keeps_cpu_powered_for_usb_serial_jtag)]
-            SleepKind::Light if config.keep_usb_serial_jtag => None,
-            #[cfg(all(
-                sleep_keeps_usb_serial_jtag,
-                not(sleep_keeps_cpu_powered_for_usb_serial_jtag)
-            ))]
-            SleepKind::Light
-                if config.keep_usb_serial_jtag && crate::debugger::debugger_connected() =>
-            {
-                None
-            }
+            SleepKind::Light if usb_keeps_cpu_powered(&config) => None,
             SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
             SleepKind::Deep => None,
         };
@@ -627,6 +657,26 @@ impl<'d> LowPower<'d> {
         }
 
         false
+    }
+}
+
+/// Returns whether a light sleep with this configuration keeps the CPU powered for USB
+/// Serial/JTAG.
+///
+/// On some chips, a powered-down CPU does not reliably come back from a sleep that keeps USB
+/// Serial/JTAG connected. On the others, such a sleep keeps the CPU powered while a debugger is
+/// attached, because powering it down loses the debug module.
+#[cfg(all(supports_cpu_power_down, feature = "rt"))]
+fn usb_keeps_cpu_powered(config: &RtcSleepConfig) -> bool {
+    cfg_select! {
+        sleep_keeps_cpu_powered_for_usb_serial_jtag => config.keep_usb_serial_jtag,
+        sleep_keeps_usb_serial_jtag => {
+            config.keep_usb_serial_jtag && crate::debugger::debugger_connected()
+        }
+        _ => {
+            let _ = config;
+            false
+        }
     }
 }
 
