@@ -23,8 +23,9 @@ pub(crate) fn enable_phy(enable: bool) {
 /// of them. The radios do not change them meanwhile: wake-up runs with the PHY state locked, and
 /// `esp-radio` calibrates before it brings up a radio.
 ///
-/// The calibration runs with interrupts enabled, and esp-hal also writes these registers, so each
-/// read-modify-write takes [crate::ESP_PHY_LOCK].
+/// The calibration runs with interrupts enabled. esp-hal also writes these registers, but only on
+/// single-core chips and with interrupts masked, so each read-modify-write here masks interrupts
+/// with [crate::ESP_PHY_LOCK].
 #[cfg(soc_has_modem_syscon)]
 pub(crate) fn with_calibration_clocks<R>(f: impl FnOnce() -> R) -> R {
     use phy_clocks_ll::{CALIBRATION_CLK_CONF_MASK, CALIBRATION_CLK_CONF1_MASK};
