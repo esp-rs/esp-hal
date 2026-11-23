@@ -330,11 +330,6 @@ mod asynch;
 mod compat;
 #[cfg(any(esp32h4, esp32s31))]
 mod compiler_rt_abi;
-#[cfg(any(
-    all(feature = "ble", any(bt_controller = "btdm", bt_controller = "btdm2")),
-    all(feature = "wifi", feature = "unstable", modem_retention = "backup_dma"),
-))]
-mod counting_lock;
 mod interrupt_dispatch;
 #[cfg(all(
     supports_modem_power_down,
