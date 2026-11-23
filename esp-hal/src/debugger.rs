@@ -4,6 +4,11 @@
 pub fn debugger_connected() -> bool {
     cfg_select! {
         xtensa => xtensa_lx::is_debugger_attached(),
+        esp32h4 => crate::peripherals::BUS_MONITOR::regs()
+            .core_0_debug_mode()
+            .read()
+            .core_0_debug_module_active()
+            .bit_is_set(),
         all(riscv, soc_has_assist_debug) => crate::peripherals::ASSIST_DEBUG::regs()
             .cpu(0)
             .debug_mode()

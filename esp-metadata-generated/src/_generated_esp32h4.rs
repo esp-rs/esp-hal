@@ -428,7 +428,7 @@ macro_rules! property {
         false
     };
     ("sleep.keeps_usb_serial_jtag") => {
-        false
+        true
     };
     ("sleep.keeps_cpu_powered_for_usb_serial_jtag") => {
         false

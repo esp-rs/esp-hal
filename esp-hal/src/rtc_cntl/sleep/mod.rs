@@ -43,7 +43,7 @@ debugger disconnects, so the higher current remains until the next chip reset.
 While a host is connected, light sleep keeps USB Serial/JTAG running and the CPU powered, even if
 CPU power-down is enabled, which increases the light-sleep current.
 "#,
-    any(esp32c5, esp32c61) => r#"
+    any(esp32c5, esp32c61, esp32h4) => r#"
 While a host is connected, light sleep keeps USB Serial/JTAG running, which increases the
 light-sleep current. While a debugger is attached, such a light sleep also keeps the CPU powered
 and the clocks that JTAG needs. The debug module stays active after the debugger disconnects, so

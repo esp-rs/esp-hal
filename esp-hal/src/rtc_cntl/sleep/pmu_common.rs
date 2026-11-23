@@ -101,7 +101,7 @@ pub(super) fn last_sleep_was_deep() -> bool {
 /// bits on all the chips that use this function.
 ///
 /// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/soc/esp32c6/include/soc/pmu_icg_mapping.h>.
-#[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+#[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32h4))]
 #[inline(always)]
 pub(super) fn configure_hp_sleep_clocks(icg_func: u32, keep_usb_serial_jtag: bool) {
     use crate::rtc_cntl::rtc::{HP_SYSCLK_PLL, HP_SYSCLK_XTAL};
