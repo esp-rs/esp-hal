@@ -418,6 +418,9 @@ macro_rules! property {
     ("rgb_display.output_lines", str) => {
         stringify!(24)
     };
+    ("rgb_display.has_rgb_timing_registers") => {
+        true
+    };
     ("adc.line_calibration") => {
         false
     };

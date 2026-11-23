@@ -532,6 +532,7 @@ instances = {
 [device.rgb_display]
 support_status = { status = "partial", issue = 6744 }
 output_lines = 24
+has_rgb_timing_registers = true
 
 [device.sdm]
 support_status = "partial"

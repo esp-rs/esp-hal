@@ -221,7 +221,9 @@ where
             .lcd_user()
             .modify(|_, w| w.lcd_reset().set_bit());
 
-        ll::set_lcd_conv_bypass(self.regs());
+        self.regs()
+            .lcd_rgb_yuv()
+            .write(|w| w.lcd_conv_enable().clear_bit());
 
         self.regs().lcd_user().modify(|_, w| {
             if config.format.enable_2byte_mode {
@@ -264,7 +266,7 @@ where
             timing.hsync_position as u8,
         );
         self.regs().lcd_misc().modify(|_, w| unsafe {
-            #[cfg(not(esp32s31))]
+            #[cfg(esp32s3)]
             w.lcd_afifo_threshold_num().bits((1 << 5) - 1);
 
             // Doesn't matter for RGB mode.
