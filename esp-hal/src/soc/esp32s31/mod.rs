@@ -37,6 +37,9 @@ pub(crate) fn pre_init() {
     // peripheral PMS control registers for every security mode.
     open_peri_pms();
 
+    // Before the first analog I2C access.
+    regi2c::configure_master_clock();
+
     // Unlike the other supported chips, the S31 ROM leaves both SYSTIMER clock
     // gates disabled. `Peripheral::KEEP_ENABLED` only prevents the clock from
     // being disabled later, so perform the same enable/reset sequence as

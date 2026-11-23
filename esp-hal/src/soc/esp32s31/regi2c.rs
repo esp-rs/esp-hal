@@ -253,21 +253,27 @@ fn block_mask(block: u8) -> u32 {
     }
 }
 
-#[inline(always)]
-fn regi2c_enable_block(bit_mask: u32) -> usize {
-    // Match the S31 bootloader setup explicitly instead of relying on a
-    // previous-stage bootloader to leave the analog-I2C source and force bit
-    // configured for us.
-    MODEM_SYSCON::regs()
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
-    MODEM_LPCON::regs()
-        .clk_conf_force_on()
-        .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
+/// Enables and selects the clock of the analog I2C master.
+///
+/// Every analog I2C access needs this clock, and esp-hal does not rely on the bootloader to set
+/// it. Nothing changes these bits afterwards. When light sleep powers the modem domain down, the
+/// modem retention restores them.
+///
+/// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e3/components/bootloader_support/src/esp32s31/bootloader_esp32s31.c#L56-L58>.
+pub(crate) fn configure_master_clock() {
     MODEM_LPCON::regs()
         .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_en().set_bit());
+    MODEM_LPCON::regs()
+        .clk_conf_force_on()
+        .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
+    MODEM_SYSCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+}
 
+#[inline(always)]
+fn regi2c_enable_block(bit_mask: u32) -> usize {
     if bit_mask == 0 {
         return 0;
     }
