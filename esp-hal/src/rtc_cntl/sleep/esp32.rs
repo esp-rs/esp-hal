@@ -65,6 +65,10 @@ pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 
 /// Default wait cycles for the 8 MHz clock.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
+/// Default wait cycles for the PLL buffer.
+pub(super) const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
+/// Default wait cycles for the XTL buffer.
+pub(super) const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u8 = 20;
 /// Default wait cycles to enable the 8 MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 
