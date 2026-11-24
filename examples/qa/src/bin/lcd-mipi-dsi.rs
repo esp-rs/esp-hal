@@ -47,7 +47,7 @@ const H_ACTIVE: u32 = 1024;
 const V_ACTIVE: u32 = 600;
 const BYTES_PER_PIXEL: usize = 2; // RGB565
 const FB_SIZE: usize = H_ACTIVE as usize * V_ACTIVE as usize * BYTES_PER_PIXEL;
-const REPORT_INTERVAL_S: u64 = 2;
+const REPORT_INTERVAL: Duration = Duration::from_secs(2);
 const COMMIT_TIMEOUT: Duration = Duration::from_millis(100);
 
 #[main]
@@ -149,7 +149,7 @@ fn main() -> ! {
     let mut report_start = Instant::now();
 
     loop {
-        if report_start.elapsed() >= Duration::from_secs(REPORT_INTERVAL_S) {
+        if report_start.elapsed() >= REPORT_INTERVAL {
             let elapsed_ms = report_start.elapsed().as_millis();
             let underrun = MIPI_DSI_BRIDGE::regs().int_raw().read().underrun().bit();
             println!(

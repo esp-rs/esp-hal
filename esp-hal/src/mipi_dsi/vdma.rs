@@ -226,9 +226,9 @@ impl VdmaChannel {
     /// channel stops. If the channel does not stop in time, it is aborted.
     pub(super) fn stop(&mut self) {
         self.ch_enable(false);
-        if !wait_until(STOP_TIMEOUT, || !self.is_enabled()) {
+        if !spin_until(STOP_TIMEOUT, || !self.is_enabled()) {
             self.abort();
-            wait_until(STOP_TIMEOUT, || {
+            spin_until(STOP_TIMEOUT, || {
                 !self.is_enabled() && !self.abort_in_progress()
             });
         }
@@ -276,7 +276,7 @@ impl VdmaChannel {
 }
 
 /// Polls `condition` until it holds or `timeout` passes, then checks it once more.
-pub(super) fn wait_until(timeout: Duration, mut condition: impl FnMut() -> bool) -> bool {
+pub(super) fn spin_until(timeout: Duration, mut condition: impl FnMut() -> bool) -> bool {
     let deadline = Instant::now() + timeout;
     while Instant::now() <= deadline {
         if condition() {

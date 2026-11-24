@@ -17,7 +17,7 @@ use crate::{
     mipi_dsi::{
         ConfigError,
         MipiDsi,
-        vdma::{VdmaChannel, VdmaLinkItem, wait_until},
+        vdma::{VdmaChannel, VdmaLinkItem, spin_until},
     },
     peripherals::{Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
     soc::clocks::{ClockTree, MipiDsiDpiClkConfig, MipiDsiInstance},
@@ -133,7 +133,7 @@ pub struct DpiConfig {
     pub timing: FrameTiming,
 }
 
-/// The DMA did not start reading a committed frame buffer in time.
+/// The DMA did not start reading the committed frame buffer in time.
 ///
 /// Returned by [`DsiDpi::wait_for_commit`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -206,8 +206,7 @@ fn dsi_bridge_isr() {
 /// continuously streaming frame buffers via VDMA.
 pub struct DsiDpi<'d> {
     /// `None` after [`Self::stop`] returned it.
-    guard: Option<crate::mipi_dsi::DphyGuard<'d>>,
-    lane_bit_rate_mbps: f32,
+    bus: Option<MipiDsi<'d>>,
     channel: VdmaChannel,
     // VDMA streams the frame buffers from PSRAM, also while the CPU waits for an interrupt.
     _cpu_frequency_lock: CpuFrequencyLock,
@@ -222,10 +221,10 @@ pub struct DsiDpi<'d> {
 
 impl Drop for DsiDpi<'_> {
     fn drop(&mut self) {
-        if self.guard.is_some() {
+        if self.bus.is_some() {
             self.shutdown();
         }
-        // The guard is dropped next, which calls dphy_power_down() and releases PHY clocks.
+        // The bus is dropped next, which calls dphy_power_down() and releases PHY clocks.
     }
 }
 
@@ -433,13 +432,8 @@ impl<'d> DsiDpi<'d> {
             .dpi_config_update()
             .write(|w| w.dpi_config_update().set_bit());
 
-        let MipiDsi {
-            guard,
-            lane_bit_rate_mbps,
-        } = bus;
         Ok(Self {
-            guard: Some(guard),
-            lane_bit_rate_mbps,
+            bus: Some(bus),
             channel,
             _cpu_frequency_lock: cpu_frequency_lock,
             fb_ptrs,
@@ -461,11 +455,7 @@ impl<'d> DsiDpi<'d> {
     /// Dropping a [`DsiDpi`] does the same, and then powers the bus down.
     pub fn stop(mut self) -> MipiDsi<'d> {
         self.shutdown();
-        let guard = self.guard.take().unwrap();
-        MipiDsi {
-            guard,
-            lane_bit_rate_mbps: self.lane_bit_rate_mbps,
-        }
+        self.bus.take().unwrap()
     }
 
     fn shutdown(&mut self) {
@@ -542,7 +532,9 @@ impl<'d> DsiDpi<'d> {
     ///
     /// The DMA reads inside that buffer, or two frame blocks completed after
     /// the commit: the first can still read the previous buffer, but the
-    /// second loads its link-list item after the commit.
+    /// second loads its link-list item after the commit. The frame count alone
+    /// would always wait for the second block. The address check ends the wait
+    /// up to one frame earlier.
     fn commit_reached(&self) -> bool {
         if self.num_fbs < 2 {
             return true;
@@ -573,7 +565,7 @@ impl<'d> DsiDpi<'d> {
     /// [`Self::framebuffer_mut`] returns, and drawing into it can tear the
     /// image on screen. The commit itself stays in place.
     pub fn wait_for_commit(&mut self, timeout: Duration) -> Result<(), CommitTimeout> {
-        if wait_until(timeout, || self.commit_reached()) {
+        if spin_until(timeout, || self.commit_reached()) {
             Ok(())
         } else {
             Err(CommitTimeout)
