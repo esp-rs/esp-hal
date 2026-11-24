@@ -435,7 +435,7 @@ impl CountingLock {
         // The counters are only accessed with the mutex held, so they need no read-modify-write
         // atomics, which some chips lack.
         let token = unsafe { self.lock.acquire() };
-        let nesting = self.nesting.load(Ordering::Relaxed);
+        let nesting = self.nesting();
         self.nesting.store(nesting + 1, Ordering::Relaxed);
         if nesting == 0 {
             self.token.store(token.inner(), Ordering::Relaxed);
@@ -457,7 +457,7 @@ impl CountingLock {
     /// - The caller must ensure to release the locks in the reverse order they were acquired.
     #[inline(always)]
     pub unsafe fn release(&self) {
-        let nesting = self.nesting.load(Ordering::Relaxed);
+        let nesting = self.nesting();
         if nesting == 0 {
             panic_release_not_acquired();
         }
@@ -469,7 +469,7 @@ impl CountingLock {
     }
 
     /// Returns the number of acquisitions that are not released yet.
-    #[inline]
+    #[inline(always)]
     pub fn nesting(&self) -> u32 {
         self.nesting.load(Ordering::Relaxed)
     }
