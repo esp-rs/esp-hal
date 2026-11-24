@@ -63,6 +63,15 @@ impl CacheGuard {
         }
     }
 
+    /// Writes dirty PSRAM lines back, then suspends the caches. Use this when the caches are
+    /// flushed before they resume.
+    #[cfg(esp32)]
+    #[ram(unstable(checked))]
+    pub(crate) fn suspend_for_flush() -> Self {
+        crate::psram::writeback_cache();
+        Self::suspend()
+    }
+
     /// Flush every line. Must run while the caches are still off.
     #[cfg(esp32)]
     #[ram(unstable(checked))]

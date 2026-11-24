@@ -794,8 +794,8 @@ impl BaudRate {
             Self::Custom(timing_config) => timing_config,
         };
 
-        // clock source on ESP32-C6 is xtal (40MHz)
-        #[cfg(esp32c6)]
+        // clock source on ESP32-C6 and ESP32-P4 is xtal (40MHz)
+        #[cfg(any(esp32c6, esp32p4))]
         let timing = TimingConfig {
             baud_rate_prescaler: timing.baud_rate_prescaler / 2,
             ..timing
@@ -917,7 +917,7 @@ where
     pub fn set_baud_rate(&mut self, baud_rate: BaudRate) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
-        #[cfg(not(any(esp32h2, esp32c6)))]
+        #[cfg(not(any(esp32h2, esp32c6, esp32p4)))]
         {
             assert!(crate::soc::clocks::apb_clk_frequency() == 80_000_000);
         }
@@ -1747,6 +1747,45 @@ impl PrivateInstance for crate::peripherals::TWAI1<'_> {
     }
 }
 
+#[cfg(soc_has_twai2)]
+impl PrivateInstance for crate::peripherals::TWAI2<'_> {
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Twai2
+    }
+
+    fn input_signal(&self) -> InputSignal {
+        InputSignal::TWAI2_RX
+    }
+
+    fn output_signal(&self) -> OutputSignal {
+        OutputSignal::TWAI2_TX
+    }
+
+    fn interrupt(&self) -> crate::peripherals::Interrupt {
+        crate::peripherals::Interrupt::TWAI2
+    }
+
+    fn async_handler(&self) -> InterruptHandler {
+        #[handler]
+        fn twai2() {
+            let twai = unsafe { crate::peripherals::TWAI2::steal() };
+            asynch::handle_interrupt(twai.register_block(), twai.async_state());
+        }
+
+        twai2
+    }
+
+    #[inline(always)]
+    fn register_block(&self) -> &RegisterBlock {
+        crate::peripherals::TWAI2::regs()
+    }
+
+    fn async_state(&self) -> &asynch::TwaiAsyncState {
+        static STATE: asynch::TwaiAsyncState = asynch::TwaiAsyncState::new();
+        &STATE
+    }
+}
+
 crate::any_peripheral! {
     /// Any TWAI peripheral.
     pub peripheral AnyTwai<'d> {
@@ -1754,6 +1793,8 @@ crate::any_peripheral! {
         Twai0(crate::peripherals::TWAI0<'d>),
         #[cfg(soc_has_twai1)]
         Twai1(crate::peripherals::TWAI1<'d>),
+        #[cfg(soc_has_twai2)]
+        Twai2(crate::peripherals::TWAI2<'d>),
     }
 }
 
@@ -1764,6 +1805,8 @@ impl PrivateInstance for AnyTwai<'_> {
             any::Inner::Twai0(twai) => twai,
             #[cfg(soc_has_twai1)]
             any::Inner::Twai1(twai) => twai,
+            #[cfg(soc_has_twai2)]
+            any::Inner::Twai2(twai) => twai,
         } {
             fn peripheral(&self) -> crate::system::Peripheral;
             fn input_signal(&self) -> InputSignal;
@@ -1783,6 +1826,8 @@ pub trait Instance: PrivateInstance + any::Degrade {}
 impl Instance for crate::peripherals::TWAI0<'_> {}
 #[cfg(soc_has_twai1)]
 impl Instance for crate::peripherals::TWAI1<'_> {}
+#[cfg(soc_has_twai2)]
+impl Instance for crate::peripherals::TWAI2<'_> {}
 impl Instance for AnyTwai<'_> {}
 
 mod asynch {

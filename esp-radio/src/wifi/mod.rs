@@ -98,7 +98,7 @@ use procmacros::BuilderLite;
 
 #[cfg(wifi_softap_support)]
 use self::ap::AccessPointConfig;
-#[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+#[cfg(all(supports_modem_power_down, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use self::mac_bb::{RetentionMemory, RetentionStorage, install_retention_memory};
 pub(crate) use self::os_adapter::*;
@@ -111,11 +111,11 @@ use self::{
     private::PacketBuffer,
     scan::{
         AccessPointInfo,
+        FreeApListOnDrop,
         ScanConfig,
         ScanResults,
         ScanTypeConfig,
         convert_ap_info,
-        free_ap_list_on_drop,
     },
     sta::StationConfig,
     state::*,
@@ -156,7 +156,8 @@ pub(crate) mod state;
 #[cfg(wifi_ftm_enable)]
 mod ftm_calibration;
 mod internal;
-#[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+#[cfg(all(supports_modem_power_down, feature = "unstable"))]
+#[cfg_attr(modem_retention = "regdma", path = "mac_bb_regdma.rs")]
 mod mac_bb;
 mod weak_overrides;
 
@@ -1267,7 +1268,7 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
         #[cfg(soc_has_modem_syscon)]
         crate::radio_clocks::enable_wifi(true);
 
-        #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+        #[cfg(all(supports_modem_power_down, feature = "unstable"))]
         mac_bb::init()?;
 
         Ok(())
@@ -1320,10 +1321,10 @@ fn wifi_deinit() -> Result<(), WifiError> {
         drop(packet);
     }
 
-    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+    #[cfg(all(supports_modem_power_down, feature = "unstable"))]
     mac_bb::stop_power_down()?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
-    #[cfg(all(modem_retention = "backup_dma", feature = "unstable"))]
+    #[cfg(all(supports_modem_power_down, feature = "unstable"))]
     mac_bb::deinit();
     #[cfg(soc_has_modem_syscon)]
     crate::radio_clocks::enable_wifi(false);
@@ -3603,7 +3604,7 @@ ignored."
         esp_wifi_result!(wifi_start_scan(false, *config))?;
 
         // Prevents memory leak if `scan_async`'s future is dropped.
-        let guard = free_ap_list_on_drop();
+        let guard = FreeApListOnDrop;
 
         loop {
             let event = subscriber.next_message_pure().await;
@@ -3617,7 +3618,7 @@ ignored."
             }
         }
 
-        guard.defuse();
+        core::mem::forget(guard);
 
         let limit = config.max.unwrap_or(usize::MAX);
         Ok(ScanResults::new(self)?.take(limit).collect::<Vec<_>>())

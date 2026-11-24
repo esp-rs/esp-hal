@@ -13,7 +13,7 @@ use esp_backtrace as _;
 use esp_hal::{
     Async,
     timer::timg::TimerGroup,
-    usb::usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
+    usb::usb_serial_jtag::{Config, UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
 };
 use static_cell::StaticCell;
 
@@ -33,6 +33,7 @@ async fn writer(
     )
     .await
     .unwrap();
+    embedded_io_async::Write::flush(&mut tx).await.unwrap();
     loop {
         let message = signal.wait().await;
         signal.reset();
@@ -71,7 +72,18 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    let (rx, tx) = UsbSerialJtag::new(peripherals.USB_DEVICE)
+    let (dp, dm) = cfg_select! {
+        feature = "esp32c3" => (peripherals.GPIO19, peripherals.GPIO18),
+        any(feature = "esp32c5", feature = "esp32h4") => (peripherals.GPIO14, peripherals.GPIO13),
+        any(feature = "esp32c6", feature = "esp32c61") => (peripherals.GPIO13, peripherals.GPIO12),
+        feature = "esp32h2" => (peripherals.GPIO27, peripherals.GPIO26),
+        feature = "esp32p4" => (peripherals.GPIO25, peripherals.GPIO24),
+        feature = "esp32s3" => (peripherals.GPIO20, peripherals.GPIO19),
+        feature = "esp32s31" => (peripherals.GPIO34, peripherals.GPIO33),
+    };
+
+    let (rx, tx) = UsbSerialJtag::new(peripherals.USB_DEVICE, dp, dm, Config::default())
+        .unwrap()
         .into_async()
         .split();
 

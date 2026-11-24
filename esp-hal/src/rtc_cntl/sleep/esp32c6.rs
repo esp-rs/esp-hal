@@ -727,6 +727,8 @@ impl RtcSleepConfig {
             // which is the dominant saving.
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags
+                .set_pd_modem(crate::rtc_cntl::regdma::modem_power_down());
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
     }
@@ -825,7 +827,7 @@ impl RtcSleepConfig {
     ///
     /// The caller waits for the result of the request.
     #[inline(always)]
-    pub(crate) fn enter_sleep(&self) -> bool {
+    pub(crate) fn enter_sleep(&self, _saved: &SavedState) -> bool {
         request_sleep()
     }
 
@@ -856,3 +858,13 @@ impl SavedState {
         });
     }
 }
+
+/// Requests a light sleep with CPU retention. The ESP32-C6 needs no steps around the request.
+#[inline(always)]
+pub(crate) fn pmu_sleep_start(_saved: &SavedState) -> bool {
+    request_sleep()
+}
+
+/// Runs the wake steps after a CPU power-down. The ESP32-C6 has no wake steps.
+#[inline(always)]
+pub(crate) fn pmu_sleep_finish(_saved: &SavedState) {}

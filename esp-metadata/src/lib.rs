@@ -760,7 +760,10 @@ impl Config {
 
         // TODO: repeat for all drivers that have Instance traits
         if let Some(peri) = self.device.peri_config.i2c_master.as_ref() {
-            tokens.extend(cfg::generate_i2c_master_peripherals(peri));
+            tokens.extend(cfg::generate_i2c_master_peripherals(
+                peri,
+                self.peripherals(),
+            ));
         };
         if let Some(peri) = self.device.peri_config.i2s.as_ref() {
             tokens.extend(cfg::generate_i2s_peripherals(peri));
@@ -790,6 +793,7 @@ impl Config {
         let mut all_peripherals = vec![];
         let mut singleton_peripherals = vec![];
         let mut dma_peripherals: Vec<(String, u32, proc_macro2::Ident)> = vec![];
+        let mut dma2d_channels = TokenStream::new();
 
         let mut stable_peris = vec![];
 
@@ -883,6 +887,30 @@ This pin may be available with certain limitations. Check your hardware to make 
             }
         }
 
+        if let Some(dma2d) = self.device.peri_config.dma2d.as_ref()
+            && dma2d.support_status.is_supported()
+        {
+            let mut tx = vec![];
+            let mut rx = vec![];
+            for (direction, variant_prefix, count, channels) in [
+                ("TX", "Tx", dma2d.tx_channel_count, &mut tx),
+                ("RX", "Rx", dma2d.rx_channel_count, &mut rx),
+            ] {
+                for index in 0..count {
+                    let name = format_ident!("DMA2D_{direction}_CH{index}");
+                    let variant = format_ident!("{variant_prefix}Ch{index}");
+                    let docs = format!("{name} peripheral singleton");
+                    let index = number(index);
+                    all_peripherals.push(quote! {
+                        @peri_type #[doc = #docs] #name <= virtual () (unstable)
+                    });
+                    singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
+                    channels.push(quote! { #index, #name, #variant });
+                }
+            }
+            dma2d_channels = generate_for_each_macro("dma2d_channel", &[("tx", &tx), ("rx", &rx)]);
+        }
+
         if let Some(pcnt) = self.device.peri_config.pcnt.as_ref()
             && pcnt.support_status.is_supported()
         {
@@ -905,6 +933,25 @@ This pin may be available with certain limitations. Check your hardware to make 
             for channel in 1..=dac.channel_count.count {
                 let name = format_ident!("DAC{channel}");
                 let singleton_doc = format!("{name} peripheral singleton");
+                let tokens = quote! {
+                    #[doc = #singleton_doc] #name <= virtual ()
+                };
+                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
+            }
+        }
+
+        if let Some(rmt) = self.device.peri_config.rmt.as_ref()
+            && rmt.support_status.is_supported()
+        {
+            for (channel, capability) in rmt.channels.0.iter().enumerate() {
+                let name = format_ident!("RMT_CH{channel}");
+                let direction = match capability {
+                    cfg::RmtChannelCapability::Tx => "Transmit only.",
+                    cfg::RmtChannelCapability::Rx => "Receive only.",
+                    cfg::RmtChannelCapability::RxTx => "Transmit or receive.",
+                };
+                let singleton_doc = format!("RMT channel {channel}. {direction}");
                 let tokens = quote! {
                     #[doc = #singleton_doc] #name <= virtual ()
                 };
@@ -999,14 +1046,15 @@ This pin may be available with certain limitations. Check your hardware to make 
             dma_eligible.push(quote! { #peri, #variant_name, #dma_id_num, #any_channel });
         }
 
-        generate_for_each_macro(
+        dma2d_channels.extend(generate_for_each_macro(
             "peripheral",
             &[
                 ("all", &all_peripherals),
                 ("singletons", &singleton_peripherals),
                 ("dma_eligible", &dma_eligible),
             ],
-        )
+        ));
+        dma2d_channels
     }
 
     pub fn active_cfgs(&self) -> Vec<String> {

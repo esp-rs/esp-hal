@@ -170,6 +170,10 @@ If your change requires user code to be updated, add a `# Migration guide` secti
 change needs a `## crate/area` heading and a `### Title` for the specific change, followed by the
 migration steps.
 
+Write a migration guide entry only when users need a step that the changelog entry does not give,
+for example a replacement API or a changed signature. Do not repeat the changelog entry in other
+words. For example, "Removed: Support for embassy-sync 0.6 and 0.7." needs no migration guide entry.
+
 If your change breaks the stable API of a crate, the PR needs the `breaking-change-<crate-name>`
 label (e.g. `breaking-change-esp-hal`). Without it, the semver check in CI fails. Ask a maintainer
 to add the label. See [Breaking changes](./DEVELOPER-GUIDELINES.md#breaking-changes) in the

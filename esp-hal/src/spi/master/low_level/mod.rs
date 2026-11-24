@@ -3,7 +3,7 @@ use core::cell::Cell;
 use core::{
     cell::UnsafeCell,
     future::Future,
-    mem::MaybeUninit,
+    mem::{DropGuard, MaybeUninit},
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
     task::{Context, Poll},
@@ -31,7 +31,7 @@ use crate::{
     handler,
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
-    private::{self, DropGuard},
+    private,
     ram,
     spi::{BitOrder, Error, Mode},
     system::PeripheralGuard,
@@ -473,7 +473,7 @@ impl Driver {
             let _ = self.flush();
         });
         self.flush_async().await;
-        cancel_on_drop.defuse();
+        DropGuard::dismiss(cancel_on_drop);
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
@@ -838,6 +838,8 @@ impl Driver {
             w.usr_miso().set_bit();
             w.usr_mosi().set_bit();
             w.doutdin().set_bit();
+            w.usr_command().clear_bit();
+            w.usr_addr().clear_bit();
             w.usr_dummy().clear_bit();
             w.sio().clear_bit()
         });
@@ -1022,7 +1024,7 @@ impl State {
         reason = "Safety requirements ensure this is okay"
     )]
     pub(super) unsafe fn pins(&self) -> &mut SpiPinGuard {
-        unsafe { (&mut *self.pins.get()).assume_init_mut() }
+        unsafe { self.pins.as_mut_unchecked().assume_init_mut() }
     }
 
     unsafe fn deinit(&self) {

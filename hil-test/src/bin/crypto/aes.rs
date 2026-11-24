@@ -248,6 +248,7 @@ where
 }
 
 fn aes_roundtrip<const K: usize>(
+    backend: &str,
     tag: &'static str,
     block_ctx: impl Into<CipherState>,
     plaintext: &[u8],
@@ -264,24 +265,33 @@ fn aes_roundtrip<const K: usize>(
     hil_test::assert_eq!(
         buffer,
         ciphertext,
-        "Failed to encrypt with {}, K={}",
+        "Failed to encrypt with {}, K={}, {} backend",
         tag,
-        K
+        K,
+        backend
     );
 
     let mut ecb_decrypt = AesContext::new(block_ctx, Operation::Decrypt, pad_to::<K>(KEY));
     let handle = ecb_decrypt.process_in_place(buffer).unwrap();
     handle.wait_blocking();
-    hil_test::assert_eq!(buffer, plaintext, "Failed to encrypt with {}, K={}", tag, K);
+    hil_test::assert_eq!(
+        buffer,
+        plaintext,
+        "Failed to decrypt with {}, K={}, {} backend",
+        tag,
+        K,
+        backend
+    );
 }
 
-fn run_cipher_tests(buffer: &mut [u8]) {
+fn run_cipher_tests(backend: &str, buffer: &mut [u8]) {
     let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
     fill_with_plaintext(&mut plaintext);
 
     // Let's use ECB as a test case for short unaligned DMA transfers.
     let short_len = 16;
     aes_roundtrip::<16>(
+        backend,
         "Short ECB",
         Ecb,
         &plaintext[0..short_len],
@@ -289,20 +299,50 @@ fn run_cipher_tests(buffer: &mut [u8]) {
         &mut buffer[0..short_len],
     );
 
-    aes_roundtrip::<16>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_128, buffer);
+    let b = backend;
+    aes_roundtrip::<16>(b, "ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_128, buffer);
     #[cfg(aes_key_length_192)]
-    aes_roundtrip::<24>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_192, buffer);
-    aes_roundtrip::<32>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_256, buffer);
+    aes_roundtrip::<24>(b, "ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_192, buffer);
+    aes_roundtrip::<32>(b, "ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_256, buffer);
 
-    aes_roundtrip::<16>("CBC", Cbc::new(IV), &plaintext, &CIPHERTEXT_CBC_128, buffer);
-    #[cfg(aes_key_length_192)]
-    aes_roundtrip::<24>("CBC", Cbc::new(IV), &plaintext, &CIPHERTEXT_CBC_192, buffer);
-    aes_roundtrip::<32>("CBC", Cbc::new(IV), &plaintext, &CIPHERTEXT_CBC_256, buffer);
-
-    aes_roundtrip::<16>("OFB", Ofb::new(IV), &plaintext, &CIPHERTEXT_OFB, buffer);
-    aes_roundtrip::<16>("CTR", Ctr::new(IV), &plaintext, &CIPHERTEXT_CTR, buffer);
-    aes_roundtrip::<16>("CFB-8", Cfb8::new(IV), &plaintext, &CIPHERTEXT_CFB8, buffer);
     aes_roundtrip::<16>(
+        b,
+        "CBC",
+        Cbc::new(IV),
+        &plaintext,
+        &CIPHERTEXT_CBC_128,
+        buffer,
+    );
+    #[cfg(aes_key_length_192)]
+    aes_roundtrip::<24>(
+        b,
+        "CBC",
+        Cbc::new(IV),
+        &plaintext,
+        &CIPHERTEXT_CBC_192,
+        buffer,
+    );
+    aes_roundtrip::<32>(
+        b,
+        "CBC",
+        Cbc::new(IV),
+        &plaintext,
+        &CIPHERTEXT_CBC_256,
+        buffer,
+    );
+
+    aes_roundtrip::<16>(b, "OFB", Ofb::new(IV), &plaintext, &CIPHERTEXT_OFB, buffer);
+    aes_roundtrip::<16>(b, "CTR", Ctr::new(IV), &plaintext, &CIPHERTEXT_CTR, buffer);
+    aes_roundtrip::<16>(
+        b,
+        "CFB-8",
+        Cfb8::new(IV),
+        &plaintext,
+        &CIPHERTEXT_CFB8,
+        buffer,
+    );
+    aes_roundtrip::<16>(
+        b,
         "CFB-128",
         Cfb128::new(IV),
         &plaintext,
@@ -311,20 +351,19 @@ fn run_cipher_tests(buffer: &mut [u8]) {
     );
 }
 
-#[cfg(aes_supports_dma)]
-fn run_unaligned_dma_tests<const MAX_SHIFT: usize>(memory: &mut [u8]) {
+fn run_unaligned_tests<const MAX_SHIFT: usize>(backend: &str, memory: &mut [u8]) {
     let zeros = [0; MAX_SHIFT];
 
-    // Different alignments in internal memory
     for shift in 0..MAX_SHIFT {
         memory.fill(0);
         let buffer = &mut memory[shift..][..PLAINTEXT_BUF_SIZE];
-        run_cipher_tests(buffer);
+        run_cipher_tests(backend, buffer);
         hil_test::assert_eq!(
             memory[..shift],
             zeros[..shift],
-            "Out of bounds write with shift {}",
-            shift
+            "Out of bounds write with shift {}, {} backend",
+            shift,
+            backend
         );
     }
 }
@@ -493,51 +532,184 @@ mod tests {
     }
 }
 
+#[cfg(aes_supports_dma)]
+use esp_hal::aes::dma::AesDmaWorkQueueDriver;
+use esp_hal::{aes::AesWorkQueueDriver, peripherals::AES};
+
+#[cfg(aes_supports_dma)]
+type AesDmaChannel<'a> = cfg_select! {
+    aes_dma_engine = "CRYPTO_DMA" => { esp_hal::peripherals::DMA_CRYPTO<'a> },
+    aes_dma_engine = "AXI_GDMA" => { esp_hal::peripherals::DMA_AXI_CH0<'a> },
+    _ => { esp_hal::peripherals::DMA_CH0<'a> },
+};
+
+#[derive(Clone, Copy)]
+enum BackendKind {
+    Cpu,
+    #[cfg(aes_supports_dma)]
+    Dma,
+}
+
+impl BackendKind {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Cpu => "CPU",
+            #[cfg(aes_supports_dma)]
+            Self::Dma => "DMA",
+        }
+    }
+}
+
+const BACKENDS: &[BackendKind] = &[
+    BackendKind::Cpu,
+    #[cfg(aes_supports_dma)]
+    BackendKind::Dma,
+];
+
+enum Backend<'d> {
+    Cpu(AesBackend<'d>),
+    #[cfg(aes_supports_dma)]
+    Dma(AesDmaBackend<'d>),
+}
+
+/// Keeps the backend processing the queue until it is dropped.
+enum RunningBackend<'t, 'd> {
+    Cpu {
+        _driver: AesWorkQueueDriver<'t, 'd>,
+    },
+    #[cfg(aes_supports_dma)]
+    Dma {
+        _driver: AesDmaWorkQueueDriver<'t, 'd>,
+    },
+}
+
+impl<'d> Backend<'d> {
+    fn start(&mut self) -> RunningBackend<'_, 'd> {
+        match self {
+            Self::Cpu(aes) => RunningBackend::Cpu {
+                _driver: aes.start(),
+            },
+            #[cfg(aes_supports_dma)]
+            Self::Dma(aes) => RunningBackend::Dma {
+                _driver: aes.start(),
+            },
+        }
+    }
+}
+
+struct Context {
+    aes: AES<'static>,
+    #[cfg(aes_supports_dma)]
+    dma: AesDmaChannel<'static>,
+}
+
+impl Context {
+    fn backend(&mut self, kind: BackendKind) -> Backend<'_> {
+        match kind {
+            BackendKind::Cpu => Backend::Cpu(AesBackend::new(self.aes.reborrow())),
+            #[cfg(aes_supports_dma)]
+            BackendKind::Dma => {
+                Backend::Dma(AesDmaBackend::new(self.aes.reborrow(), self.dma.reborrow()))
+            }
+        }
+    }
+}
+
+/// Each test runs its steps on every work-queue backend of the chip, one backend after the other.
 #[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
 mod work_queue_tests {
-    use super::*;
+    use aes_gcm::aes::{
+        Aes128,
+        cipher::{KeyIvInit, StreamCipher},
+    };
+    use allocator_api2::vec::Vec;
 
-    struct Context {
-        aes: AesBackend<'static>,
-    }
+    use super::*;
 
     #[init]
     fn init() -> Context {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+
+        esp_alloc::heap_allocator!(size: 32 * 1024);
+
+        #[cfg(all(soc_has_psram, dma_can_access_psram))]
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+
         Context {
-            aes: AesBackend::new(p.AES),
+            aes: p.AES,
+            #[cfg(aes_supports_dma)]
+            dma: cfg_select! {
+                aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
+                aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
+                _ => p.DMA_CH0,
+            },
         }
     }
 
     #[test]
-    fn test_aes_work_queue_cpu(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+    fn test_aes_work_queue(mut ctx: Context) {
+        const MAX_SHIFT: usize = 15;
 
-        let mut buffer = [0; PLAINTEXT_BUF_SIZE];
-        run_cipher_tests(&mut buffer);
+        let mut internal_memory =
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::InternalMemory);
+        internal_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
+
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            // Different alignments in internal memory
+            run_unaligned_tests::<MAX_SHIFT>(kind.name(), &mut internal_memory);
+        }
+    }
+
+    #[test]
+    #[cfg(all(soc_has_psram, dma_can_access_psram))]
+    fn test_aes_work_queue_psram(mut ctx: Context) {
+        const MAX_SHIFT: usize = 15;
+
+        let mut external_memory =
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::ExternalMemory);
+        external_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
+
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            // Different alignments in external memory
+            run_unaligned_tests::<MAX_SHIFT>(kind.name(), &mut external_memory);
+        }
     }
 
     #[test]
     fn test_aes_work_queue_work_posted_before_queue_started(mut ctx: Context) {
-        let mut output = [0; PLAINTEXT_BUF_SIZE];
-
         let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
         fill_with_plaintext(&mut plaintext);
 
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
-        let handle = ecb_encrypt.process(&plaintext, &mut output).unwrap();
+        for &kind in BACKENDS {
+            let mut output = [0; PLAINTEXT_BUF_SIZE];
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let handle = ecb_encrypt.process(&plaintext, &mut output).unwrap();
 
-        let _backend = ctx.aes.start();
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        handle.wait_blocking();
+            handle.wait_blocking();
 
-        hil_test::assert_eq!(output, CIPHERTEXT_ECB_128);
+            hil_test::assert_eq!(output, CIPHERTEXT_ECB_128, "{} backend", kind.name());
+        }
     }
 
     #[test]
     async fn test_aes_work_queue_work_posted_before_queue_started_async(mut ctx: Context) {
-        #[embassy_executor::task]
-        async fn aes_task(signal: &'static Signal<CriticalSectionRawMutex, ()>) {
+        // One for each backend. The operation can complete in the task's last poll and wake the
+        // task, which then holds its slot until the executor polls it once more, after the next
+        // spawn.
+        #[embassy_executor::task(pool_size = 2)]
+        async fn aes_task(
+            signal: &'static Signal<CriticalSectionRawMutex, ()>,
+            backend: &'static str,
+        ) {
             let mut output = [0; PLAINTEXT_BUF_SIZE];
             let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
             fill_with_plaintext(&mut plaintext);
@@ -551,38 +723,44 @@ mod work_queue_tests {
             handle.wait().await;
             core::mem::drop(handle);
 
-            hil_test::assert_eq!(output, CIPHERTEXT_ECB_128);
+            hil_test::assert_eq!(output, CIPHERTEXT_ECB_128, "{} backend", backend);
 
             // Test can end now
             signal.signal(());
         }
 
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
-
-        // Start task before we'd start the AES operation
         let spawner = SendSpawner::for_current_executor().await;
-        spawner.spawn(aes_task(signal).unwrap());
 
-        signal.wait().await;
+        for &kind in BACKENDS {
+            // Start task before we'd start the AES operation
+            spawner.spawn(aes_task(signal, kind.name()).unwrap());
 
-        let _backend = ctx.aes.start();
+            signal.wait().await;
 
-        signal.wait().await;
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            signal.wait().await;
+        }
     }
 
     #[test]
     fn test_aes_work_queue_in_place(mut ctx: Context) {
-        let mut buffer = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut buffer);
+        for &kind in BACKENDS {
+            let mut buffer = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut buffer);
 
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
-        let handle = ecb_encrypt.process_in_place(&mut buffer).unwrap();
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let handle = ecb_encrypt.process_in_place(&mut buffer).unwrap();
 
-        let _backend = ctx.aes.start();
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        handle.wait_blocking();
+            handle.wait_blocking();
 
-        hil_test::assert_eq!(buffer, CIPHERTEXT_ECB_128);
+            hil_test::assert_eq!(buffer, CIPHERTEXT_ECB_128, "{} backend", kind.name());
+        }
     }
 
     #[test]
@@ -593,92 +771,40 @@ mod work_queue_tests {
         // Note that this result is not guaranteed. The cancellation can come later than the work
         // item has finished processing. We can only reliably test it because we start the backend
         // after cancelling the operation.
-        let mut buffer1 = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut buffer1);
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
-        let handle1 = ecb_encrypt.process_in_place(&mut buffer1).unwrap();
+        for &kind in BACKENDS {
+            let mut buffer1 = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut buffer1);
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let handle1 = ecb_encrypt.process_in_place(&mut buffer1).unwrap();
 
-        let mut buffer2 = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut buffer2);
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_256);
-        let handle2 = ecb_encrypt.process_in_place(&mut buffer2).unwrap();
+            let mut buffer2 = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut buffer2);
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_256);
+            let handle2 = ecb_encrypt.process_in_place(&mut buffer2).unwrap();
 
-        let mut buffer3 = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut buffer3);
-        let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
-        let handle3 = ecb_encrypt.process_in_place(&mut buffer3).unwrap();
+            let mut buffer3 = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut buffer3);
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let handle3 = ecb_encrypt.process_in_place(&mut buffer3).unwrap();
 
-        core::mem::drop(handle1);
+            core::mem::drop(handle1);
 
-        let _backend = ctx.aes.start();
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        handle3.wait_blocking();
-        handle2.wait_blocking();
+            handle3.wait_blocking();
+            handle2.wait_blocking();
 
-        hil_test::assert_eq!(&buffer1[..PLAINTEXT.len()], PLAINTEXT);
-        hil_test::assert_eq!(buffer2, CIPHERTEXT_ECB_256);
-        hil_test::assert_eq!(buffer3, CIPHERTEXT_ECB_128);
-    }
-}
-
-#[cfg(aes_supports_dma)]
-#[embedded_test::tests(default_timeout = 10)]
-mod work_queue_dma_tests {
-    use allocator_api2::vec::Vec;
-
-    use super::*;
-
-    struct Context {
-        aes: AesDmaBackend<'static>,
-    }
-
-    #[init]
-    fn init() -> Context {
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-
-        esp_alloc::heap_allocator!(size: 32 * 1024);
-
-        #[cfg(all(soc_has_psram, dma_can_access_psram))]
-        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
-
-        let dma = cfg_select! {
-            aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
-            aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
-            _ => p.DMA_CH0,
-        };
-
-        Context {
-            aes: AesDmaBackend::new(p.AES, dma),
+            let backend = kind.name();
+            hil_test::assert_eq!(
+                &buffer1[..PLAINTEXT.len()],
+                PLAINTEXT,
+                "{} backend",
+                backend
+            );
+            hil_test::assert_eq!(buffer2, CIPHERTEXT_ECB_256, "{} backend", backend);
+            hil_test::assert_eq!(buffer3, CIPHERTEXT_ECB_128, "{} backend", backend);
         }
-    }
-
-    #[test]
-    fn test_aes_dma_work_queue(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
-        const MAX_SHIFT: usize = 15;
-
-        let mut internal_memory =
-            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::InternalMemory);
-        internal_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
-
-        // Different alignments in internal memory
-        run_unaligned_dma_tests::<MAX_SHIFT>(&mut internal_memory);
-    }
-
-    #[test]
-    #[cfg(all(soc_has_psram, dma_can_access_psram))]
-    fn test_aes_dma_work_queue_psram(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
-        const MAX_SHIFT: usize = 15;
-
-        let mut external_memory =
-            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::ExternalMemory);
-        external_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
-
-        // Different alignments in external memory
-        run_unaligned_dma_tests::<MAX_SHIFT>(&mut external_memory);
     }
 
     // 128 bytes is the longest data cache line in front of memory that the DMA writes.
@@ -694,7 +820,7 @@ mod work_queue_dma_tests {
     ///
     /// The output starts 16 bytes into a cache line, which meets the DMA's block alignment, and
     /// ends partway into another line.
-    fn run_output_shares_cache_lines(memory: &mut [u8]) {
+    fn run_output_shares_cache_lines(backend: &str, memory: &mut [u8]) {
         let addr = memory.as_ptr().addr();
         let line_start = addr.next_multiple_of(SHARED_LINE) - addr;
         let (before, rest) = memory[line_start..].split_at_mut(16);
@@ -732,44 +858,266 @@ mod work_queue_dma_tests {
         core::mem::drop(handle);
 
         let expected = &expected[..];
-        hil_test::assert_eq!(&output[..], expected, "output, {} polls", count);
+        hil_test::assert_eq!(
+            &output[..],
+            expected,
+            "output, {} polls, {} backend",
+            count,
+            backend
+        );
         hil_test::assert!(
             before.iter().all(|&b| b == last),
-            "bytes before the output, {} polls",
-            count
+            "bytes before the output, {} polls, {} backend",
+            count,
+            backend
         );
         hil_test::assert!(
             after.iter().all(|&b| b == last),
-            "bytes after the output, {} polls",
-            count
+            "bytes after the output, {} polls, {} backend",
+            count,
+            backend
         );
     }
 
     #[test]
-    fn test_aes_dma_output_shares_cache_lines(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
+    fn test_aes_output_shares_cache_lines(mut ctx: Context) {
         let mut internal_memory =
             Vec::with_capacity_in(SHARED_LINE_MEMORY_LEN, esp_alloc::InternalMemory);
         internal_memory.resize(SHARED_LINE_MEMORY_LEN, 0);
 
-        run_output_shares_cache_lines(&mut internal_memory);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_output_shares_cache_lines(kind.name(), &mut internal_memory);
+        }
     }
 
     #[test]
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
-    fn test_aes_dma_psram_output_shares_cache_lines(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
+    fn test_aes_psram_output_shares_cache_lines(mut ctx: Context) {
         let mut external_memory =
             Vec::with_capacity_in(SHARED_LINE_MEMORY_LEN, esp_alloc::ExternalMemory);
         external_memory.resize(SHARED_LINE_MEMORY_LEN, 0);
 
-        run_output_shares_cache_lines(&mut external_memory);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_output_shares_cache_lines(kind.name(), &mut external_memory);
+        }
+    }
+
+    fn padded_plaintext() -> [u8; PLAINTEXT_BUF_SIZE] {
+        let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
+        fill_with_plaintext(&mut plaintext);
+        plaintext
+    }
+
+    /// Processes `buffer` in place with `context`, in one call for each piece between `splits`
+    fn process_in_calls(context: &mut AesContext, buffer: &mut [u8], splits: &[usize]) {
+        let mut start = 0;
+        for &end in splits.iter().chain([buffer.len()].iter()) {
+            context
+                .process_in_place(&mut buffer[start..end])
+                .unwrap()
+                .wait_blocking();
+            start = end;
+        }
+    }
+
+    /// A context carries its chaining state from one call to the next, so two calls over halves
+    /// of the text give the result of one call over all of it.
+    #[test]
+    fn test_aes_cbc_iv_carries_between_calls(mut ctx: Context) {
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            let mut buffer = padded_plaintext();
+            let mut cbc = AesContext::new(Cbc::new(IV), Operation::Encrypt, KEY_128);
+            process_in_calls(&mut cbc, &mut buffer, &[128]);
+            hil_test::assert_eq!(buffer, CIPHERTEXT_CBC_128, "{} backend", kind.name());
+
+            let mut buffer = CIPHERTEXT_CBC_256;
+            let mut cbc = AesContext::new(Cbc::new(IV), Operation::Decrypt, KEY_256);
+            process_in_calls(&mut cbc, &mut buffer, &[128]);
+            hil_test::assert_eq!(buffer, padded_plaintext(), "{} backend", kind.name());
+        }
+    }
+
+    #[test]
+    fn test_aes_ctr_counter_carries_between_calls(mut ctx: Context) {
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            let mut buffer = padded_plaintext();
+            let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
+            process_in_calls(&mut ctr, &mut buffer, &[128]);
+            hil_test::assert_eq!(buffer, CIPHERTEXT_CTR, "{} backend", kind.name());
+        }
+    }
+
+    /// Bytes after the buffer, which no call may change
+    const GUARD: [u8; 16] = [0xa5; 16];
+
+    /// A stream mode also processes a partial last block.
+    #[test]
+    fn test_aes_ctr_partial_last_block(mut ctx: Context) {
+        const LEN: usize = 250;
+
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            let mut memory = [0; LEN + GUARD.len()];
+            memory[..LEN].copy_from_slice(&padded_plaintext()[..LEN]);
+            memory[LEN..].copy_from_slice(&GUARD);
+
+            let mut ctr = AesContext::new(Ctr::new(IV), Operation::Encrypt, KEY_128);
+            process_in_calls(&mut ctr, &mut memory[..LEN], &[]);
+
+            hil_test::assert_eq!(
+                memory[..LEN],
+                CIPHERTEXT_CTR[..LEN],
+                "{} backend",
+                kind.name()
+            );
+            hil_test::assert_eq!(memory[LEN..], GUARD, "{} backend", kind.name());
+        }
+    }
+
+    /// Each mode that takes any length, in calls of 1, 3, 96, 100 and 56 bytes. The first call is
+    /// shorter than a block. The second ends inside the block that the first call started, so CTR
+    /// and CFB-128 finish it from the key stream that the first call left over. Later calls start
+    /// and end part way through a block.
+    #[test]
+    fn test_aes_stream_modes_in_pieces(mut ctx: Context) {
+        const SPLITS: &[usize] = &[1, 4, 100, 200];
+
+        let modes: [(&str, CipherState, &[u8]); 3] = [
+            ("CTR", Ctr::new(IV).into(), &CIPHERTEXT_CTR),
+            ("CFB-8", Cfb8::new(IV).into(), &CIPHERTEXT_CFB8),
+            ("CFB-128", Cfb128::new(IV).into(), &CIPHERTEXT_CFB128),
+        ];
+
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            for (mode, state, ciphertext) in &modes {
+                let mut memory = [0; PLAINTEXT_BUF_SIZE + GUARD.len()];
+                memory[..PLAINTEXT_BUF_SIZE].copy_from_slice(&padded_plaintext());
+                memory[PLAINTEXT_BUF_SIZE..].copy_from_slice(&GUARD);
+
+                let mut context = AesContext::new(state.clone(), Operation::Encrypt, KEY_128);
+                process_in_calls(&mut context, &mut memory[..PLAINTEXT_BUF_SIZE], SPLITS);
+
+                hil_test::assert_eq!(
+                    memory[..PLAINTEXT_BUF_SIZE],
+                    ciphertext[..],
+                    "{}, {} backend",
+                    mode,
+                    kind.name()
+                );
+                hil_test::assert_eq!(
+                    memory[PLAINTEXT_BUF_SIZE..],
+                    GUARD,
+                    "{}, {} backend",
+                    mode,
+                    kind.name()
+                );
+            }
+        }
+    }
+
+    /// The counter block increments as one 128-bit number, so a carry out of its low 32 bits
+    /// reaches the bits above them.
+    #[test]
+    fn test_aes_ctr_counter_carries_past_32_bits(mut ctx: Context) {
+        // The low 32 bits wrap after the second block
+        const NONCE: [u8; 16] = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0xff, 0xff, 0xff, 0xfe,
+        ];
+
+        let mut expected = padded_plaintext();
+        ctr::Ctr128BE::<Aes128>::new(&KEY_128.into(), &NONCE.into()).apply_keystream(&mut expected);
+
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            let mut buffer = padded_plaintext();
+            let mut ctr = AesContext::new(Ctr::new(NONCE), Operation::Encrypt, KEY_128);
+            process_in_calls(&mut ctr, &mut buffer, &[]);
+
+            hil_test::assert_eq!(buffer, expected, "{} backend", kind.name());
+        }
+    }
+
+    /// Longer than one DMA descriptor carries, so the DMA takes more than one transfer over it.
+    const LONG_LEN: usize = 32 * PLAINTEXT_BUF_SIZE;
+
+    /// Encrypts the plaintext, repeated to `LONG_LEN` bytes, in one ECB call, in place at
+    /// `offset` into `memory`. ECB has no chaining state, so each repeat must come out as the
+    /// known ciphertext.
+    fn run_long_call(backend: &str, memory: &mut [u8], offset: usize) {
+        let buffer = &mut memory[offset..][..LONG_LEN];
+        let plaintext = padded_plaintext();
+        for repeat in buffer.chunks_mut(PLAINTEXT_BUF_SIZE) {
+            repeat.copy_from_slice(&plaintext);
+        }
+
+        let mut ecb = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+        process_in_calls(&mut ecb, buffer, &[]);
+
+        for (i, repeat) in buffer.chunks(PLAINTEXT_BUF_SIZE).enumerate() {
+            hil_test::assert_eq!(
+                repeat,
+                &CIPHERTEXT_ECB_128[..],
+                "repeat {}, {} backend",
+                i,
+                backend
+            );
+        }
+    }
+
+    #[test]
+    fn test_aes_long_call(mut ctx: Context) {
+        let mut internal_memory = Vec::with_capacity_in(LONG_LEN, esp_alloc::InternalMemory);
+        internal_memory.resize(LONG_LEN, 0);
+
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_long_call(kind.name(), &mut internal_memory, 0);
+        }
+    }
+
+    /// In external memory, each DMA transfer hands its partial last cache line to the CPU through
+    /// a bounce buffer, and the next transfer starts in that same line.
+    #[test]
+    #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
+    fn test_aes_long_call_psram(mut ctx: Context) {
+        let len = LONG_LEN + SHARED_LINE + 16;
+        let mut external_memory = Vec::with_capacity_in(len, esp_alloc::ExternalMemory);
+        external_memory.resize(len, 0);
+
+        // 8 bytes into a cache line, so that the first transfer ends part way through one
+        let addr = external_memory.as_ptr().addr();
+        let offset = addr.next_multiple_of(SHARED_LINE) - addr + 8;
+
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_long_call(kind.name(), &mut external_memory, offset);
+        }
     }
 }
 
-#[cfg(aes_dma_mode_gcm)]
 mod gcm {
     use aes_gcm::{
         AeadInOut,
@@ -783,14 +1131,23 @@ mod gcm {
         aes::{
             Error,
             Key,
-            dma::{AesGcmContext, GcmError},
+            gcm::{AesGcmContext, GcmError},
         },
         rng::Rng,
     };
     use hex_literal::hex;
 
+    use super::BackendKind;
+
     pub const MAX_TEXT: usize = 20_400;
     pub const MAX_AAD: usize = 4_080;
+
+    /// The backends that run AES-GCM as AES-CTR steps, with GHASH on the CPU: the CPU backend
+    /// where the hardware runs GCM, and every backend elsewhere.
+    pub(crate) const STEP_BACKENDS: &[BackendKind] = cfg_select! {
+        aes_dma_mode_gcm => &[BackendKind::Cpu],
+        _ => super::BACKENDS,
+    };
 
     /// Adds the GCM tests' heap. The test modules share one region, because each test boots on
     /// its own and the ESP32-S2 cannot fit two.
@@ -1026,7 +1383,12 @@ mod gcm {
     }
 
     /// As [`compare_with_software`], waiting with `wait` instead of `wait_blocking`.
-    pub async fn compare_with_software_async(key: &[u8], len: usize, aad_len: usize) {
+    pub async fn compare_with_software_async(
+        backend: &str,
+        key: &[u8],
+        len: usize,
+        aad_len: usize,
+    ) {
         let nonce = random::<12>();
         let aad = random_vec(aad_len);
         let plaintext = random_vec(len);
@@ -1044,11 +1406,19 @@ mod gcm {
         core::mem::drop(handle);
         hil_test::assert!(
             ciphertext[..] == expected[..],
-            "len {} aad {}",
+            "{}: len {} aad {}",
+            backend,
             len,
             aad_len
         );
-        hil_test::assert_eq!(tag, expected_tag, "len {} aad {}", len, aad_len);
+        hil_test::assert_eq!(
+            tag,
+            expected_tag,
+            "{}: len {} aad {}",
+            backend,
+            len,
+            aad_len
+        );
 
         let mut handle = gcm
             .decrypt_in_place(&nonce, &aad, &mut ciphertext, &tag)
@@ -1057,15 +1427,16 @@ mod gcm {
         core::mem::drop(handle);
         hil_test::assert!(
             ciphertext[..] == plaintext[..],
-            "len {} aad {}",
+            "{}: len {} aad {}",
+            backend,
             len,
             aad_len
         );
     }
 
     /// Encrypts and decrypts `len` random bytes with `aad_len` random bytes of additional data on
-    /// the hardware, and compares both with RustCrypto.
-    pub fn compare_with_software(key: &[u8], len: usize, aad_len: usize) {
+    /// the driver, and compares both with RustCrypto.
+    pub fn compare_with_software(backend: &str, key: &[u8], len: usize, aad_len: usize) {
         let nonce = random::<12>();
         let aad = random_vec(aad_len);
         let plaintext = random_vec(len);
@@ -1083,11 +1454,19 @@ mod gcm {
         hil_test::assert_eq!(
             &ciphertext[..],
             &expected[..],
-            "len {} aad {}",
+            "{}: len {} aad {}",
+            backend,
             len,
             aad_len
         );
-        hil_test::assert_eq!(tag, expected_tag, "len {} aad {}", len, aad_len);
+        hil_test::assert_eq!(
+            tag,
+            expected_tag,
+            "{}: len {} aad {}",
+            backend,
+            len,
+            aad_len
+        );
 
         gcm.decrypt_in_place(&nonce, &aad, &mut ciphertext, &tag)
             .unwrap()
@@ -1096,7 +1475,8 @@ mod gcm {
         hil_test::assert_eq!(
             &ciphertext[..],
             &plaintext[..],
-            "len {} aad {}",
+            "{}: len {} aad {}",
+            backend,
             len,
             aad_len
         );
@@ -1104,6 +1484,7 @@ mod gcm {
 
     /// Decrypts `ciphertext` with `tag` and expects `TagMismatch` and an all-zero output.
     pub fn expect_mismatch(
+        backend: &str,
         key: &[u8],
         nonce: &[u8; 12],
         aad: &[u8],
@@ -1117,10 +1498,15 @@ mod gcm {
             .decrypt(nonce, aad, ciphertext, &mut output, tag)
             .unwrap()
             .wait_blocking();
-        hil_test::assert_eq!(result, Err(GcmError::TagMismatch));
-        hil_test::assert!(output.iter().all(|&b| b == 0), "output not zeroed");
+        hil_test::assert_eq!(result, Err(GcmError::TagMismatch), "{}", backend);
+        hil_test::assert!(
+            output.iter().all(|&b| b == 0),
+            "{}: output not zeroed",
+            backend
+        );
     }
 
+    #[cfg(aes_dma_mode_gcm)]
     pub const POISON: u32 = 0xa55a_5aa5;
 
     /// Writes a known word to the first key register, and asserts that it reads back.
@@ -1128,6 +1514,7 @@ mod gcm {
     /// A register that does not read back what was written could read zero whatever it holds, so
     /// a zero read from it would prove nothing. The AES clock must be on, or every register reads
     /// zero.
+    #[cfg(aes_dma_mode_gcm)]
     pub fn poison_key() {
         let regs = esp_hal::peripherals::AES::regs();
         regs.key(0).write(|w| unsafe { w.bits(POISON) });
@@ -1144,6 +1531,7 @@ mod gcm {
     /// These are the secrets: H is the key's encryption of a zero block. J0 comes from the nonce
     /// and the tag goes out with the ciphertext. Software cannot write H between operations, so
     /// no test can first show that H reads back.
+    #[cfg(aes_dma_mode_gcm)]
     pub fn assert_secrets_clear() {
         let regs = esp_hal::peripherals::AES::regs();
         for i in 0..8 {
@@ -1158,6 +1546,7 @@ mod gcm {
     ///
     /// Call it before the backend starts: `Aes::new` turns DMA mode off, which would stop an
     /// operation in progress.
+    #[cfg(aes_dma_mode_gcm)]
     pub fn hold_aes_clock() -> esp_hal::aes::Aes<'static> {
         esp_hal::aes::Aes::new(unsafe { esp_hal::peripherals::AES::steal() })
     }
@@ -1181,23 +1570,20 @@ mod gcm {
     }
 }
 
-#[cfg(aes_dma_mode_gcm)]
+/// Each test runs its steps on every work-queue backend of the chip, one backend after the other.
 #[embedded_test::tests(default_timeout = 30, executor = hil_test::Executor::new())]
 mod gcm_tests {
+    #[cfg(all(soc_has_psram, dma_can_access_psram))]
     use allocator_api2::vec::Vec;
     use esp_hal::{
         aes::{
             Error,
-            dma::{AesDmaBackend, AesGcmContext, GcmError},
+            gcm::{AesGcmContext, GcmError},
         },
         rng::Rng,
     };
 
     use super::{gcm::*, *};
-
-    struct Context {
-        aes: AesDmaBackend<'static>,
-    }
 
     #[init]
     fn init() -> Context {
@@ -1208,45 +1594,46 @@ mod gcm_tests {
         #[cfg(all(soc_has_psram, dma_can_access_psram))]
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
-        let dma = cfg_select! {
-            aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
-            aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
-            _ => p.DMA_CH0,
-        };
-
         Context {
-            aes: AesDmaBackend::new(p.AES, dma),
+            aes: p.AES,
+            #[cfg(aes_supports_dma)]
+            dma: cfg_select! {
+                aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
+                aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
+                _ => p.DMA_CH0,
+            },
         }
     }
 
-    fn run_vectors(encrypt: &[Vector], decrypt: &[Vector]) {
-        // The vectors are in flash, and the DMA reads the additional data where it is.
+    fn run_vectors(backend: &str, encrypt: &[Vector], decrypt: &[Vector]) {
+        // The vectors are in flash. They are copied to RAM, where the hardware can read them.
         for v in encrypt {
             let aad = v.aad.to_vec();
             let mut gcm = AesGcmContext::new(hw_key(v.key));
-            let plaintext = v.plaintext.unwrap();
+            let plaintext = v.plaintext.unwrap().to_vec();
             let mut output = zeroed_vec(plaintext.len());
             let mut tag = [0; 16];
-            gcm.encrypt(&v.nonce, &aad, plaintext, &mut output, &mut tag)
+            gcm.encrypt(&v.nonce, &aad, &plaintext, &mut output, &mut tag)
                 .unwrap()
                 .wait_blocking()
                 .unwrap();
-            hil_test::assert_eq!(&output[..], v.ciphertext);
-            hil_test::assert_eq!(tag, v.tag);
+            hil_test::assert_eq!(&output[..], v.ciphertext, "{}", backend);
+            hil_test::assert_eq!(tag, v.tag, "{}", backend);
         }
         for v in decrypt {
             let aad = v.aad.to_vec();
+            let ciphertext = v.ciphertext.to_vec();
             match v.plaintext {
                 Some(plaintext) => {
                     let mut gcm = AesGcmContext::new(hw_key(v.key));
                     let mut output = zeroed_vec(v.ciphertext.len());
-                    gcm.decrypt(&v.nonce, &aad, v.ciphertext, &mut output, &v.tag)
+                    gcm.decrypt(&v.nonce, &aad, &ciphertext, &mut output, &v.tag)
                         .unwrap()
                         .wait_blocking()
                         .unwrap();
-                    hil_test::assert_eq!(&output[..], plaintext);
+                    hil_test::assert_eq!(&output[..], plaintext, "{}", backend);
                 }
-                None => expect_mismatch(v.key, &v.nonce, &aad, v.ciphertext, &v.tag),
+                None => expect_mismatch(backend, v.key, &v.nonce, &aad, &ciphertext, &v.tag),
             }
         }
     }
@@ -1254,38 +1641,47 @@ mod gcm_tests {
     /// NIST CAVP vectors, for correctness against a published source.
     #[test]
     fn test_gcm_nist_vectors(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        run_vectors(&ENCRYPT_128, &DECRYPT_128);
-        #[cfg(aes_key_length_192)]
-        run_vectors(&ENCRYPT_192, &DECRYPT_192);
-        run_vectors(&ENCRYPT_256, &DECRYPT_256);
+            run_vectors(kind.name(), &ENCRYPT_128, &DECRYPT_128);
+            #[cfg(aes_key_length_192)]
+            run_vectors(kind.name(), &ENCRYPT_192, &DECRYPT_192);
+            run_vectors(kind.name(), &ENCRYPT_256, &DECRYPT_256);
+        }
     }
 
     /// Text and additional-data lengths on both sides of one block, one DMA descriptor and two
     /// descriptors, against RustCrypto.
     #[test]
     fn test_gcm_lengths(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        let key_128 = random::<16>();
-        let key_256 = random::<32>();
-        for len in [1, 15, 16, 17, 4_079, 4_080, 4_081, 8_161, 16_385] {
-            for aad_len in [0, 5, 16, 17, MAX_AAD] {
-                compare_with_software(&key_128, len, aad_len);
-                compare_with_software(&key_256, len, aad_len);
+            let key_128 = random::<16>();
+            let key_256 = random::<32>();
+            for len in [1, 15, 16, 17, 4_079, 4_080, 4_081, 8_161, 16_385] {
+                for aad_len in [0, 5, 16, 17, MAX_AAD] {
+                    compare_with_software(kind.name(), &key_128, len, aad_len);
+                    compare_with_software(kind.name(), &key_256, len, aad_len);
+                }
             }
+            #[cfg(aes_key_length_192)]
+            compare_with_software(kind.name(), &random::<24>(), 4_081, 17);
         }
-        #[cfg(aes_key_length_192)]
-        compare_with_software(&random::<24>(), 4_081, 17);
     }
 
     /// The longest text the driver takes.
     #[test]
     fn test_gcm_max_text(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        compare_with_software(&random::<16>(), MAX_TEXT, 5);
+            compare_with_software(kind.name(), &random::<16>(), MAX_TEXT, 5);
+        }
     }
 
     /// Returns `len` random bytes in PSRAM.
@@ -1297,13 +1693,14 @@ mod gcm_tests {
         bytes
     }
 
-    /// On the ESP32-S2, the longest text and additional data come from PSRAM and the output stays
-    /// in internal memory. A PSRAM output is refused before anything is queued, to a separate
+    /// On the ESP32-S2, the hardware takes the longest text and additional data from PSRAM, with
+    /// the output in internal memory. An output in PSRAM runs as AES-CTR steps, to a separate
     /// buffer and in place.
     #[test]
     #[cfg(all(soc_has_psram, dma_can_access_psram, esp32s2))]
-    fn test_gcm_psram_input_only_s2(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+    fn test_gcm_psram_s2(mut ctx: Context) {
+        let mut aes = ctx.backend(BackendKind::Dma);
+        let _backend = aes.start();
 
         let key = random::<32>();
         let nonce = random::<12>();
@@ -1329,25 +1726,20 @@ mod gcm_tests {
         hil_test::assert!(ciphertext[..] == plaintext[..], "plaintext differs");
 
         let mut output = psram_vec(100);
-        expect_refused(
-            &mut gcm,
-            &aad[..5],
-            &plaintext[..100],
-            &mut output,
-            Error::OutputInPsram,
-        );
-        let refused = gcm
-            .encrypt_in_place(&nonce, &aad[..5], &mut output, &mut tag)
-            .map(|_| ());
-        hil_test::assert_eq!(refused, Err(Error::OutputInPsram));
-        let refused = gcm
-            .decrypt(&nonce, &aad[..5], &plaintext[..100], &mut output, &tag)
-            .map(|_| ());
-        hil_test::assert_eq!(refused, Err(Error::OutputInPsram));
-        let refused = gcm
-            .decrypt_in_place(&nonce, &aad[..5], &mut output, &tag)
-            .map(|_| ());
-        hil_test::assert_eq!(refused, Err(Error::OutputInPsram));
+        let mut expected = copy_vec(&plaintext[..100]);
+        let expected_tag = sw_encrypt(&key, &nonce, &aad[..5], &mut expected);
+        gcm.encrypt(&nonce, &aad[..5], &plaintext[..100], &mut output, &mut tag)
+            .unwrap()
+            .wait_blocking()
+            .unwrap();
+        hil_test::assert!(output[..] == expected[..], "PSRAM ciphertext differs");
+        hil_test::assert_eq!(tag, expected_tag);
+
+        gcm.decrypt_in_place(&nonce, &aad[..5], &mut output, &tag)
+            .unwrap()
+            .wait_blocking()
+            .unwrap();
+        hil_test::assert!(output[..] == plaintext[..100], "PSRAM plaintext differs");
     }
 
     /// The longest text and additional data in PSRAM, where the larger alignment fills every
@@ -1355,33 +1747,44 @@ mod gcm_tests {
     #[test]
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
     fn test_gcm_max_lengths_psram(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        let key = random::<32>();
-        let nonce = random::<12>();
-        let aad = psram_vec(MAX_AAD);
-        let plaintext = psram_vec(MAX_TEXT);
-        let mut expected = copy_vec(&plaintext);
-        let expected_tag = sw_encrypt(&key, &nonce, &aad, &mut expected);
+            let key = random::<32>();
+            let nonce = random::<12>();
+            let aad = psram_vec(MAX_AAD);
+            let plaintext = psram_vec(MAX_TEXT);
+            let mut expected = copy_vec(&plaintext);
+            let expected_tag = sw_encrypt(&key, &nonce, &aad, &mut expected);
 
-        let mut gcm = AesGcmContext::new(hw_key(&key));
-        let mut ciphertext = psram_vec(MAX_TEXT);
-        let mut tag = [0; 16];
-        gcm.encrypt(&nonce, &aad, &plaintext, &mut ciphertext, &mut tag)
-            .unwrap()
-            .wait_blocking()
-            .unwrap();
-        hil_test::assert!(ciphertext[..] == expected[..], "ciphertext differs");
-        hil_test::assert_eq!(tag, expected_tag);
+            let mut gcm = AesGcmContext::new(hw_key(&key));
+            let mut ciphertext = psram_vec(MAX_TEXT);
+            let mut tag = [0; 16];
+            gcm.encrypt(&nonce, &aad, &plaintext, &mut ciphertext, &mut tag)
+                .unwrap()
+                .wait_blocking()
+                .unwrap();
+            hil_test::assert!(
+                ciphertext[..] == expected[..],
+                "{}: ciphertext differs",
+                kind.name()
+            );
+            hil_test::assert_eq!(tag, expected_tag, "{}", kind.name());
 
-        gcm.decrypt_in_place(&nonce, &aad, &mut ciphertext, &tag)
-            .unwrap()
-            .wait_blocking()
-            .unwrap();
-        hil_test::assert!(ciphertext[..] == plaintext[..], "plaintext differs");
+            gcm.decrypt_in_place(&nonce, &aad, &mut ciphertext, &tag)
+                .unwrap()
+                .wait_blocking()
+                .unwrap();
+            hil_test::assert!(
+                ciphertext[..] == plaintext[..],
+                "{}: plaintext differs",
+                kind.name()
+            );
+        }
     }
 
-    fn run_shifts(memory: &mut [u8]) {
+    fn run_shifts(backend: &str, memory: &mut [u8]) {
         const LEN: usize = 100;
         let key = random::<16>();
         let nonce = random::<12>();
@@ -1401,22 +1804,36 @@ mod gcm_tests {
                 .unwrap()
                 .wait_blocking()
                 .unwrap();
-            hil_test::assert_eq!(buffer, &expected[..], "in place, shift {}", shift);
-            hil_test::assert_eq!(tag, expected_tag, "in place, shift {}", shift);
+            hil_test::assert_eq!(
+                buffer,
+                &expected[..],
+                "{}: in place, shift {}",
+                backend,
+                shift
+            );
+            hil_test::assert_eq!(tag, expected_tag, "{}: in place, shift {}", backend, shift);
 
             gcm.decrypt_in_place(&nonce, &aad, buffer, &tag)
                 .unwrap()
                 .wait_blocking()
                 .unwrap();
-            hil_test::assert_eq!(buffer, &plaintext[..], "in place, shift {}", shift);
+            hil_test::assert_eq!(
+                buffer,
+                &plaintext[..],
+                "{}: in place, shift {}",
+                backend,
+                shift
+            );
             hil_test::assert!(
                 memory[..shift].iter().all(|&b| b == 0),
-                "write before, shift {}",
+                "{}: write before, shift {}",
+                backend,
                 shift
             );
             hil_test::assert!(
                 memory[shift + LEN..].iter().all(|&b| b == 0),
-                "write after, shift {}",
+                "{}: write after, shift {}",
+                backend,
                 shift
             );
 
@@ -1426,44 +1843,59 @@ mod gcm_tests {
                 .unwrap()
                 .wait_blocking()
                 .unwrap();
-            hil_test::assert_eq!(buffer, &expected[..], "separate, shift {}", shift);
-            hil_test::assert_eq!(tag, expected_tag, "separate, shift {}", shift);
+            hil_test::assert_eq!(
+                buffer,
+                &expected[..],
+                "{}: separate, shift {}",
+                backend,
+                shift
+            );
+            hil_test::assert_eq!(tag, expected_tag, "{}: separate, shift {}", backend, shift);
         }
     }
 
     /// Alignment in internal memory, in place and to a separate buffer.
     #[test]
     fn test_gcm_shifts(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
         let mut memory = zeroed_vec(100 + 16 + 64);
-        run_shifts(&mut memory);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_shifts(kind.name(), &mut memory);
+        }
     }
 
     /// Alignment in PSRAM, in place and to a separate buffer.
     #[test]
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
     fn test_gcm_shifts_psram(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
         let mut memory = Vec::with_capacity_in(100 + 16 + 64, esp_alloc::ExternalMemory);
         memory.resize(100 + 16 + 64, 0);
-        run_shifts(&mut memory);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_shifts(kind.name(), &mut memory);
+        }
     }
 
     /// Every offset in PSRAM with every partial block length. The lengths cover the three receive
-    /// chains the driver builds: all of the text through one bounce buffer, a head and a tail
-    /// bounce around the PSRAM run, and a run that fills more than one descriptor.
+    /// chains the hardware driver builds: all of the text through one bounce buffer, a head and a
+    /// tail bounce around the PSRAM run, and a run that fills more than one descriptor.
     #[test]
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
     fn test_gcm_offsets_psram(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
         let mut memory = Vec::with_capacity_in(16 + 4_097 + 64, esp_alloc::ExternalMemory);
         memory.resize(16 + 4_097 + 64, 0);
-        for offset in 0..16 {
-            for len in (1..=48).chain(95..=112).chain(4_079..=4_097) {
-                run_offset(&mut memory, offset, len);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            for offset in 0..16 {
+                for len in (1..=48).chain(95..=112).chain(4_079..=4_097) {
+                    run_offset(kind.name(), &mut memory, offset, len);
+                }
             }
         }
     }
@@ -1473,13 +1905,16 @@ mod gcm_tests {
     #[test]
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
     fn test_gcm_max_text_offsets_psram(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
         let mut memory = Vec::with_capacity_in(16 + MAX_TEXT + 64, esp_alloc::ExternalMemory);
         memory.resize(16 + MAX_TEXT + 64, 0);
-        for offset in 0..16 {
-            for len in [MAX_TEXT - 15, MAX_TEXT - 5, MAX_TEXT] {
-                run_offset(&mut memory, offset, len);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            for offset in 0..16 {
+                for len in [MAX_TEXT - 15, MAX_TEXT - 5, MAX_TEXT] {
+                    run_offset(kind.name(), &mut memory, offset, len);
+                }
             }
         }
     }
@@ -1488,7 +1923,7 @@ mod gcm_tests {
     /// tag against software. Then decrypts in place, and checks that the bytes around the text
     /// stay zero.
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
-    fn run_offset(memory: &mut [u8], offset: usize, len: usize) {
+    fn run_offset(backend: &str, memory: &mut [u8], offset: usize, len: usize) {
         let key = random::<16>();
         let nonce = random::<12>();
         let aad = random::<5>();
@@ -1507,11 +1942,19 @@ mod gcm_tests {
             .unwrap();
         hil_test::assert!(
             text[..] == expected[..],
-            "ciphertext, offset {} len {}",
+            "{}: ciphertext, offset {} len {}",
+            backend,
             offset,
             len
         );
-        hil_test::assert_eq!(tag, expected_tag, "tag, offset {} len {}", offset, len);
+        hil_test::assert_eq!(
+            tag,
+            expected_tag,
+            "{}: tag, offset {} len {}",
+            backend,
+            offset,
+            len
+        );
 
         gcm.decrypt_in_place(&nonce, &aad, text, &tag)
             .unwrap()
@@ -1519,25 +1962,28 @@ mod gcm_tests {
             .unwrap();
         hil_test::assert!(
             text[..] == plaintext[..],
-            "plaintext, offset {} len {}",
+            "{}: plaintext, offset {} len {}",
+            backend,
             offset,
             len
         );
         hil_test::assert!(
             memory[..offset].iter().all(|&b| b == 0),
-            "write before, offset {} len {}",
+            "{}: write before, offset {} len {}",
+            backend,
             offset,
             len
         );
         hil_test::assert!(
             memory[offset + len..].iter().all(|&b| b == 0),
-            "write after, offset {} len {}",
+            "{}: write after, offset {} len {}",
+            backend,
             offset,
             len
         );
     }
 
-    fn run_guard_byte(memory: &mut [u8]) {
+    fn run_guard_byte(backend: &str, memory: &mut [u8]) {
         let key = random::<16>();
         let nonce = random::<12>();
         let plaintext = random::<17>();
@@ -1552,18 +1998,25 @@ mod gcm_tests {
             .unwrap()
             .wait_blocking()
             .unwrap();
-        hil_test::assert_eq!(output, &expected[..]);
-        hil_test::assert_eq!(tag, expected_tag);
-        hil_test::assert!(guard.iter().all(|&b| b == 0xa5), "guard bytes changed");
+        hil_test::assert_eq!(output, &expected[..], "{}", backend);
+        hil_test::assert_eq!(tag, expected_tag, "{}", backend);
+        hil_test::assert!(
+            guard.iter().all(|&b| b == 0xa5),
+            "{}: guard bytes changed",
+            backend
+        );
     }
 
     /// A text one byte longer than a block does not overwrite the memory after the buffer.
     #[test]
     fn test_gcm_guard_byte(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
         let mut memory = zeroed_vec(17 + 64);
-        run_guard_byte(&mut memory);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_guard_byte(kind.name(), &mut memory);
+        }
     }
 
     /// A text one byte longer than a block does not overwrite the memory after the buffer, in
@@ -1571,115 +2024,128 @@ mod gcm_tests {
     #[test]
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
     fn test_gcm_guard_byte_psram(mut ctx: Context) {
-        let _backend = ctx.aes.start();
-
         let mut memory = Vec::with_capacity_in(17 + 64, esp_alloc::ExternalMemory);
         memory.resize(17 + 64, 0);
-        run_guard_byte(&mut memory);
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            run_guard_byte(kind.name(), &mut memory);
+        }
     }
 
-    /// A text in flash, which the backend copies to the output before the DMA reads it.
+    /// A text and additional data in flash, which the DMA cannot read: on chips with GCM in
+    /// hardware, the operation runs as AES-CTR steps.
     #[test]
     fn test_gcm_text_in_flash(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        let v = &ENCRYPT_128[1];
-        let mut output = zeroed_vec(v.ciphertext.len());
-        let mut tag = [0; 16];
-        let aad = v.aad.to_vec();
-        AesGcmContext::new(hw_key(v.key))
-            .encrypt(&v.nonce, &aad, v.plaintext.unwrap(), &mut output, &mut tag)
-            .unwrap()
-            .wait_blocking()
-            .unwrap();
-        hil_test::assert_eq!(&output[..], v.ciphertext);
-        hil_test::assert_eq!(tag, v.tag);
+            let v = &ENCRYPT_128[1];
+            let plaintext = v.plaintext.unwrap();
+            let mut gcm = AesGcmContext::new(hw_key(v.key));
+            let mut output = zeroed_vec(v.ciphertext.len());
+            let mut tag = [0; 16];
+            gcm.encrypt(&v.nonce, v.aad, plaintext, &mut output, &mut tag)
+                .unwrap()
+                .wait_blocking()
+                .unwrap();
+            hil_test::assert_eq!(&output[..], v.ciphertext, "{}", kind.name());
+            hil_test::assert_eq!(tag, v.tag, "{}", kind.name());
+
+            gcm.decrypt(&v.nonce, v.aad, v.ciphertext, &mut output, &v.tag)
+                .unwrap()
+                .wait_blocking()
+                .unwrap();
+            hil_test::assert_eq!(&output[..], plaintext, "{}", kind.name());
+        }
     }
 
     /// A changed tag, changed additional data and a changed last partial block each end in
     /// `TagMismatch` with the output zeroed.
     #[test]
     fn test_gcm_tag_mismatch(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+            let backend = kind.name();
 
-        let key = random::<16>();
-        let nonce = random::<12>();
-        let aad = random::<16>();
-        let mut ciphertext = random::<33>();
-        let tag = sw_encrypt(&key, &nonce, &aad, &mut ciphertext);
+            let key = random::<16>();
+            let nonce = random::<12>();
+            let aad = random::<16>();
+            let mut ciphertext = random::<33>();
+            let tag = sw_encrypt(&key, &nonce, &aad, &mut ciphertext);
 
-        let mut first = tag;
-        first[0] ^= 1;
-        expect_mismatch(&key, &nonce, &aad, &ciphertext, &first);
+            let mut first = tag;
+            first[0] ^= 1;
+            expect_mismatch(backend, &key, &nonce, &aad, &ciphertext, &first);
 
-        let mut last = tag;
-        last[15] ^= 0x80;
-        expect_mismatch(&key, &nonce, &aad, &ciphertext, &last);
+            let mut last = tag;
+            last[15] ^= 0x80;
+            expect_mismatch(backend, &key, &nonce, &aad, &ciphertext, &last);
 
-        let mut changed_aad = aad;
-        changed_aad[9] ^= 1;
-        expect_mismatch(&key, &nonce, &changed_aad, &ciphertext, &tag);
+            let mut changed_aad = aad;
+            changed_aad[9] ^= 1;
+            expect_mismatch(backend, &key, &nonce, &changed_aad, &ciphertext, &tag);
 
-        let mut changed_text = ciphertext;
-        changed_text[32] ^= 1;
-        expect_mismatch(&key, &nonce, &aad, &changed_text, &tag);
+            let mut changed_text = ciphertext;
+            changed_text[32] ^= 1;
+            expect_mismatch(backend, &key, &nonce, &aad, &changed_text, &tag);
+        }
     }
 
-    /// Inputs the hardware path does not take are refused before anything is posted.
+    /// Inputs the driver does not take are refused before anything is posted.
     #[test]
     fn test_gcm_refusals(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        static AAD_IN_FLASH: [u8; 5] = [1, 2, 3, 4, 5];
+            let mut gcm = AesGcmContext::new(hw_key(&random::<16>()));
+            let aad = zeroed_vec(MAX_AAD + 1);
+            let input = zeroed_vec(MAX_TEXT + 1);
+            let mut output = zeroed_vec(MAX_TEXT + 1);
 
-        let mut gcm = AesGcmContext::new(hw_key(&random::<16>()));
-        let aad = zeroed_vec(MAX_AAD + 1);
-        let input = zeroed_vec(MAX_TEXT + 1);
-        let mut output = zeroed_vec(MAX_TEXT + 1);
+            expect_refused(&mut gcm, &[], &[], &mut [], Error::IncorrectBufferLength);
+            expect_refused(
+                &mut gcm,
+                &aad,
+                &input[..16],
+                &mut output[..16],
+                Error::IncorrectBufferLength,
+            );
+            expect_refused(
+                &mut gcm,
+                &[],
+                &input,
+                &mut output,
+                Error::IncorrectBufferLength,
+            );
+            expect_refused(
+                &mut gcm,
+                &[],
+                &input[..16],
+                &mut output[..17],
+                Error::BuffersNotEqual,
+            );
 
-        expect_refused(&mut gcm, &[], &[], &mut [], Error::IncorrectBufferLength);
-        expect_refused(
-            &mut gcm,
-            &aad,
-            &input[..16],
-            &mut output[..16],
-            Error::IncorrectBufferLength,
-        );
-        expect_refused(
-            &mut gcm,
-            &[],
-            &input,
-            &mut output,
-            Error::IncorrectBufferLength,
-        );
-        expect_refused(
-            &mut gcm,
-            &AAD_IN_FLASH,
-            &input[..16],
-            &mut output[..16],
-            Error::AadNotInRam,
-        );
-        expect_refused(
-            &mut gcm,
-            &[],
-            &input[..16],
-            &mut output[..17],
-            Error::BuffersNotEqual,
-        );
-
-        // A refused operation leaves nothing in the queue.
-        compare_with_software(&random::<16>(), 17, 5);
+            // A refused operation leaves nothing in the queue.
+            compare_with_software(kind.name(), &random::<16>(), 17, 5);
+        }
     }
 
     /// The block reset at the end of each operation leaves no key and no H in the registers: after
     /// an encryption and a decryption, and after a mismatch.
     #[test]
+    #[cfg(aes_dma_mode_gcm)]
     fn test_gcm_clears_secrets(mut ctx: Context) {
         let _clock = hold_aes_clock();
-        let _backend = ctx.aes.start();
+        let mut aes = ctx.backend(BackendKind::Dma);
+        let _backend = aes.start();
 
         poison_key();
-        compare_with_software(&random::<32>(), 33, 5);
+        compare_with_software("DMA", &random::<32>(), 33, 5);
         assert_secrets_clear();
 
         let key = random::<32>();
@@ -1688,7 +2154,7 @@ mod gcm_tests {
         let mut tag = sw_encrypt(&key, &nonce, &[], &mut ciphertext);
         tag[0] ^= 1;
         poison_key();
-        expect_mismatch(&key, &nonce, &[], &ciphertext, &tag);
+        expect_mismatch("DMA", &key, &nonce, &[], &ciphertext, &tag);
         assert_secrets_clear();
     }
 
@@ -1722,9 +2188,70 @@ mod gcm_tests {
         hil_test::assert_eq!(tag, [0x5a; 16]);
     }
 
-    /// Dropping the backend during an operation waits for the operation to complete, with its tag
-    /// checked.
+    /// An operation cancelled after the backend has taken its first step ends as `Cancelled`. A
+    /// decryption's output is zeroed, an encryption leaves its tag untouched, and the context's
+    /// next operation is correct.
     #[test]
+    async fn test_gcm_cancel_after_start(mut ctx: Context) {
+        for &kind in STEP_BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+            let backend = kind.name();
+
+            let key = random::<16>();
+            let nonce = random::<12>();
+            let plaintext = random_vec(MAX_TEXT);
+            let mut ciphertext = copy_vec(&plaintext);
+            let tag = sw_encrypt(&key, &nonce, &[], &mut ciphertext);
+
+            let mut gcm = AesGcmContext::new(hw_key(&key));
+            let mut output = zeroed_vec(MAX_TEXT);
+            output.fill(0xa5);
+            let mut handle = gcm
+                .decrypt(&nonce, &[], &ciphertext, &mut output, &tag)
+                .unwrap();
+            handle.cancel().await;
+            hil_test::assert_eq!(handle.wait().await, Err(GcmError::Cancelled), "{}", backend);
+            core::mem::drop(handle);
+            hil_test::assert!(
+                output.iter().all(|&b| b == 0),
+                "{}: output not zeroed",
+                backend
+            );
+
+            let mut untouched = [0x5a; 16];
+            let mut handle = gcm
+                .encrypt(&nonce, &[], &plaintext, &mut output, &mut untouched)
+                .unwrap();
+            handle.cancel().await;
+            hil_test::assert_eq!(handle.wait().await, Err(GcmError::Cancelled), "{}", backend);
+            core::mem::drop(handle);
+            hil_test::assert_eq!(untouched, [0x5a; 16], "{}", backend);
+
+            let mut new_tag = [0; 16];
+            gcm.encrypt(&nonce, &[], &plaintext, &mut output, &mut new_tag)
+                .unwrap()
+                .wait_blocking()
+                .unwrap();
+            hil_test::assert!(
+                output[..] == ciphertext[..],
+                "{}: ciphertext after a cancel",
+                backend
+            );
+            hil_test::assert_eq!(new_tag, tag, "{}", backend);
+        }
+    }
+
+    #[doc = cfg_select! {
+        aes_dma_mode_gcm => {
+            "Dropping the backend during an operation waits for the operation to complete, with its tag checked."
+        }
+        _ => {
+            "Dropping the DMA backend during an operation pauses it after the step in progress, and a backend started later completes it."
+        }
+    }]
+    #[test]
+    #[cfg(aes_supports_dma)]
     fn test_gcm_backend_dropped_during_operation(mut ctx: Context) {
         let key = random::<16>();
         let nonce = random::<12>();
@@ -1734,9 +2261,12 @@ mod gcm_tests {
 
         let mut gcm = AesGcmContext::new(hw_key(&key));
         let mut output = zeroed_vec(MAX_TEXT);
+        #[cfg(aes_dma_mode_gcm)]
         let _clock = hold_aes_clock();
+        #[cfg(aes_dma_mode_gcm)]
         poison_key();
-        let backend = ctx.aes.start();
+        let mut aes = ctx.backend(BackendKind::Dma);
+        let backend = aes.start();
         let mut handle = gcm
             .decrypt(&nonce, &[], &ciphertext, &mut output, &tag)
             .unwrap();
@@ -1747,73 +2277,92 @@ mod gcm_tests {
         );
         core::mem::drop(backend);
 
-        hil_test::assert_eq!(handle.wait_blocking(), Ok(()));
-        hil_test::assert_eq!(&output[..], &plaintext[..]);
-        assert_secrets_clear();
+        cfg_select! {
+            aes_dma_mode_gcm => {
+                hil_test::assert_eq!(handle.wait_blocking(), Ok(()));
+                hil_test::assert_eq!(&output[..], &plaintext[..]);
+                assert_secrets_clear();
+            }
+            _ => {
+                core::mem::drop(aes);
+                hil_test::assert!(!handle.poll(), "operation finished without a backend");
+
+                let mut aes = ctx.backend(BackendKind::Cpu);
+                let _backend = aes.start();
+                hil_test::assert_eq!(handle.wait_blocking(), Ok(()));
+                hil_test::assert!(output[..] == plaintext[..], "plaintext differs");
+            }
+        }
     }
 
     /// Three operations posted before the backend starts. The last is waited first, so the earlier
     /// results must survive until they are asked for.
     #[test]
     fn test_gcm_posted_before_start(mut ctx: Context) {
-        let (key0, key1, key2) = (random::<16>(), random::<32>(), random::<16>());
-        let keys: [&[u8]; 3] = [&key0, &key1, &key2];
-        let nonce = random::<12>();
-        let aad = random::<5>();
-        let plaintext = random::<40>();
+        for &kind in BACKENDS {
+            let (key0, key1, key2) = (random::<16>(), random::<32>(), random::<16>());
+            let keys: [&[u8]; 3] = [&key0, &key1, &key2];
+            let nonce = random::<12>();
+            let aad = random::<5>();
+            let plaintext = random::<40>();
 
-        let mut expected = [plaintext; 3];
-        let mut expected_tags = [[0; 16]; 3];
-        for i in 0..3 {
-            expected_tags[i] = sw_encrypt(&keys[i], &nonce, &aad, &mut expected[i]);
+            let mut expected = [plaintext; 3];
+            let mut expected_tags = [[0; 16]; 3];
+            for i in 0..3 {
+                expected_tags[i] = sw_encrypt(&keys[i], &nonce, &aad, &mut expected[i]);
+            }
+
+            let [mut gcm0, mut gcm1, mut gcm2] = keys.map(|k| AesGcmContext::new(hw_key(k)));
+            let [mut out0, mut out1, mut out2] = [[0; 40]; 3];
+            let [mut tag0, mut tag1, mut tag2] = [[0; 16]; 3];
+            let h0 = gcm0
+                .encrypt(&nonce, &aad, &plaintext, &mut out0, &mut tag0)
+                .unwrap();
+            let h1 = gcm1
+                .encrypt(&nonce, &aad, &plaintext, &mut out1, &mut tag1)
+                .unwrap();
+            let h2 = gcm2
+                .encrypt(&nonce, &aad, &plaintext, &mut out2, &mut tag2)
+                .unwrap();
+
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
+
+            h2.wait_blocking().unwrap();
+            h1.wait_blocking().unwrap();
+            h0.wait_blocking().unwrap();
+
+            hil_test::assert_eq!([out0, out1, out2], expected, "{}", kind.name());
+            hil_test::assert_eq!([tag0, tag1, tag2], expected_tags, "{}", kind.name());
         }
-
-        let [mut gcm0, mut gcm1, mut gcm2] = keys.map(|k| AesGcmContext::new(hw_key(k)));
-        let [mut out0, mut out1, mut out2] = [[0; 40]; 3];
-        let [mut tag0, mut tag1, mut tag2] = [[0; 16]; 3];
-        let h0 = gcm0
-            .encrypt(&nonce, &aad, &plaintext, &mut out0, &mut tag0)
-            .unwrap();
-        let h1 = gcm1
-            .encrypt(&nonce, &aad, &plaintext, &mut out1, &mut tag1)
-            .unwrap();
-        let h2 = gcm2
-            .encrypt(&nonce, &aad, &plaintext, &mut out2, &mut tag2)
-            .unwrap();
-
-        let _backend = ctx.aes.start();
-
-        h2.wait_blocking().unwrap();
-        h1.wait_blocking().unwrap();
-        h0.wait_blocking().unwrap();
-
-        hil_test::assert_eq!([out0, out1, out2], expected);
-        hil_test::assert_eq!([tag0, tag1, tag2], expected_tags);
     }
 
     /// An async wait.
     #[test]
     async fn test_gcm_async(mut ctx: Context) {
-        let _backend = ctx.aes.start();
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        let key = random::<16>();
-        let nonce = random::<12>();
-        let aad = random::<5>();
-        let plaintext = random::<100>();
-        let mut expected = plaintext;
-        let expected_tag = sw_encrypt(&key, &nonce, &aad, &mut expected);
+            let key = random::<16>();
+            let nonce = random::<12>();
+            let aad = random::<5>();
+            let plaintext = random::<100>();
+            let mut expected = plaintext;
+            let expected_tag = sw_encrypt(&key, &nonce, &aad, &mut expected);
 
-        let mut gcm = AesGcmContext::new(hw_key(&key));
-        let mut output = [0; 100];
-        let mut tag = [0; 16];
-        let mut handle = gcm
-            .encrypt(&nonce, &aad, &plaintext, &mut output, &mut tag)
-            .unwrap();
-        handle.wait().await.unwrap();
-        core::mem::drop(handle);
+            let mut gcm = AesGcmContext::new(hw_key(&key));
+            let mut output = [0; 100];
+            let mut tag = [0; 16];
+            let mut handle = gcm
+                .encrypt(&nonce, &aad, &plaintext, &mut output, &mut tag)
+                .unwrap();
+            handle.wait().await.unwrap();
+            core::mem::drop(handle);
 
-        hil_test::assert_eq!(output, expected);
-        hil_test::assert_eq!(tag, expected_tag);
+            hil_test::assert_eq!(output, expected, "{}", kind.name());
+            hil_test::assert_eq!(tag, expected_tag, "{}", kind.name());
+        }
     }
 
     /// GCM and ECB operations queued together. The last is waited first, so the earlier results
@@ -1821,115 +2370,90 @@ mod gcm_tests {
     /// lengths, and leaves nothing that changes the next operation.
     #[test]
     fn test_gcm_mixed_with_ecb(mut ctx: Context) {
-        let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut plaintext);
-        let mut ecb_128 = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
-        let mut ecb_256 = AesContext::new(Ecb, Operation::Encrypt, KEY_256);
-        let mut ecb_128_out = [0; PLAINTEXT_BUF_SIZE];
-        let mut ecb_256_out = [0; PLAINTEXT_BUF_SIZE];
+        for &kind in BACKENDS {
+            let backend = kind.name();
+            let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut plaintext);
+            let mut ecb_128 = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let mut ecb_256 = AesContext::new(Ecb, Operation::Encrypt, KEY_256);
+            let mut ecb_128_out = [0; PLAINTEXT_BUF_SIZE];
+            let mut ecb_256_out = [0; PLAINTEXT_BUF_SIZE];
 
-        let (key_a, key_b) = (random::<16>(), random::<32>());
-        let (nonce_a, nonce_b) = (random::<12>(), random::<12>());
-        let aad_a = random::<16>();
-        let text_a = random::<17>();
-        let text_b = random::<16>();
-        let mut expected_a = text_a;
-        let expected_tag_a = sw_encrypt(&key_a, &nonce_a, &aad_a, &mut expected_a);
-        let mut expected_b = text_b;
-        let expected_tag_b = sw_encrypt(&key_b, &nonce_b, &[], &mut expected_b);
+            let (key_a, key_b) = (random::<16>(), random::<32>());
+            let (nonce_a, nonce_b) = (random::<12>(), random::<12>());
+            let aad_a = random::<16>();
+            let text_a = random::<17>();
+            let text_b = random::<16>();
+            let mut expected_a = text_a;
+            let expected_tag_a = sw_encrypt(&key_a, &nonce_a, &aad_a, &mut expected_a);
+            let mut expected_b = text_b;
+            let expected_tag_b = sw_encrypt(&key_b, &nonce_b, &[], &mut expected_b);
 
-        let mut gcm_a = AesGcmContext::new(hw_key(&key_a));
-        let mut gcm_b = AesGcmContext::new(hw_key(&key_b));
-        let (mut out_a, mut out_b) = ([0; 17], [0; 16]);
-        let (mut tag_a, mut tag_b) = ([0; 16], [0; 16]);
+            let mut gcm_a = AesGcmContext::new(hw_key(&key_a));
+            let mut gcm_b = AesGcmContext::new(hw_key(&key_b));
+            let (mut out_a, mut out_b) = ([0; 17], [0; 16]);
+            let (mut tag_a, mut tag_b) = ([0; 16], [0; 16]);
 
-        let ecb_128_handle = ecb_128.process(&plaintext, &mut ecb_128_out).unwrap();
-        let gcm_a_handle = gcm_a
-            .encrypt(&nonce_a, &aad_a, &text_a, &mut out_a, &mut tag_a)
-            .unwrap();
-        let ecb_256_handle = ecb_256.process(&plaintext, &mut ecb_256_out).unwrap();
-        let gcm_b_handle = gcm_b
-            .encrypt(&nonce_b, &[], &text_b, &mut out_b, &mut tag_b)
-            .unwrap();
+            let ecb_128_handle = ecb_128.process(&plaintext, &mut ecb_128_out).unwrap();
+            let gcm_a_handle = gcm_a
+                .encrypt(&nonce_a, &aad_a, &text_a, &mut out_a, &mut tag_a)
+                .unwrap();
+            let ecb_256_handle = ecb_256.process(&plaintext, &mut ecb_256_out).unwrap();
+            let gcm_b_handle = gcm_b
+                .encrypt(&nonce_b, &[], &text_b, &mut out_b, &mut tag_b)
+                .unwrap();
 
-        let _backend = ctx.aes.start();
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        gcm_b_handle.wait_blocking().unwrap();
-        ecb_256_handle.wait_blocking();
-        gcm_a_handle.wait_blocking().unwrap();
-        ecb_128_handle.wait_blocking();
+            gcm_b_handle.wait_blocking().unwrap();
+            ecb_256_handle.wait_blocking();
+            gcm_a_handle.wait_blocking().unwrap();
+            ecb_128_handle.wait_blocking();
 
-        hil_test::assert_eq!(ecb_128_out, CIPHERTEXT_ECB_128);
-        hil_test::assert_eq!(ecb_256_out, CIPHERTEXT_ECB_256);
-        hil_test::assert_eq!(out_a, expected_a);
-        hil_test::assert_eq!(tag_a, expected_tag_a);
-        hil_test::assert_eq!(out_b, expected_b);
-        hil_test::assert_eq!(tag_b, expected_tag_b);
+            hil_test::assert_eq!(ecb_128_out, CIPHERTEXT_ECB_128, "{}", backend);
+            hil_test::assert_eq!(ecb_256_out, CIPHERTEXT_ECB_256, "{}", backend);
+            hil_test::assert_eq!(out_a, expected_a, "{}", backend);
+            hil_test::assert_eq!(tag_a, expected_tag_a, "{}", backend);
+            hil_test::assert_eq!(out_b, expected_b, "{}", backend);
+            hil_test::assert_eq!(tag_b, expected_tag_b, "{}", backend);
+        }
     }
 
     /// Two workers, each with its own key, interleave GCM operations through the queue, and each
     /// gets its own results.
     #[test]
     async fn test_gcm_two_workers(mut ctx: Context) {
-        async fn worker() {
+        async fn worker(backend: &str) {
             let key = random::<32>();
             for _ in 0..20 {
                 let [len, aad_len] = random::<2>();
-                compare_with_software_async(&key, 1 + len as usize * 4, aad_len as usize % 64)
-                    .await;
+                compare_with_software_async(
+                    backend,
+                    &key,
+                    1 + len as usize * 4,
+                    aad_len as usize % 64,
+                )
+                .await;
             }
         }
 
-        let _backend = ctx.aes.start();
+        for &kind in BACKENDS {
+            let mut aes = ctx.backend(kind);
+            let _backend = aes.start();
 
-        embassy_futures::join::join(worker(), worker()).await;
-    }
-}
-
-#[cfg(aes_dma_mode_gcm)]
-#[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
-mod gcm_cpu_backend_tests {
-    use esp_hal::aes::dma::{AesGcmContext, GcmError};
-
-    use super::{gcm::*, *};
-
-    /// A GCM item on the CPU backend ends as `Unsupported`, and leaves the output, the tag and the
-    /// key registers untouched.
-    #[test]
-    fn test_gcm_unsupported_on_cpu_backend() {
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-        let _clock = hold_aes_clock();
-        poison_key();
-        let mut aes = AesBackend::new(p.AES);
-        let _backend = aes.start();
-
-        let mut gcm = AesGcmContext::new(hw_key(&random::<16>()));
-        let plaintext = random::<17>();
-        let mut output = [0xa5; 17];
-        let mut tag = [0x5a; 16];
-        let result = gcm
-            .encrypt(&[0x11; 12], &[], &plaintext, &mut output, &mut tag)
-            .unwrap()
-            .wait_blocking();
-
-        hil_test::assert_eq!(result, Err(GcmError::Unsupported));
-        hil_test::assert_eq!(output, [0xa5; 17]);
-        hil_test::assert_eq!(tag, [0x5a; 16]);
-        // The backend wrote no key: the word written before the operation is still there.
-        hil_test::assert_eq!(
-            esp_hal::peripherals::AES::regs().key(0).read().bits(),
-            POISON
-        );
+            embassy_futures::join::join(worker(kind.name()), worker(kind.name())).await;
+        }
     }
 }
 
 /// Tests of the AES work queue under contention: a waiter at a higher interrupt priority, and a
 /// second core. GCM and ECB operations are the load.
-#[cfg(aes_dma_mode_gcm)]
+#[cfg(aes_supports_dma)]
 #[embedded_test::tests(default_timeout = 30, executor = hil_test::Executor::new())]
 mod work_queue_concurrency_tests {
     use esp_hal::{
-        aes::dma::{AesDmaBackend, AesGcmContext},
+        aes::{dma::AesDmaBackend, gcm::AesGcmContext},
         interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt},
         peripherals::{FROM_CPU_INTR3, Peripherals},
         time::{Duration, Instant},

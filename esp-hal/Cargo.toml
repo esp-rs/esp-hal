@@ -2,7 +2,7 @@
 name          = "esp-hal"
 version       = "1.2.0"
 edition       = "2024"
-rust-version  = "1.95.0"
+rust-version  = "1.100.0"
 description   = "Bare-metal HAL for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-hal/latest/"
 keywords      = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
@@ -106,6 +106,9 @@ log-04                   = { package = "log", version = "0.4", optional = true }
 sha1                     = { version = "0.11", default-features = false, optional = true }
 sha2                     = { version = "0.11", default-features = false, optional = true }
 
+# Software GHASH for AES-GCM that runs as AES-CTR steps
+ghash                    = { version = "0.6", default-features = false, features = ["zeroize"], optional = true }
+
 # Optional dependencies that enable ecosystem support.
 # We could support individually enabling them, but there is no big downside to just
 # enabling them all via the `unstable` feature.
@@ -122,18 +125,18 @@ ufmt-write               = { version = "0.1", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32h4 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
-esp32p4 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "61f9678" }
+esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32h4 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
+esp32p4 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "0ea555f" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
@@ -146,7 +149,7 @@ xtensa-lx-rt     = { version = "0.23.0", path = "../xtensa-lx-rt", optional = tr
 [build-dependencies]
 esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 esp-config   = { version = "0.8.0", path = "../esp-config", features = ["build"] }
-somni-template = "0.3.1"
+somni-template = { version = "0.3.1", optional = true }
 
 [dev-dependencies]
 crypto-bigint = { version = "0.7.5", default-features = false }
@@ -177,6 +180,7 @@ __ethernet = [
 rt = [
     "dep:xtensa-lx-rt",
     "dep:esp-riscv-rt",
+    "dep:somni-template",
     "esp32?/rt",
     "esp32c2?/rt",
     "esp32c3?/rt",
@@ -223,11 +227,12 @@ esp32   = [
     "esp-metadata-generated/esp32",
     "dep:sha1",
     "dep:sha2",
+    "dep:ghash",
 ]
 ##
 esp32c2 = [
     "dep:esp32c2",
-    "esp-riscv-rt/no-mie-mip",
+    "esp-riscv-rt?/no-mie-mip",
     "portable-atomic/unsafe-assume-single-core",
     "esp-rom-sys/esp32c2",
     "esp-sync/esp32c2",
@@ -236,34 +241,37 @@ esp32c2 = [
 ##
 esp32c3 = [
     "dep:esp32c3",
-    "esp-riscv-rt/no-mie-mip",
-    "esp-riscv-rt/rtc-ram",
+    "esp-riscv-rt?/no-mie-mip",
+    "esp-riscv-rt?/rtc-ram",
     "procmacros/rtc-fast",
     "portable-atomic/unsafe-assume-single-core",
     "esp-rom-sys/esp32c3",
     "esp-sync/esp32c3",
     "esp-metadata-generated/esp32c3",
+    "dep:ghash",
 ]
 ##
 esp32c5 = [
     "dep:esp32c5",
-    "esp-riscv-rt/rtc-ram",
-    "esp-riscv-rt/clic-48",
+    "esp-riscv-rt?/rtc-ram",
+    "esp-riscv-rt?/clic-48",
     "procmacros/rtc-fast",
     "procmacros/has-lp-core",
     "esp-rom-sys/esp32c5",
     "esp-sync/esp32c5",
     "esp-metadata-generated/esp32c5",
+    "dep:ghash",
 ]
 ##
 esp32c6 = [
     "dep:esp32c6",
-    "esp-riscv-rt/rtc-ram",
+    "esp-riscv-rt?/rtc-ram",
     "procmacros/rtc-fast",
     "procmacros/has-lp-core",
     "esp-rom-sys/esp32c6",
     "esp-sync/esp32c6",
     "esp-metadata-generated/esp32c6",
+    "dep:ghash",
 ]
 ## ESP32-P4 (chip revision >= v3.x)
 esp32p4 = [
@@ -271,20 +279,21 @@ esp32p4 = [
     "__sdmmc",
     "__usb_otg",
     "__ethernet",
-    "esp-riscv-rt/rtc-ram",
-    "esp-riscv-rt/uncached-ram",
-    "esp-riscv-rt/clic-48",
+    "esp-riscv-rt?/rtc-ram",
+    "esp-riscv-rt?/uncached-ram",
+    "esp-riscv-rt?/clic-48",
     "procmacros/rtc-fast",
     "procmacros/uncached",
     "procmacros/has-lp-core",
     "esp-rom-sys/esp32p4",
     "esp-sync/esp32p4",
     "esp-metadata-generated/esp32p4",
+    "dep:ghash",
 ]
 ##
 esp32c61 = [
     "dep:esp32c61",
-    "esp-riscv-rt/clic-48",
+    "esp-riscv-rt?/clic-48",
     "procmacros/has-lp-core",
     "esp-rom-sys/esp32c61",
     "esp-sync/esp32c61",
@@ -293,19 +302,22 @@ esp32c61 = [
 ##
 esp32h2 = [
     "dep:esp32h2",
-    "esp-riscv-rt/rtc-ram",
+    "esp-riscv-rt?/rtc-ram",
     "procmacros/rtc-fast",
     "esp-rom-sys/esp32h2",
     "esp-sync/esp32h2",
     "esp-metadata-generated/esp32h2",
+    "dep:ghash",
 ]
 ##
 esp32h4 = [
     "dep:esp32h4",
-    "esp-riscv-rt/clic-48",
+    "__usb_otg",
+    "esp-riscv-rt?/clic-48",
     "esp-rom-sys/esp32h4",
     "esp-sync/esp32h4",
     "esp-metadata-generated/esp32h4",
+    "dep:ghash",
 ]
 ##
 esp32s2 = [
@@ -318,6 +330,7 @@ esp32s2 = [
     "esp-rom-sys/esp32s2",
     "esp-sync/esp32s2",
     "esp-metadata-generated/esp32s2",
+    "dep:ghash",
 ]
 ##
 esp32s3 = [
@@ -331,6 +344,7 @@ esp32s3 = [
     "esp-rom-sys/esp32s3",
     "esp-sync/esp32s3",
     "esp-metadata-generated/esp32s3",
+    "dep:ghash",
 ]
 ##
 esp32s31 = [
@@ -338,12 +352,13 @@ esp32s31 = [
     "__sdmmc",
     "__usb_otg",
     "__ethernet",
-    "esp-riscv-rt/rtc-ram",
-    "esp-riscv-rt/clic-48",
+    "esp-riscv-rt?/rtc-ram",
+    "esp-riscv-rt?/clic-48",
     "procmacros/rtc-fast",
     "esp-rom-sys/esp32s31",
     "esp-sync/esp32s31",
     "esp-metadata-generated/esp32s31",
+    "dep:ghash",
 ]
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.
@@ -416,6 +431,10 @@ requires-unstable = []
 
 [lints.clippy]
 mixed_attributes_style = "allow"
+
+[lints.cargo]
+# False positives for dependencies that only some configurations use.
+unused_dependencies = "allow"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(host_os, values("windows"))'] }

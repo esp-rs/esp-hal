@@ -12,12 +12,18 @@ impl RegI2cMaster {
         Self { master, host_id }
     }
 
+    // The ESP32-S31 light sleep sets the MPLL with the caches suspended, through the RAM `read` and
+    // `write` in `soc::esp32s31::regi2c`. The accessors in this file must then be inlined into the
+    // RAM caller. On other chips, the accessors end in flash or ROM code anyway, and inlining only
+    // copies them into each call site.
     #[allow(unused)]
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn write(&self, reg: u8, data: u8) {
         regi2c_write(self.master, self.host_id, reg, data);
     }
 
     #[allow(unused)]
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn read(&self, reg: u8) -> u8 {
         regi2c_read(self.master, self.host_id, reg)
     }
@@ -36,11 +42,13 @@ impl RegI2cRegister {
     }
 
     #[allow(unused)]
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn write_reg(&self, data: u8) {
         self.master.write(self.reg_add, data);
     }
 
     #[allow(unused)]
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn read(&self) -> u8 {
         self.master.read(self.reg_add)
     }
@@ -61,6 +69,7 @@ impl RawRegI2cField {
         Self { register, msb, lsb }
     }
 
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     const fn mask(&self) -> u8 {
         const fn lower_n_bits(bits: u8) -> u8 {
             !((u32::MAX << bits) as u8)
@@ -70,11 +79,13 @@ impl RawRegI2cField {
     }
 
     #[allow(unused)]
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn read(&self) -> u8 {
         (self.register.read() >> self.lsb) & self.mask()
     }
 
     #[allow(unused)]
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn write_field(&self, data: u8) {
         let mask = self.mask() << self.lsb;
         let bits = self.register.read();

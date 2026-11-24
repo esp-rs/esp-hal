@@ -1300,6 +1300,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             register_modem_sleep();
         }
 
+        #[cfg(modem_retention = "regdma")]
+        super::mac_bb::init(config.modem_sleep() && super::lp_clk::light_sleep_supported());
+
         #[cfg(feature = "coex")]
         crate::sys::include::coex_enable();
 
@@ -1345,6 +1348,8 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
 pub(crate) fn ble_deinit() {
     super::lp_clk::release_wake_source();
+    #[cfg(modem_retention = "regdma")]
+    super::mac_bb::deinit();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 

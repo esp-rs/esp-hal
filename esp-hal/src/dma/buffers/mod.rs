@@ -100,7 +100,7 @@ cfg_select! {
             Size32 = 32,
 
             /// 64 bytes
-            // TODO: investigate why ext_mem_bk_size = 2 causes corruption on S2
+            // The S2 EDMA only transfers the first 32 bytes of each 64-byte block.
             #[cfg(not(esp32s2))]
             Size64 = 64,
         }
@@ -1943,7 +1943,7 @@ unsafe impl DmaRxBuffer for NoBuffer {
 #[cfg_attr(not(any(aes_supports_dma, spi_master_supports_dma)), expect(unused))]
 pub(crate) unsafe fn prepare_for_tx(
     descriptors: &mut [DmaDescriptor],
-    mut data: NonNull<[u8]>,
+    data: NonNull<[u8]>,
     block_size: usize,
 ) -> Result<(NoBuffer, usize), DmaError> {
     let alignment =
@@ -1962,7 +1962,11 @@ pub(crate) unsafe fn prepare_for_tx(
     let alignment = alignment.max(block_size);
     let chunk_size = 4096 - alignment;
 
+    // Whole blocks only, and only as many bytes as the descriptors hold. The caller transfers the
+    // rest some other way.
     let data_len = data.len().min(chunk_size * descriptors.len());
+    let data_len = data_len - data_len % block_size;
+    let mut data = NonNull::slice_from_raw_parts(data.cast::<u8>(), data_len);
 
     cfg_select! {
         dma_can_access_psram => {
@@ -1982,8 +1986,6 @@ pub(crate) unsafe fn prepare_for_tx(
 
     let descriptors = unsafe { DmaAlignedMut::new_unchecked(descriptors) };
     let mut descriptors = unwrap!(DescriptorSet::new(descriptors));
-    // TODO: it would be best if this function returned the amount of data that could be linked
-    // up.
     unwrap!(descriptors.link_with_buffer(unsafe { data.as_mut() }, chunk_size));
     unwrap!(descriptors.set_tx_length(data_len, chunk_size));
 

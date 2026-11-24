@@ -218,7 +218,9 @@ where
             .map_err(ConfigError::Clock)?;
 
         ll::set_rgb_mode_en(self.regs(), false);
-        ll::set_lcd_conv_bypass(self.regs());
+        self.regs()
+            .lcd_rgb_yuv()
+            .write(|w| w.lcd_conv_enable().clear_bit());
 
         self.regs().lcd_user().modify(|_, w| {
             w.lcd_bit_order().bit(false);
@@ -227,7 +229,7 @@ where
         ll::set_8bits_order(self.regs(), false);
         ll::set_2byte_mode(self.regs(), false);
         self.regs().lcd_misc().write(|w| unsafe {
-            #[cfg(not(esp32s31))]
+            #[cfg(esp32s3)]
             w.lcd_afifo_threshold_num().bits(0);
             // Configure the setup cycles in LCD non-RGB mode. Setup cycles
             // expected = this value + 1. (6 bit)

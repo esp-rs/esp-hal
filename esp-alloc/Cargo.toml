@@ -2,7 +2,7 @@
 name          = "esp-alloc"
 version       = "0.11.0"
 edition       = "2024"
-rust-version  = "1.95.0"
+rust-version  = "1.100.0"
 description   = "A heap allocator for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-alloc/latest/"
 keywords      = ["allocator", "embedded", "esp32", "espressif", "memory"]
@@ -134,3 +134,7 @@ esp32    = ["esp-sync/esp32", "esp-metadata-generated/esp32"]
 esp32s2  = ["esp-sync/esp32s2", "esp-metadata-generated/esp32s2"]
 ##
 esp32s3  = ["esp-sync/esp32s3", "esp-metadata-generated/esp32s3"]
+
+[lints.cargo]
+# False positives for dependencies that only some configurations use.
+unused_dependencies = "allow"

@@ -65,13 +65,14 @@ jobs:
         id: labels
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_GROUP_REF: ${{ github.event.merge_group.head_ref }}
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # Not the event payload: a re-run reuses it, labels and all.
             LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels --jq '.labels[].name')
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            COMMIT_MSG=$(git log -1 --pretty=%B)
-            PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*" || true)
+            # The queue ref is `refs/heads/gh-readonly-queue/<base>/pr-<number>-<sha>`.
+            PR_NUMBER=$(echo "$MERGE_GROUP_REF" | { grep -oP '(?<=/pr-)[0-9]+(?=-)' || true; })
             if [ -n "$PR_NUMBER" ]; then
               LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>/dev/null || true)
             fi

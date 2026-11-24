@@ -288,7 +288,7 @@ impl<'d> PeripheralOutput<'d> for OutputSignal<'d> {
 }
 
 impl gpio::InputSignal {
-    fn can_use_gpio_matrix(self) -> bool {
+    pub(crate) const fn can_use_gpio_matrix(self) -> bool {
         self as usize <= property!("gpio.input_signal_max")
     }
 
@@ -310,7 +310,7 @@ impl gpio::InputSignal {
 }
 
 impl gpio::OutputSignal {
-    fn can_use_gpio_matrix(self) -> bool {
+    pub(crate) const fn can_use_gpio_matrix(self) -> bool {
         self as usize <= property!("gpio.output_signal_max")
     }
 
@@ -480,12 +480,15 @@ impl Signal<'_> {
     }
 
     fn disconnect_from_peripheral_output(&self) {
-        let Some(number) = self.gpio_number() else {
+        let Signal::Pin(pin) = self else {
             return;
         };
+        // Reset `out_sel` first, it may still select an older signal while the pin uses an IO MUX
+        // function.
         GPIO::regs()
-            .func_out_sel_cfg(number as usize)
+            .func_out_sel_cfg(pin.number() as usize)
             .modify(|_, w| unsafe { w.out_sel().bits(gpio::OutputSignal::GPIO as _) });
+        pin.set_alternate_function(AlternateFunction::GPIO);
     }
 }
 

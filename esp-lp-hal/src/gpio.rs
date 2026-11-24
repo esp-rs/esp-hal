@@ -94,7 +94,7 @@ pub struct Flex<const PIN: u8> {}
 
 #[allow(clippy::new_without_default)]
 impl<const PIN: u8> Flex<PIN> {
-    /// Create flexible pin driver for a [Pin].
+    /// Create flexible pin driver for a pin.
     /// No mode change happens.
     pub const fn new() -> Self {
         Self {}

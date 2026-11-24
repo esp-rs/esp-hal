@@ -2,7 +2,7 @@
 name = "esp-bootloader-esp-idf"
 version = "0.6.0"
 edition = "2024"
-rust-version = "1.95.0"
+rust-version = "1.100.0"
 description = "Functionality related to the esp-idf bootloader"
 documentation = "https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/"
 keywords = ["esp32", "espressif", "no-std"]
@@ -108,6 +108,10 @@ esp32s31  = ["esp-rom-sys/esp32s31", "esp-metadata-generated/esp32s31", "esp-hal
 # "md-5" is hidden behind `std` feature and `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]
 ignored = ["md-5", "esp-hal-procmacros"]
+
+[lints.cargo]
+# False positives for dependencies that only some configurations use.
+unused_dependencies = "allow"
 
 [lints.rust]
 # Starting with 1.85.0, the test cfg is considered to be a "userspace" config despite being also set by rustc and should be managed by the build system itself.

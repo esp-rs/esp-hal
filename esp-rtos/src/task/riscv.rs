@@ -249,7 +249,7 @@ pub(crate) fn new_task_context(
 /// Select the new task
 ///
 /// Task switching happens when exiting the interrupt handler. The handler detects that `tp` has
-/// changed, and saves/restores registers accordingly.
+/// changed, and restores registers accordingly.
 #[inline]
 pub(crate) fn task_switch(_old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
     unsafe {
@@ -258,16 +258,40 @@ pub(crate) fn task_switch(_old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
 }
 
 pub(crate) fn setup_multitasking() {
+    super::init_switch_stack();
+
     // The HAL runs this handler in the lowest-priority interrupt of this CPU.
     unsafe {
         set_context_switch_handler(Cpu::current(), swint_handler_trampoline);
     }
 }
 
+/// Moves `t0` to the top of the switch stack of the second CPU, on that CPU. Clobbers `a1`.
+macro_rules! second_stack {
+    () => {
+        cfg_select! {
+            multi_core => {
+                "
+                csrr a1, mhartid
+                beqz a1, 3f
+                add t0, t0, t1
+            3:
+                "
+            }
+            _ => "",
+        }
+    };
+}
+
 /// Direct-bound interrupt handler for the context switch.
 ///
-/// Stores context into the `CpuContext` behind the current thread pointer, calls the scheduler,
-/// and restores context from the `CpuContext` behind the next thread pointer.
+/// Stores the context into the `CpuContext` behind the current thread pointer, calls the scheduler
+/// on the switch stack of the CPU, and restores the context from the `CpuContext` behind the next
+/// thread pointer.
+///
+/// The context is complete before the scheduler runs, and the CPU does not use the stack of the
+/// current task after the scheduler selects the next one. Once the scheduler releases its lock, the
+/// other CPU can take the current task, and run it on its stack.
 ///
 /// The scheduler itself only changes the thread pointer. The new thread pointer is guaranteed to be non-zero.
 ///
@@ -293,15 +317,12 @@ unsafe extern "C" fn swint_handler_trampoline() {
         # https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/139d8d8e1d8ee8c0c3ee150de709ceaab5c08417/riscv-dwarf.adoc
         # .cfi_register ra, 0x1341 # Unwind with MEPC as return address, crashes probe-rs
 
-        # Reserve enough stack space for the idle context. A running task saves
-        # directly into its CpuContext instead, avoiding duplicate stores.
-        addi sp, sp, -80 # RISC-V requires 16-byte alignment
-
-        sw tp, 0*4(sp)
         bnez tp, 1f
 
         # Idle has no CpuContext (tp == 0), so preserve its caller-saved
-        # registers on the interrupted stack.
+        # registers on the interrupted stack. The stack of idle is the main stack,
+        # which no other CPU uses.
+        addi sp, sp, -80 # RISC-V requires 16-byte alignment
         sw ra, 1*4(sp)
         sw t0, 2*4(sp)
         sw t1, 3*4(sp)
@@ -318,6 +339,9 @@ unsafe extern "C" fn swint_handler_trampoline() {
         sw a5, 14*4(sp)
         sw a6, 15*4(sp)
         sw a7, 16*4(sp)
+
+        # The scheduler checks the interrupted stack pointer.
+        addi a0, sp, 80
         j 2f
 
 1:
@@ -339,74 +363,61 @@ unsafe extern "C" fn swint_handler_trampoline() {
         sw a6, 14*4(tp)
         sw a7, 15*4(tp)
 
+        # Save the rest of the context before the scheduler runs. Once the scheduler releases
+        # its lock, the other CPU can restore this context.
+        sw s0, 16*4(tp)
+        sw s1, 17*4(tp)
+        sw s2, 18*4(tp)
+        sw s3, 19*4(tp)
+        sw s4, 20*4(tp)
+        sw s5, 21*4(tp)
+        sw s6, 22*4(tp)
+        sw s7, 23*4(tp)
+        sw s8, 24*4(tp)
+        sw s9, 25*4(tp)
+        sw s10, 26*4(tp)
+        sw s11, 27*4(tp)
+        sw gp, 28*4(tp)
+      # sw tp, 29*4(tp) # No need to save TP, it's set up when the task is created.
+        sw sp, 30*4(tp)
+        # mepc -> pc
+        csrr t1, mepc
+        sw t1, 31*4(tp)
+
         # Save the FPU registers before the scheduler runs. Rust code can change them.
 ",
         fpu_save!(),
 "
+        # The scheduler checks the interrupted stack pointer.
+        mv a0, sp
+
 2:
+        # Run the scheduler on the switch stack of this CPU. Keep the stack pointer to return
+        # to if the task does not change, and the current thread pointer.
+        mv t2, sp
+        la t0, {switch_stacks}
+        li t1, {switch_stack_size}
+        add t0, t0, t1
+",
+        second_stack!(),
+"
+        addi sp, t0, -16
+        sw t2, 0*4(sp)
+        sw tp, 1*4(sp)
+
         # Let's run the interrupt handler, which runs the scheduler. If the scheduler
         # decides we need to switch context, it will change the thread pointer to the new context.
         la t0, {scheduler_interrupt_handler}
         jalr ra, t0, 0
 
-        # If idle remains idle, restore its caller-saved registers directly
-        # from the interrupt stack. It has no CpuContext to restore from.
-        lw t0, 0*4(sp)
-        bnez t0, 3f
-        bnez tp, 3f
-
-        lw ra, 1*4(sp)
-        lw t1, 3*4(sp)
-        lw t2, 4*4(sp)
-        lw t3, 5*4(sp)
-        lw t4, 6*4(sp)
-        lw t5, 7*4(sp)
-        lw t6, 8*4(sp)
-        lw a0, 9*4(sp)
-        lw a1, 10*4(sp)
-        lw a2, 11*4(sp)
-        lw a3, 12*4(sp)
-        lw a4, 13*4(sp)
-        lw a5, 14*4(sp)
-        lw a6, 15*4(sp)
-        lw a7, 16*4(sp)
-        lw t0, 2*4(sp)
-        addi sp, sp, 80
-        mret
-
-3:
-        # Free the interrupt stack before saving the old task's SP or loading
-        # the selected context.
-        addi sp, sp, 80
+        # Leave the switch stack. If the task changed, the code below does not use the old
+        # stack pointer.
+        lw t0, 1*4(sp)
+        lw sp, 0*4(sp)
 
         # If the thread pointer has not changed, just restore caller-saved registers
-        beq t0, tp, 5f # Skip to restoring caller-saved registers in the new context
+        beq t0, tp, 4f
 
-        # Skip storing context for the idle context or deleted tasks (no thread pointer)
-        beqz t0, 4f # Skip to loading registers for the new context
-
-        # If the thread pointer has changed, switch context
-        # First, save registers to the old context
-        sw s0, 16*4(t0)
-        sw s1, 17*4(t0)
-        sw s2, 18*4(t0)
-        sw s3, 19*4(t0)
-        sw s4, 20*4(t0)
-        sw s5, 21*4(t0)
-        sw s6, 22*4(t0)
-        sw s7, 23*4(t0)
-        sw s8, 24*4(t0)
-        sw s9, 25*4(t0)
-        sw s10, 26*4(t0)
-        sw s11, 27*4(t0)
-        sw gp, 28*4(t0)
-      # sw tp, 29*4(t0) # No need to save TP, it's set up when the task is created.
-        sw sp, 30*4(t0)
-        # mepc -> pc
-        csrr t1, mepc
-        sw t1, 31*4(t0)
-
-4:
         # Next, load registers from the new context
         lw s0, 16*4(tp)
         lw s1, 17*4(tp)
@@ -427,11 +438,31 @@ unsafe extern "C" fn swint_handler_trampoline() {
         lw t1, 31*4(tp)
         csrw mepc, t1
 
-5:
-        # When tp==0 the idle task is (re-)entering: its caller-saved registers were never
-        # written to a CpuContext, so there is nothing to reload.
-        beqz tp, 6f
+4:
+        # If idle remains idle, restore its caller-saved registers directly
+        # from the interrupted stack. It has no CpuContext to restore from.
+        bnez tp, 5f
 
+        lw ra, 1*4(sp)
+        lw t1, 3*4(sp)
+        lw t2, 4*4(sp)
+        lw t3, 5*4(sp)
+        lw t4, 6*4(sp)
+        lw t5, 7*4(sp)
+        lw t6, 8*4(sp)
+        lw a0, 9*4(sp)
+        lw a1, 10*4(sp)
+        lw a2, 11*4(sp)
+        lw a3, 12*4(sp)
+        lw a4, 13*4(sp)
+        lw a5, 14*4(sp)
+        lw a6, 15*4(sp)
+        lw a7, 16*4(sp)
+        lw t0, 2*4(sp)
+        addi sp, sp, 80
+        mret
+
+5:
         # Restore the FPU registers before the integer registers. The restore changes t1.
 ",
         fpu_restore!(),
@@ -456,15 +487,18 @@ unsafe extern "C" fn swint_handler_trampoline() {
         # Restore TP last. For the idle hook, this should write 0, which prevents saving its state.
         lw tp, 29*4(tp)
 
-6:
         mret
         .cfi_endproc
         "),
+        switch_stacks = sym super::SWITCH_STACKS,
+        switch_stack_size = const super::SWITCH_STACK_SIZE,
         scheduler_interrupt_handler = sym swint_handler,
     }
 }
 
+/// Runs the scheduler. `current_sp` is the stack pointer of the interrupted context.
 #[esp_hal::ram]
-extern "C" fn swint_handler() {
-    SCHEDULER.with(|scheduler| scheduler.switch_task());
+extern "C" fn swint_handler(current_sp: u32) {
+    SCHEDULER.with(|scheduler| scheduler.switch_task(current_sp, task_switch));
+    super::check_switch_stack();
 }

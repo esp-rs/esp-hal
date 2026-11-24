@@ -687,7 +687,11 @@ driver_configs![
         UsbSerialJtagProperties {
             driver: usb_serial_jtag,
             name: "USB Serial/JTAG",
-            properties: {}
+            properties: {
+                /// The analog pad groups that the USB Serial/JTAG controller can use, for example
+                /// `USJ` for the `USJ_DM`/`USJ_DP` pins.
+                phy_pads: Vec<String>,
+            }
         },
     ]
 
@@ -730,8 +734,8 @@ driver_configs![
             driver: ieee802154,
             name: "IEEE 802.15.4",
             properties: {
-                /// Whether the CPU clock must stay at its configured frequency while the radio
-                /// driver exists.
+                /// Whether the CPU clock must stay at its configured frequency while the radio is
+                /// awake.
                 #[serde(default)]
                 requires_fast_cpu: bool,
             }
@@ -801,6 +805,12 @@ driver_configs![
             name: "RGB display", // LCD_CAM, ESP32 I2S, S2 I2S
             properties: {
                 output_lines: u32,
+                /// `LCD_RGB_VERTICAL`, `LCD_RGB_HORIZONTAL`, `LCD_RGB_BLANK` and `LCD_RGB_CTRL`
+                /// hold the timing, and `LCD_RGB_MODE_EN` is in `LCD_MISC`. The other layout
+                /// stores the timing in `LCD_CTRL`, `LCD_CTRL1` and `LCD_CTRL2`, and
+                /// `LCD_RGB_MODE_EN` in `LCD_CTRL`.
+                #[serde(default)]
+                has_rgb_timing_registers: bool,
             }
         },
         SpiLcdProperties {
@@ -927,6 +937,14 @@ driver_configs![
                 /// Register-layout generation derived from the chip SVD.
                 version: u32,
                 channel_count: u32,
+            }
+        },
+        Dma2dProperties {
+            driver: dma2d,
+            name: "2D DMA",
+            properties: {
+                tx_channel_count: u32,
+                rx_channel_count: u32,
             }
         },
         McpwmProperties {

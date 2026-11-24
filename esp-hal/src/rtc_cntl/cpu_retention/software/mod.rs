@@ -29,8 +29,6 @@ use frames::chip::{
     PMUFUNC_JUST_WOKE,
 };
 
-// The rendezvous needs the IPC path, which `interrupt::ipc` gives to a
-// multi-core chip with the `rt` and the `unstable` features.
 #[cfg(all(multi_core, feature = "rt"))]
 pub(crate) mod rendezvous;
 
@@ -503,11 +501,12 @@ pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSl
 /// The caller must run with interrupts disabled on this core. [`LowPower::sleep_light`] holds that
 /// state for the whole sleep path.
 ///
-/// `enter_sleep` requests the sleep. `wait` blocks until the hardware reports the result.
+/// `saved` is the state that [`RtcSleepConfig::start_sleep`] returned. A wake returns through the
+/// saved frame with every register back in place, so `saved` is still valid on that path.
 ///
 /// The caller suspends the caches before the call. This function does not invalidate the caches.
 #[ram(unstable(checked))]
-pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool {
+pub(crate) fn sleep_retained(buffer: *mut u8, saved: &sleep::SavedState) -> bool {
     let core = system::raw_core();
     let mut ctx = CoreRetentionContext::new(buffer, core);
     save_pre_critical(&mut ctx);
@@ -518,12 +517,16 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool
     let pmufunc = unsafe { device_regs::load_word(&raw const (*frame).pmufunc) };
     let rejected = if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
         arm_wake_stub();
-        enter_sleep()
+        sleep::pmu_sleep_start(saved)
     } else {
-        // The wake holds the APP CPU in reset. A core that waits in the rendezvous comes back
-        // through the wake stub once it runs again.
+        // `pmu_sleep_finish` must run after the critical restore and before the non-critical
+        // restore.
+        // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/lowpower/port/esp32s31/sleep_cpu.c#L333>.
+        sleep::pmu_sleep_finish(saved);
+        // The wake holds the APP CPU in reset. A core that saved itself comes back through the
+        // wake stub once it runs again.
         #[cfg(all(multi_core, feature = "rt"))]
-        if rendezvous::helper_saved() {
+        if rendezvous::app_cpu_saved() {
             crate::soc::cpu_control::restart_core1_after_wake();
         }
         false
@@ -669,8 +672,8 @@ pub(crate) const BUFFER_SIZE: usize = BLOCK_SIZE * Cpu::COUNT;
 /// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
 /// cannot carry a power-down into a light sleep that has no retention memory.
 ///
-/// A second running core must save itself, so the power-down also needs the rendezvous. The sleep
-/// path engages it before this call, and does not get here if the other core stays out.
+/// A second running core must save itself too. The sleep path lets the parked core do that, after
+/// this call.
 #[cfg(feature = "rt")]
 pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
     config.pd_flags.set_pd_cpu(buffer.is_some());
@@ -689,16 +692,15 @@ pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Optio
 #[ram(unstable(checked))]
 pub(crate) fn enter_sleep_with_retention(
     config: &RtcSleepConfig,
+    saved: &sleep::SavedState,
     buffer: Option<NonNull<u8>>,
 ) -> bool {
     let retained = buffer.filter(|_| config.pd_flags.pd_cpu());
     let _cache = (!config.is_deep_sleep()).then(crate::soc::cache::CacheGuard::suspend);
 
     match retained {
-        Some(buffer) => {
-            cpu_retention::sleep_retained(buffer.as_ptr(), sleep::pmu_common::request_sleep)
-        }
-        None => config.enter_sleep(),
+        Some(buffer) => cpu_retention::sleep_retained(buffer.as_ptr(), saved),
+        None => config.enter_sleep(saved),
     }
 }
 

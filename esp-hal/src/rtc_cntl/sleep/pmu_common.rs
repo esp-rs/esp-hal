@@ -1,5 +1,5 @@
 use crate::{
-    clock::{RtcClock, calibrate_rtc_fast_clock, calibrate_rtc_slow_clock, rtc_slow_cal_period},
+    clock::{RtcClock, calibrate_rtc_fast_clock, rtc_slow_cal_period},
     peripherals::PMU,
     rtc_cntl::sleep::PowerDownFlags,
     soc::clocks,
@@ -21,18 +21,10 @@ impl SleepTimeConfig {
         clocks::rc_fast_clk_frequency()
     }
 
-    fn rtc_clk_cal_slow(deep: bool) -> u32 {
-        if deep {
-            calibrate_rtc_slow_clock();
-        }
-
-        rtc_slow_cal_period()
-    }
-
     pub fn new(deep: bool) -> Self {
         Self {
             sleep_time_adjustment: 0,
-            slowclk_period: Self::rtc_clk_cal_slow(deep),
+            slowclk_period: rtc_slow_cal_period(),
             fastclk_frequency: Self::rtc_clk_cal_fast(deep),
         }
     }
@@ -94,8 +86,7 @@ fn writeback_data_cache() {
 
 /// Requests the sleep and returns whether the hardware rejected the request.
 ///
-/// The software retention path calls this through a function pointer after the critical frame is
-/// saved.
+/// The software retention path calls this after the critical frame is saved.
 #[cfg_attr(cpu_retention = "software", procmacros::ram(unstable(checked)))]
 #[cfg_attr(not(cpu_retention = "software"), inline(always))]
 pub(crate) fn request_sleep() -> bool {

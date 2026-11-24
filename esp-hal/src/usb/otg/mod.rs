@@ -62,6 +62,7 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
+#[cfg_attr(esp32h4, path = "ll/esp32h4.rs")]
 #[cfg_attr(esp32s2, path = "ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "ll/esp32s3.rs")]
 #[cfg_attr(esp32p4, path = "ll/esp32p4.rs")]

@@ -1,14 +1,19 @@
 #![no_std]
 
-// By default, we don't want probe-rs to interfere with test timings by halting
-// cores and polling RTT. The tests don't produce output most of the time
-// anyway. The only cases where output can be interesting are: during
-// development, and when a test fails. In these cases, you can enable
-// the `defmt` feature to get the output.
+// By default, the tests log through esp-println on the serial port that probe-rs reads, because
+// polling RTT halts the cores. The tests that use UART0 or the USB-Serial-JTAG port for themselves
+// log over RTT.
+
+#[cfg(all(feature = "log-serial", feature = "log-rtt"))]
+compile_error!(
+    "Enable only one of `log-serial` and `log-rtt`. Add `//% DEFAULT-FEATURES: false` to use `log-rtt`."
+);
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 use esp_hal as _;
+#[cfg(feature = "log-serial")]
+use esp_println as _;
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
@@ -59,6 +64,17 @@ macro_rules! assert_ne {
 
 #[cfg(feature = "defmt")]
 #[macro_export]
+macro_rules! assert_matches {
+    ($left:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?))
+    };
+    ($left:expr, $pattern:pat $(if $guard:expr)?, $($arg:tt)+) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?), $($arg)+)
+    };
+}
+
+#[cfg(feature = "defmt")]
+#[macro_export]
 macro_rules! panic {
     ($($t:tt)*) => { defmt::panic!($($t)*) }
 }
@@ -79,6 +95,12 @@ macro_rules! assert_eq {
 #[macro_export]
 macro_rules! assert_ne {
     ($($t:tt)*) => { ::core::assert_ne!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! assert_matches {
+    ($($t:tt)*) => { ::core::assert_matches!($($t)*) }
 }
 
 #[cfg(not(feature = "defmt"))]
@@ -193,6 +215,70 @@ macro_rules! adc_pin {
     }};
 }
 
+// Creates the USB Serial/JTAG driver on the D+ and D- pins of the PHY that the controller uses.
+// With `other_phy`, it passes the pins of the other PHY of the chip instead.
+//
+// The H4 rig board has the `USB_PHY_SEL` eFuse burned, so the pins differ between boards.
+#[macro_export]
+macro_rules! usb_serial_jtag {
+    ($peripherals:expr, $config:expr) => {
+        $crate::usb_serial_jtag!(@new $peripherals, $config, $crate::usb_phy_sel_burned!())
+    };
+    ($peripherals:expr, $config:expr, other_phy) => {
+        $crate::usb_serial_jtag!(@new $peripherals, $config, !$crate::usb_phy_sel_burned!())
+    };
+    (@new $peripherals:expr, $config:expr, $usb_fs_phy:expr) => {{
+        // Order: (D+, D-)
+        cfg_select! {
+            esp32c3 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO19, GPIO18),
+            esp32c5 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO14, GPIO13),
+            any(esp32c6, esp32c61) => {
+                $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO13, GPIO12)
+            }
+            esp32h2 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO27, GPIO26),
+            esp32h4 => {
+                if $usb_fs_phy {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO22, GPIO21)
+                } else {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO14, GPIO13)
+                }
+            }
+            esp32p4 => {
+                if $usb_fs_phy {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO27, GPIO26)
+                } else {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO25, GPIO24)
+                }
+            }
+            esp32s3 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO20, GPIO19),
+            esp32s31 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO34, GPIO33),
+        }
+    }};
+    (@pins $peripherals:expr, $config:expr, $dp:ident, $dm:ident) => {
+        esp_hal::usb::usb_serial_jtag::UsbSerialJtag::new(
+            $peripherals.USB_DEVICE,
+            $peripherals.$dp,
+            $peripherals.$dm,
+            $config,
+        )
+    };
+}
+
+// Returns whether the `USB_PHY_SEL` eFuse moves USB Serial/JTAG to the USB FS PHY. The tests do not
+// write the PHY selection register, so the eFuse selects the PHY.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! usb_phy_sel_burned {
+    () => {
+        cfg_select! {
+            all(usb_serial_jtag_phy_pads_usj, usb_serial_jtag_phy_pads_usb_fs) => {
+                esp_hal::efuse::read_bit(esp_hal::efuse::USB_PHY_SEL)
+            }
+            _ => false,
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -242,14 +328,15 @@ pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
 
-/// Starts the RTT logger and disables every watchdog timer with raw register writes.
+/// Starts the RTT logger if `log-rtt` is enabled, and disables every watchdog timer with raw
+/// register writes.
 ///
 /// Disabling the watchdogs prevents the firmware reset loop if no debugger is attached. The
 /// function must not depend on esp-hal drivers, because a driver that is broken or half-initialized
 /// must not stop the tests from running.
 #[embedded_test::setup]
 fn init_rtt_and_disable_watchdogs() {
-    #[cfg(feature = "defmt")]
+    #[cfg(feature = "log-rtt")]
     {
         let channels = cfg_select! {
             esp32p4 => rtt_target::rtt_init! {

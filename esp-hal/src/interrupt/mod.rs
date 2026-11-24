@@ -316,8 +316,7 @@ impl Iterator for InterruptStatusIterator {
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         for i in self.idx..STATUS_WORDS {
-            if self.status.status[i] != 0 {
-                let bit = self.status.status[i].trailing_zeros();
+            if let Some(bit) = self.status.status[i].lowest_one() {
                 self.status.status[i] ^= 1 << bit;
                 self.idx = i;
                 let nr = (bit + 32 * i as u32) as u16;

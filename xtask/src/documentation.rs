@@ -529,6 +529,7 @@ fn cargo_doc_without_pre_processing(
         [
             "--cfg docsrs",
             "--cfg not_really_docsrs",
+            "-D warnings",
             "-Z unstable-options",
             // fix-up broken documentation links for `rand_core`
             "--extern-html-root-takes-precedence",

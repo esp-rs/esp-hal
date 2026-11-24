@@ -2,7 +2,7 @@
 name          = "esp-backtrace"
 version       = "0.20.0"
 edition       = "2024"
-rust-version  = "1.95.0"
+rust-version  = "1.100.0"
 description   = "Bare-metal backtrace support for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-backtrace/latest/"
 keywords      = ["backtrace", "embedded", "esp32", "espressif"]
@@ -43,10 +43,10 @@ semihosting = { version = "0.1.20", optional = true }
 document-features = "0.2"
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
-riscv            = { version = "0.15.0" }
+riscv            = { version = "0.15.0", optional = true }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
+xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx", optional = true }
 
 [build-dependencies]
 esp-config   = { version = "0.8.0", path = "../esp-config", features = ["build"] }
@@ -75,7 +75,7 @@ println = ["dep:esp-println"]
 ##
 ## Please note that `defmt` does _not_ provide MSRV guarantees with releases, and as such we are
 ## not able to make any MSRV guarantees when this feature is enabled. For more information refer to
-## the MSRV section of `defmt`'s README: https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv
+## the MSRV section of `defmt`'s README: <https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv>
 defmt = ["dep:defmt"]
 
 print-float-registers = [] # TODO support esp32p4
@@ -94,7 +94,7 @@ halt-cores           = []
 ## Exit with a semihosting call in case of a panic
 semihosting = ["dep:semihosting"]
 ## Include a panic handler
-panic-handler        = []
+panic-handler        = ["dep:riscv", "dep:xtensa-lx"]
 
 [lints.rust]
 unexpected_cfgs = "allow"

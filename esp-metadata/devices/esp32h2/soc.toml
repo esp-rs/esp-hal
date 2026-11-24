@@ -364,6 +364,7 @@ wakeup_sources = {
 [device.sleep.retention]
 cpu_retention = "software"
 modem_retention = "regdma"
+regdma_list_count = 4
 cpu_retention_frame = "c6_h2"
 supports_top_power_down = true
 
@@ -421,6 +422,7 @@ instances = {
 support_status = { status = "partial", issue = 6781 }
 [device.usb_serial_jtag]
 support_status = { status = "partial", issue = 6787 }
+phy_pads = ["USJ"]
 
 ## Miscellaneous
 [device.etm]

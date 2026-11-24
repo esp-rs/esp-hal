@@ -219,7 +219,7 @@ single inline tables.
 `clippy-configs`; documentation builds read `doc-config`; semver checks read `semver-config`. If `check-configs` is absent, a single
 default case with no features and no env overrides is used. `CI`, `DEFMT_LOG`, and `ESP_LOG`
 (check only) are always set by xtask and override duplicate keys from metadata. Documentation
-builds and doc-tests always set `RUSTDOCFLAGS` (and `ESP_HAL_DOCTEST` for doc-tests) and override
+builds and doc-tests always set `RUSTDOCFLAGS` and override
 duplicate keys from `doc-config`. Semver checks always set `RUSTDOCFLAGS` and override duplicate
 keys from `semver-config`.
 

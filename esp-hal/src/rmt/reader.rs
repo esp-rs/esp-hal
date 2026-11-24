@@ -1,14 +1,14 @@
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
 
-use super::{DynChannelAccess, Error, PulseCode, Rx};
+use super::{DynChannelAccess, PulseCode, Rx, RxError};
 
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(super) enum ReaderState {
     Active,
 
-    Error(Error),
+    Error(RxError),
 
     Done,
 }
@@ -139,7 +139,7 @@ impl RmtReader {
 
         if count < max_count {
             // `data` exhausted
-            self.state = ReaderState::Error(Error::ReceiverError);
+            self.state = ReaderState::Error(RxError::BufferTooSmall);
         } else if final_ {
             // Caller indicated that we're done
             self.state = ReaderState::Done;

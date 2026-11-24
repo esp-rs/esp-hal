@@ -146,6 +146,24 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
     ] },
+    { group = "SDM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
+    ] },
+    # PCR.rmt_sclk_conf.sclk_sel: 0 = XTAL, 1 = RC_FAST, see SOC_RMT_CLKS.
+    { group = "RMT", clocks = [
+        { name = "SCLK", type = "mux", wake_locking = true, variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        ] },
+    ] },
+    # PCR.twai0_func_clk_conf.twai0_func_clk_sel: 0 = XTAL, 1 = RC_FAST, 2 = PLL_F96M, see
+    # SOC_TWAI_CLKS. RC_FAST is not accurate enough for CAN bit timing.
+    { group = "TWAI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+            { name = "PLL_F96M", outputs = "PLL_F96M_CLK", default = true },
+        ] },
+    ] },
     # Sources: SOC_GPTIMER_CLKS and SOC_MWDT_CLKS. Like the other chips we default
     # to XTAL
     { group = "TIMG", clocks = [
@@ -179,6 +197,7 @@ peripheral_clocks = { templates = [
     { name = "AhbGdma", template_params = { peripheral = "gdma" } },
     { name = "Aes" },
     { name = "Ecc" },
+    { name = "Hmac" },
     { name = "Ledc" },
     # Besides the function clock that drives the glitch filter, the PCNT has a separate register
     # clock. Register accesses are dropped while it is gated, and both boot disabled.
@@ -198,4 +217,6 @@ peripheral_clocks = { templates = [
     # than a clock gate, so `pre_init` runs IDF's `rng_ll_enable` sequence instead.
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "UsbDevice", keep_enabled = true },
+    { name = "UsbFs", template_params = { peripheral = "usb_otg11" } },
+    { name = "Twai0" },
 ] }

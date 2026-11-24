@@ -83,6 +83,7 @@ peripherals = [
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
+    { name = "JPEG", interrupts = { peri = "JPEG" } },
     { name = "LCD_CAM", interrupts = { peri = "LCD_CAM" }, clock_group = "LCD_CAM" },
     { name = "IOMUX_MSPI_PIN", hidden = true },
     { name = "LP_AON_CLK_RST", pac = "LP_AON_CLKRST" },
@@ -123,6 +124,8 @@ peripherals = [
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
     { name = "TSENS", pac = "LP_TSENS", clock_group = "TSENS" },
+    { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" }, clock_group = "TWAI" },
+    { name = "TWAI1", interrupts = { peri = "TWAI1", timer = "TWAI1_TIMER" }, clock_group = "TWAI" },
     { name = "UART0", interrupts = { peri = "UART0" }, clock_group = "UART", stable = true },
     { name = "UART1", interrupts = { peri = "UART1" }, clock_group = "UART", stable = true },
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART", stable = true },
@@ -258,6 +261,8 @@ wakeup_sources = {
 [device.sleep.retention]
 cpu_retention = "software"
 modem_retention = "regdma"
+regdma_list_count = 5
+regdma_link_configurable = true
 cpu_retention_frame = "s31"
 supports_top_power_down = true
 
@@ -426,6 +431,7 @@ instances = [
 
 [device.usb_serial_jtag]
 support_status = { status = "partial", issue = 6787 }
+phy_pads = ["USJ"]
 
 [device.camera]
 support_status = { status = "partial", issue = 6751 }
@@ -526,6 +532,7 @@ instances = {
 [device.rgb_display]
 support_status = { status = "partial", issue = 6744 }
 output_lines = 24
+has_rgb_timing_registers = true
 
 [device.sdm]
 support_status = "partial"
@@ -537,7 +544,11 @@ register_block = "lp_tsens"
 [device.touch]
 support_status = "not_supported"
 [device.canfd]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6746 }
+instances = [
+    { name = "twai0", sys_instance = "Twai0", rx = "TWAI0_RX", tx = "TWAI0_TX" },
+    { name = "twai1", sys_instance = "Twai1", rx = "TWAI1_RX", tx = "TWAI1_TX" },
+]
 [device.uhci]
 support_status = { status = "partial", issue = 6783 }
 combined_uart_selector_field = true
@@ -624,6 +635,11 @@ idle_low_speed_switch = true
 octal_spi = true
 has_timing_tuning = true
 
+[device.dma2d]
+support_status = "partial"
+tx_channel_count = 4
+rx_channel_count = 3
+
 [device.pixel_accelerator]
 support_status = { status = "partial", issue = 6772 }
 
@@ -634,4 +650,4 @@ support_status = "not_supported"
 support_status = "partial"
 
 [device.jpeg]
-support_status = "not_supported"
+support_status = "partial"

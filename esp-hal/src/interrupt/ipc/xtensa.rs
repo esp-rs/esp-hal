@@ -3,6 +3,7 @@
 //! The CPUs have no interrupt that reaches the other CPU. Each CPU therefore takes the call in
 //! a `FROM_CPU` interrupt of its own.
 
+use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use portable_atomic::Ordering;
 
 use super::runtime::STATE;
@@ -11,7 +12,6 @@ use crate::{
     peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1, Interrupt},
     ram,
     system::Cpu,
-    trapframe::TrapFrame,
 };
 
 pub(super) fn raise(core: Cpu) {
@@ -42,22 +42,14 @@ pub(crate) fn install() {
 }
 
 fn install_core(core: Cpu) {
-    let handler = crate::interrupt::InterruptHandler::new(
-        // The vectored dispatcher calls every handler with the trap frame.
-        unsafe {
-            core::mem::transmute::<fn(&mut TrapFrame), extern "C" fn()>(
-                ipc_handler as fn(&mut TrapFrame),
-            )
-        },
-        Priority::min(),
-    );
+    let handler = crate::interrupt::InterruptHandler::new(ipc_handler, Priority::min());
 
     crate::interrupt::bind_vector(interrupt(core), handler);
     crate::interrupt::enable_on_cpu(core, interrupt(core), Priority::min());
 }
 
 #[ram]
-fn ipc_handler(context: &mut TrapFrame) {
+extern "C" fn ipc_handler() {
     let core = Cpu::current();
 
     // This is the only place that clears the request. A second clear would drop a request
@@ -69,20 +61,23 @@ fn ipc_handler(context: &mut TrapFrame) {
 
     let state = &STATE[core as usize];
 
-    // The posted requests return here, so they run first.
+    // The posted requests return here, so they run first. An interrupt handler at a higher
+    // priority can stop this CPU. The stop must not occur in the drain outside `func`, so no
+    // interrupt handler can run during the drain.
+    let token = unsafe { SingleCoreInterruptLock.enter() };
     unsafe { super::queue::drain(&state.lists, core as u32) };
+    unsafe { SingleCoreInterruptLock.exit(token) };
 
     if state.deferral.load(Ordering::Relaxed) != 0 {
         return;
     }
 
-    // The context switch chooses the context that the interrupt returns to, so it runs last.
+    // The context switch chooses the context that the interrupt returns to, so it runs at the
+    // exit of the interrupt, after all level 1 handlers.
     let handler = state
         .pending_context_switch
         .swap(core::ptr::null_mut(), Ordering::AcqRel);
     if !handler.is_null() {
-        let handler =
-            unsafe { core::mem::transmute::<*mut (), extern "C" fn(&mut TrapFrame)>(handler) };
-        handler(context);
+        crate::interrupt::__rtos_implementation::exit::switch_at_exit(handler);
     }
 }

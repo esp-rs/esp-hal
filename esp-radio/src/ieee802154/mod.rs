@@ -19,7 +19,7 @@
 use byte::{BytesExt, TryRead};
 use docsplay::Display;
 use esp_hal::peripherals::IEEE802154;
-use esp_phy::{PhyClockGuard, PhyInitGuard};
+use esp_phy::PhyClockGuard;
 use esp_sync::NonReentrantMutex;
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
 
@@ -73,6 +73,13 @@ pub struct Config {
     pub promiscuous: bool,
     pub coordinator: bool,
     pub rx_when_idle: bool,
+    /// Gives the PHY reference back while the radio sleeps.
+    ///
+    /// The radio sleeps after [`Ieee802154::sleep`], and also after every operation when
+    /// `rx_when_idle` is false. With this option, the RF is then closed unless another radio still
+    /// uses it, and the next `transmit` or `start_receive` opens it again. Off by default: a
+    /// sleeping radio stops, but the RF stays on.
+    pub modem_sleep: bool,
     pub txpower: i8,
     pub channel: u8,
     pub cca_threshold: i8,
@@ -92,6 +99,7 @@ impl Default for Config {
             promiscuous: Default::default(),
             coordinator: Default::default(),
             rx_when_idle: Default::default(),
+            modem_sleep: Default::default(),
             txpower: 20,
             channel: 15,
             cca_threshold: CONFIG_IEEE802154_CCA_THRESHOLD,
@@ -111,13 +119,13 @@ impl Default for Config {
 pub struct Ieee802154<'a> {
     _align: u32,
     transmit_buffer: [u8; FRAME_SIZE],
-    // Before the PHY guards, so that it drops first.
+    // Fields drop in declaration order. The entropy count falls first, while the PHY is still
+    // enabled.
     _entropy_source_guard: EntropySourceGuard,
+    _radio_stop_guard: RadioStopGuard<'a>,
     _phy_clock_guard: PhyClockGuard<'a>,
-    _phy_init_guard: PhyInitGuard<'a>,
-    // Fields drop in declaration order: this guard must stay last so the PHY
-    // is torn down (which still needs the modem clocks) before the clocks are
-    // gated off.
+    // This guard must stay last so the PHY is torn down (which still needs the modem clocks)
+    // before the clocks are gated off.
     _radio_clock_guard: RadioClockGuard,
 }
 
@@ -127,16 +135,14 @@ impl<'a> Ieee802154<'a> {
     /// NOTE: Coexistence with Wi-Fi is currently not supported.
     #[instability::unstable]
     pub fn new(radio: IEEE802154<'a>) -> Self {
-        #[cfg(ieee802154_requires_fast_cpu)]
-        esp_hal::clock::CpuFrequencyLock::acquire();
-        let (_entropy_source_guard, _phy_clock_guard, _phy_init_guard, _radio_clock_guard) =
+        let (_entropy_source_guard, _radio_stop_guard, _phy_clock_guard, _radio_clock_guard) =
             esp_ieee802154_enable(radio);
         Self {
             _align: 0,
             transmit_buffer: [0u8; FRAME_SIZE],
             _entropy_source_guard,
+            _radio_stop_guard,
             _phy_clock_guard,
-            _phy_init_guard,
             _radio_clock_guard,
         }
     }
@@ -150,6 +156,7 @@ impl<'a> Ieee802154<'a> {
         set_promiscuous(cfg.promiscuous);
         set_coordinator(cfg.coordinator);
         set_rx_when_idle(cfg.rx_when_idle);
+        raw::set_modem_sleep(cfg.modem_sleep);
         set_tx_power(cfg.txpower);
         set_channel(cfg.channel);
         set_cca_threshold(cfg.cca_threshold);
@@ -177,6 +184,24 @@ impl<'a> Ieee802154<'a> {
     #[instability::unstable]
     pub fn start_receive(&mut self) {
         ieee802154_receive();
+    }
+
+    /// Put the radio to sleep: stop whatever it is doing and stop receiving frames.
+    ///
+    /// A transmission that is not complete fails, and the TX-failed callback is called. A frame
+    /// that is being received is lost. A received frame whose ACK is being sent is delivered, but
+    /// the ACK is not sent.
+    ///
+    /// `transmit` and `start_receive` wake the radio up, so with `rx_when_idle` set the radio
+    /// receives again after the next `transmit`.
+    ///
+    /// While asleep, the radio does not keep the CPU clock at its configured frequency, so idle
+    /// frequency scaling can lower it. With [`Config::modem_sleep`], the PHY reference is given
+    /// back too, so the RF is closed unless another radio still uses it. The radio is then not a
+    /// source of true random numbers.
+    #[instability::unstable]
+    pub fn sleep(&mut self) {
+        ieee802154_sleep();
     }
 
     /// Return the raw data of a received frame
@@ -376,8 +401,6 @@ impl Drop for Ieee802154<'_> {
         self.clear_rx_available_callback_fn();
         self.clear_tx_failed_callback();
         self.clear_tx_failed_callback_fn();
-        #[cfg(ieee802154_requires_fast_cpu)]
-        esp_hal::clock::CpuFrequencyLock::release();
     }
 }
 

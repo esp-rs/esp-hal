@@ -523,6 +523,64 @@ impl TimgInstance {
     }
 }
 
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.function_clk_en().bit(en));
+    }
+}
+
+impl RmtInstance {
+    // RMT_SCLK
+
+    fn enable_sclk_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .rmt_sclk_conf()
+            .modify(|_, w| w.sclk_en().bit(en));
+    }
+
+    fn configure_sclk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<RmtSclkConfig>,
+        new_config: RmtSclkConfig,
+    ) {
+        PCR::regs().rmt_sclk_conf().modify(|_, w| {
+            w.sclk_sel().bit(match new_config {
+                RmtSclkConfig::XtalClk => false,
+                RmtSclkConfig::RcFastClk => true,
+            })
+        });
+    }
+}
+
+impl TwaiInstance {
+    // TWAI_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .twai0_func_clk_conf()
+            .modify(|_, w| w.twai0_func_clk_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<TwaiFunctionClockConfig>,
+        new_config: TwaiFunctionClockConfig,
+    ) {
+        PCR::regs().twai0_func_clk_conf().modify(|_, w| unsafe {
+            w.twai0_func_clk_sel().bits(match new_config {
+                TwaiFunctionClockConfig::Xtal => 0,
+                TwaiFunctionClockConfig::PllF96m => 2,
+            })
+        });
+    }
+}
+
 impl ParlIoInstance {
     // PARL_IO_RX_CLOCK
 

@@ -4,6 +4,10 @@
 //! avoid timeouts while printing. Note that probe-rs reading the buffer might still mess up
 //! timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the
 //! action, but adding any additional logging to the driver is likely to cause sporadic issues.
+//!
+//! The loopback tests receive on an async channel, which the executor polls while a blocking
+//! transmission runs. A blocking transmission does not let the executor read the RX RAM, so its
+//! frames fit in the RX RAM.
 
 //% CHIP_FILTER: rmt_driver_supported
 //% FEATURES: embassy esp-alloc unstable
@@ -13,59 +17,108 @@
 
 extern crate alloc;
 
-use core::task::Poll;
+use core::{pin::pin, task::Poll};
 
 use allocator_api2::{vec, vec::Vec};
-use embassy_futures::poll_once;
+use embassy_futures::{join::join, poll_once};
 use esp_hal::{
     Async,
     Blocking,
-    DriverMode,
     delay::Delay,
     gpio::{
         AnyPin,
         Flex,
         InputConfig,
         Level,
-        NoPin,
         OutputConfig,
         Pin,
         Pull,
-        interconnect::{PeripheralInput, PeripheralOutput},
+        interconnect::{InputSignal, OutputSignal},
     },
     peripherals::RMT,
     ram,
     rmt::{
         CHANNEL_RAM_SIZE,
-        Channel,
         ConfigError,
-        Error,
         HAS_RX_WRAP,
         LoopMode,
         PulseCode,
         Rmt,
-        Rx,
-        RxChannelConfig,
-        RxChannelCreator,
-        Tx,
-        TxChannelConfig,
-        TxChannelCreator,
+        RmtConfig,
+        RxChannel,
+        RxConfig,
+        RxError,
+        RxInstance,
+        TxChannel,
+        TxConfig,
+        TxError,
+        TxInstance,
     },
-    time::Rate,
+    time::{Duration, Instant, Rate},
     timer::timg::TimerGroup,
 };
 #[allow(unused_imports)]
-use hil_test::{assert, assert_eq};
+use hil_test::{assert, assert_eq, assert_matches};
 
 // RMT channel clock = 500kHz
 cfg_select! {
     any(esp32h2, esp32h4) => {
         const FREQ: Rate = Rate::from_mhz(32);
-        const DIV: u8 = 64;
+        const DIV: u32 = 64;
     }
     _ => {
         const FREQ: Rate = Rate::from_mhz(80);
-        const DIV: u8 = 160;
+        const DIV: u32 = 160;
+    }
+}
+
+// The channel singletons. Each test starts from a fresh `esp_hal::init`, so stealing them is
+// sound.
+macro_rules! ch {
+    ($name:ident) => {
+        unsafe { esp_hal::peripherals::$name::steal() }
+    };
+}
+
+macro_rules! tx_1 {
+    () => {
+        ch!(RMT_CH0)
+    };
+}
+
+macro_rules! tx_2 {
+    () => {
+        (ch!(RMT_CH0), ch!(RMT_CH1))
+    };
+}
+
+cfg_select! {
+    any(esp32, esp32s3, esp32s31, esp32p4) => {
+        macro_rules! rx_1 {
+            () => {
+                ch!(RMT_CH4)
+            };
+        }
+        // All RX blocks after the TX channels of the tests.
+        macro_rules! rx_all {
+            () => {
+                (ch!(RMT_CH4), ch!(RMT_CH5), ch!(RMT_CH6), ch!(RMT_CH7))
+            };
+        }
+        const RX_ALL_CODES: usize = 4 * CHANNEL_RAM_SIZE;
+    }
+    _ => {
+        macro_rules! rx_1 {
+            () => {
+                ch!(RMT_CH2)
+            };
+        }
+        macro_rules! rx_all {
+            () => {
+                (ch!(RMT_CH2), ch!(RMT_CH3))
+            };
+        }
+        const RX_ALL_CODES: usize = 2 * CHANNEL_RAM_SIZE;
     }
 }
 
@@ -78,18 +131,14 @@ enum EndMarkerConfig {
 struct LoopbackConfig {
     tx_len: usize,
     idle_threshold: u16,
-    idle_output: bool,
-    tx_memsize: u8,
-    rx_memsize: u8,
     write_stop_code: bool,
     end_marker: EndMarkerConfig,
     tolerance: u16,
-    abort: bool,
     length1_base: u16,
     length1_step: u16,
     length2: u16,
-    sclk_div: u16, // 1 - 256
-    ch_div: u8,
+    sclk_div: u32, // 1 - 256
+    ch_div: u32,
 }
 
 impl Default for LoopbackConfig {
@@ -97,13 +146,9 @@ impl Default for LoopbackConfig {
         Self {
             tx_len: CHANNEL_RAM_SIZE / 2,
             idle_threshold: 1000,
-            idle_output: false,
-            tx_memsize: 1,
-            rx_memsize: 1,
             write_stop_code: true,
             end_marker: EndMarkerConfig::Field1,
             tolerance: 1,
-            abort: false,
             length1_base: 100,
             length1_step: 10,
             length2: 50,
@@ -115,22 +160,33 @@ impl Default for LoopbackConfig {
 
 impl LoopbackConfig {
     fn sclk_freq(&self) -> Rate {
-        FREQ / self.sclk_div as u32
+        FREQ / self.sclk_div
     }
 
-    fn tx_config(&self) -> TxChannelConfig {
-        TxChannelConfig::default()
-            .with_clk_divider(self.ch_div)
-            .with_idle_output(self.idle_output)
-            .with_idle_output_level(Level::Low)
-            .with_memsize(self.tx_memsize)
+    fn tick_rate(&self) -> Rate {
+        self.sclk_freq() / self.ch_div
     }
 
-    fn rx_config(&self) -> RxChannelConfig {
-        RxChannelConfig::default()
-            .with_clk_divider(self.ch_div)
-            .with_idle_threshold(self.idle_threshold)
-            .with_memsize(self.rx_memsize)
+    fn rmt_config(&self) -> RmtConfig {
+        #[allow(unused_mut)]
+        let mut config = RmtConfig::default();
+        #[cfg(not(rmt_has_per_channel_clock))]
+        {
+            config = config.with_frequency(self.sclk_freq());
+        }
+        config
+    }
+
+    fn tx_config(&self) -> TxConfig {
+        TxConfig::default().with_tick_rate(self.tick_rate())
+    }
+
+    fn rx_config(&self) -> RxConfig {
+        let idle_ns =
+            u64::from(self.idle_threshold) * 1_000_000_000 / u64::from(self.tick_rate().as_hz());
+        RxConfig::default()
+            .with_tick_rate(self.tick_rate())
+            .with_idle_ns(idle_ns as u32)
     }
 }
 
@@ -139,7 +195,6 @@ impl LoopbackConfig {
 // Note that there's no small common multiple of `CHANNEL_RAM_SIZE` (either 48 or 64) and the
 // period 23, so we don't repeatedly write the same data to the same location in the hardware
 // buffer in loopback tests with buffer wrapping. If we did, that might hide bugs.
-// FIXME: Make a method on LoopbackConfig?
 fn generate_tx_data(conf: &LoopbackConfig) -> Vec<PulseCode> {
     const WRAP_COUNT: u16 = 23;
 
@@ -197,15 +252,12 @@ fn pulse_code_matches(left: PulseCode, right: PulseCode, tolerance: u16) -> bool
         && left.length2().abs_diff(right.length2()) <= tolerance
 }
 
-// Compare tx and rx data from a loopback transmission
-//
-// This takes into account whether the device does not support wrapping rx such that truncated
-// output is expected.
+// Compare tx and rx data from a loopback transmission.
 fn check_data_eq(
     conf: &LoopbackConfig,
     tx: &[PulseCode],
     rx: &[PulseCode],
-    rx_res: Result<usize, Error>,
+    rx_res: Result<usize, RxError>,
 ) {
     let mut errors: usize = 0;
     let mut count: usize = 0;
@@ -219,7 +271,7 @@ fn check_data_eq(
 
         let mut _msg = "";
         if rx_done {
-            // The rx buffer should be zero-filled, we check that below.
+            // The rx buffer should be untouched, we check that below.
         } else if code_tx.length1() > conf.idle_threshold {
             // Should receive an end marker in the first PulseCode field
             rx_done = true;
@@ -251,21 +303,8 @@ fn check_data_eq(
                 code_rx,
                 _msg
             );
-        } else {
-            defmt::info!(
-                "loopback @ idx {}: {:?} (tx) -> {:?} (rx)",
-                idx,
-                code_tx,
-                code_rx,
-            );
         }
     }
-
-    // Some devices don't support wrapping rx, and will terminate rx when the buffer is full.
-    let rx_memsize_codes = conf.rx_memsize as usize * CHANNEL_RAM_SIZE;
-    if !HAS_RX_WRAP {
-        expected_rx_len = expected_rx_len.min(rx_memsize_codes)
-    };
 
     match rx_res {
         Ok(rx_count) => {
@@ -273,15 +312,9 @@ fn check_data_eq(
                 rx_count,
                 expected_rx_len,
                 "unexpected rx count (last: tx={:?}, rx={:?})",
-                tx[rx_count - 1],
-                rx[rx_count - 1],
+                tx[rx_count.max(1) - 1],
+                rx[rx_count.max(1) - 1],
             );
-        }
-        Err(Error::InvalidDataLength) if !HAS_RX_WRAP => {
-            // In this case, rx wasn't even started, so we can't compare the partially received
-            // data below!
-            assert!(tx.len() > rx_memsize_codes);
-            return;
         }
         Err(e) => {
             panic!("unexpected rx error {:?}", e);
@@ -324,11 +357,11 @@ impl BitbangTransmitter {
 
         Self {
             pin,
-            cycles_per_us: conf.ch_div as u32 * 1000 * Self::SCALE / conf.sclk_freq().as_khz(),
+            cycles_per_us: conf.ch_div * 1000 * Self::SCALE / conf.sclk_freq().as_khz(),
         }
     }
 
-    fn rx_pin(&mut self) -> impl PeripheralInput<'static> {
+    fn rx_pin(&mut self) -> InputSignal<'static> {
         self.pin.peripheral_input()
     }
 
@@ -351,136 +384,100 @@ impl BitbangTransmitter {
     }
 }
 
-// Returns the channels for reuse if the transactions completed.
-fn do_rmt_loopback_inner<'ch>(
-    conf: &LoopbackConfig,
-    tx_channel: Channel<'ch, Blocking, Tx>,
-    rx_channel: Channel<'ch, Blocking, Rx>,
-) -> Option<(Channel<'ch, Blocking, Tx>, Channel<'ch, Blocking, Rx>)> {
+// The transmit channel of a loopback, in either driver mode.
+enum Tx<'r, 'c> {
+    Blocking(&'r mut TxChannel<'c, Blocking>),
+    Async(&'r mut TxChannel<'c, Async>),
+}
+
+// Sends data from `tx` and receives it on `rx`, and checks that the data matches.
+async fn do_rmt_loopback(conf: &LoopbackConfig, tx: Tx<'_, '_>, rx: &mut RxChannel<'_, Async>) {
     let tx_data = generate_tx_data(conf);
-    let mut rcv_data = vec![PulseCode::default(); conf.tx_len];
+    let mut rx_data = vec![PulseCode::end_marker(); conf.tx_len];
 
-    let rx_transaction = rx_channel.receive(&mut rcv_data);
-    let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+    // `join` polls the receive future first, so the reception starts before the transmission.
+    let (rx_res, tx_res) = join(rx.receive_async(&mut rx_data), async {
+        match tx {
+            Tx::Blocking(tx) => tx.transmit(&tx_data),
+            Tx::Async(tx) => tx.transmit_async(&tx_data).await,
+        }
+    })
+    .await;
 
-    if conf.abort {
-        // Start the transactions...
-        let mut rx_transaction = rx_transaction.unwrap();
-
-        Delay::new().delay_millis(2);
-
-        // ...poll them for a while, but then drop them...
-        // (`poll_once` takes the future by value and drops it before returning)
-        let rx_done = rx_transaction.poll();
-        let tx_done = tx_transaction.poll();
-
-        // Drop the transactions
-        core::mem::drop(rx_transaction);
-        core::mem::drop(tx_transaction);
-
-        // The test should fail here when the delay above is increased, e.g. to 100ms.
-        assert!(!rx_done);
-        assert!(!tx_done);
-
-        None
-    } else {
-        let run = move || match rx_transaction {
-            Ok(mut rx_transaction) => {
-                // ... poll them until completion.
-                loop {
-                    let tx_done = tx_transaction.poll();
-                    let rx_done = rx_transaction.poll();
-                    if tx_done && rx_done {
-                        break;
-                    }
-                }
-
-                let tx_channel = tx_transaction.wait().unwrap();
-                match rx_transaction.wait() {
-                    Ok((rx_count, rx_channel)) => (Ok(rx_count), Some((tx_channel, rx_channel))),
-                    Err((err, rx_channel)) => (Err(err), Some((tx_channel, rx_channel))),
-                }
-            }
-            Err((e, _)) => (Err(e), None),
-        };
-        let (rx_res, channels) = run();
-
-        check_data_eq(conf, &tx_data, &rcv_data, rx_res);
-
-        channels
-    }
+    tx_res.unwrap();
+    check_data_eq(conf, &tx_data, &rx_data, rx_res);
 }
 
-// Run a test where some data is sent from one channel and looped back to
-// another one for receive, and verify that the data matches.
-fn do_rmt_loopback(ctx: &mut Context, conf: &LoopbackConfig) {
-    let (tx_channel, rx_channel) = ctx.setup_loopback(&conf);
-
-    do_rmt_loopback_inner(&conf, tx_channel, rx_channel);
+fn pins<'a>(pin: &'a mut AnyPin<'static>) -> (InputSignal<'a>, OutputSignal<'a>) {
+    Flex::new(pin.reborrow()).split()
 }
 
-async fn do_rmt_loopback_async_inner(
+// Creates the channels of a loopback from one `Rmt`.
+fn setup<'a>(
+    rmt: &'a Rmt<'_, Async>,
+    pin: &'a mut AnyPin<'static>,
     conf: &LoopbackConfig,
-    tx_channel: &mut Channel<'_, Async, Tx>,
-    rx_channel: &mut Channel<'_, Async, Rx>,
-) {
-    use embassy_time::Delay;
-    use embedded_hal_async::delay::DelayNs;
-
-    let tx_data = generate_tx_data(conf);
-    let mut rcv_data = vec![PulseCode::default(); conf.tx_len];
-
-    // Start the transactions...
-    let rx_fut = rx_channel.receive(&mut rcv_data);
-    let tx_fut = tx_channel.transmit(&tx_data);
-
-    if conf.abort {
-        Delay.delay_ms(2).await;
-
-        // ...poll them, but then drop them before completion...
-        // (`poll_once` takes the future by value and drops it before returning)
-        let rx_poll = poll_once(rx_fut);
-        let tx_poll = poll_once(tx_fut);
-
-        // The test should fail here when the delay above is increased, e.g. to 100ms.
-        assert!(rx_poll.is_pending());
-        assert!(tx_poll.is_pending());
-    } else {
-        let (rx_res, tx_res) = embassy_futures::join::join(rx_fut, tx_fut).await;
-
-        tx_res.unwrap();
-
-        check_data_eq(conf, &tx_data, &rcv_data, rx_res);
-    }
+    tx: impl TxInstance + 'a,
+    rx: impl RxInstance + 'a,
+) -> (TxChannel<'a, Blocking>, RxChannel<'a, Async>) {
+    let (rx_pin, tx_pin) = pins(pin);
+    let tx = rmt
+        .tx_channel(tx, conf.tx_config())
+        .unwrap()
+        .with_pin(tx_pin);
+    let rx = rmt
+        .async_rx_channel(rx, conf.rx_config())
+        .unwrap()
+        .with_pin(rx_pin);
+    (tx, rx)
 }
 
-// Run a test where some data is sent from one channel and looped back to
-// another one for receive, and verify that the data matches.
-async fn do_rmt_loopback_async(ctx: &mut Context, conf: &LoopbackConfig) {
-    let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&conf);
-
-    do_rmt_loopback_async_inner(&conf, &mut tx_channel, &mut rx_channel).await
+fn setup_async<'a>(
+    rmt: &'a Rmt<'_, Async>,
+    pin: &'a mut AnyPin<'static>,
+    conf: &LoopbackConfig,
+    tx: impl TxInstance + 'a,
+    rx: impl RxInstance + 'a,
+) -> (TxChannel<'a, Async>, RxChannel<'a, Async>) {
+    let (rx_pin, tx_pin) = pins(pin);
+    let tx = rmt
+        .async_tx_channel(tx, conf.tx_config())
+        .unwrap()
+        .with_pin(tx_pin);
+    let rx = rmt
+        .async_rx_channel(rx, conf.rx_config())
+        .unwrap()
+        .with_pin(rx_pin);
+    (tx, rx)
 }
 
-// SCLK dividers to test; ESP32 and ESP32-S2 don't have an SCLK divider.
-const SCLK_DIVIDERS: &[u16] = if cfg!(any(esp32, esp32s2)) {
+// Time that the hardware needs to send `codes`, at 2 us per tick.
+fn send_time(codes: &[PulseCode]) -> Duration {
+    let ticks: u64 = codes
+        .iter()
+        .map(|c| u64::from(c.length1()) + u64::from(c.length2()))
+        .sum();
+    Duration::from_micros(ticks * 2)
+}
+
+// SCLK dividers to test; ESP32 and ESP32-S2 don't have an SCLK divider. On ESP32-P4 and
+// ESP32-S31, 80 MHz comes from a 160 MHz source, so the largest integer divider is 128.
+const SCLK_DIVIDERS: &[u32] = if cfg!(any(esp32, esp32s2)) {
     &[1]
+} else if cfg!(any(esp32p4, esp32s31)) {
+    &[1, 16, 128]
 } else {
     &[1, 16, 256]
 };
 
-const CHANNEL_DIVIDERS: &[u8] = &[1, 16, 255];
+const CHANNEL_DIVIDERS: &[u32] = &[1, 16, 255];
 
-fn divider_loopback_config(sclk_div: u16, ch_div: u8) -> LoopbackConfig {
-    let div = sclk_div as u32 * ch_div as u32;
+fn divider_loopback_config(sclk_div: u32, ch_div: u32) -> LoopbackConfig {
+    let div = sclk_div * ch_div;
     // the stop code is sent with length 2 * idle_threshold = 40 * step, cf. generate_tx_data
     let step = (32767 / (41 * div)).max(5) as u16;
 
-    #[cfg(feature = "defmt")]
-    defmt::info!("sclk_div: {}, ch_div: {}, step: {}", sclk_div, ch_div, step);
-
     LoopbackConfig {
-        idle_output: true,
         sclk_div,
         ch_div,
         tx_len: 5,
@@ -492,27 +489,148 @@ fn divider_loopback_config(sclk_div: u16, ch_div: u8) -> LoopbackConfig {
     }
 }
 
-macro_rules! pins {
-    ($ctx:expr) => {
-        Flex::new($ctx.pin.reborrow()).split()
+// Starts a transmission longer than the channel RAM, refills it `refills_in_time` times, then
+// stops polling. The hardware must stop at the driver's end marker, and the transmission must
+// report the underrun. Then the channel must work again.
+async fn do_rmt_underrun(ctx: &mut Context, tx_blocks: u8, refills_in_time: usize) {
+    let m = tx_blocks as usize * CHANNEL_RAM_SIZE;
+    let h = m / 2;
+    // The hardware stops after the initial fill (all of RAM but the end marker) and the refills.
+    let sent = m - 1 + refills_in_time * h;
+    if !HAS_RX_WRAP && sent + 1 > RX_ALL_CODES {
+        return;
+    }
+
+    let conf = LoopbackConfig {
+        tx_len: sent + h + 4,
+        ..Default::default()
     };
+    let tx_data = generate_tx_data(&conf);
+    let mut rx_data = vec![PulseCode::end_marker(); sent + 1];
+
+    let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+        .unwrap()
+        .into_async();
+    let (mut tx, mut rx) = if tx_blocks == 1 {
+        setup_async(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_all!())
+    } else {
+        setup_async(&rmt, &mut ctx.pin, &conf, tx_2!(), rx_all!())
+    };
+
+    let rx_res = {
+        let mut rx_fut = pin!(rx.receive_async(&mut rx_data));
+        let mut tx_fut = pin!(tx.transmit_async(&tx_data));
+
+        assert!(poll_once(rx_fut.as_mut()).is_pending());
+        let start = Instant::now();
+        assert!(poll_once(tx_fut.as_mut()).is_pending());
+
+        // Poll TX until half a refill period after the last in-time refill, then stop. RX is
+        // polled until the hardware has stopped, so that RX does not overflow.
+        let tx_stop = send_time(&tx_data[..refills_in_time * h + h / 2]);
+        let rx_stop = send_time(&tx_data[..sent]) + Duration::from_millis(20);
+        let mut rx_res = None;
+        while start.elapsed() < rx_stop {
+            if refills_in_time > 0 && start.elapsed() < tx_stop {
+                assert!(poll_once(tx_fut.as_mut()).is_pending());
+            }
+            if rx_res.is_none()
+                && let Poll::Ready(res) = poll_once(rx_fut.as_mut())
+            {
+                rx_res = Some(res);
+            }
+        }
+
+        assert_matches!(
+            poll_once(tx_fut.as_mut()),
+            Poll::Ready(Err(TxError::Underrun))
+        );
+        match rx_res {
+            Some(res) => res,
+            None => rx_fut.await,
+        }
+    };
+
+    let expected = LoopbackConfig {
+        tx_len: sent,
+        ..LoopbackConfig::default()
+    };
+    let mut expected_data = tx_data[..sent].to_vec();
+    // The output stays low after the last code, so RX ends with it.
+    expected_data[sent - 1] = expected_data[sent - 1].with_length2(1100).unwrap();
+    check_data_eq(&expected, &expected_data, &rx_data, rx_res);
+
+    // The channel works again after the underrun.
+    let again = LoopbackConfig {
+        tx_len: (m * 3 / 2).min(RX_ALL_CODES),
+        ..Default::default()
+    };
+    do_rmt_loopback(&again, Tx::Async(&mut tx), &mut rx).await;
 }
 
-cfg_select! {
-    any(esp32, esp32s3, esp32s31, esp32p4) => {
-        macro_rules! rx_channel_creator {
-            ($rmt:expr) => {
-                $rmt.channel4
-            };
+// Sends data with lengths around the RAM size and its halves.
+async fn do_rmt_exact_fit(ctx: &mut Context, tx_blocks: u8) {
+    let m = tx_blocks as usize * CHANNEL_RAM_SIZE;
+    let h = m / 2;
+
+    for tx_len in [m - 2, m - 1, m, m + 1, m + h - 1, m + h, m + h + 1, 2 * m] {
+        if !HAS_RX_WRAP && tx_len > RX_ALL_CODES {
+            continue;
         }
+        let conf = LoopbackConfig {
+            tx_len,
+            ..Default::default()
+        };
+
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = if tx_blocks == 1 {
+            setup_async(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_all!())
+        } else {
+            setup_async(&rmt, &mut ctx.pin, &conf, tx_2!(), rx_all!())
+        };
+        do_rmt_loopback(&conf, Tx::Async(&mut tx), &mut rx).await;
     }
-    _ => {
-        macro_rules! rx_channel_creator {
-            ($rmt:expr) => {
-                $rmt.channel2
-            };
-        }
+}
+
+// Receives on a blocking channel. A loop transmission is the stimulus, because it runs without
+// the CPU: each repetition starts with a low level that is longer than the idle threshold, so RX
+// receives exactly one repetition.
+fn do_rmt_blocking_rx(ctx: &mut Context, pattern_len: usize, tx_blocks: u8, rx_blocks: u8) {
+    let conf = LoopbackConfig {
+        tx_len: pattern_len,
+        write_stop_code: false,
+        end_marker: EndMarkerConfig::None,
+        ..Default::default()
+    };
+    let pattern = generate_tx_data(&conf);
+    let mut tx_data = vec![PulseCode::new(Level::Low, 1500, Level::Low, 1500)];
+    tx_data.extend_from_slice(&pattern);
+
+    let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config()).unwrap();
+    let (rx_pin, tx_pin) = pins(&mut ctx.pin);
+    let mut tx = match tx_blocks {
+        1 => rmt.tx_channel(tx_1!(), conf.tx_config()),
+        _ => rmt.tx_channel(tx_2!(), conf.tx_config()),
     }
+    .unwrap()
+    .with_pin(tx_pin);
+    let mut rx = match rx_blocks {
+        1 => rmt.rx_channel(rx_1!(), conf.rx_config()),
+        _ => rmt.rx_channel(rx_all!(), conf.rx_config()),
+    }
+    .unwrap()
+    .with_pin(rx_pin);
+
+    let mut rx_data = vec![PulseCode::end_marker(); pattern_len];
+    let tx_loop = tx.transmit_loop(&tx_data, LoopMode::Infinite).unwrap();
+    let rx_res = rx.receive(&mut rx_data);
+    tx_loop.stop().unwrap();
+
+    let mut expected = pattern.clone();
+    expected[pattern_len - 1] = expected[pattern_len - 1].with_length2(1100).unwrap();
+    check_data_eq(&conf, &expected, &rx_data, rx_res);
 }
 
 struct Context {
@@ -523,52 +641,10 @@ struct Context {
     pin2: AnyPin<'static>,
 }
 
-impl Context {
-    fn setup_impl<'a, Dm: DriverMode>(
-        rmt: Rmt<'a, Dm>,
-        rx: impl PeripheralInput<'a>,
-        tx: impl PeripheralOutput<'a>,
-        conf: &LoopbackConfig,
-    ) -> (Channel<'a, Dm, Tx>, Channel<'a, Dm, Rx>) {
-        let tx_channel = rmt
-            .channel0
-            .configure_tx(&conf.tx_config())
-            .unwrap()
-            .with_pin(tx);
-
-        let rx_channel = rx_channel_creator!(rmt)
-            .configure_rx(&conf.rx_config())
-            .unwrap()
-            .with_pin(rx);
-
-        (tx_channel, rx_channel)
-    }
-
-    fn setup_loopback(
-        &mut self,
-        conf: &LoopbackConfig,
-    ) -> (Channel<'_, Blocking, Tx>, Channel<'_, Blocking, Rx>) {
-        let rmt = Rmt::new(self.rmt.reborrow(), conf.sclk_freq()).unwrap();
-        let (rx, tx) = pins!(self);
-        Self::setup_impl(rmt, rx, tx, conf)
-    }
-
-    fn setup_loopback_async(
-        &mut self,
-        conf: &LoopbackConfig,
-    ) -> (Channel<'_, Async, Tx>, Channel<'_, Async, Rx>) {
-        let rmt = Rmt::new(self.rmt.reborrow(), conf.sclk_freq())
-            .unwrap()
-            .into_async();
-        let (rx, tx) = pins!(self);
-        Self::setup_impl(rmt, rx, tx, conf)
-    }
-}
-
 #[embedded_test::tests(default_timeout = 1, executor = hil_test::Executor::new())]
 mod tests {
     #[allow(unused_imports)]
-    use hil_test::{assert, assert_eq};
+    use hil_test::{assert, assert_eq, assert_matches};
 
     use super::*;
 
@@ -576,7 +652,8 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+        // The reclaimed region (dram2_seg) is only 56 KiB on the H4.
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 48 * 1024);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
 
@@ -594,7 +671,8 @@ mod tests {
 
     #[test]
     fn rmt_frequency_accessor_reports_configured_rate(mut ctx: Context) {
-        let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
+        let conf = LoopbackConfig::default();
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config()).unwrap();
         assert_eq!(rmt.frequency(), FREQ);
 
         #[cfg(soc_has_clock_node_rmt_sclk)]
@@ -604,18 +682,25 @@ mod tests {
         );
     }
 
-    // 3 MHz needs a fractional SCLK divider: 80 MHz / (26 + 2/3) or 32 MHz / (10 + 2/3). An
-    // integral divider or swapped fraction fields are off by more than the tolerance.
-    #[cfg(not(any(esp32, esp32s2)))]
+    // 3 MHz is not an integer fraction of the source clock: the group clock uses the nearest
+    // integer divider, and the transmission runs at the reported frequency.
+    #[cfg(not(rmt_has_per_channel_clock))]
     #[test]
-    fn rmt_fractional_sclk_divider(mut ctx: Context) {
-        use esp_hal::time::Instant;
-
-        const SCLK: Rate = Rate::from_mhz(3);
+    fn rmt_integer_group_divider(mut ctx: Context) {
+        const REQUESTED: Rate = Rate::from_mhz(3);
         const CODES: u64 = 4;
 
-        let rmt = Rmt::new(ctx.rmt.reborrow(), SCLK).unwrap();
-        assert_eq!(rmt.frequency(), SCLK);
+        let rmt = Rmt::new(
+            ctx.rmt.reborrow(),
+            RmtConfig::default().with_frequency(REQUESTED),
+        )
+        .unwrap();
+        let frequency = rmt.frequency();
+        assert!(
+            frequency.as_hz().abs_diff(REQUESTED.as_hz()) < REQUESTED.as_hz() / 30,
+            "group clock {} Hz",
+            frequency.as_hz()
+        );
 
         let code = PulseCode::new(
             Level::High,
@@ -623,18 +708,18 @@ mod tests {
             Level::Low,
             PulseCode::MAX_LEN,
         );
-        let tx_data = [code, code, code, code, PulseCode::end_marker()];
-        let expected_us = CODES * 2 * PulseCode::MAX_LEN as u64 * 1_000_000 / SCLK.as_hz() as u64;
+        let tx_data = [code; CODES as usize];
+        let expected_us =
+            CODES * 2 * PulseCode::MAX_LEN as u64 * 1_000_000 / frequency.as_hz() as u64;
 
-        let config = TxChannelConfig::default().with_clk_divider(1);
-        let tx_channel = rmt
-            .channel0
-            .configure_tx(&config)
+        let mut tx = rmt
+            .tx_channel(tx_1!(), TxConfig::default())
             .unwrap()
             .with_pin(ctx.pin.reborrow());
+        assert_eq!(tx.tick_rate(), frequency);
 
         let start = Instant::now();
-        tx_channel.transmit(&tx_data).unwrap().wait().unwrap();
+        tx.transmit(&tx_data).unwrap();
         let elapsed_us = start.elapsed().as_micros();
 
         assert!(
@@ -651,319 +736,307 @@ mod tests {
         // Reproducer for #5532: with the default ESP32-C6 clock configuration, APB runs at
         // 40 MHz, while the RMT driver configures the RMT counter clock to 80 MHz. Code that
         // derives pulse lengths from APB will therefore generate pulses that are too short.
-        let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
+        let rmt = Rmt::new(ctx.rmt.reborrow(), RmtConfig::default()).unwrap();
 
         let apb_frequency = Rate::from_hz(esp_hal::clock::ll::apb_clk_frequency());
 
         assert_eq!(apb_frequency.as_hz(), 40_000_000);
         assert_eq!(rmt.frequency().as_hz(), 80_000_000);
-
-        let ticks_for_400ns =
-            |frequency: Rate| ((400_u64 * u64::from(frequency.as_hz())) / 1_000_000_000) as u16;
-        assert_eq!(ticks_for_400ns(apb_frequency), 16);
-        assert_eq!(ticks_for_400ns(rmt.frequency()), 32);
     }
 
     #[test]
-    fn rmt_loopback_simple(mut ctx: Context) {
+    fn rmt_tick_rates(mut ctx: Context) {
+        let conf = LoopbackConfig::default();
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config()).unwrap();
+        let group = rmt.frequency();
+
+        // Channels of one `Rmt` have independent tick rates.
+        let mut tx0 = rmt.tx_channel(ch!(RMT_CH0), TxConfig::default()).unwrap();
+        let tx1 = rmt.tx_channel(ch!(RMT_CH1), conf.tx_config()).unwrap();
+        assert_eq!(tx0.tick_rate(), group);
+        assert_eq!(tx1.tick_rate(), conf.tick_rate());
+
+        // The nearest tick period: 7/16 of the group clock gives divider 2.
+        tx0.apply_config(&TxConfig::default().with_tick_rate(group * 7 / 16))
+            .unwrap();
+        assert_eq!(tx0.tick_rate(), group / 2);
+
+        for rate in [
+            Rate::from_hz(group.as_hz() + 1),
+            group / 257,
+            Rate::from_hz(0),
+        ] {
+            assert_eq!(
+                tx0.apply_config(&TxConfig::default().with_tick_rate(rate)),
+                Err(ConfigError::UnreachableTickRate)
+            );
+        }
+
+        let rx = rmt.rx_channel(rx_1!(), conf.rx_config()).unwrap();
+        assert_eq!(rx.tick_rate(), conf.tick_rate());
+    }
+
+    #[test]
+    fn rmt_config_errors(mut ctx: Context) {
+        let rmt = Rmt::new(ctx.rmt.reborrow(), LoopbackConfig::default().rmt_config()).unwrap();
+
+        let mut tx = rmt.tx_channel(tx_1!(), TxConfig::default()).unwrap();
+        let carrier = esp_hal::rmt::CarrierConfig::default();
+        tx.apply_config(&TxConfig::default().with_carrier(carrier))
+            .unwrap();
+        for carrier in [
+            carrier.with_duty_percent(0),
+            carrier.with_duty_percent(101),
+            carrier.with_frequency(Rate::from_hz(0)),
+        ] {
+            assert_eq!(
+                tx.apply_config(&TxConfig::default().with_carrier(carrier)),
+                Err(ConfigError::UnreachableCarrier)
+            );
+        }
+
+        let mut rx = rmt.rx_channel(rx_1!(), RxConfig::default()).unwrap();
+        for config in [
+            // Longer than the largest idle threshold at the group clock.
+            RxConfig::default().with_idle_ns(1_000_000_000),
+            RxConfig::default().with_idle_ns(0),
+            // The filter holds at most 255 group clock cycles.
+            RxConfig::default().with_min_pulse_ns(1_000_000),
+        ] {
+            assert_eq!(
+                rx.apply_config(&config),
+                Err(ConfigError::RxLimitOutOfRange)
+            );
+        }
+    }
+
+    #[test]
+    async fn rmt_loopback_simple(mut ctx: Context) {
         // Fit both tx and rx data into a single memory block
         let conf = LoopbackConfig::default();
-        do_rmt_loopback(&mut ctx, &conf);
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_1!());
+        do_rmt_loopback(&conf, Tx::Blocking(&mut tx), &mut rx).await;
     }
 
     #[test]
     async fn rmt_loopback_simple_async(mut ctx: Context) {
-        // Fit both tx and rx data into a single memory block
         let conf = LoopbackConfig::default();
-        do_rmt_loopback_async(&mut ctx, &conf).await;
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup_async(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_1!());
+        do_rmt_loopback(&conf, Tx::Async(&mut tx), &mut rx).await;
     }
 
     #[test]
-    fn rmt_loopback_end_marker_field2(mut ctx: Context) {
-        // Fit both tx and rx data into a single memory block
+    async fn rmt_loopback_end_marker_field2(mut ctx: Context) {
         let conf = LoopbackConfig {
             end_marker: EndMarkerConfig::Field2,
             ..Default::default()
         };
-        do_rmt_loopback(&mut ctx, &conf);
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_1!());
+        do_rmt_loopback(&conf, Tx::Blocking(&mut tx), &mut rx).await;
+    }
+
+    // The driver adds the end marker.
+    #[test]
+    async fn rmt_loopback_without_end_marker(mut ctx: Context) {
+        let rmt = Rmt::new(ctx.rmt.reborrow(), LoopbackConfig::default().rmt_config())
+            .unwrap()
+            .into_async();
+        for tx_len in [CHANNEL_RAM_SIZE / 2, CHANNEL_RAM_SIZE * 3 / 2] {
+            let conf = LoopbackConfig {
+                tx_len,
+                end_marker: EndMarkerConfig::None,
+                ..Default::default()
+            };
+            let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_all!());
+            do_rmt_loopback(&conf, Tx::Blocking(&mut tx), &mut rx).await;
+        }
     }
 
     #[test]
-    fn rmt_loopback_extended_ram(mut ctx: Context) {
-        // require/use 2 memory blocks for both tx and rx data -> no wrapping
+    async fn rmt_loopback_extended_ram(mut ctx: Context) {
+        // 2 memory blocks for tx data -> no wrapping
         let conf = LoopbackConfig {
             tx_len: CHANNEL_RAM_SIZE * 3 / 2,
-            tx_memsize: 2,
-            rx_memsize: 2,
             ..Default::default()
         };
-        do_rmt_loopback(&mut ctx, &conf);
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_2!(), rx_all!());
+        do_rmt_loopback(&conf, Tx::Blocking(&mut tx), &mut rx).await;
     }
 
     #[test]
-    fn rmt_loopback_tx_wrap(mut ctx: Context) {
-        // require two RAM blocks; thus a tx channel with only 1 block requires wrapping.
+    async fn rmt_loopback_tx_wrap(mut ctx: Context) {
+        // A tx channel with only 1 block requires wrapping.
         let conf = LoopbackConfig {
             tx_len: CHANNEL_RAM_SIZE * 3 / 2,
-            tx_memsize: 1,
-            rx_memsize: 2,
             ..Default::default()
         };
-        do_rmt_loopback(&mut ctx, &conf);
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_all!());
+        do_rmt_loopback(&conf, Tx::Blocking(&mut tx), &mut rx).await;
     }
 
     #[test]
     async fn rmt_loopback_tx_wrap_async(mut ctx: Context) {
-        // require two RAM blocks; thus a tx channel with only 1 block requires wrapping.
         let conf = LoopbackConfig {
             tx_len: CHANNEL_RAM_SIZE * 3 / 2,
-            tx_memsize: 1,
-            rx_memsize: 2,
             ..Default::default()
         };
-        do_rmt_loopback_async(&mut ctx, &conf).await;
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup_async(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_all!());
+        do_rmt_loopback(&conf, Tx::Async(&mut tx), &mut rx).await;
     }
 
-    #[test]
-    fn rmt_loopback_rx_wrap(mut ctx: Context) {
-        // require two RAM blocks; thus an rx channel with only 1 block requires wrapping.
-        let conf = LoopbackConfig {
-            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
-            tx_memsize: 2,
-            rx_memsize: 1,
-            ..Default::default()
-        };
-        do_rmt_loopback(&mut ctx, &conf);
-    }
-
+    #[cfg(rmt_has_rx_wrap)]
     #[test]
     async fn rmt_loopback_rx_wrap_async(mut ctx: Context) {
-        // require two RAM blocks; thus an rx channel with only 1 block requires wrapping.
+        // An rx channel with only 1 block requires wrapping.
         let conf = LoopbackConfig {
             tx_len: CHANNEL_RAM_SIZE * 3 / 2,
-            tx_memsize: 2,
-            rx_memsize: 1,
             ..Default::default()
         };
-        do_rmt_loopback_async(&mut ctx, &conf).await;
-    }
-
-    // Test that errors on invalid data are returned as expected (in particular, checks that the
-    // methods don't hang executing a never-ending/never-started transmission).
-    #[test]
-    fn rmt_tx_errors_blocking(mut ctx: Context) {
-        let conf = LoopbackConfig {
-            end_marker: EndMarkerConfig::None,
-            ..Default::default()
-        };
-
-        let (mut tx_channel, _) = ctx.setup_loopback(&conf);
-
-        let tx_data = generate_tx_data(&conf);
-
-        assert!(
-            matches!(
-                tx_channel.reborrow().transmit(&tx_data),
-                Err((Error::EndMarkerMissing, _))
-            ),
-            "Expected transmit to return an error without end marker"
-        );
-
-        assert!(
-            matches!(
-                tx_channel.reborrow().transmit(&tx_data[..0]),
-                Err((Error::InvalidArgument, _))
-            ),
-            "Expected transmit to return an error on empty data"
-        );
-
-        assert!(
-            matches!(
-                tx_channel
-                    .reborrow()
-                    .transmit_continuously(&tx_data, LoopMode::Infinite),
-                Err((Error::EndMarkerMissing, _))
-            ),
-            "Expected transmit_continuously to return an error without end marker"
-        );
-
-        assert!(
-            matches!(
-                tx_channel
-                    .reborrow()
-                    .transmit_continuously(&tx_data[..0], LoopMode::Infinite),
-                Err((Error::InvalidArgument, _))
-            ),
-            "Expected transmit_continuously to return an error on empty data"
-        );
-
-        // Configuration that requires wrapping tx and is missing an end marker
-        let conf = LoopbackConfig {
-            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
-            end_marker: EndMarkerConfig::None,
-            ..Default::default()
-        };
-
-        let tx_data = generate_tx_data(&conf);
-
-        // Most importantly, this should not hang indefinitely due to the missing end marker and
-        // re-transmitting the channel RAM content over and over again.
-        assert!(
-            matches!(
-                tx_channel
-                    .reborrow()
-                    .transmit(&tx_data)
-                    .map(|t| t.wait())
-                    .flatten(),
-                Err((Error::EndMarkerMissing, _))
-            ),
-            "Expected transmit to return an error without end marker when wrapping"
-        );
-
-        assert!(
-            matches!(
-                tx_channel
-                    .reborrow()
-                    .transmit_continuously(&tx_data, LoopMode::Infinite),
-                Err((Error::Overflow, _))
-            ),
-            "Expected transmit_continuously to return an error on overflow"
-        );
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup_async(&rmt, &mut ctx.pin, &conf, tx_2!(), rx_1!());
+        do_rmt_loopback(&conf, Tx::Async(&mut tx), &mut rx).await;
     }
 
     #[test]
-    async fn rmt_tx_errors_async(mut ctx: Context) {
-        let conf = LoopbackConfig {
-            end_marker: EndMarkerConfig::None,
-            ..Default::default()
-        };
+    fn rmt_blocking_rx(mut ctx: Context) {
+        do_rmt_blocking_rx(&mut ctx, CHANNEL_RAM_SIZE / 2, 1, 1);
+    }
 
-        let (mut tx_channel, _) = ctx.setup_loopback_async(&conf);
-
-        let tx_data = generate_tx_data(&conf);
-
-        assert!(
-            matches!(
-                poll_once(tx_channel.transmit(&tx_data)),
-                Poll::Ready(Err(Error::EndMarkerMissing))
-            ),
-            "Expected transmit to return an error without end marker"
-        );
-
-        assert!(
-            matches!(
-                poll_once(tx_channel.transmit(&tx_data[..0])),
-                Poll::Ready(Err(Error::InvalidArgument))
-            ),
-            "Expected transmit to return an error on empty data"
-        );
-
-        // Configuration that requires wrapping tx and is missing an end marker
-        let conf = LoopbackConfig {
-            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
-            end_marker: EndMarkerConfig::None,
-            ..Default::default()
-        };
-        let tx_data = generate_tx_data(&conf);
-
-        // Most importantly, this should not hang indefinitely due to the missing end marker and
-        // re-transmitting the channel RAM content over and over again.
-        assert!(
-            matches!(
-                tx_channel.transmit(&tx_data).await,
-                Err(Error::EndMarkerMissing)
-            ),
-            "Expected transmit to return an error without end marker when wrapping"
-        );
+    // The blocking receive reads the RX RAM while the frame arrives.
+    #[cfg(rmt_has_rx_wrap)]
+    #[test]
+    fn rmt_blocking_rx_wrap(mut ctx: Context) {
+        do_rmt_blocking_rx(&mut ctx, CHANNEL_RAM_SIZE * 3 / 2, 2, 1);
     }
 
     #[test]
-    fn rmt_overlapping_ram_fails(mut ctx: Context) {
-        let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
+    async fn rmt_tx_errors(mut ctx: Context) {
+        let conf = LoopbackConfig::default();
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
 
-        let _ch0 = rmt
-            .channel0
-            .configure_tx(&TxChannelConfig::default().with_memsize(2))
+        let mut tx = rmt.tx_channel(ch!(RMT_CH0), conf.tx_config()).unwrap();
+        let mut tx_async = rmt
+            .async_tx_channel(ch!(RMT_CH1), conf.tx_config())
             .unwrap();
 
-        // Configuring channel 1 should fail, since channel 0 already uses its memory.
-        let ch1 = rmt.channel1.configure_tx(&TxChannelConfig::default());
+        // Empty data returns at once.
+        assert_eq!(tx.transmit(&[]), Ok(()));
+        assert_eq!(tx_async.transmit_async(&[]).await, Ok(()));
+        tx.transmit_loop(&[], LoopMode::Infinite)
+            .unwrap()
+            .stop()
+            .unwrap();
 
-        assert!(matches!(ch1, Err(ConfigError::MemoryBlockNotAvailable)));
+        // Loop mode does not refill: the data and the end marker must fit in the RAM.
+        let data = [PulseCode::new(Level::High, 100, Level::Low, 100); CHANNEL_RAM_SIZE];
+        assert_matches!(
+            tx.transmit_loop(&data, LoopMode::Infinite),
+            Err(TxError::DataTooLong)
+        );
+
+        #[cfg(rmt_has_tx_loop_count)]
+        assert_matches!(
+            tx.transmit_loop(
+                &data[..1],
+                LoopMode::InfiniteWithInterrupt(esp_hal::rmt::MAX_TX_LOOPCOUNT + 1)
+            ),
+            Err(TxError::LoopCountOutOfRange)
+        );
+    }
+
+    // A code with a zero length ends the transmission, also after the first RAM fill.
+    #[test]
+    async fn rmt_zero_length_code_ends_early(mut ctx: Context) {
+        let rmt = Rmt::new(ctx.rmt.reborrow(), LoopbackConfig::default().rmt_config())
+            .unwrap()
+            .into_async();
+        for end in [10, CHANNEL_RAM_SIZE + 10] {
+            let conf = LoopbackConfig {
+                tx_len: end + 1,
+                ..Default::default()
+            };
+            let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_all!());
+
+            let mut tx_data = generate_tx_data(&conf);
+            // Codes after the end marker must not be sent.
+            tx_data.extend_from_slice(&[PulseCode::new(Level::High, 100, Level::Low, 100); 20]);
+            let mut rx_data = vec![PulseCode::end_marker(); tx_data.len()];
+
+            let (rx_res, tx_res) = join(rx.receive_async(&mut rx_data), async {
+                tx.transmit(&tx_data)
+            })
+            .await;
+            assert_eq!(tx_res, Ok(()));
+            check_data_eq(&conf, &tx_data, &rx_data, rx_res);
+        }
     }
 
     #[test]
-    fn rmt_overlapping_ram_release(mut ctx: Context) {
-        let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
-
-        let ch0 = rmt
-            .channel0
-            .configure_tx(&TxChannelConfig::default().with_memsize(2))
-            .unwrap();
-
-        // After dropping channel 0, the memory that it reserved should become available
-        // again such that channel 1 configuration succeeds.
-        core::mem::drop(ch0);
-        rmt.channel1
-            .configure_tx(&TxChannelConfig::default())
-            .unwrap();
+    #[timeout(3)]
+    async fn rmt_underrun_initial_1_block(mut ctx: Context) {
+        do_rmt_underrun(&mut ctx, 1, 0).await;
     }
 
     #[test]
-    fn rmt_overlapping_ram_reconfigure(mut ctx: Context) {
-        let mut rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
+    #[timeout(3)]
+    async fn rmt_underrun_after_refill_1_block(mut ctx: Context) {
+        do_rmt_underrun(&mut ctx, 1, 1).await;
+    }
 
-        let mut ch0 = rmt
-            .channel0
-            .configure_tx(&TxChannelConfig::default().with_memsize(1))
-            .unwrap();
+    #[test]
+    #[timeout(3)]
+    async fn rmt_underrun_initial_2_blocks(mut ctx: Context) {
+        do_rmt_underrun(&mut ctx, 2, 0).await;
+    }
 
-        let ch1 = rmt
-            .channel1
-            .reborrow()
-            .configure_tx(&TxChannelConfig::default().with_memsize(1))
-            .unwrap();
+    #[test]
+    #[timeout(3)]
+    async fn rmt_underrun_after_refill_2_blocks(mut ctx: Context) {
+        do_rmt_underrun(&mut ctx, 2, 1).await;
+    }
 
-        let res = ch0.apply_config(&TxChannelConfig::default().with_memsize(2));
-        assert!(matches!(res, Err(ConfigError::MemoryBlockNotAvailable)));
+    #[test]
+    #[timeout(5)]
+    async fn rmt_exact_fit_1_block(mut ctx: Context) {
+        do_rmt_exact_fit(&mut ctx, 1).await;
+    }
 
-        core::mem::drop(ch1);
-
-        ch0.apply_config(&TxChannelConfig::default().with_memsize(2))
-            .unwrap();
-
-        let res = rmt
-            .channel1
-            .configure_tx(&TxChannelConfig::default().with_memsize(1));
-        assert!(matches!(res, Err(ConfigError::MemoryBlockNotAvailable)));
+    #[test]
+    #[timeout(5)]
+    async fn rmt_exact_fit_2_blocks(mut ctx: Context) {
+        do_rmt_exact_fit(&mut ctx, 2).await;
     }
 
     macro_rules! test_channel_pair {
-        (
-            $ctx:expr,
-            $tx_channel:ident,
-            $rx_channel:ident
-        ) => {{
+        ($ctx:expr, $tx:ident, $rx:ident) => {{
             let conf = LoopbackConfig::default();
-
-            let (rx_pin, tx_pin) = pins!($ctx);
-            let mut rmt = Rmt::new($ctx.rmt.reborrow(), conf.sclk_freq()).unwrap();
-
-            let tx_channel = rmt
-                .$tx_channel
-                .reborrow()
-                .configure_tx(&conf.tx_config())
+            let rmt = Rmt::new($ctx.rmt.reborrow(), conf.rmt_config())
                 .unwrap()
-                .with_pin(tx_pin);
-
-            let rx_channel = rmt
-                .$rx_channel
-                .reborrow()
-                .configure_rx(&conf.rx_config())
-                .unwrap()
-                .with_pin(rx_pin);
-
-            do_rmt_loopback_inner(&conf, tx_channel, rx_channel);
+                .into_async();
+            let (mut tx, mut rx) = setup(&rmt, &mut $ctx.pin, &conf, ch!($tx), ch!($rx));
+            do_rmt_loopback(&conf, Tx::Blocking(&mut tx), &mut rx).await;
         }};
     }
 
@@ -971,53 +1044,51 @@ mod tests {
     // indexing in the driver is correct. The other tests are prone to hide related issues due to
     // using low channel numbers only (in particular 0 for the tx channel).
     #[test]
-    fn rmt_use_all_channels(mut ctx: Context) {
-        // FIXME: Find a way to leverage esp-metadata to generate this.
-
+    async fn rmt_use_all_channels(mut ctx: Context) {
         // Chips with combined RxTx channels
         #[cfg(esp32)]
         {
-            test_channel_pair!(ctx, channel0, channel1);
-            test_channel_pair!(ctx, channel0, channel2);
-            test_channel_pair!(ctx, channel0, channel3);
-            test_channel_pair!(ctx, channel0, channel4);
-            test_channel_pair!(ctx, channel0, channel5);
-            test_channel_pair!(ctx, channel0, channel6);
-            test_channel_pair!(ctx, channel0, channel7);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH1);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH2);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH3);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH4);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH5);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH6);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH7);
 
-            test_channel_pair!(ctx, channel1, channel0);
-            test_channel_pair!(ctx, channel2, channel0);
-            test_channel_pair!(ctx, channel3, channel0);
-            test_channel_pair!(ctx, channel4, channel0);
-            test_channel_pair!(ctx, channel5, channel0);
-            test_channel_pair!(ctx, channel6, channel0);
-            test_channel_pair!(ctx, channel7, channel0);
+            test_channel_pair!(ctx, RMT_CH1, RMT_CH0);
+            test_channel_pair!(ctx, RMT_CH2, RMT_CH0);
+            test_channel_pair!(ctx, RMT_CH3, RMT_CH0);
+            test_channel_pair!(ctx, RMT_CH4, RMT_CH0);
+            test_channel_pair!(ctx, RMT_CH5, RMT_CH0);
+            test_channel_pair!(ctx, RMT_CH6, RMT_CH0);
+            test_channel_pair!(ctx, RMT_CH7, RMT_CH0);
         }
 
         #[cfg(esp32s2)]
         {
-            test_channel_pair!(ctx, channel0, channel1);
-            test_channel_pair!(ctx, channel0, channel2);
-            test_channel_pair!(ctx, channel0, channel3);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH1);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH2);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH3);
 
-            test_channel_pair!(ctx, channel1, channel0);
-            test_channel_pair!(ctx, channel2, channel0);
-            test_channel_pair!(ctx, channel3, channel0);
+            test_channel_pair!(ctx, RMT_CH1, RMT_CH0);
+            test_channel_pair!(ctx, RMT_CH2, RMT_CH0);
+            test_channel_pair!(ctx, RMT_CH3, RMT_CH0);
         }
 
         // Chips with separate Rx and Tx channels
         #[cfg(any(esp32s3, esp32s31, esp32p4))]
         {
-            test_channel_pair!(ctx, channel0, channel4);
-            test_channel_pair!(ctx, channel1, channel5);
-            test_channel_pair!(ctx, channel2, channel6);
-            test_channel_pair!(ctx, channel3, channel7);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH4);
+            test_channel_pair!(ctx, RMT_CH1, RMT_CH5);
+            test_channel_pair!(ctx, RMT_CH2, RMT_CH6);
+            test_channel_pair!(ctx, RMT_CH3, RMT_CH7);
         }
 
         #[cfg(not(any(esp32, esp32s2, esp32s3, esp32s31, esp32p4)))]
         {
-            test_channel_pair!(ctx, channel0, channel2);
-            test_channel_pair!(ctx, channel1, channel3);
+            test_channel_pair!(ctx, RMT_CH0, RMT_CH2);
+            test_channel_pair!(ctx, RMT_CH1, RMT_CH3);
         }
     }
 
@@ -1025,7 +1096,7 @@ mod tests {
     // misconfigured).
     // This test is almost guaranteed to fail when using defmt!
     #[test]
-    fn rmt_clock_rate(ctx: Context) {
+    async fn rmt_clock_rate(ctx: Context) {
         // Increase pulse lengths and tolerance to deal with the imprecision of Delay
         let conf = LoopbackConfig {
             tx_len: 6,
@@ -1039,172 +1110,106 @@ mod tests {
             ..Default::default()
         };
 
-        let rmt = Rmt::new(ctx.rmt, conf.sclk_freq()).unwrap();
+        let rmt = Rmt::new(ctx.rmt, conf.rmt_config()).unwrap().into_async();
 
         let mut bitbang_tx = BitbangTransmitter::new(ctx.pin, &conf);
-        let (_, rx_channel) = Context::setup_impl(rmt, bitbang_tx.rx_pin(), NoPin, &conf);
+        let mut rx = rmt
+            .async_rx_channel(rx_1!(), conf.rx_config())
+            .unwrap()
+            .with_pin(bitbang_tx.rx_pin());
 
         let tx_data = generate_tx_data(&conf);
-        let mut rx_data = [PulseCode::default(); 6];
+        let mut rx_data = [PulseCode::end_marker(); 6];
 
-        let rx_transaction = rx_channel.receive(&mut rx_data).unwrap();
-        bitbang_tx.transmit(&tx_data);
-        let rx_res = rx_transaction.wait().map(|(x, _)| x).map_err(|(e, _)| e);
+        // The receive future is polled first, so the reception starts before the bitbanging.
+        let (rx_res, ()) = join(rx.receive_async(&mut rx_data), async {
+            bitbang_tx.transmit(&tx_data);
+        })
+        .await;
 
         check_data_eq(&conf, &tx_data, &rx_data, rx_res);
-    }
-
-    // Compile-only test to verify that reborrowing channel creators works.
-    async fn _rmt_reborrow_channel_creator() {
-        let mut peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let mut rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
-            .unwrap()
-            .into_async();
-
-        let conf = LoopbackConfig::default();
-
-        for _ in 0..2 {
-            let mut ch0 = rmt
-                .channel0
-                .reborrow()
-                .configure_tx(&conf.tx_config())
-                .unwrap();
-
-            let tx_data = generate_tx_data(&conf);
-
-            ch0.transmit(&tx_data).await.unwrap();
-        }
-    }
-
-    // Test that dropping rx/tx transactions returns the hardware to a predictable state from which
-    // subsequent transactions are successful.
-    #[test]
-    fn rmt_loopback_after_drop_blocking(mut ctx: Context) {
-        let mut conf = LoopbackConfig {
-            // If not enabling a defined idle_output level, the output might remain high after
-            // dropping the tx transaction, which will lead to an extra edge being received.
-            idle_output: true,
-            ..Default::default()
-        };
-
-        let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(&conf);
-
-        conf.abort = true;
-        do_rmt_loopback_inner(&conf, tx_channel.reborrow(), rx_channel.reborrow());
-
-        conf.abort = false;
-        do_rmt_loopback_inner(&conf, tx_channel, rx_channel);
-    }
-
-    // Test that completed blocking transactions leave the hardware in a predictable state from
-    // which subsequent transactions are successful.
-    #[test]
-    fn rmt_loopback_repeat_blocking(mut ctx: Context) {
-        let conf = LoopbackConfig {
-            // If not enabling a defined idle_output level, the output might remain high after
-            // dropping the tx transaction, which will lead to an extra edge being received.
-            idle_output: true,
-            ..Default::default()
-        };
-
-        // Test that dropping & recreating Rmt works
-        for _ in 0..3 {
-            let mut rmt = Rmt::new(ctx.rmt.reborrow(), conf.sclk_freq()).unwrap();
-
-            // Test that dropping & recreating ChannelCreator works
-            for _ in 0..3 {
-                let (rx, tx) = pins!(ctx);
-
-                let mut tx_channel = rmt
-                    .channel0
-                    .reborrow()
-                    .configure_tx(&conf.tx_config())
-                    .unwrap()
-                    .with_pin(tx);
-
-                let mut rx_channel = rx_channel_creator!(rmt)
-                    .reborrow()
-                    .configure_rx(&conf.rx_config())
-                    .unwrap()
-                    .with_pin(rx);
-
-                // Test that dropping & recreating Channel works
-                for _ in 0..3 {
-                    do_rmt_loopback_inner(&conf, tx_channel.reborrow(), rx_channel.reborrow());
-                }
-            }
-        }
     }
 
     // Test that dropping rx/tx futures returns the hardware to a predictable state from which
     // subsequent transactions are successful.
     #[test]
     async fn rmt_loopback_after_drop_async(mut ctx: Context) {
-        let mut conf = LoopbackConfig {
-            // If not enabling a defined idle_output level, the output might remain high after
-            // dropping the tx future, which will lead to an extra edge being received.
-            idle_output: true,
-            ..Default::default()
-        };
-
-        let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&conf);
+        let conf = LoopbackConfig::default();
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup_async(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_1!());
 
         // Start loopback once, but abort before completion...
-        conf.abort = true;
-        do_rmt_loopback_async_inner(&conf, &mut tx_channel, &mut rx_channel).await;
+        let tx_data = generate_tx_data(&conf);
+        let mut rx_data = vec![PulseCode::end_marker(); conf.tx_len];
+        {
+            let mut rx_fut = pin!(rx.receive_async(&mut rx_data));
+            let mut tx_fut = pin!(tx.transmit_async(&tx_data));
+            assert!(poll_once(rx_fut.as_mut()).is_pending());
+            assert!(poll_once(tx_fut.as_mut()).is_pending());
+
+            Delay::new().delay_millis(2);
+
+            // The test should fail here when the delay above is increased, e.g. to 100ms.
+            assert!(poll_once(rx_fut.as_mut()).is_pending());
+            assert!(poll_once(tx_fut.as_mut()).is_pending());
+        }
 
         // ...then start over and check that everything still works as expected (i.e. we
         // didn't leave the hardware in an unexpected state or lock up when
         // dropping the futures).
-        conf.abort = false;
-        do_rmt_loopback_async_inner(&conf, &mut tx_channel, &mut rx_channel).await;
+        do_rmt_loopback(&conf, Tx::Async(&mut tx), &mut rx).await;
     }
 
-    // Test that completed async transactions leave the hardware in a predictable state from which
+    // Test that dropping a loop transmission stops it, so that the channel works again.
+    #[test]
+    async fn rmt_loopback_after_loop_drop(mut ctx: Context) {
+        let conf = LoopbackConfig::default();
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_1!());
+
+        let data = [PulseCode::new(Level::High, 100, Level::Low, 100); 4];
+        let tx_loop = tx.transmit_loop(&data, LoopMode::Infinite).unwrap();
+        Delay::new().delay_millis(2);
+        core::mem::drop(tx_loop);
+
+        do_rmt_loopback(&conf, Tx::Blocking(&mut tx), &mut rx).await;
+    }
+
+    // Test that completed transactions leave the hardware in a predictable state from which
     // subsequent transactions are successful.
     #[test]
-    async fn rmt_loopback_repeat_async(mut ctx: Context) {
-        let conf = LoopbackConfig {
-            // If not enabling a defined idle_output level, the output might remain high after
-            // dropping the tx future, which will lead to an extra edge being received.
-            idle_output: true,
-            ..Default::default()
-        };
+    #[timeout(3)]
+    async fn rmt_loopback_repeat(mut ctx: Context) {
+        let conf = LoopbackConfig::default();
 
         // Test that dropping & recreating Rmt works
         for _ in 0..3 {
-            let mut rmt = Rmt::new(ctx.rmt.reborrow(), conf.sclk_freq())
+            let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
                 .unwrap()
                 .into_async();
 
-            // Test that dropping & recreating ChannelCreator works
+            // Test that dropping & recreating the channels works
             for _ in 0..3 {
-                let (rx, tx) = pins!(ctx);
-
-                let mut tx_channel = rmt
-                    .channel0
-                    .reborrow()
-                    .configure_tx(&conf.tx_config())
-                    .unwrap()
-                    .with_pin(tx);
-
-                let mut rx_channel = rx_channel_creator!(rmt)
-                    .reborrow()
-                    .configure_rx(&conf.rx_config())
-                    .unwrap()
-                    .with_pin(rx);
-
-                // Test that dropping & recreating Channel works
+                let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_1!());
                 for _ in 0..3 {
-                    do_rmt_loopback_async_inner(&conf, &mut tx_channel, &mut rx_channel).await;
+                    do_rmt_loopback(&conf, Tx::Blocking(&mut tx), &mut rx).await;
+                }
+            }
+            for _ in 0..3 {
+                let (mut tx, mut rx) = setup_async(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_1!());
+                for _ in 0..3 {
+                    do_rmt_loopback(&conf, Tx::Async(&mut tx), &mut rx).await;
                 }
             }
         }
     }
 
     #[cfg(not(esp32))]
-    fn rmt_loopback_continuous_tx_impl(mut ctx: Context, use_autostop: bool) {
+    async fn rmt_loopback_continuous_tx_impl(mut ctx: Context, use_autostop: bool) {
         const TX_COUNT: usize = 10;
         const MAX_LOOP_COUNT: usize = 3;
         const MAX_RX_LEN: usize = (MAX_LOOP_COUNT + 1) * TX_COUNT;
@@ -1212,16 +1217,17 @@ mod tests {
         let mut conf = LoopbackConfig {
             tx_len: TX_COUNT + 1,
             write_stop_code: false,
-            idle_output: true,
-            rx_memsize: 2,
             ..Default::default()
         };
 
-        let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(&conf);
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+            .unwrap()
+            .into_async();
+        let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_all!());
 
         let tx_data = generate_tx_data(&conf);
-        let mut rx_data = vec![PulseCode::default(); MAX_RX_LEN];
-        let mut expected_data = vec![PulseCode::default(); MAX_RX_LEN];
+        let mut rx_data = vec![PulseCode::end_marker(); MAX_RX_LEN];
+        let mut expected_data = vec![PulseCode::end_marker(); MAX_RX_LEN];
 
         for loopcount in 1..MAX_LOOP_COUNT {
             #[allow(unused_mut)]
@@ -1230,38 +1236,26 @@ mod tests {
             if use_autostop {
                 loopmode = LoopMode::Finite(loopcount as u16);
             };
-            rx_data.fill(PulseCode::default());
-            let rx_transaction = rx_channel.reborrow().receive(&mut rx_data).unwrap();
-            let tx_transaction = tx_channel
-                .reborrow()
-                .transmit_continuously(&tx_data, loopmode)
-                .unwrap();
+            rx_data.fill(PulseCode::end_marker());
 
-            // All data is small enough to fit a single hardware buffer, so we don't need to poll
-            // rx/tx concurrently.
-            while !tx_transaction.is_loopcount_interrupt_set() {}
-
-            let rx_res = if use_autostop {
-                // tx should stop automatically, so rx should also stop before we explicitly stop
-                // tx
-                let res = rx_transaction.wait();
-                tx_transaction.stop_next().unwrap();
-                res
-            } else {
-                tx_transaction.stop_next().unwrap();
-                rx_transaction.wait()
-            };
-
-            let rx_res = rx_res.map(|(x, _)| x).map_err(|(e, _)| e);
-
-            // FIXME: Somehow verify that tx is really stopped!
+            // `join` polls the receive future first, so the reception starts before the loop.
+            let (rx_res, ()) = join(rx.receive_async(&mut rx_data), async {
+                let tx_loop = tx.transmit_loop(&tx_data, loopmode).unwrap();
+                while !tx_loop.is_loopcount_interrupt_set() {
+                    embassy_futures::yield_now().await;
+                }
+                if !use_autostop {
+                    tx_loop.stop_next().unwrap();
+                }
+            })
+            .await;
 
             let rx_loopcount = if use_autostop {
                 loopcount
             } else {
                 loopcount + 1
             };
-            expected_data.fill(PulseCode::default());
+            expected_data.fill(PulseCode::end_marker());
             for i in 0..rx_loopcount {
                 let i0 = i * TX_COUNT;
                 expected_data[i0..i0 + TX_COUNT].copy_from_slice(&tx_data[..TX_COUNT]);
@@ -1274,6 +1268,7 @@ mod tests {
 
             conf.tx_len = expected_data.len();
             check_data_eq(&conf, &expected_data, &rx_data, rx_res);
+            conf.tx_len = TX_COUNT + 1;
         }
     }
 
@@ -1281,49 +1276,48 @@ mod tests {
     // stopping (on devices that have the required hardware support).
     #[cfg(not(esp32))]
     #[test]
-    fn rmt_loopback_continuous_tx_manual_stop(ctx: Context) {
-        rmt_loopback_continuous_tx_impl(ctx, false);
+    async fn rmt_loopback_continuous_tx_manual_stop(ctx: Context) {
+        rmt_loopback_continuous_tx_impl(ctx, false).await;
     }
 
     // Test that continuous tx with a finite loopcount works as expected when using automatic
     // stopping (on devices that have the required hardware support).
     #[cfg(rmt_has_tx_loop_auto_stop)]
     #[test]
-    fn rmt_loopback_continuous_tx_auto_stop(ctx: Context) {
-        rmt_loopback_continuous_tx_impl(ctx, true);
+    async fn rmt_loopback_continuous_tx_auto_stop(ctx: Context) {
+        rmt_loopback_continuous_tx_impl(ctx, true).await;
     }
 
     // Regression test for continuous tx with a slow SCLK, where the loop count interrupt often
     // never fired, see esp-rs/esp-hal#3930.
-    #[cfg(all(rmt_has_tx_loop_count, not(esp32s2)))]
+    #[cfg(all(rmt_has_tx_loop_count, not(rmt_has_per_channel_clock)))]
     #[test]
     #[timeout(3)]
     fn rmt_continuous_tx_slow_sclk(mut ctx: Context) {
-        use esp_hal::time::Instant;
-
         const LOOPS: u16 = 10;
         const CODE_LENGTH: u16 = 289;
 
         let sclk = FREQ / 256;
-        let expected_us = (LOOPS as u64 * 2 * CODE_LENGTH as u64 * 1_000_000) / sclk.as_hz() as u64;
 
-        let tx_data = [
-            PulseCode::new(Level::High, CODE_LENGTH, Level::Low, CODE_LENGTH),
-            PulseCode::end_marker(),
-        ];
-        let config = TxChannelConfig::default()
-            .with_clk_divider(1)
-            .with_idle_output(true)
-            .with_idle_output_level(Level::Low);
+        let tx_data = [PulseCode::new(
+            Level::High,
+            CODE_LENGTH,
+            Level::Low,
+            CODE_LENGTH,
+        )];
 
-        let mut rmt = Rmt::new(ctx.rmt.reborrow(), sclk).unwrap();
+        let rmt = Rmt::new(
+            ctx.rmt.reborrow(),
+            RmtConfig::default().with_frequency(sclk),
+        )
+        .unwrap();
+        let expected_us =
+            (LOOPS as u64 * 2 * CODE_LENGTH as u64 * 1_000_000) / rmt.frequency().as_hz() as u64;
 
-        // Reconfigure the channel for every transaction, as in the original report.
+        // Recreate the channel for every transaction, as in the original report.
         for _ in 0..10 {
-            let tx_channel = rmt
-                .channel0
-                .reborrow()
-                .configure_tx(&config)
+            let mut tx = rmt
+                .tx_channel(tx_1!(), TxConfig::default())
                 .unwrap()
                 .with_pin(ctx.pin.reborrow());
 
@@ -1333,14 +1327,12 @@ mod tests {
             let loopmode = LoopMode::InfiniteWithInterrupt(LOOPS);
 
             let start = Instant::now();
-            let tx_transaction = tx_channel
-                .transmit_continuously(&tx_data, loopmode)
-                .unwrap();
+            let tx_loop = tx.transmit_loop(&tx_data, loopmode).unwrap();
 
-            while !tx_transaction.is_loopcount_interrupt_set() {}
+            while !tx_loop.is_loopcount_interrupt_set() {}
             let elapsed_us = start.elapsed().as_micros();
 
-            tx_transaction.stop_next().unwrap();
+            tx_loop.stop_next().unwrap();
 
             assert!(
                 elapsed_us * 10 >= expected_us * 9 && elapsed_us * 10 <= expected_us * 11,
@@ -1355,34 +1347,27 @@ mod tests {
     #[cfg(rmt_has_tx_loop_auto_stop)]
     #[test]
     fn rmt_continuous_tx_zero_loopcount(mut ctx: Context) {
-        use esp_hal::time::Instant;
-
-        let conf = LoopbackConfig {
-            idle_output: true,
-            write_stop_code: false,
-            ..Default::default()
-        };
-
-        let (mut tx_channel, _) = ctx.setup_loopback(&conf);
+        let conf = LoopbackConfig::default();
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config()).unwrap();
+        let mut tx = rmt
+            .tx_channel(tx_1!(), conf.tx_config())
+            .unwrap()
+            .with_pin(ctx.pin.reborrow());
 
         // Use long pulse codes, such that we can use a relatively low threshold in the assertion
         // below to ensure that this test is robust against small timing variations
-        let tx_data: [_; 3] = [
+        let tx_data = [
             PulseCode::new(Level::High, 10_000, Level::Low, 10_000),
             PulseCode::new(Level::High, 10_000, Level::Low, 10_000),
-            PulseCode::end_marker(),
         ];
 
         let start = Instant::now();
 
-        let tx_transaction = tx_channel
-            .reborrow()
-            .transmit_continuously(&tx_data, LoopMode::Finite(0))
-            .unwrap();
+        let tx_loop = tx.transmit_loop(&tx_data, LoopMode::Finite(0)).unwrap();
 
-        while !tx_transaction.is_loopcount_interrupt_set() {}
+        while !tx_loop.is_loopcount_interrupt_set() {}
 
-        tx_transaction.stop_next().unwrap();
+        tx_loop.stop_next().unwrap();
 
         // overall, this should complete in less time than sending a single code from `tx_data`
         // would take (see above, the codes are several 2 * 10ms long)
@@ -1398,25 +1383,31 @@ mod tests {
     #[cfg(esp32)]
     #[test]
     async fn rmt_check_regression_4697(mut ctx: Context) {
-        let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap().into_async();
+        let rmt = Rmt::new(ctx.rmt.reborrow(), RmtConfig::default())
+            .unwrap()
+            .into_async();
 
-        let (rx, tx) = (ctx.pin, ctx.pin2);
+        let (rx_pin, tx_pin) = (ctx.pin, ctx.pin2);
 
-        let mut rx_channel = rx_channel_creator!(rmt)
-            .configure_rx(
-                &RxChannelConfig::default()
-                    .with_clk_divider(255)
-                    .with_idle_threshold(10000),
+        // A tick of 255 source clock cycles and an idle threshold of 10000 ticks.
+        let tick_rate = FREQ / 255;
+        let idle_ns = (10_000 * 1_000_000_000 / u64::from(tick_rate.as_hz())) as u32;
+        let mut rx = rmt
+            .async_rx_channel(
+                rx_1!(),
+                RxConfig::default()
+                    .with_tick_rate(tick_rate)
+                    .with_idle_ns(idle_ns),
             )
             .unwrap()
-            .with_pin(rx);
+            .with_pin(rx_pin);
 
         let mut spi = esp_hal::spi::master::Spi::new(
             unsafe { esp_hal::peripherals::SPI2::steal() },
             Default::default(),
         )
         .unwrap()
-        .with_sck(tx)
+        .with_sck(tx_pin)
         .into_async();
 
         let mut buf = [0u8; 1000];
@@ -1432,11 +1423,11 @@ mod tests {
         // With the previous assert in place, interestingly the first two receive calls failed as
         // expected but then we ran into the issue where the assert failed instead of seeing
         // the error bit set.
-        embassy_futures::join::join(
+        join(
             async {
                 let mut data = [PulseCode::default(); 10];
                 for _ in 0..3 {
-                    assert!(rx_channel.receive(&mut data).await.is_err());
+                    assert!(rx.receive_async(&mut data).await.is_err());
                 }
             },
             async {
@@ -1450,15 +1441,17 @@ mod tests {
     // slow SCLK.
     #[test]
     #[timeout(10)]
-    fn rmt_dividers(mut ctx: Context) {
+    async fn rmt_dividers(mut ctx: Context) {
         for &sclk_div in SCLK_DIVIDERS {
             for &ch_div in CHANNEL_DIVIDERS {
                 let conf = divider_loopback_config(sclk_div, ch_div);
 
-                let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(&conf);
+                let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+                    .unwrap()
+                    .into_async();
+                let (mut tx, mut rx) = setup(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_1!());
                 for _ in 0..3 {
-                    (tx_channel, rx_channel) =
-                        do_rmt_loopback_inner(&conf, tx_channel, rx_channel).unwrap();
+                    do_rmt_loopback(&conf, Tx::Blocking(&mut tx), &mut rx).await;
                 }
             }
         }
@@ -1471,9 +1464,12 @@ mod tests {
             for &ch_div in CHANNEL_DIVIDERS {
                 let conf = divider_loopback_config(sclk_div, ch_div);
 
-                let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&conf);
+                let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config())
+                    .unwrap()
+                    .into_async();
+                let (mut tx, mut rx) = setup_async(&rmt, &mut ctx.pin, &conf, tx_1!(), rx_1!());
                 for _ in 0..3 {
-                    do_rmt_loopback_async_inner(&conf, &mut tx_channel, &mut rx_channel).await;
+                    do_rmt_loopback(&conf, Tx::Async(&mut tx), &mut rx).await;
                 }
             }
         }

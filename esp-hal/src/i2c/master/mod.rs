@@ -151,7 +151,7 @@ mod eh;
 mod low_level;
 
 pub use low_level::{AnyI2c, Instance};
-use low_level::{Driver, I2cClockGuard};
+use low_level::{Driver, I2cClockGuard, I2cWrapper};
 
 const I2C_FIFO_SIZE: usize = property!("i2c_master.fifo_size");
 // Chunk writes/reads by this size
@@ -674,7 +674,7 @@ impl Default for Config {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct I2c<'d, Dm: DriverMode> {
-    i2c: AnyI2c<'d>,
+    i2c: I2cWrapper<'d>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
     config: DriverConfig,
@@ -707,6 +707,7 @@ impl<'d> I2c<'d, Blocking> {
     ///
     /// [`ConfigError`] when bus frequency or timeout passed in config is invalid.
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
+        let i2c = I2cWrapper::new(i2c);
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
         ClockTree::with(|clocks| {
@@ -722,10 +723,8 @@ impl<'d> I2c<'d, Blocking> {
         let sda_pin = PinGuard::new_unconnected();
         let scl_pin = PinGuard::new_unconnected();
 
-        let i2c_any = i2c.degrade();
-
         let i2c = I2c {
-            i2c: i2c_any,
+            i2c,
             phantom: PhantomData,
             guard,
             config: DriverConfig {
@@ -1005,7 +1004,7 @@ impl<'d> I2c<'d, Async> {
         address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
-        let _clock_guard = I2cClockGuard::new(self.i2c.reborrow());
+        let _clock_guard = I2cClockGuard::new(self.i2c.info());
         self.driver()
             .transaction_impl_async(address.into(), operations.into_iter().map(Operation::from))
             .await
@@ -1265,7 +1264,7 @@ where
         address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
-        let _clock_guard = I2cClockGuard::new(self.i2c.reborrow());
+        let _clock_guard = I2cClockGuard::new(self.i2c.info());
         self.driver()
             .transaction_impl(address.into(), operations.into_iter().map(Operation::from))
             .inspect_err(|error| self.internal_recover(error))

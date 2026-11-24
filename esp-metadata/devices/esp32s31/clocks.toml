@@ -170,6 +170,13 @@ system_clocks = { clock_tree = [
     { group = "SDM", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
     ] },
+    # HP_SYS_CLKRST.twai{0,1}_ctrl0.clk_src_sel: 0 = XTAL, 2 = PLL_F80M, see SOC_TWAI_CLKS.
+    { group = "TWAI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+            { name = "PLL_F80M", outputs = "PLL_F80M", default = true },
+        ] },
+    ] },
     # The glitch filter counts APB_CLK cycles.
     { group = "PCNT", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "APB_CLK" },
@@ -273,6 +280,7 @@ peripheral_clocks = { templates = [
     { name = "AhbGdma", template_params = { peripheral = "ahb_pdma", clk_en = "{{sys_clk}}" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Dma2d", template_params = { peripheral = "dma2d", clk_en = "{{sys_clk}}" } },
+    { name = "Jpeg", template_params = { peripheral = "jpeg", clk_en = "{{sys_clk}}" } },
     { name = "Ppa", template_params = { peripheral = "ppa", clk_en = "{{sys_clk}}" } },
     # USB
     { name = "UsbHs", template_params = { peripheral = "usb_otghs", rst_template = "{{no_rst}}" } },
@@ -313,6 +321,8 @@ peripheral_clocks = { templates = [
     { name = "Rmt", template_params = { clk_en = "{{sys_clk}}" } },
     { name = "ParlIo", template_params = { peripheral = "parlio" } },
     { name = "LcdCam", template_params = { peripheral = "lcdcam", rst_en = ".apb_rst_en().bit(reset).rst_en().bit(reset)" } },
+    { name = "Twai0", template_params = { clk_en = "{{apb_clk}}" } },
+    { name = "Twai1", template_params = { clk_en = "{{apb_clk}}" } },
     { name = "Pcnt", template_params = { clk_en = ".pcnt0_apb_clk_en().bit(enable)", rst_en = ".pcnt0_rst_en().bit(reset)" } },
     { name = "Pcnt1", template_params = { ctrl_reg = "pcnt_ctrl0()", clk_en = ".pcnt1_apb_clk_en().bit(enable)", rst_en = ".pcnt1_rst_en().bit(reset)" } },
     { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "{{no_rst}}" } },

@@ -79,7 +79,7 @@ impl<'d, Dm: DriverMode> Lcd<'d, Dm> {
                 w.lcd_clk_equ_sysclk().clear_bit();
                 w.lcd_clkcnt_n().bits(2 - 1); // Must not be 0.
             } else {
-                // ESP32-S31: PCLK tracks LCD_CLK.
+                // PCLK tracks LCD_CLK.
                 w.lcd_clk_equ_sysclk().set_bit();
             }
             w.lcd_ck_idle_edge()

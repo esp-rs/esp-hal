@@ -391,8 +391,9 @@ mod tests {
         let mut config = AdcConfig::new();
         let result =
             config.enable_pin_with_cal::<_, AdcCalLine<ADC1>>(failed_pin, Attenuation::_11dB);
-        hil_test::assert!(
-            matches!(result, Err(Error::MissingCalibrationData)),
+        hil_test::assert_matches!(
+            result,
+            Err(Error::MissingCalibrationData),
             "line calibration without eFuse data must report MissingCalibrationData"
         );
 
@@ -417,11 +418,9 @@ mod tests {
         let mut config = AdcConfig::new();
         let result =
             config.enable_pin_with_cal::<_, AdcCalLine<ADC1>>(failed_pin, Attenuation::_6dB);
-        hil_test::assert!(
-            matches!(
-                result,
-                Err(Error::UnsupportedAttenuation(Attenuation::_6dB))
-            ),
+        hil_test::assert_matches!(
+            result,
+            Err(Error::UnsupportedAttenuation(Attenuation::_6dB)),
             "line calibration at 6 dB must report UnsupportedAttenuation"
         );
 
@@ -541,11 +540,9 @@ mod tests {
 
         let channel = pin.pin.adc_channel();
         let result = nb::block!(adc.read_oneshot(&mut pin));
-        hil_test::assert!(
-            matches!(
-                result,
-                Err(Error::ChannelNotConfigured(ch)) if ch == channel
-            ),
+        hil_test::assert_matches!(
+            result,
+            Err(Error::ChannelNotConfigured(ch)) if ch == channel,
             "reading an unconfigured channel must report ChannelNotConfigured"
         );
     }
@@ -563,11 +560,9 @@ mod tests {
 
         let channel = pin.pin.adc_channel();
         let result = adc.read_oneshot(&mut pin).await;
-        hil_test::assert!(
-            matches!(
-                result,
-                Err(Error::ChannelNotConfigured(ch)) if ch == channel
-            ),
+        hil_test::assert_matches!(
+            result,
+            Err(Error::ChannelNotConfigured(ch)) if ch == channel,
             "reading an unconfigured channel must report ChannelNotConfigured"
         );
     }

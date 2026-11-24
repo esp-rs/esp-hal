@@ -1,8 +1,9 @@
 //! Xtensa context switching implementation.
 //!
 //! Context switching is implemented via interrupt handlers. Servicing the interrupt request
-//! saves context to the stack. The OS copies the state to memory, replaces it with the new task's
-//! state, then returns from the interrupt handler.
+//! saves context to the stack. At the exit of the level 1 interrupt, the HAL calls the OS on the
+//! switch stack. The OS copies the saved state to memory, copies the new task's state to the top
+//! of the switch stack, and the HAL returns to it.
 //!
 //! The HAL owns the interrupt that carries the context switch. Context switching must happen at
 //! the lowest interrupt priority. A switch then does not interfere with other interrupts, and no
@@ -11,7 +12,11 @@
 use core::{ffi::c_void, sync::atomic::Ordering};
 
 pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
-use esp_hal::{interrupt::__rtos_implementation::set_context_switch_handler, ram, system::Cpu};
+use esp_hal::{
+    interrupt::__rtos_implementation::{set_context_switch_handler, set_context_switch_stack},
+    ram,
+    system::Cpu,
+};
 use portable_atomic::AtomicPtr;
 
 use crate::{
@@ -101,26 +106,36 @@ pub(crate) fn new_task_context(
     }
 }
 
-#[inline]
-pub(crate) fn task_switch(
-    current_context: *mut CpuContext,
-    next_context: *mut CpuContext,
-    trap_frame: &mut CpuContext,
-) {
-    if !current_context.is_null() {
-        unsafe { core::ptr::copy_nonoverlapping(trap_frame, current_context, 1) };
-    }
-    unsafe { core::ptr::copy_nonoverlapping(next_context, trap_frame, 1) };
-}
-
 pub(crate) fn setup_multitasking() {
-    // The HAL runs this handler in the lowest-priority interrupt of this CPU.
+    super::init_switch_stack();
+
+    // The HAL runs this handler at the exit of the lowest-priority interrupt of this CPU, on the
+    // switch stack.
+    let cpu = Cpu::current();
     unsafe {
-        set_context_switch_handler(Cpu::current(), trigger_task_switch);
+        set_context_switch_stack(cpu, super::switch_stack(cpu));
+        set_context_switch_handler(cpu, switch_context);
     }
 }
 
+/// Runs the scheduler on the switch stack.
+///
+/// `saved` is the context of the interrupted task, on the stack of that task. `next` is free space
+/// at the top of the switch stack. Returns the context to restore: `saved`, or `next` with the
+/// context of another task.
 #[ram]
-extern "C" fn trigger_task_switch(context: &mut CpuContext) {
-    SCHEDULER.with(|scheduler| scheduler.switch_task(context));
+extern "C" fn switch_context(saved: *mut CpuContext, next: *mut CpuContext) -> *mut CpuContext {
+    let mut resume = saved;
+    SCHEDULER.with(|scheduler| {
+        scheduler.switch_task(saved as u32, |current_context, next_context| {
+            // Both copies run before the scheduler releases its lock.
+            if !current_context.is_null() {
+                unsafe { core::ptr::copy_nonoverlapping(saved, current_context, 1) };
+            }
+            unsafe { core::ptr::copy_nonoverlapping(next_context, next, 1) };
+            resume = next;
+        })
+    });
+    super::check_switch_stack();
+    resume
 }

@@ -15,7 +15,7 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::Level,
-    rmt::{PulseCode, Rmt, TxChannelConfig, TxChannelCreator},
+    rmt::{PulseCode, Rmt, RmtConfig, TxConfig},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -33,27 +33,25 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    let freq = cfg_select! {
-        feature = "esp32h2" => Rate::from_mhz(32),
-        _ => Rate::from_mhz(80),
-    };
-
-    let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
+    let rmt = Rmt::new(peripherals.RMT, RmtConfig::default())
+        .unwrap()
+        .into_async();
 
     let mut channel = rmt
-        .channel0
-        .configure_tx(&TxChannelConfig::default().with_clk_divider(255))
+        .async_tx_channel(
+            peripherals.RMT_CH0,
+            TxConfig::default().with_tick_rate(Rate::from_mhz(1)),
+        )
         .unwrap()
         .with_pin(peripherals.GPIO4);
 
     let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 
-    data[data.len() - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
-    data[data.len() - 1] = PulseCode::end_marker();
+    data[data.len() - 1] = PulseCode::new(Level::High, 3000, Level::Low, 500);
 
     loop {
         println!("transmit");
-        channel.transmit(&data).await.unwrap();
+        channel.transmit_async(&data).await.unwrap();
         println!("transmitted\n");
         Timer::after(Duration::from_millis(500)).await;
     }

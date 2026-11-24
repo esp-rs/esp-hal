@@ -653,11 +653,9 @@ where
         rx_buffer: &mut [u8],
         tx_buffer: &[u8],
     ) -> Result<SimpleMem2MemTransfer<'_, 'd, Dm>, DmaError> {
-        let State::Idle(mem2mem, mut rx_descriptors, mut tx_descriptors) =
-            core::mem::replace(&mut self.state, State::InUse)
-        else {
+        if !matches!(self.state, State::Idle(..)) {
             panic!("SimpleMem2MemTransfer was forgotten with core::mem::forget or similar");
-        };
+        }
 
         // Raise these buffers to 'static. This is not safe, bad things will happen if
         // the user calls core::mem::forget on SimpleMem2MemTransfer. This is
@@ -666,6 +664,13 @@ where
         let rx_buffer = DmaAlignedMut::new(unsafe {
             core::slice::from_raw_parts_mut(rx_buffer.as_mut_ptr(), rx_buffer.len())
         })?;
+
+        let State::Idle(mem2mem, mut rx_descriptors, mut tx_descriptors) =
+            core::mem::replace(&mut self.state, State::InUse)
+        else {
+            unreachable!("the state is Idle");
+        };
+
         let tx_buffer = unsafe {
             DmaAlignedMut::new_unchecked(core::slice::from_raw_parts_mut(
                 tx_buffer.as_ptr() as _,

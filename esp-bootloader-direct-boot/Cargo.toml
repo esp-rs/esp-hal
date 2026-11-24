@@ -2,7 +2,7 @@
 name          = "esp-bootloader-direct-boot"
 version       = "0.1.0"
 edition       = "2024"
-rust-version  = "1.95.0"
+rust-version  = "1.100.0"
 description   = "Boot esp-hal applications directly from the ROM, without a 2nd-stage bootloader"
 documentation = "https://docs.espressif.com/projects/rust/esp-bootloader-direct-boot/latest/"
 keywords      = ["esp32", "espressif", "no-std"]

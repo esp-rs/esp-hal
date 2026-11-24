@@ -264,8 +264,9 @@ mod tests {
             }
 
             // Assert that the I2C transaction was cancelled.
-            hil_test::assert!(
-                matches!(select_result, Either::Second(_)),
+            hil_test::assert_matches!(
+                select_result,
+                Either::Second(_),
                 "({}) Transaction completed with {:?}",
                 n_yield,
                 select_result
@@ -576,6 +577,7 @@ mod i2c_slave {
     ];
     const TIMEOUT_CASES: [(bool, u8); 4] = [(false, 14), (true, 14), (false, 22), (true, 22)];
     const MAX_LEFTOVER_BYTES: usize = u16::MAX as usize;
+    const SCL_RISE_TIME: time::Duration = time::Duration::from_micros(10);
     static LONG_RESPONSE: [u8; MAX_LEFTOVER_BYTES + 2] = [0x5a; MAX_LEFTOVER_BYTES + 2];
     static MASTER_DONE: AtomicBool = AtomicBool::new(false);
     static MASTER_PAUSED: AtomicBool = AtomicBool::new(false);
@@ -754,6 +756,9 @@ mod i2c_slave {
                 self.pause_on_read_stretch = false;
                 pause_master().await;
             }
+            // SCL can read low for SCL_RISE_TIME after release. That low level is not a stretch.
+            let released = time::Instant::now();
+            while self.scl.is_low() && released.elapsed() < SCL_RISE_TIME {}
             while self.scl.is_low() {
                 Timer::after_micros(50).await;
             }
@@ -1039,10 +1044,10 @@ mod i2c_slave {
             .modify(|_, w| w.i2c_sclk_en().clear_bit());
         assert!(!function_clock_enabled());
 
-        assert!(matches!(
+        hil_test::assert_matches!(
             I2cSlave::new(i2c.reborrow(), Config::new(0x80)),
             Err(ConfigError::AddressInvalid)
-        ));
+        );
         assert!(!function_clock_enabled());
 
         for _ in 0..2 {
@@ -1689,6 +1694,7 @@ mod i2c_slave {
             } else {
                 assert_eq!(slave.listen(&mut [0]).await, Err(Error::Timeout));
             }
+            assert_eq!(regs.to().read().time_out_value().bits(), timeout);
             wait_for_pause().await;
             MASTER_PAUSED.store(false, Ordering::SeqCst);
             // Keep the next listen from recovering the controller before the bus check.
