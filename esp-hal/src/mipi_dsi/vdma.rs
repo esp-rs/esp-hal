@@ -1,36 +1,24 @@
 //! Minimal VDMA abstraction for MIPI-DSI video streaming.
 
 use crate::{
-    peripherals::VDMA,
-    private::Sealed,
+    dma::dw_gdma::{
+        ChannelConfig,
+        ChannelInterruptHandler,
+        DwGdmaChannel,
+        MasterSelect,
+        enable_controller,
+        register_channel_handler,
+        unregister_channel_handler,
+    },
     reg_access::VolatileCell,
     time::{Duration, Instant},
 };
 
-/// Implemented by VDMA channel singletons (`VDMA_CH0`–`VDMA_CH3`).
-///
-/// Provides the hardware channel index without exposing the full DMA trait
-/// surface, since VDMA uses DW-GDMA linked-list mode which is incompatible
-/// with the standard GDMA channel traits.
-pub trait VdmaDmaChannel: Sealed {
-    /// Zero-based hardware channel index (0–3).
-    fn channel_id(&self) -> u8;
-}
-
-for_each_dma_channel! {
-    ("VDMA", $ch:ident, $num:literal, compatible = [$($compatible:ident),*]) => {
-        impl VdmaDmaChannel for crate::peripherals::$ch<'_> {
-            #[inline]
-            fn channel_id(&self) -> u8 { $num }
-        }
-    };
-}
-
 /// Fixed write destination for all DSI DMA transfers (DSI bridge pixel FIFO).
 pub(super) const DSI_BRG_MEM_BASE: u32 = 0x5010_5000;
 
-const PORT_MEMORY: u32 = 1;
-const PORT_DSI: u32 = 0;
+const PORT_MEMORY: u32 = MasterSelect::Memory.raw();
+const PORT_DSI: u32 = MasterSelect::Peripheral.raw();
 
 /// CTL0 value for mem → DSI transfers (constant across all frame buffers):
 ///   sms=1 (MEMORY), dms=0 (DSI), sinc=0 (increment), dinc=1 (fixed),
@@ -58,6 +46,24 @@ const CTRL_HI: u32 = CTRL_HI_BASE | IOC_BLK_TFR | LLI_VALID;
 
 /// Time to wait for the channel to stop, and then for an abort to complete.
 const STOP_TIMEOUT: Duration = Duration::from_millis(10);
+
+/// The only channel interrupt source that DSI uses.
+const BLOCK_TFR_DONE: u32 = 1 << 0;
+
+const DSI_CHANNEL_CONFIG: ChannelConfig = ChannelConfig {
+    // Link-list multi-block for both source and destination.
+    src_multblk_type: 3,
+    dst_multblk_type: 3,
+    // M→P, DMA as flow controller (DW_GDMA_LL_FLOW_M2P_DMAC).
+    transfer_type_flow_control: 1,
+    src_peripheral: 0,
+    // Hardware handshake interface of the DSI bridge.
+    dst_peripheral: 0,
+    priority: 1,
+    // Outstanding: src = 5 (4+1), dst = 2 (1+1).
+    src_outstanding_limit: 4,
+    dst_outstanding_limit: 1,
+};
 
 /// One VDMA link-list item (LLI).
 #[repr(C)]
@@ -153,44 +159,22 @@ impl VdmaLinkItem {
 
 /// Handles for a single VDMA channel dedicated to the DSI bridge.
 pub(super) struct VdmaChannel {
-    channel_id: u8,
+    channel: DwGdmaChannel,
 }
 
 impl VdmaChannel {
-    /// Initializes the VDMA controller and configures channel `channel_id`
-    /// (0-indexed, 0–3) for mem→DSI linked-list transfers.
+    /// Enables the VDMA controller, configures channel `channel_id`
+    /// (0-indexed, 0–3) for mem→DSI linked-list transfers, and routes its
+    /// interrupts to `handler`.
     ///
     /// The caller must hold the `Vdma` peripheral guard before calling this.
-    pub(super) fn new(channel_id: u8) -> Self {
-        VDMA::regs().reset0().write(|w| w.dmac_rst().set_bit());
-        while VDMA::regs().reset0().read().dmac_rst().bit_is_set() {}
-        VDMA::regs().cfg0().modify(|_, w| {
-            w.dmac_en().set_bit();
-            w.int_en().set_bit()
-        });
+    pub(super) fn new(channel_id: u8, handler: ChannelInterruptHandler) -> Self {
+        enable_controller();
 
-        let ch = VDMA::regs().ch(channel_id as usize);
-
-        // linked-list multi-block for both source and destination
-        ch.cfg0().write(|w| unsafe {
-            w.ch1_src_multblk_type().bits(3);
-            w.ch1_dst_multblk_type().bits(3)
-        });
-
-        // M→P, DMA as flow controller (tt_fc = 1 = DW_GDMA_LL_FLOW_M2P_DMAC)
-        // HW handshake on both ends; dst handshake peripheral = DSI (0)
-        // channel priority = 1; outstanding: src = 5 (4+1), dst = 2 (1+1)
-        ch.cfg1().write(|w| unsafe {
-            w.ch1_tt_fc().bits(1);
-            w.ch1_hs_sel_src().clear_bit();
-            w.ch1_hs_sel_dst().clear_bit();
-            w.ch1_dst_per().bits(0);
-            w.ch1_ch_prior().bits(1);
-            w.ch1_src_osr_lmt().bits(4);
-            w.ch1_dst_osr_lmt().bits(1)
-        });
-
-        Self { channel_id }
+        let channel = DwGdmaChannel::new(channel_id);
+        channel.configure(DSI_CHANNEL_CONFIG);
+        register_channel_handler(channel, handler);
+        Self { channel }
     }
 
     /// Points the channel's LLP at `item` and enables the channel.
@@ -198,26 +182,13 @@ impl VdmaChannel {
     /// Only `BLOCK_TFR_DONE` causes an interrupt, once for each frame. The reset value of the
     /// interrupt enables also includes the transaction-done sources, which occur for each line.
     pub(super) fn start(&mut self, item: &VdmaLinkItem) {
-        let addr = item as *const VdmaLinkItem as u32;
-        debug_assert_eq!(addr & 0x3F, 0, "LLI must be 64-byte aligned");
-        let dma = VDMA::regs();
-        let ch = dma.ch(self.channel_id as usize);
-
         // The interrupt enables ignore writes while the channel is enabled.
-        unsafe {
-            ch.intstatus_enable0()
-                .write_with_zero(|w| w.ch1_enable_block_tfr_done_intstat().set_bit());
-            ch.intsignal_enable0()
-                .write_with_zero(|w| w.ch1_enable_block_tfr_done_intsignal().set_bit());
-        }
-        ch.intclear0().write(|w| unsafe { w.bits(u32::MAX) });
+        self.channel.set_interrupt_status_enable(BLOCK_TFR_DONE);
+        self.channel.set_interrupt_signal_enable(BLOCK_TFR_DONE);
+        self.channel.clear_all_interrupts();
 
-        // LLP0: lms = MEMORY, loc0 = addr >> 6
-        ch.llp0()
-            .write(|w| unsafe { w.ch1_lms().bit(PORT_MEMORY != 0).ch1_loc0().bits(addr >> 6) });
-        unsafe { ch.llp1().write_with_zero(|w| w) };
-
-        self.ch_enable(true);
+        self.channel
+            .start_link_list_transfer(item as *const VdmaLinkItem as u32, MasterSelect::Memory);
     }
 
     /// Disables the channel and its interrupts.
@@ -225,53 +196,24 @@ impl VdmaChannel {
     /// The DSI bridge continues to read its FIFO, so the burst in progress completes and the
     /// channel stops. If the channel does not stop in time, it is aborted.
     pub(super) fn stop(&mut self) {
-        self.ch_enable(false);
-        if !wait_until(STOP_TIMEOUT, || !self.is_enabled()) {
-            self.abort();
+        let channel = self.channel;
+        channel.set_enabled(false);
+        if !wait_until(STOP_TIMEOUT, || !channel.is_enabled()) {
+            channel.trigger_abort();
             wait_until(STOP_TIMEOUT, || {
-                !self.is_enabled() && !self.abort_in_progress()
+                !channel.is_enabled() && !channel.abort_in_progress()
             });
         }
 
-        let ch = VDMA::regs().ch(self.channel_id as usize);
-        unsafe {
-            ch.intsignal_enable0().write_with_zero(|w| w);
-            ch.intstatus_enable0().write_with_zero(|w| w);
-        }
-        ch.intclear0().write(|w| unsafe { w.bits(u32::MAX) });
+        channel.set_interrupt_signal_enable(0);
+        channel.set_interrupt_status_enable(0);
+        channel.clear_all_interrupts();
+        unregister_channel_handler(channel);
     }
 
     /// Returns the address that the channel reads next (`SAR`).
     pub(super) fn source_address(&self) -> u32 {
-        VDMA::regs()
-            .ch(self.channel_id as usize)
-            .sar0()
-            .read()
-            .bits()
-    }
-
-    fn is_enabled(&self) -> bool {
-        VDMA::regs().chen0().read().bits() & (1 << self.channel_id) != 0
-    }
-
-    fn abort(&self) {
-        // ch_abort bit + ch_abort_we bit
-        let val: u32 = 0x0101 << self.channel_id;
-        unsafe { VDMA::regs().chen1().write(|w| w.bits(val)) };
-    }
-
-    fn abort_in_progress(&self) -> bool {
-        VDMA::regs().chen1().read().bits() & (1 << self.channel_id) != 0
-    }
-
-    fn ch_enable(&self, en: bool) {
-        let shift = self.channel_id;
-        let val: u32 = if en {
-            0x0101 << shift // ch_en bit + ch_en_we bit
-        } else {
-            0x0100 << shift // ch_en_we only (clears ch_en)
-        };
-        unsafe { VDMA::regs().chen0().write(|w| w.bits(val)) };
+        self.channel.source_address()
     }
 }
 

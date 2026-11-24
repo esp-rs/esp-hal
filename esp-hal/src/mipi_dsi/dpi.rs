@@ -3,7 +3,6 @@
 use core::{
     marker::PhantomData,
     pin::Pin,
-    sync::atomic,
     task::{Context, Poll},
 };
 
@@ -12,25 +11,17 @@ use esp_sync::NonReentrantMutex;
 use crate::{
     asynch::AtomicWaker,
     clock::CpuFrequencyLock,
-    dma::aligned::InternalMemory,
+    dma::{aligned::InternalMemory, dw_gdma::DwGdmaChannel},
     interrupt,
     mipi_dsi::{
         ConfigError,
         MipiDsi,
         vdma::{VdmaChannel, VdmaLinkItem, wait_until},
     },
-    peripherals::{Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
+    peripherals::{Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST},
     soc::clocks::{ClockTree, MipiDsiDpiClkConfig, MipiDsiInstance},
-    system::Cpu,
     time::Duration,
 };
-
-/// Channel index used by the static VDMA block-done ISR.
-///
-/// Must be set before the channel is started. The ISR reads this value and cannot
-/// capture runtime state. A single MIPI-DSI instance is the only VDMA user, so
-/// this value is stable for the lifetime of `DsiDpi`.
-static VDMA_ISR_CHANNEL: atomic::AtomicU8 = atomic::AtomicU8::new(0);
 
 const MAX_FBS: usize = 3;
 /// LLIs in the circular DMA ring.  The ISR re-arms each one immediately after
@@ -159,12 +150,11 @@ impl core::error::Error for CommitTimeout {}
 /// flushes the cache line to SRAM) so the DMA can use it again when the ring
 /// comes back around.  This keeps the channel running indefinitely without
 /// software ever needing to restart it.
+///
+/// The shared DW-GDMA interrupt dispatcher calls it only for the DSI channel.
 #[crate::ram]
-#[crate::handler]
-fn vdma_block_done_isr() {
-    let channel_id = VDMA_ISR_CHANNEL.load(atomic::Ordering::Relaxed) as usize;
-    let ch = VDMA::regs().ch(channel_id);
-    ch.intclear0().write(|w| unsafe { w.bits(0xFFFFFFFF) });
+fn vdma_block_done_isr(channel: DwGdmaChannel, _pending: u32) {
+    channel.clear_all_interrupts();
 
     LLI_STORAGE.with(|storage| {
         let mut storage = storage.get_mut();
@@ -211,7 +201,6 @@ pub struct DsiDpi<'d> {
 impl Drop for DsiDpi<'_> {
     fn drop(&mut self) {
         self.channel.stop();
-        interrupt::disable(Cpu::current(), Interrupt::DMA);
 
         MIPI_DSI_BRIDGE::regs()
             .dpi_misc_config()
@@ -397,7 +386,6 @@ impl<'d> DsiDpi<'d> {
         });
 
         let vdma_channel_id = bus.guard.vdma_channel_id;
-        VDMA_ISR_CHANNEL.store(vdma_channel_id, atomic::Ordering::Relaxed);
 
         LLI_STORAGE.with(|storage| {
             let mut storage = storage.get_mut();
@@ -412,9 +400,7 @@ impl<'d> DsiDpi<'d> {
 
         // ── VDMA block-done interrupt ──────────────────────────────────────
         // The ISR fires after every frame block and re-arms the consumed LLI.
-        interrupt::bind_handler(Interrupt::DMA, vdma_block_done_isr);
-
-        let mut channel = VdmaChannel::new(vdma_channel_id);
+        let mut channel = VdmaChannel::new(vdma_channel_id, vdma_block_done_isr);
         LLI_STORAGE.with(|storage| channel.start(&storage.get_mut()[0]));
 
         // ── Enable video mode ──────────────────────────────────────────────
