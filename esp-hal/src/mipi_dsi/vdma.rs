@@ -1,6 +1,11 @@
 //! Minimal VDMA abstraction for MIPI-DSI video streaming.
 
-use crate::{peripherals::VDMA, private::Sealed, reg_access::VolatileCell};
+use crate::{
+    peripherals::VDMA,
+    private::Sealed,
+    reg_access::VolatileCell,
+    time::{Duration, Instant},
+};
 
 /// Implemented by VDMA channel singletons (`VDMA_CH0`–`VDMA_CH3`).
 ///
@@ -43,7 +48,16 @@ const CTRL_LO: u32 = PORT_MEMORY        // bit  0: sms
 /// CTL1 base: arlen_en=1, arlen=16, awlen_en=1, awlen=16.
 const CTRL_HI_BASE: u32 = (1 << 6) | (16 << 7) | (1 << 15) | (16 << 16);
 
+/// CTL1 `IOC_BlkTfr`: set `BLOCK_TFR_DONE` when the block of this LLI completes.
+const IOC_BLK_TFR: u32 = 1 << 26;
+
 const LLI_VALID: u32 = 1 << 31;
+
+/// CTL1 of a ready LLI. `LLI_LAST` is never set, so the ring loops forever.
+const CTRL_HI: u32 = CTRL_HI_BASE | IOC_BLK_TFR | LLI_VALID;
+
+/// Time to wait for the channel to stop, and then for an abort to complete.
+const STOP_TIMEOUT: Duration = Duration::from_millis(10);
 
 /// One VDMA link-list item (LLI).
 #[repr(C)]
@@ -96,7 +110,6 @@ impl VdmaLinkItem {
     pub(super) fn configure(&self, src_addr: u32, fb_size: usize, next: *const VdmaLinkItem) {
         debug_assert!(fb_size.is_multiple_of(8), "fb_size must be a multiple of 8");
         let block_ts = (fb_size / 8) as u32 - 1;
-        let ctrl_hi = CTRL_HI_BASE | LLI_VALID; // no LLI_LAST → loop forever
         self.sar_lo.set(src_addr);
         self.sar_hi.set(0);
         self.dar_lo.set(DSI_BRG_MEM_BASE);
@@ -108,7 +121,7 @@ impl VdmaLinkItem {
         self.llp_lo.set(next as u32 | PORT_MEMORY);
         self.llp_hi.set(0);
         self.ctrl_lo.set(CTRL_LO);
-        self.ctrl_hi.set(ctrl_hi);
+        self.ctrl_hi.set(CTRL_HI);
         self.sstat.set(0);
         self.dstat.set(0);
         self.status_lo.set(0);
@@ -134,7 +147,7 @@ impl VdmaLinkItem {
     /// **just-consumed** LLI from the ping-pong pair while the DMA is busy
     /// with the other one.
     pub(super) fn rearm(&self) {
-        self.ctrl_hi.set(CTRL_HI_BASE | LLI_VALID);
+        self.ctrl_hi.set(CTRL_HI);
     }
 }
 
@@ -181,11 +194,23 @@ impl VdmaChannel {
     }
 
     /// Points the channel's LLP at `item` and enables the channel.
+    ///
+    /// Only `BLOCK_TFR_DONE` causes an interrupt, once for each frame. The reset value of the
+    /// interrupt enables also includes the transaction-done sources, which occur for each line.
     pub(super) fn start(&mut self, item: &VdmaLinkItem) {
         let addr = item as *const VdmaLinkItem as u32;
         debug_assert_eq!(addr & 0x3F, 0, "LLI must be 64-byte aligned");
         let dma = VDMA::regs();
         let ch = dma.ch(self.channel_id as usize);
+
+        // The interrupt enables ignore writes while the channel is enabled.
+        unsafe {
+            ch.intstatus_enable0()
+                .write_with_zero(|w| w.ch1_enable_block_tfr_done_intstat().set_bit());
+            ch.intsignal_enable0()
+                .write_with_zero(|w| w.ch1_enable_block_tfr_done_intsignal().set_bit());
+        }
+        ch.intclear0().write(|w| unsafe { w.bits(u32::MAX) });
 
         // LLP0: lms = MEMORY, loc0 = addr >> 6
         ch.llp0()
@@ -193,6 +218,50 @@ impl VdmaChannel {
         unsafe { ch.llp1().write_with_zero(|w| w) };
 
         self.ch_enable(true);
+    }
+
+    /// Disables the channel and its interrupts.
+    ///
+    /// The DSI bridge continues to read its FIFO, so the burst in progress completes and the
+    /// channel stops. If the channel does not stop in time, it is aborted.
+    pub(super) fn stop(&mut self) {
+        self.ch_enable(false);
+        if !wait_until(STOP_TIMEOUT, || !self.is_enabled()) {
+            self.abort();
+            wait_until(STOP_TIMEOUT, || {
+                !self.is_enabled() && !self.abort_in_progress()
+            });
+        }
+
+        let ch = VDMA::regs().ch(self.channel_id as usize);
+        unsafe {
+            ch.intsignal_enable0().write_with_zero(|w| w);
+            ch.intstatus_enable0().write_with_zero(|w| w);
+        }
+        ch.intclear0().write(|w| unsafe { w.bits(u32::MAX) });
+    }
+
+    /// Returns the address that the channel reads next (`SAR`).
+    pub(super) fn source_address(&self) -> u32 {
+        VDMA::regs()
+            .ch(self.channel_id as usize)
+            .sar0()
+            .read()
+            .bits()
+    }
+
+    fn is_enabled(&self) -> bool {
+        VDMA::regs().chen0().read().bits() & (1 << self.channel_id) != 0
+    }
+
+    fn abort(&self) {
+        // ch_abort bit + ch_abort_we bit
+        let val: u32 = 0x0101 << self.channel_id;
+        unsafe { VDMA::regs().chen1().write(|w| w.bits(val)) };
+    }
+
+    fn abort_in_progress(&self) -> bool {
+        VDMA::regs().chen1().read().bits() & (1 << self.channel_id) != 0
     }
 
     fn ch_enable(&self, en: bool) {
@@ -204,4 +273,15 @@ impl VdmaChannel {
         };
         unsafe { VDMA::regs().chen0().write(|w| w.bits(val)) };
     }
+}
+
+/// Polls `condition` until it holds or `timeout` passes, then checks it once more.
+pub(super) fn wait_until(timeout: Duration, mut condition: impl FnMut() -> bool) -> bool {
+    let deadline = Instant::now() + timeout;
+    while Instant::now() <= deadline {
+        if condition() {
+            return true;
+        }
+    }
+    condition()
 }

@@ -17,11 +17,12 @@ use crate::{
     mipi_dsi::{
         ConfigError,
         MipiDsi,
-        vdma::{VdmaChannel, VdmaLinkItem},
+        vdma::{VdmaChannel, VdmaLinkItem, wait_until},
     },
     peripherals::{Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
     soc::clocks::{ClockTree, MipiDsiDpiClkConfig, MipiDsiInstance},
     system::Cpu,
+    time::Duration,
 };
 
 /// Channel index used by the static VDMA block-done ISR.
@@ -132,6 +133,24 @@ pub struct DpiConfig {
     pub timing: FrameTiming,
 }
 
+/// The DMA did not start reading a committed frame buffer in time.
+///
+/// Returned by [`DsiDpi::wait_for_commit`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct CommitTimeout;
+
+impl core::fmt::Display for CommitTimeout {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "the DMA did not start reading the committed frame buffer in time"
+        )
+    }
+}
+
+impl core::error::Error for CommitTimeout {}
+
 // ── VDMA block-done ISR ───────────────────────────────────────────────────────
 
 /// Fired by the DW-GDMA at the end of every frame block transfer.
@@ -179,6 +198,7 @@ fn dsi_bridge_isr() {
 /// continuously streaming frame buffers via VDMA.
 pub struct DsiDpi<'d> {
     _guard: crate::mipi_dsi::DphyGuard<'d>,
+    channel: VdmaChannel,
     // VDMA streams the frame buffers from PSRAM, also while the CPU waits for an interrupt.
     _cpu_frequency_lock: CpuFrequencyLock,
     fb_ptrs: [*mut u8; MAX_FBS],
@@ -190,19 +210,8 @@ pub struct DsiDpi<'d> {
 
 impl Drop for DsiDpi<'_> {
     fn drop(&mut self) {
-        // Disable the block-done interrupt before shutting down.
-        let channel_id = self._guard.vdma_channel_id as usize;
-        let ch = VDMA::regs().ch(channel_id);
-        unsafe {
-            ch.intsignal_enable0().write_with_zero(|w| w);
-            ch.intstatus_enable0().write_with_zero(|w| w);
-        }
+        self.channel.stop();
         interrupt::disable(Cpu::current(), Interrupt::DMA);
-
-        // Disable the VDMA channel itself.
-        let shift = channel_id as u32;
-        let val: u32 = 0x0100 << shift; // ch_en_we only (clears ch_en)
-        unsafe { VDMA::regs().chen0().write(|w| w.bits(val)) };
 
         MIPI_DSI_BRIDGE::regs()
             .dpi_misc_config()
@@ -399,21 +408,14 @@ impl<'d> DsiDpi<'d> {
 
             // Flush the LLI descriptors from CPU cache → SRAM so the DMA sees them.
             storage.writeback();
-
-            VdmaChannel::new(vdma_channel_id).start(&storage[0]);
         });
 
         // ── VDMA block-done interrupt ──────────────────────────────────────
-        // Enable the block-transfer-done signal so the ISR fires after every
-        // frame block and re-arms the consumed LLI.
-        {
-            let ch = VDMA::regs().ch(vdma_channel_id as usize);
-            ch.intstatus_enable0()
-                .write(|w| w.ch1_enable_block_tfr_done_intstat().set_bit());
-            ch.intsignal_enable0()
-                .write(|w| w.ch1_enable_block_tfr_done_intsignal().set_bit());
-        }
+        // The ISR fires after every frame block and re-arms the consumed LLI.
         interrupt::bind_handler(Interrupt::DMA, vdma_block_done_isr);
+
+        let mut channel = VdmaChannel::new(vdma_channel_id);
+        LLI_STORAGE.with(|storage| channel.start(&storage.get_mut()[0]));
 
         // ── Enable video mode ──────────────────────────────────────────────
         host.mode_cfg()
@@ -426,6 +428,7 @@ impl<'d> DsiDpi<'d> {
         let MipiDsi { guard, .. } = bus;
         Ok(Self {
             _guard: guard,
+            channel,
             _cpu_frequency_lock: cpu_frequency_lock,
             fb_ptrs,
             fb_size,
@@ -436,6 +439,10 @@ impl<'d> DsiDpi<'d> {
     }
 
     /// Returns a mutable slice to the back (not-currently-displayed) frame buffer.
+    ///
+    /// Right after [`Self::commit`] the DMA can still be reading this buffer
+    /// for the rest of the frame on screen. Call [`Self::wait_for_commit`]
+    /// first to draw into it without tearing.
     ///
     /// With a single frame buffer this is the same buffer the DMA may be
     /// reading — the caller is responsible for synchronization in that case.
@@ -465,16 +472,47 @@ impl<'d> DsiDpi<'d> {
         // The DMA latches sar_lo at the start of each block, so an in-progress
         // block is unaffected; the new pixels appear on the next block boundary.
         let src = self.fb_ptrs[back] as u32;
+        // The ISR runs only once for each frame, so write the LLIs back here.
         LLI_STORAGE.with(|storage| {
-            let storage = storage.get_mut();
+            let mut storage = storage.get_mut();
             for lli in storage.iter() {
                 lli.set_source(src);
             }
+            storage.writeback();
         });
 
-        // The ISR will flush the cache, no need to do it here.
-
         self.current_fb = back;
+    }
+
+    /// Blocks until the DMA reads the frame buffer of the last
+    /// [`Self::commit`], so that it no longer reads the previous one.
+    ///
+    /// Takes up to two frames: the frame on screen at the commit finishes from
+    /// the previous buffer, and the next one can still start from it if the
+    /// commit landed just as the DMA loaded its link-list item. Returns
+    /// immediately with a single frame buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CommitTimeout`] if the DMA did not start on the committed
+    /// buffer within `timeout`. It can then still read the buffer that
+    /// [`Self::framebuffer_mut`] returns, and drawing into it can tear the
+    /// image on screen. The commit itself stays in place.
+    pub fn wait_for_commit(&mut self, timeout: Duration) -> Result<(), CommitTimeout> {
+        if self.num_fbs < 2 {
+            return Ok(());
+        }
+        let front = self.fb_ptrs[self.current_fb] as u32;
+        // The address one past the previous buffer can equal the start of this
+        // one, so only an address inside it shows that a block reads it.
+        let reading_front = front + 1..front + self.fb_size as u32;
+        if wait_until(timeout, || {
+            reading_front.contains(&self.channel.source_address())
+        }) {
+            Ok(())
+        } else {
+            Err(CommitTimeout)
+        }
     }
 
     /// Blocks until the DSI bridge signals the start of the next vertical blank.
