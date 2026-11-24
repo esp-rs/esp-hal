@@ -322,17 +322,20 @@ impl SchedulerState {
                 .mark_task_ready(&self.per_cpu, self.active_cores, current_task);
         }
 
-        let mut arm_next_timeslice_tick = false;
         #[cfg(multi_core)]
         let mut arm_peer_timeslice = false;
 
         #[cfg(multi_core)]
         let other_core_task = self.per_cpu[1 - current_cpu].current_task;
 
-        let next_task = self.run_queue.pop(
+        let next = self.run_queue.pop(
+            #[cfg(multi_core)]
+            cpu,
             #[cfg(multi_core)]
             other_core_task,
         );
+        let arm_next_timeslice_tick = next.as_ref().is_some_and(|next| next.time_slice);
+        let next_task = next.map(|next| next.task);
         if next_task != current_task || deleted_self {
             debug!("Switching task {:?} -> {:?}", current_task, next_task);
 
@@ -371,11 +374,6 @@ impl SchedulerState {
                 rtos_trace::trace::task_exec_begin(next.rtos_trace_id());
 
                 unsafe { next.as_ref().set_up_stack_watchpoint() };
-
-                // If there are more tasks at this priority level, we need to schedule a timeslice
-                // tick.
-                let new_core_priority = next.priority(&mut self.run_queue);
-                arm_next_timeslice_tick = !self.run_queue.is_level_empty(new_core_priority);
 
                 unsafe { &raw mut (*next.as_ptr()).cpu_context }
             } else {
