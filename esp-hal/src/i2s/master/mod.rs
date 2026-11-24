@@ -1509,9 +1509,9 @@ impl<'d> I2s<'d, Blocking> {
         channel: I2sMasterErased<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let channel = Channel::new(channel);
+        let mut channel = Channel::new(channel);
         let i2s = i2s.degrade();
-        channel.runtime_ensure_compatible(i2s.dma_peripheral());
+        channel.connect(i2s.dma_peripheral());
 
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -1750,7 +1750,7 @@ where
         self.i2s.info().reset_tx();
         let res = unsafe {
             self.tx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = res {
@@ -1823,7 +1823,7 @@ where
 
         let res = unsafe {
             self.rx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = res {

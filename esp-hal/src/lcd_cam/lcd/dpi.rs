@@ -184,8 +184,8 @@ where
         channel: impl LcdDmaTxChannel<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let tx_channel = ChannelTx::new(channel.into());
-        tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
+        let mut tx_channel = ChannelTx::new(channel.into());
+        tx_channel.connect(DmaPeripheral::LCD_CAM);
 
         let mut this = Self { lcd, tx_channel };
 
@@ -511,11 +511,8 @@ where
             w.lcd_next_frame_en().bit(next_frame_en)
         });
 
-        let result = unsafe {
-            self.tx_channel
-                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
-        }
-        .and_then(|_| self.tx_channel.start_transfer());
+        let result = unsafe { self.tx_channel.prepare_transfer(&mut buf) }
+            .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {
             return Err((err, self, buf));
         }

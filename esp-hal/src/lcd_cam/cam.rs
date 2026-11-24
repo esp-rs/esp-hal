@@ -200,8 +200,8 @@ impl<'d> Camera<'d, Blocking> {
         channel: impl CamDmaRxChannel<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let rx_channel = ChannelRx::new(channel.into());
-        rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
+        let mut rx_channel = ChannelRx::new(channel.into());
+        rx_channel.connect(DmaPeripheral::LCD_CAM);
 
         let mut this = Self { cam, rx_channel };
 
@@ -477,7 +477,7 @@ impl<'d, Dm: DriverMode> Camera<'d, Dm> {
         // Start DMA to receive incoming transfer.
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
+                .prepare_transfer(&mut buf)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
 

@@ -252,8 +252,8 @@ impl<'d> SpiDma<'d, Blocking> {
     }
 
     fn new_inner(spi: SpiWrapper<'d>, channel: SpiMasterErased<'d>) -> Self {
-        let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(spi.spi.dma_peripheral());
+        let mut channel = Channel::new(channel);
+        channel.connect(spi.spi.dma_peripheral());
 
         let state = spi.spi.dma_state();
 
@@ -1014,6 +1014,7 @@ where
         DmaDriver {
             driver: self.driver(),
             state: self.spi().dma_state(),
+            #[cfg(spi_master_version = "1")]
             dma_peripheral: self.spi.spi.dma_peripheral(),
         }
     }
@@ -1816,6 +1817,7 @@ where
 
 pub(super) struct DmaDriver {
     driver: Driver,
+    #[cfg(spi_master_version = "1")]
     dma_peripheral: crate::dma::DmaPeripheral,
     state: &'static DmaState,
 }
@@ -1894,7 +1896,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .rx
-                    .prepare_transfer(self.dma_peripheral, rx_buffer)
+                    .prepare_transfer(rx_buffer)
                     .and_then(|_| channel.rx.start_transfer())?;
             }
         } else {
@@ -1916,7 +1918,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .tx
-                    .prepare_transfer(self.dma_peripheral, tx_buffer)
+                    .prepare_transfer(tx_buffer)
                     .and_then(|_| channel.tx.start_transfer())?;
             }
         }
