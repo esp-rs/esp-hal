@@ -176,7 +176,7 @@ fn vdma_block_done_isr() {
     });
 
     FRAMES_DONE.fetch_add(1, atomic::Ordering::Release);
-    COMMIT_WAKER.wake();
+    WAKER.wake();
 }
 
 /// Frame blocks that the VDMA completed, counted by `vdma_block_done_isr`.
@@ -184,8 +184,9 @@ static FRAMES_DONE: atomic::AtomicU32 = atomic::AtomicU32::new(0);
 
 // ── Async waker ───────────────────────────────────────────────────────────────
 
-static VSYNC_WAKER: AtomicWaker = AtomicWaker::new();
-static COMMIT_WAKER: AtomicWaker = AtomicWaker::new();
+/// Woken at the end of each frame block and at vsync. One waker covers both
+/// waits, because both take `&mut DsiDpi`.
+static WAKER: AtomicWaker = AtomicWaker::new();
 
 #[crate::handler]
 fn dsi_bridge_isr() {
@@ -193,7 +194,7 @@ fn dsi_bridge_isr() {
     let st = bridge.int_st().read();
     if st.vsync().bit_is_set() {
         bridge.int_ena().modify(|_, w| w.vsync().clear_bit());
-        VSYNC_WAKER.wake();
+        WAKER.wake();
     }
 }
 
@@ -591,7 +592,7 @@ impl<'d> DsiDpi<'d> {
             if self.commit_reached() {
                 return Poll::Ready(());
             }
-            COMMIT_WAKER.register(cx.waker());
+            WAKER.register(cx.waker());
             if self.commit_reached() {
                 Poll::Ready(())
             } else {
@@ -632,7 +633,7 @@ impl Future for VsyncFuture<'_, '_> {
             bridge.int_clr().write(|w| w.vsync().clear_bit_by_one());
             Poll::Ready(())
         } else {
-            VSYNC_WAKER.register(cx.waker());
+            WAKER.register(cx.waker());
             bridge.int_ena().modify(|_, w| w.vsync().set_bit());
             Poll::Pending
         }
