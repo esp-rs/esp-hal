@@ -58,6 +58,11 @@ name              = "interrupt"
 harness           = false
 
 [[bin]]
+name              = "mipi_dsi"
+harness           = false
+required-features = ["esp-alloc"]
+
+[[bin]]
 name              = "lcd_cam"
 harness           = false
 
