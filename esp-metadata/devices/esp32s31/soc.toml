@@ -228,8 +228,8 @@ support_status = { status = "partial", issue = 6777 }
 [device.lp_timer]
 
 [device.assist_debug]
-support_status = "not_supported"
-has_sp_monitor = false
+support_status = { status = "partial", issue = 6749 }
+has_sp_monitor = true
 has_region_monitor = true
 
 [device.rng]
