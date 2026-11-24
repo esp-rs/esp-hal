@@ -1851,6 +1851,12 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
     type Final = DmaLoopBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        {
+            self.descriptor.writeback();
+            self.buffer.writeback();
+        }
+
         Preparation {
             start: self.descriptor.as_mut_ptr(),
             #[cfg(dma_can_access_psram)]
