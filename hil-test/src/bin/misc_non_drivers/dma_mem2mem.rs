@@ -8,8 +8,20 @@ mod tests {
     };
     const DATA_SIZE: usize = 1024 * 10;
 
+    cfg_select! {
+        esp32s2 => {
+            type Engine = esp_hal::dma::CopyDma;
+        }
+        esp32s31 => {
+            type Engine = esp_hal::dma::AxiGdma;
+        }
+        _ => {
+            type Engine = esp_hal::dma::AhbGdma;
+        }
+    }
+
     struct Context {
-        mem2mem: Mem2Mem<'static, Blocking>,
+        mem2mem: Mem2Mem<'static, Blocking, Engine>,
     }
 
     #[init]
