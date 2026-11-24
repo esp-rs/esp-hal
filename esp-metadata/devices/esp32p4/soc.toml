@@ -227,11 +227,12 @@ has_pd_en = true
 support_status = { status = "partial", issue = 6754 }
 gdma_version = 2
 separate_in_out_interrupts = true
+psram_max_burst = 128
 engines = [
     {
         name = "AHB_GDMA",
         max_priority = 5,
-        burst_sizes = [0, 4, 16, 32], # unclear if 64 byte (INCR16) is supported
+        burst_sizes = [4, 16, 32, 64],
         drivers = ["i2s", "uhci"],
         peripheral_instances = [
             { name = "UHCI0", dma_id = 2 },

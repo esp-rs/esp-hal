@@ -150,7 +150,7 @@ impl RegisterAccess for SpiDmaTxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, SpiDmaChannel(any::Inner::Spi2(_)))
+        self.0.can_access_psram()
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
@@ -347,7 +347,7 @@ impl RegisterAccess for SpiDmaRxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, SpiDmaChannel(any::Inner::Spi2(_)))
+        self.0.can_access_psram()
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
@@ -494,6 +494,8 @@ impl SpiDmaChannel<'_> {
             fn register_block(&self) -> &SpiRegisterBlock;
             fn info(&self) -> &'static ChannelInfo;
             fn state(&self) -> &'static ChannelState;
+            #[cfg(dma_can_access_psram)]
+            fn can_access_psram(&self) -> bool;
         }
     }
 }
@@ -509,6 +511,17 @@ impl<'d> From<SpiDmaChannel<'d>> for SpiDmaTxChannel<'d> {
     fn from(this: SpiDmaChannel<'d>) -> SpiDmaTxChannel<'d> {
         SpiDmaTxChannel(this)
     }
+}
+
+#[cfg(dma_can_access_psram)]
+for_each_dma_channel! {
+    ("SPI_DMA", $ch:ident, can_access_psram = $can_access_psram:literal) => {
+        impl crate::peripherals::$ch<'_> {
+            fn can_access_psram(&self) -> bool {
+                $can_access_psram
+            }
+        }
+    };
 }
 
 for_each_dma_channel_peri_pair! {

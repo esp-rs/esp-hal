@@ -439,6 +439,9 @@ macro_rules! property {
     ("dma.gdma_version", str) => {
         stringify!(2)
     };
+    ("dma.psram_max_burst") => {
+        32
+    };
     ("interrupts.status_registers") => {
         3
     };
@@ -780,6 +783,8 @@ macro_rules! for_each_dma_channel {
         interrupt_out = DMA_OUT_CH0, compatible = [SPI2, I2S0, SHA]));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1, interrupt_in = DMA_IN_CH1,
         interrupt_out = DMA_OUT_CH1, compatible = [SPI2, I2S0, SHA]));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, can_access_psram = true));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, can_access_psram = true));
         _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA",
         DMA_CH1))); _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA",
         any_channel = AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
@@ -788,6 +793,8 @@ macro_rules! for_each_dma_channel {
         ("AHB_GDMA", DMA_CH1, 1, interrupt_in = DMA_IN_CH1, interrupt_out = DMA_OUT_CH1,
         compatible = [SPI2, I2S0, SHA])));
         _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("AHB_GDMA", DMA_CH0, can_access_psram =
+        true), ("AHB_GDMA", DMA_CH1, can_access_psram = true)));
     };
 }
 #[macro_export]

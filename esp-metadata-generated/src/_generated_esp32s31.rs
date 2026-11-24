@@ -607,6 +607,9 @@ macro_rules! property {
     ("dma.gdma_version", str) => {
         stringify!(3)
     };
+    ("dma.psram_max_burst") => {
+        128
+    };
     ("interrupts.status_registers") => {
         6
     };
@@ -1476,7 +1479,15 @@ macro_rules! for_each_dma_channel {
         compatible = [LCD_CAM, SPI2, SPI3, PARL_IO, AES, SHA]));
         _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH2, 2, interrupt_in =
         AXI_PDMA_IN_CH2, interrupt_out = AXI_PDMA_OUT_CH2, compatible = [LCD_CAM, SPI2,
-        SPI3, PARL_IO, AES, SHA])); _for_each_inner_dma_channel!((names("AHB_GDMA",
+        SPI3, PARL_IO, AES, SHA])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH3,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH0,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH1,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH2,
+        can_access_psram = true)); _for_each_inner_dma_channel!((names("AHB_GDMA",
         DMA_CH0), ("AHB_GDMA", DMA_CH1), ("AHB_GDMA", DMA_CH2), ("AHB_GDMA", DMA_CH3),
         ("AHB_GDMA", DMA_CH4), ("AXI_GDMA", DMA_AXI_CH0), ("AXI_GDMA", DMA_AXI_CH1),
         ("AXI_GDMA", DMA_AXI_CH2)));
@@ -1498,6 +1509,12 @@ macro_rules! for_each_dma_channel {
         SPI3, PARL_IO, AES, SHA]), ("AXI_GDMA", DMA_AXI_CH2, 2, interrupt_in =
         AXI_PDMA_IN_CH2, interrupt_out = AXI_PDMA_OUT_CH2, compatible = [LCD_CAM, SPI2,
         SPI3, PARL_IO, AES, SHA]))); _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("AHB_GDMA", DMA_CH0, can_access_psram =
+        true), ("AHB_GDMA", DMA_CH1, can_access_psram = true), ("AHB_GDMA", DMA_CH2,
+        can_access_psram = true), ("AHB_GDMA", DMA_CH3, can_access_psram = true),
+        ("AHB_GDMA", DMA_CH4, can_access_psram = true), ("AXI_GDMA", DMA_AXI_CH0,
+        can_access_psram = true), ("AXI_GDMA", DMA_AXI_CH1, can_access_psram = true),
+        ("AXI_GDMA", DMA_AXI_CH2, can_access_psram = true)));
     };
 }
 #[macro_export]

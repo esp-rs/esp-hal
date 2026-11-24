@@ -674,11 +674,14 @@ macro_rules! for_each_dma_channel {
         macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0,
-        compatible = [SPI2, SHA])); _for_each_inner_dma_channel!((names("AHB_GDMA",
+        compatible = [SPI2, SHA])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0,
+        can_access_psram = false)); _for_each_inner_dma_channel!((names("AHB_GDMA",
         DMA_CH0))); _for_each_inner_dma_channel!((separate_any_type));
         _for_each_inner_dma_channel!((shared("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0,
         compatible = [SPI2, SHA]))); _for_each_inner_dma_channel!((split));
         _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("AHB_GDMA", DMA_CH0, can_access_psram =
+        false)));
     };
 }
 #[macro_export]

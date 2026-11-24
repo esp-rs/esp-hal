@@ -475,6 +475,7 @@ engines = [
     {
         name = "AHB_GDMA",
         max_priority = 5,
+        burst_sizes = [4, 16, 32, 64],
         # Mux IDs below include later peripherals; only list HAL drivers that are enabled.
         drivers = ["aes", "i2s", "parl_io", "sha", "spi_master", "spi_slave", "uhci"],
         # Peripheral selector values, TRM table 2.4-1.

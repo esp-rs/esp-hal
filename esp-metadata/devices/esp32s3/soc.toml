@@ -146,6 +146,7 @@ gdma_version = 1
 separate_in_out_interrupts = true
 mem2mem_requires_peripheral = true
 ext_mem_configurable_block_size = true
+psram_max_burst = 64
 engines = [
     {
         name = "AHB_GDMA",
