@@ -144,7 +144,7 @@ impl core::fmt::Display for CommitTimeout {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "the DMA did not start reading the committed frame buffer in time"
+            "The DMA did not start reading the committed frame buffer in time"
         )
     }
 }
@@ -174,11 +174,18 @@ fn vdma_block_done_isr() {
 
         storage.writeback();
     });
+
+    FRAMES_DONE.fetch_add(1, atomic::Ordering::Release);
+    COMMIT_WAKER.wake();
 }
+
+/// Frame blocks that the VDMA completed, counted by `vdma_block_done_isr`.
+static FRAMES_DONE: atomic::AtomicU32 = atomic::AtomicU32::new(0);
 
 // ── Async waker ───────────────────────────────────────────────────────────────
 
 static VSYNC_WAKER: AtomicWaker = AtomicWaker::new();
+static COMMIT_WAKER: AtomicWaker = AtomicWaker::new();
 
 #[crate::handler]
 fn dsi_bridge_isr() {
@@ -197,7 +204,9 @@ fn dsi_bridge_isr() {
 /// Consumes the [`MipiDsi`] bus and drives the DSI host in video mode,
 /// continuously streaming frame buffers via VDMA.
 pub struct DsiDpi<'d> {
-    _guard: crate::mipi_dsi::DphyGuard<'d>,
+    /// `None` after [`Self::stop`] returned it.
+    guard: Option<crate::mipi_dsi::DphyGuard<'d>>,
+    lane_bit_rate_mbps: f32,
     channel: VdmaChannel,
     // VDMA streams the frame buffers from PSRAM, also while the CPU waits for an interrupt.
     _cpu_frequency_lock: CpuFrequencyLock,
@@ -205,19 +214,17 @@ pub struct DsiDpi<'d> {
     fb_size: usize,
     num_fbs: usize,
     current_fb: usize,
+    /// [`FRAMES_DONE`] at the last [`Self::commit`].
+    commit_frame: u32,
     _phantom: PhantomData<&'d mut [u8]>,
 }
 
 impl Drop for DsiDpi<'_> {
     fn drop(&mut self) {
-        self.channel.stop();
-        interrupt::disable(Cpu::current(), Interrupt::DMA);
-
-        MIPI_DSI_BRIDGE::regs()
-            .dpi_misc_config()
-            .modify(|_, w| w.dpi_en().clear_bit());
-        ClockTree::with(|clocks| MipiDsiInstance::MipiDsi.release_dpi_clk(clocks));
-        // _guard is dropped next, which calls dphy_power_down() and releases PHY clocks.
+        if self.guard.is_some() {
+            self.shutdown();
+        }
+        // The guard is dropped next, which calls dphy_power_down() and releases PHY clocks.
     }
 }
 
@@ -425,17 +432,61 @@ impl<'d> DsiDpi<'d> {
             .dpi_config_update()
             .write(|w| w.dpi_config_update().set_bit());
 
-        let MipiDsi { guard, .. } = bus;
+        let MipiDsi {
+            guard,
+            lane_bit_rate_mbps,
+        } = bus;
         Ok(Self {
-            _guard: guard,
+            guard: Some(guard),
+            lane_bit_rate_mbps,
             channel,
             _cpu_frequency_lock: cpu_frequency_lock,
             fb_ptrs,
             fb_size,
             num_fbs,
             current_fb: 0,
+            commit_frame: FRAMES_DONE.load(atomic::Ordering::Acquire),
             _phantom: PhantomData,
         })
+    }
+
+    /// Stops video output and returns the bus.
+    ///
+    /// Stops the DMA channel, disables the DPI and returns the host to command
+    /// mode, so that the bus can start [`MipiDsi::dbi`] or [`MipiDsi::dpi`]
+    /// again. The DMA channel normally stops within one millisecond. If it does
+    /// not stop within 10 ms, it is aborted, which can take another 10 ms.
+    ///
+    /// Dropping a [`DsiDpi`] does the same, and then powers the bus down.
+    pub fn stop(mut self) -> MipiDsi<'d> {
+        self.shutdown();
+        let guard = self.guard.take().unwrap();
+        MipiDsi {
+            guard,
+            lane_bit_rate_mbps: self.lane_bit_rate_mbps,
+        }
+    }
+
+    fn shutdown(&mut self) {
+        self.channel.stop();
+        interrupt::disable(Cpu::current(), Interrupt::DMA);
+
+        let bridge = MIPI_DSI_BRIDGE::regs();
+        bridge
+            .dpi_misc_config()
+            .modify(|_, w| w.dpi_en().clear_bit());
+        bridge
+            .dpi_config_update()
+            .write(|w| w.dpi_config_update().set_bit());
+        bridge.en().modify(|_, w| w.dsi_en().clear_bit());
+        // The bridge keeps the position in the stopped frame. The reset returns it
+        // to the state after `MipiDsi::new`.
+        bridge.en().modify(|_, w| w.dsi_brig_rst().set_bit());
+        bridge.en().modify(|_, w| w.dsi_brig_rst().clear_bit());
+        MIPI_DSI_HOST::regs()
+            .mode_cfg()
+            .modify(|_, w| w.cmd_video_mode().set_bit());
+        ClockTree::with(|clocks| MipiDsiInstance::MipiDsi.release_dpi_clk(clocks));
     }
 
     /// Returns a mutable slice to the back (not-currently-displayed) frame buffer.
@@ -482,6 +533,28 @@ impl<'d> DsiDpi<'d> {
         });
 
         self.current_fb = back;
+        self.commit_frame = FRAMES_DONE.load(atomic::Ordering::Acquire);
+    }
+
+    /// Returns `true` when the DMA reads the frame buffer of the last
+    /// [`Self::commit`].
+    ///
+    /// The DMA reads inside that buffer, or two frame blocks completed after
+    /// the commit: the first can still read the previous buffer, but the
+    /// second loads its link-list item after the commit.
+    fn commit_reached(&self) -> bool {
+        if self.num_fbs < 2 {
+            return true;
+        }
+        let front = self.fb_ptrs[self.current_fb] as u32;
+        // The address one past the previous buffer can equal the start of this
+        // one, so only an address inside it shows that a block reads it.
+        let reading_front = front + 1..front + self.fb_size as u32;
+        reading_front.contains(&self.channel.source_address())
+            || FRAMES_DONE
+                .load(atomic::Ordering::Acquire)
+                .wrapping_sub(self.commit_frame)
+                >= 2
     }
 
     /// Blocks until the DMA reads the frame buffer of the last
@@ -499,20 +572,33 @@ impl<'d> DsiDpi<'d> {
     /// [`Self::framebuffer_mut`] returns, and drawing into it can tear the
     /// image on screen. The commit itself stays in place.
     pub fn wait_for_commit(&mut self, timeout: Duration) -> Result<(), CommitTimeout> {
-        if self.num_fbs < 2 {
-            return Ok(());
-        }
-        let front = self.fb_ptrs[self.current_fb] as u32;
-        // The address one past the previous buffer can equal the start of this
-        // one, so only an address inside it shows that a block reads it.
-        let reading_front = front + 1..front + self.fb_size as u32;
-        if wait_until(timeout, || {
-            reading_front.contains(&self.channel.source_address())
-        }) {
+        if wait_until(timeout, || self.commit_reached()) {
             Ok(())
         } else {
             Err(CommitTimeout)
         }
+    }
+
+    /// Waits until the DMA reads the frame buffer of the last
+    /// [`Self::commit`], so that it no longer reads the previous one.
+    ///
+    /// This is the async version of [`Self::wait_for_commit`], without a
+    /// timeout. The VDMA interrupt at the end of each frame wakes the task,
+    /// and the wait takes up to two frames. If the DMA stops, the future does
+    /// not complete, so combine it with a timer to bound the wait.
+    pub async fn wait_for_commit_async(&mut self) {
+        core::future::poll_fn(|cx| {
+            if self.commit_reached() {
+                return Poll::Ready(());
+            }
+            COMMIT_WAKER.register(cx.waker());
+            if self.commit_reached() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        })
+        .await
     }
 
     /// Blocks until the DSI bridge signals the start of the next vertical blank.
