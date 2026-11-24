@@ -5317,8 +5317,11 @@ macro_rules! implement_peripheral_clocks {
                 Self::SarAdc,
                 Self::Systimer,
                 Self::Timg0,
+                #[cfg(keep_uart0_enabled)]
                 Self::Uart0,
+                #[cfg(keep_uart0_enabled)]
                 Self::UartMem,
+                #[cfg(keep_usb_serial_jtag_enabled)]
                 Self::UsbDevice,
             ];
             const COUNT: usize = Self::ALL.len();

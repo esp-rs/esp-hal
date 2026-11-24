@@ -248,6 +248,18 @@ options:
       - value: false
     active: "soc_has_clock_node_xtal32k_clk"
 
+  - name: keep-uart0-enabled
+    description: "Keeps UART0 enabled at startup, for output without a driver, such as esp-println."
+    default:
+      - value: true
+
+  - name: keep-usb-serial-jtag-enabled
+    description: "Keeps USB-Serial-JTAG connected at startup. Disable to save power if neither
+      the application nor a debugger uses it."
+    default:
+      - value: true
+    active: "soc_has_usb_device"
+
   - name: enable-pmp
     description: "Protects additional memory regions via Physical Memory Protection (PMP). (Only RISC-V other than ESP32-C2/C3)"
     default:

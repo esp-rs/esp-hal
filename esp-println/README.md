@@ -33,6 +33,17 @@ use esp_println::println;
 
 You can now `println!("Hello world")` as usual.
 
+## Using esp-println with esp-hal
+
+`esp_hal::init` can gate the clocks of peripherals that no driver uses. esp-println writes to UART0
+and USB-Serial-JTAG outside of esp-hal's drivers, so they must stay enabled:
+
+- For UART0 output (the `uart` feature, or `auto` without a USB host), leave
+  `ESP_HAL_CONFIG_KEEP_UART0_ENABLED` at its default, `true`. Dropping a UART0 driver of esp-hal
+  still stops UART0's function clock, and with it the output.
+- For USB-Serial-JTAG output, leave `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_ENABLED` at its default,
+  `true`.
+
 ## Logging
 
 With the feature `log-04` activated, and version 0.4 of the `log` crate added to your dependencies,
