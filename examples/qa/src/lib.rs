@@ -11,6 +11,8 @@ use esp_hal::{
     rtc_cntl::{SocResetReason, reset_reason},
     system::Cpu,
 };
+#[cfg(mipi_csi_driver_supported)]
+pub mod camera;
 
 /// Bytes in `.dram2_uninit` for the selected chip.
 pub const DRAM2_UNINIT_SIZE: usize = {

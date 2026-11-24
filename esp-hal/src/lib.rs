@@ -451,11 +451,16 @@ unstable_driver! {
     pub mod usb;
     #[cfg(ethernet_driver_supported)]
     pub mod ethernet;
+    #[cfg(mipi_csi_driver_supported)]
+    pub mod mipi_csi;
     #[cfg(mipi_dsi_driver_supported)]
     pub mod mipi_dsi;
 }
 
-#[cfg(all(feature = "unstable", mipi_dsi_driver_supported))]
+#[cfg(all(
+    feature = "unstable",
+    any(mipi_csi_driver_supported, mipi_dsi_driver_supported)
+))]
 pub(crate) mod mipi_dphy_power;
 
 /// State of the CPU saved when entering exception or interrupt

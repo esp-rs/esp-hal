@@ -59,6 +59,8 @@ const DSI_CHANNEL_CONFIG: ChannelConfig = ChannelConfig {
     src_peripheral: 0,
     // Hardware handshake interface of the DSI bridge.
     dst_peripheral: 0,
+    src_status_fetch_addr: 0,
+    dst_status_fetch_addr: 0,
     priority: 1,
     // Outstanding: src = 5 (4+1), dst = 2 (1+1).
     src_outstanding_limit: 4,
