@@ -176,13 +176,14 @@ key_length = { options = [
 support_status = { status = "partial", issue = 6754 }
 gdma_version = 2
 separate_in_out_interrupts = true
+psram_max_burst = 32
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
     {
         name = "AHB_GDMA",
         max_priority = 5,
-        burst_sizes = [4, 16, 32],
+        burst_sizes = [4, 16, 32, 64],
         drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s", "parl_io"],
         peripheral_instances = [
             { name = "SPI2", dma_id = 1 },

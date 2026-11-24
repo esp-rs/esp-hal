@@ -900,10 +900,15 @@ macro_rules! for_each_dma_channel {
         [SPI3, SPI2, UHCI0, I2S0, AES, SHA, PARL_IO]));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4, 4, interrupt_in = DMA_IN_CH4,
         interrupt_out = DMA_OUT_CH4, compatible = [SPI3, SPI2, UHCI0, I2S0, AES, SHA,
-        PARL_IO])); _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0),
-        ("AHB_GDMA", DMA_CH1), ("AHB_GDMA", DMA_CH2), ("AHB_GDMA", DMA_CH3), ("AHB_GDMA",
-        DMA_CH4))); _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA",
-        any_channel = AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
+        PARL_IO])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, can_access_psram =
+        true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, can_access_psram =
+        true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, can_access_psram =
+        true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH3, can_access_psram =
+        true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4, can_access_psram =
+        true)); _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA",
+        DMA_CH1), ("AHB_GDMA", DMA_CH2), ("AHB_GDMA", DMA_CH3), ("AHB_GDMA", DMA_CH4)));
+        _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA", any_channel =
+        AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
         _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
         DMA_IN_CH0, interrupt_out = DMA_OUT_CH0, compatible = [SPI3, SPI2, UHCI0, I2S0,
         AES, SHA, PARL_IO]), ("AHB_GDMA", DMA_CH1, 1, interrupt_in = DMA_IN_CH1,
@@ -915,6 +920,10 @@ macro_rules! for_each_dma_channel {
         4, interrupt_in = DMA_IN_CH4, interrupt_out = DMA_OUT_CH4, compatible = [SPI3,
         SPI2, UHCI0, I2S0, AES, SHA, PARL_IO])));
         _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("AHB_GDMA", DMA_CH0, can_access_psram =
+        true), ("AHB_GDMA", DMA_CH1, can_access_psram = true), ("AHB_GDMA", DMA_CH2,
+        can_access_psram = true), ("AHB_GDMA", DMA_CH3, can_access_psram = true),
+        ("AHB_GDMA", DMA_CH4, can_access_psram = true)));
     };
 }
 #[macro_export]

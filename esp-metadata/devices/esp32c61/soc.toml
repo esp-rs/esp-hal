@@ -165,6 +165,7 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 support_status = { status = "partial", issue = 6754 }
 gdma_version = 2
 separate_in_out_interrupts = true
+psram_max_burst = 32
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
