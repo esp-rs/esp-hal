@@ -87,6 +87,7 @@ peripherals = [
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "PSRAM", virtual = true },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "ULP_RISCV_CORE", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },
     { name = "FROM_CPU_INTR1", virtual = true },
@@ -418,7 +419,8 @@ extmem_origin = 0x3f500000
 
 [device.systimer]
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6778 }
+register_block = "sens"
 [device.ulp_fsm]
 support_status = { status = "not_supported", issue = 376 }
 [device.ulp_riscv]

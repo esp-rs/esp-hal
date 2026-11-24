@@ -412,6 +412,12 @@ macro_rules! property {
     ("adc.sar_power_override") => {
         false
     };
+    ("temp_sensor.min_stabilization_time_us") => {
+        0
+    };
+    ("temp_sensor.min_stabilization_time_us", str) => {
+        stringify!(0)
+    };
     ("ledc.version") => {
         2
     };

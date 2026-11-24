@@ -85,6 +85,7 @@ peripherals = [
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
+    { name = "TSENS", pac = "LP_TSENS", clock_group = "TSENS" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UART2", interrupts = { peri = "UART2" }, stable = true, clock_group = "UART" },
@@ -546,7 +547,8 @@ support_status = "not_supported"
 [device.i3c_slave]
 support_status = "not_supported"
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6778 }
+register_block = "lp_tsens"
 [device.touch]
 support_status = "not_supported"
 [device.uhci]

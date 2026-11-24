@@ -67,6 +67,10 @@ mod tsens {
             assert!(uncalibrated < f32::from(u8::MAX) * ADC_STEP_CELSIUS + ADC_ZERO_CELSIUS);
             check_temperature(&sample);
             let calibrated = sample.to_celsius();
+            // The test boards are at room temperature.
+            if let Some(celsius) = calibrated {
+                assert!((10.0..45.0).contains(&celsius));
+            }
             drop(sensor);
             assert_eq!(sample.to_uncalibrated_celsius(), uncalibrated);
             assert_eq!(sample.to_celsius(), calibrated);
@@ -75,7 +79,9 @@ mod tsens {
 
     fn stabilization_duration() -> Duration {
         let frequency = u64::from(TsensInstance::Tsens.sclk_frequency());
-        Duration::from_micros((20_000u64 * 1_000_000).div_ceil(frequency))
+        Duration::from_micros((20_000u64 * 1_000_000).div_ceil(frequency).max(
+            esp_metadata_generated::property!("temp_sensor.min_stabilization_time_us"),
+        ))
     }
 
     fn check_deferred_stabilization(sensor: &mut TemperatureSensor<'_>, start: Instant) {

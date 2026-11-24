@@ -463,6 +463,12 @@ macro_rules! property {
     ("dac.resolution", str) => {
         stringify!(12)
     };
+    ("temp_sensor.min_stabilization_time_us") => {
+        0
+    };
+    ("temp_sensor.min_stabilization_time_us", str) => {
+        stringify!(0)
+    };
     ("dma2d.tx_channel_count") => {
         4
     };

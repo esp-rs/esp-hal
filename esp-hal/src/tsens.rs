@@ -203,7 +203,8 @@ impl<'d> TemperatureSensor<'d> {
     fn start_stabilization(&mut self) {
         const STABILIZATION_CYCLES: u64 = 20_000;
         let delay_us = (STABILIZATION_CYCLES * 1_000_000)
-            .div_ceil(u64::from(TsensInstance::Tsens.sclk_frequency()));
+            .div_ceil(u64::from(TsensInstance::Tsens.sclk_frequency()))
+            .max(property!("temp_sensor.min_stabilization_time_us"));
         self.ready_at = Instant::now() + Duration::from_micros(delay_us);
     }
 
@@ -214,6 +215,19 @@ impl<'d> TemperatureSensor<'d> {
                 APB_SARADC::regs()
                     .tsens_ctrl()
                     .modify(|_, w| w.pu().set_bit());
+            }
+            esp32s2 => {
+                // The request bit can survive a digital-system reset.
+                SENS::regs().sar_tsens_ctrl().modify(|_, w| {
+                    w.tsens_dump_out().clear_bit();
+                    w.tsens_power_up_force().set_bit()
+                });
+                SENS::regs()
+                    .sar_tsens_ctrl2()
+                    .modify(|_, w| unsafe { w.tsens_xpd_force().bits(1) });
+                SENS::regs()
+                    .sar_tsens_ctrl()
+                    .modify(|_, w| w.tsens_power_up().set_bit());
             }
             temp_sensor_register_block_sens => {
                 // The request bit can survive a digital-system reset.
@@ -245,6 +259,17 @@ impl<'d> TemperatureSensor<'d> {
                 APB_SARADC::regs()
                     .tsens_ctrl()
                     .modify(|_, w| w.pu().clear_bit());
+            }
+            esp32s2 => {
+                SENS::regs()
+                    .sar_tsens_ctrl()
+                    .modify(|_, w| w.tsens_power_up_force().clear_bit());
+                SENS::regs()
+                    .sar_tsens_ctrl2()
+                    .modify(|_, w| unsafe { w.tsens_xpd_force().bits(0) });
+                SENS::regs()
+                    .sar_tsens_ctrl()
+                    .modify(|_, w| w.tsens_power_up().clear_bit());
             }
             temp_sensor_register_block_sens => {
                 SENS::regs()
@@ -307,6 +332,13 @@ impl<'d> TemperatureSensor<'d> {
             temp_sensor_register_block_apb_saradc => {
                 APB_SARADC::regs().tsens_ctrl().read().out().bits()
             }
+            esp32s2 => {{
+                let ctrl = SENS::regs().sar_tsens_ctrl();
+                ctrl.modify(|_, w| w.tsens_dump_out().set_bit());
+                while ctrl.read().tsens_ready().bit_is_clear() {}
+                ctrl.modify(|_, w| w.tsens_dump_out().clear_bit());
+                ctrl.read().tsens_out().bits()
+            }}
             temp_sensor_register_block_sens => {{
                 let ctrl = SENS::regs().sar_tsens_ctrl();
                 ctrl.modify(|_, w| w.sar_tsens_dump_out().set_bit());

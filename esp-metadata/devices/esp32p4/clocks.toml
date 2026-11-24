@@ -62,6 +62,7 @@ system_clocks = { clock_tree = [
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         { name = "XTAL_D2", outputs = "XTAL_D2_CLK" },
     ] },
+    { name = "LP_PERI_CLK", type = "generic", always_on = true, params = { divisor = "0..64" }, output = "LP_FAST_CLK / (divisor + 1)" },
     { name = "LP_SLOW_CLK", type = "mux", variants = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
@@ -93,6 +94,11 @@ system_clocks = { clock_tree = [
         #{ name = "PLL_LP_CLK",      outputs = "PLL_LP_CLK" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "LP_PERI", outputs = "LP_PERI_CLK", default = true },
+        ] },
+    ] },
     { group = "PSRAM", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL", outputs = "XTAL_CLK", default = true },
@@ -317,6 +323,10 @@ peripheral_clocks = { templates = [
     { name = "Jpeg",    template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "jpeg",     rst_group = "0", rst_field = "jpeg" } },
     # Pixel processing accelerator
     { name = "Ppa",     template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "ppa",      rst_group = "1", rst_field = "ppa" } },
+    { name = "Tsens", template_params = {
+        clk_en_template = "crate::peripherals::LP_PERI::regs().clk_en().modify(|_, w| w.ck_en_lp_tsens().bit(enable));",
+        rst_template = "crate::peripherals::LP_PERI::regs().reset_en().modify(|_, w| w.rst_en_lp_tsens().bit(reset));"
+    } },
     # ADC -- the digital controller needs both the APB gate and the PERI_CLK_CTRL23 function clock.
     { name = "ApbSarAdc", template_params = { clk_en_template = "{{apb_clk_template}} {{control}}::regs().peri_clk_ctrl23().modify(|_, w| w.adc_clk_en().bit(enable));", clk_field = "adc", rst_group = "2", rst_field = "adc" } },
     # Parallel IO -- reset asserts the parlio block plus its rx/tx subreset bits in one write.

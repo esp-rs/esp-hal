@@ -111,6 +111,7 @@ peripherals = [
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
     { name = "PSRAM", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },
@@ -378,7 +379,10 @@ instances = [
 support_status = { status = "not_supported", issue = 5417 }
 
 [device.temp_sensor]
-support_status = { status = "not_supported", issue = 5421 }
+support_status = { status = "partial", issue = 6778 }
+register_block = "apb_saradc"
+# A range change takes up to 0.6 ms to settle.
+min_stabilization_time_us = 1000
 
 ## Radio
 [device.wifi]

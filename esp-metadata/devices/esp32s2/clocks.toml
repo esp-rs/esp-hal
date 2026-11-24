@@ -78,6 +78,11 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "RC_FAST", outputs = "RC_FAST_CLK", default = true },
+        ] },
+    ] },
     { group = "TIMG", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
@@ -146,6 +151,11 @@ peripheral_clocks = { templates = [
     #{ name = "Adc2Arb" },
     { name = "Systimer", keep_enabled = true },
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
+    { name = "Tsens", template_params = {
+        control = "crate::peripherals::SENS",
+        clk_en_register = "sar_tsens_ctrl2", clk_en_field = "tsens_clkgate_en",
+        rst_register = "sar_tsens_ctrl2", rst_field = "tsens_reset"
+    } },
     { name = "Spi3Dma" },
     #{ name = "Pwm3" },
     #{ name = "Pwm2" },

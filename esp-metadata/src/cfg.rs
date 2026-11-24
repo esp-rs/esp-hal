@@ -919,6 +919,10 @@ driver_configs![
             properties: {
                 #[serde(default)]
                 register_block: TempSensorRegisterBlock,
+                /// Shortest settle time after power-up or a range change, in microseconds.
+                /// The sensor needs this time at every clock frequency.
+                #[serde(default)]
+                min_stabilization_time_us: u32,
             }
         },
         TouchProperties {

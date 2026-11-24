@@ -84,6 +84,12 @@ system_clocks = { clock_tree = [
         { name = "OSC32K_CLK",     outputs = "OSC_SLOW_CLK" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+        ] },
+    ] },
     { group = "TIMG", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
