@@ -75,7 +75,9 @@ mod tsens {
 
     fn stabilization_duration() -> Duration {
         let frequency = u64::from(TsensInstance::Tsens.sclk_frequency());
-        Duration::from_micros((20_000u64 * 1_000_000).div_ceil(frequency))
+        Duration::from_micros((20_000u64 * 1_000_000).div_ceil(frequency).max(
+            esp_metadata_generated::property!("temp_sensor.min_stabilization_time_us"),
+        ))
     }
 
     fn check_deferred_stabilization(sensor: &mut TemperatureSensor<'_>, start: Instant) {

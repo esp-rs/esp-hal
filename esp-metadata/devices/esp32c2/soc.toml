@@ -73,6 +73,7 @@ peripherals = [
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
     { name = "FROM_CPU_INTR0", virtual = true, hidden = true },
     { name = "FROM_CPU_INTR1", virtual = true },
@@ -256,7 +257,8 @@ channel_count = 6
 [device.io_mux]
 support_status = { status = "partial", issue = 6758 }
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6778 }
+register_block = "apb_saradc"
 [device.systimer]
 [device.lp_timer]
 

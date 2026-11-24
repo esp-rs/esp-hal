@@ -60,6 +60,7 @@ impl CpuClock {
         )),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_peri_clk: None,
         timg_calibration_clock: None,
     };
 
@@ -80,6 +81,7 @@ impl CpuClock {
         )),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_peri_clk: None,
         timg_calibration_clock: None,
     };
 
@@ -98,6 +100,7 @@ impl CpuClock {
         )),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_peri_clk: None,
         timg_calibration_clock: None,
     };
 }
@@ -128,7 +131,18 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(self, clocks: &mut ClockTree) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
+        if self.lp_peri_clk.is_none() {
+            // Keep the LP peripheral divider configured by the bootloader.
+            self.lp_peri_clk = Some(LpPeriClkConfig::new(
+                LP_AON_CLKRST::regs()
+                    .lp_aonclkrst_lp_clk_conf()
+                    .read()
+                    .lp_aonclkrst_lp_peri_div_num()
+                    .bits() as u32,
+            ));
+        }
+
         with_single_bus_clock_update(|| self.apply(clocks));
     }
 }
@@ -438,6 +452,16 @@ fn configure_lp_fast_clk_impl(
                 LpFastClkConfig::XtalD2 => 1,
             })
         });
+}
+
+fn configure_lp_peri_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<LpPeriClkConfig>,
+    new: LpPeriClkConfig,
+) {
+    LP_AON_CLKRST::regs()
+        .lp_aonclkrst_lp_clk_conf()
+        .modify(|_, w| unsafe { w.lp_aonclkrst_lp_peri_div_num().bits(new.divisor() as u8) });
 }
 
 // LP_SLOW_CLK mux
