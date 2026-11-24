@@ -4,28 +4,30 @@
 //!
 //! Hardware setup:
 //!
-//! Signal     | ESP32-S3-LCD-EV-Board v1.5 | ESP32-S31-Korvo-1-V1.1
-//! ---------- | -------------------------- | ----------------------
-//! LCD_VSYNC  | GPIO3                      | GPIO45
-//! LCD_HSYNC  | GPIO46                     | GPIO44
-//! LCD_DE     | GPIO17                     | GPIO43
-//! LCD_PCLK   | GPIO9                      | GPIO40
-//! LCD_DATA0  | GPIO10                     | GPIO8
-//! LCD_DATA1  | GPIO11                     | GPIO9
-//! LCD_DATA2  | GPIO12                     | GPIO10
-//! LCD_DATA3  | GPIO13                     | GPIO11
-//! LCD_DATA4  | GPIO14                     | GPIO12
-//! LCD_DATA5  | GPIO21                     | GPIO13
-//! LCD_DATA6  | GPIO8                      | GPIO14
-//! LCD_DATA7  | GPIO18                     | GPIO15
-//! LCD_DATA8  | GPIO45                     | GPIO16
-//! LCD_DATA9  | GPIO38                     | GPIO17
-//! LCD_DATA10 | GPIO39                     | GPIO18
-//! LCD_DATA11 | GPIO40                     | GPIO19
-//! LCD_DATA12 | GPIO41                     | GPIO33
-//! LCD_DATA13 | GPIO42                     | GPIO34
-//! LCD_DATA14 | GPIO2                      | GPIO35
-//! LCD_DATA15 | GPIO1                      | GPIO36
+//! On the ESP32-P4, connect an 800x480 RGB565 panel to the pins in the last column.
+//!
+//! Signal     | ESP32-S3-LCD-EV-Board v1.5 | ESP32-S31-Korvo-1-V1.1 | ESP32-P4
+//! ---------- | -------------------------- | ---------------------- | --------
+//! LCD_VSYNC  | GPIO3                      | GPIO45                 | GPIO28
+//! LCD_HSYNC  | GPIO46                     | GPIO44                 | GPIO29
+//! LCD_DE     | GPIO17                     | GPIO43                 | GPIO30
+//! LCD_PCLK   | GPIO9                      | GPIO40                 | GPIO31
+//! LCD_DATA0  | GPIO10                     | GPIO8                  | GPIO7
+//! LCD_DATA1  | GPIO11                     | GPIO9                  | GPIO8
+//! LCD_DATA2  | GPIO12                     | GPIO10                 | GPIO9
+//! LCD_DATA3  | GPIO13                     | GPIO11                 | GPIO10
+//! LCD_DATA4  | GPIO14                     | GPIO12                 | GPIO11
+//! LCD_DATA5  | GPIO21                     | GPIO13                 | GPIO12
+//! LCD_DATA6  | GPIO8                      | GPIO14                 | GPIO13
+//! LCD_DATA7  | GPIO18                     | GPIO15                 | GPIO14
+//! LCD_DATA8  | GPIO45                     | GPIO16                 | GPIO15
+//! LCD_DATA9  | GPIO38                     | GPIO17                 | GPIO16
+//! LCD_DATA10 | GPIO39                     | GPIO18                 | GPIO17
+//! LCD_DATA11 | GPIO40                     | GPIO19                 | GPIO18
+//! LCD_DATA12 | GPIO41                     | GPIO33                 | GPIO19
+//! LCD_DATA13 | GPIO42                     | GPIO34                 | GPIO20
+//! LCD_DATA14 | GPIO2                      | GPIO35                 | GPIO21
+//! LCD_DATA15 | GPIO1                      | GPIO36                 | GPIO22
 
 //% CHIP_FILTER: rgb_display_driver_supported && !esp32
 
@@ -175,35 +177,6 @@ fn main() -> ! {
                 }
             }
             drop(vsync_must_be_high_during_setup);
-
-            let config = Config::default()
-                .with_clock_mode(ClockMode {
-                    polarity: Polarity::IdleLow,
-                    phase: Phase::ShiftLow,
-                })
-                .with_frequency(Rate::from_mhz(16))
-                .with_format(Format {
-                    enable_2byte_mode: true,
-                    ..Default::default()
-                })
-                .with_timing(FrameTiming {
-                    horizontal_active_width: 480,
-                    horizontal_total_width: 520,
-                    horizontal_blank_front_porch: 10,
-
-                    vertical_active_height: 480,
-                    vertical_total_height: 510,
-                    vertical_blank_front_porch: 10,
-
-                    hsync_width: 10,
-                    vsync_width: 10,
-
-                    hsync_position: 0,
-                })
-                .with_vsync_idle_level(Level::High)
-                .with_hsync_idle_level(Level::High)
-                .with_de_idle_level(Level::Low)
-                .with_disable_black_region(false);
         }
         esp32s31 => {
             let vsync_pin = peripherals.GPIO45;
@@ -226,37 +199,63 @@ fn main() -> ! {
             let data13_pin = peripherals.GPIO34;
             let data14_pin = peripherals.GPIO35;
             let data15_pin = peripherals.GPIO36;
-
-            let config = Config::default()
-                .with_clock_mode(ClockMode {
-                    polarity: Polarity::IdleLow,
-                    phase: Phase::ShiftLow,
-                })
-                .with_frequency(Rate::from_mhz(40))
-                .with_format(Format {
-                    enable_2byte_mode: true,
-                    ..Default::default()
-                })
-                .with_timing(FrameTiming {
-                    horizontal_active_width: 800,
-                    horizontal_total_width: 840,
-                    horizontal_blank_front_porch: 10,
-
-                    vertical_active_height: 480,
-                    vertical_total_height: 510,
-                    vertical_blank_front_porch: 10,
-
-                    hsync_width: 10,
-                    vsync_width: 10,
-
-                    hsync_position: 0,
-                })
-                .with_vsync_idle_level(Level::High)
-                .with_hsync_idle_level(Level::High)
-                .with_de_idle_level(Level::Low)
-                .with_disable_black_region(false);
+        }
+        esp32p4 => {
+            let vsync_pin = peripherals.GPIO28;
+            let hsync_pin = peripherals.GPIO29;
+            let de_pin = peripherals.GPIO30;
+            let pclk_pin = peripherals.GPIO31;
+            let data0_pin = peripherals.GPIO7;
+            let data1_pin = peripherals.GPIO8;
+            let data2_pin = peripherals.GPIO9;
+            let data3_pin = peripherals.GPIO10;
+            let data4_pin = peripherals.GPIO11;
+            let data5_pin = peripherals.GPIO12;
+            let data6_pin = peripherals.GPIO13;
+            let data7_pin = peripherals.GPIO14;
+            let data8_pin = peripherals.GPIO15;
+            let data9_pin = peripherals.GPIO16;
+            let data10_pin = peripherals.GPIO17;
+            let data11_pin = peripherals.GPIO18;
+            let data12_pin = peripherals.GPIO19;
+            let data13_pin = peripherals.GPIO20;
+            let data14_pin = peripherals.GPIO21;
+            let data15_pin = peripherals.GPIO22;
         }
     }
+
+    let (frequency, horizontal_active_width, horizontal_total_width) = cfg_select! {
+        esp32s3 => (Rate::from_mhz(16), 480, 520),
+        _ => (Rate::from_mhz(40), 800, 840),
+    };
+    let config = Config::default()
+        .with_clock_mode(ClockMode {
+            polarity: Polarity::IdleLow,
+            phase: Phase::ShiftLow,
+        })
+        .with_frequency(frequency)
+        .with_format(Format {
+            enable_2byte_mode: true,
+            ..Default::default()
+        })
+        .with_timing(FrameTiming {
+            horizontal_active_width,
+            horizontal_total_width,
+            horizontal_blank_front_porch: 10,
+
+            vertical_active_height: 480,
+            vertical_total_height: 510,
+            vertical_blank_front_porch: 10,
+
+            hsync_width: 10,
+            vsync_width: 10,
+
+            hsync_position: 0,
+        })
+        .with_vsync_idle_level(Level::High)
+        .with_hsync_idle_level(Level::High)
+        .with_de_idle_level(Level::Low)
+        .with_disable_black_region(false);
 
     let mut dma_buf = dma_loop_buffer!(2 * 16);
 
