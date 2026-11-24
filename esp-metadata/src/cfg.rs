@@ -805,6 +805,12 @@ driver_configs![
             name: "RGB display", // LCD_CAM, ESP32 I2S, S2 I2S
             properties: {
                 output_lines: u32,
+                /// `LCD_RGB_VERTICAL`, `LCD_RGB_HORIZONTAL`, `LCD_RGB_BLANK` and `LCD_RGB_CTRL`
+                /// hold the timing, and `LCD_RGB_MODE_EN` is in `LCD_MISC`. The other layout
+                /// stores the timing in `LCD_CTRL`, `LCD_CTRL1` and `LCD_CTRL2`, and
+                /// `LCD_RGB_MODE_EN` in `LCD_CTRL`.
+                #[serde(default)]
+                has_rgb_timing_registers: bool,
             }
         },
         SpiLcdProperties {

@@ -382,6 +382,9 @@ macro_rules! property {
     ("rgb_display.output_lines", str) => {
         stringify!(16)
     };
+    ("rgb_display.has_rgb_timing_registers") => {
+        false
+    };
     ("adc.controller") => {
         "rtc"
     };
