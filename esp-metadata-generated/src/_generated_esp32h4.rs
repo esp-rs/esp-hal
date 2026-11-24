@@ -448,6 +448,9 @@ macro_rules! property {
     ("dma.gdma_version", str) => {
         stringify!(3)
     };
+    ("dma.psram_max_burst") => {
+        64
+    };
     ("interrupts.status_registers") => {
         4
     };

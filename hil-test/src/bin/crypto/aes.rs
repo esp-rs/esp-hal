@@ -1884,6 +1884,7 @@ mod gcm_tests {
     /// chains the hardware driver builds: all of the text through one bounce buffer, a head and a
     /// tail bounce around the PSRAM run, and a run that fills more than one descriptor.
     #[test]
+    #[timeout(60)] // The H4 takes about 31 s.
     #[cfg(all(soc_has_psram, dma_can_access_psram, not(esp32s2)))]
     fn test_gcm_offsets_psram(mut ctx: Context) {
         let mut memory = Vec::with_capacity_in(16 + 4_097 + 64, esp_alloc::ExternalMemory);
