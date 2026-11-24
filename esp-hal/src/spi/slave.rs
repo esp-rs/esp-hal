@@ -212,8 +212,8 @@ pub mod dma {
 
     impl<'d> SpiDma<'d, Blocking> {
         pub(super) fn new(spi: AnySpi<'d>, channel: SpiSlaveErased<'d>) -> Self {
-            let channel = Channel::new(channel);
-            channel.runtime_ensure_compatible(spi.dma_peripheral());
+            let mut channel = Channel::new(channel);
+            channel.connect(spi.dma_peripheral());
             let guard = PeripheralGuard::new(spi.info().peripheral);
 
             Self {
@@ -231,7 +231,6 @@ pub mod dma {
         fn driver(&self) -> DmaDriver {
             DmaDriver {
                 info: self.spi.info(),
-                dma_peripheral: self.spi.dma_peripheral(),
             }
         }
 
@@ -454,7 +453,6 @@ pub mod dma {
 
     struct DmaDriver {
         info: &'static Info,
-        dma_peripheral: crate::dma::DmaPeripheral,
     }
 
     impl DmaDriver {
@@ -476,17 +474,13 @@ pub mod dma {
 
             if read_buffer_len > 0 {
                 unsafe {
-                    channel
-                        .rx
-                        .prepare_transfer(self.dma_peripheral, rx_buffer)?;
+                    channel.rx.prepare_transfer(rx_buffer)?;
                 }
             }
 
             if write_buffer_len > 0 {
                 unsafe {
-                    channel
-                        .tx
-                        .prepare_transfer(self.dma_peripheral, tx_buffer)?;
+                    channel.tx.prepare_transfer(tx_buffer)?;
                 }
             }
 

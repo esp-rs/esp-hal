@@ -1260,8 +1260,8 @@ impl<'d> ParlIo<'d, Blocking> {
     ) -> Result<Self, Error> {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
-        let dma_channel = Channel::new(dma_channel.into());
-        dma_channel.runtime_ensure_compatible(DmaPeripheral::PARL_IO);
+        let mut dma_channel = Channel::new(dma_channel.into());
+        dma_channel.connect(DmaPeripheral::PARL_IO);
 
         Ok(Self {
             tx: TxCreator {
@@ -1441,7 +1441,7 @@ where
 
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::PARL_IO, &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = result {
@@ -1792,7 +1792,7 @@ where
 
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::PARL_IO, &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = result {

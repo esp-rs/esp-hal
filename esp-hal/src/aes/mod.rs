@@ -456,8 +456,8 @@ pub mod dma {
     impl<'d> super::Aes<'d> {
         /// Enables DMA for the current instance of the AES driver.
         pub fn with_dma(self, channel: impl AesDmaChannel<'d>) -> AesDma<'d> {
-            let channel = Channel::new(channel.into());
-            channel.runtime_ensure_compatible(self.aes.dma_peripheral());
+            let mut channel = Channel::new(channel.into());
+            channel.connect(self.aes.dma_peripheral());
             AesDma { aes: self, channel }
         }
     }
@@ -500,10 +500,8 @@ pub mod dma {
             TXBUF: DmaTxBuffer,
             RXBUF: DmaRxBuffer,
         {
-            let peri = self.aes.aes.dma_peripheral();
-
-            if let Err(error) = unsafe { self.channel.tx.prepare_transfer(peri, &mut input) }
-                .and_then(|_| unsafe { self.channel.rx.prepare_transfer(peri, &mut output) })
+            if let Err(error) = unsafe { self.channel.tx.prepare_transfer(&mut input) }
+                .and_then(|_| unsafe { self.channel.rx.prepare_transfer(&mut output) })
                 // Start them together, to avoid the latter prepare discarding data from FIFOs.
                 .and_then(|_| self.channel.tx.start_transfer())
                 .and_then(|_| self.channel.rx.start_transfer())

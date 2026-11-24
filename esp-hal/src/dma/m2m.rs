@@ -80,12 +80,12 @@ for_each_mem2mem_channel! {
                     $( Self::$variant(channel) => channel, )*
                 } {
                     fn set_mem2mem_mode(&mut self, value: bool);
+                    fn set_peripheral(&mut self, peripheral: DmaPeripheral);
                     fn start_transfer(&mut self) -> Result<(), DmaError>;
                     fn stop_transfer(&mut self);
                     fn end_transfer(&mut self);
                     unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
                         &mut self,
-                        peri: DmaPeripheral,
                         buffer: &mut BUF,
                     ) -> Result<(), DmaError>;
                 }
@@ -126,12 +126,12 @@ for_each_mem2mem_channel! {
                 to match self {
                     $( Self::$variant(channel) => channel, )*
                 } {
+                    fn set_peripheral(&mut self, peripheral: DmaPeripheral);
                     fn start_transfer(&mut self) -> Result<(), DmaError>;
                     fn stop_transfer(&mut self);
                     fn end_transfer(&mut self);
                     unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
                         &mut self,
-                        peri: DmaPeripheral,
                         buffer: &mut BUF,
                     ) -> Result<(), DmaError>;
                 }
@@ -263,17 +263,18 @@ impl<'d> Mem2Mem<'d, Blocking> {
         #[cfg(dma_mem2mem_requires_peripheral)]
         channel.rx.runtime_ensure_compatible(peripheral);
 
+        channel.rx.set_peripheral(peripheral);
+        channel.tx.set_peripheral(peripheral);
+
         #[cfg(dma_supports_mem2mem)]
         channel.rx.set_mem2mem_mode(true);
 
         Mem2Mem {
             rx: Mem2MemRx {
                 channel: channel.rx,
-                peripheral,
             },
             tx: Mem2MemTx {
                 channel: channel.tx,
-                peripheral,
             },
         }
     }
@@ -295,7 +296,6 @@ where
     Dm: DriverMode,
 {
     channel: ErasedChannelRx<'d, Dm>,
-    peripheral: DmaPeripheral,
 }
 
 impl<'d> Mem2MemRx<'d, Blocking> {
@@ -303,7 +303,6 @@ impl<'d> Mem2MemRx<'d, Blocking> {
     pub fn into_async(self) -> Mem2MemRx<'d, Async> {
         Mem2MemRx {
             channel: self.channel.into_async(),
-            peripheral: self.peripheral,
         }
     }
 }
@@ -322,7 +321,7 @@ where
     {
         let result = unsafe {
             self.channel
-                .prepare_transfer(self.peripheral, &mut buf)
+                .prepare_transfer(&mut buf)
                 .and_then(|_| self.channel.start_transfer())
         };
 
@@ -447,7 +446,6 @@ where
     Dm: DriverMode,
 {
     channel: ErasedChannelTx<'d, Dm>,
-    peripheral: DmaPeripheral,
 }
 
 impl<'d> Mem2MemTx<'d, Blocking> {
@@ -455,7 +453,6 @@ impl<'d> Mem2MemTx<'d, Blocking> {
     pub fn into_async(self) -> Mem2MemTx<'d, Async> {
         Mem2MemTx {
             channel: self.channel.into_async(),
-            peripheral: self.peripheral,
         }
     }
 }
@@ -474,7 +471,7 @@ where
     {
         let result = unsafe {
             self.channel
-                .prepare_transfer(self.peripheral, &mut buf)
+                .prepare_transfer(&mut buf)
                 .and_then(|_| self.channel.start_transfer())
         };
 
