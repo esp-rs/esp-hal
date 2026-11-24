@@ -73,6 +73,8 @@ use crate::{
 
 pub mod aligned;
 mod buffers;
+#[cfg(all(feature = "unstable", soc_has_vdma))]
+pub(crate) mod dw_gdma;
 #[cfg(dma_supports_mem2mem)]
 mod m2m;
 
