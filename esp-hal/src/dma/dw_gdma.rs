@@ -20,6 +20,9 @@ const CHANNEL_COUNT: usize = 4;
 // `CHEN0`: `CH_EN` bits [3:0], `CH_EN_WE` bits [11:8].
 const CHANNEL_ENABLE_WRITE: u32 = 0x0100;
 const CHANNEL_ENABLE_SET: u32 = 0x0101;
+// `CHEN0`: `CH_SUSP` bits [19:16], `CH_SUSP_WE` bits [27:24].
+const CHANNEL_SUSPEND_WRITE: u32 = 0x0100_0000;
+const CHANNEL_SUSPEND_SET: u32 = 0x0101_0000;
 // `CHEN1`: `CH_ABORT` bits [3:0], `CH_ABORT_WE` bits [11:8].
 const CHANNEL_ABORT_SET: u32 = 0x0101;
 
@@ -58,6 +61,42 @@ impl MasterSelect {
     }
 }
 
+/// Address increment mode of a block transfer endpoint.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AddressIncrementMode {
+    Increment,
+    Fixed,
+}
+
+/// Maximum block transfer size in transfer-width units.
+///
+/// `BLOCK_TS0` is 22-bit and stores `(transfer_size - 1)`.
+pub(crate) const MAX_BLOCK_TRANSFER_SIZE_UNITS: u32 = 0x0040_0000;
+
+/// One endpoint of a block transfer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct BlockTransferEndpointConfig {
+    pub(crate) addr: u32,
+    pub(crate) master: MasterSelect,
+    pub(crate) addr_inc_mode: AddressIncrementMode,
+    /// `CTL0.*_MSIZE`.
+    pub(crate) burst_size: u8,
+    /// `CTL1.ARLEN` or `CTL1.AWLEN`.
+    pub(crate) axi_burst_len: u8,
+    /// `CTL0.*_TR_WIDTH`.
+    pub(crate) width: u8,
+}
+
+/// A single block transfer, programmed through the channel registers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct BlockTransferConfig {
+    pub(crate) src: BlockTransferEndpointConfig,
+    pub(crate) dst: BlockTransferEndpointConfig,
+    /// Transfer size in transfer-width units.
+    pub(crate) transfer_size_in_units: u32,
+    pub(crate) interrupt_on_block_done: bool,
+}
+
 /// Channel configuration. Both ends use the hardware handshake.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ChannelConfig {
@@ -71,6 +110,10 @@ pub(crate) struct ChannelConfig {
     pub(crate) src_peripheral: u8,
     /// `CFG1.DST_PER`: hardware handshake interface of the destination.
     pub(crate) dst_peripheral: u8,
+    /// `SSTATAR`: address that the channel reads the source status from, or 0.
+    pub(crate) src_status_fetch_addr: u32,
+    /// `DSTATAR`: address that the channel reads the destination status from, or 0.
+    pub(crate) dst_status_fetch_addr: u32,
     /// `CFG1.CH_PRIOR`.
     pub(crate) priority: u8,
     /// `CFG1.SRC_OSR_LMT`: outstanding source requests, minus one.
@@ -142,6 +185,18 @@ pub(crate) fn unregister_channel_handler(channel: DwGdmaChannel) {
     while CHANNEL_DISPATCHES_IN_FLIGHT[index].load(Ordering::SeqCst) != 0 {
         core::hint::spin_loop();
     }
+}
+
+/// Returns whether `channel` can take interrupts through the dispatcher, that
+/// is, no handler is registered for it.
+///
+/// Whether something else rebound [`Interrupt::DMA`] is not checked:
+/// `interrupt::bound_handler` reads the vector table non-volatilely and was
+/// seen on hardware to return the link-time default after `bind_handler`.
+pub(crate) fn channel_interrupt_available(channel: DwGdmaChannel) -> bool {
+    CHANNEL_HANDLERS[channel.channel_id as usize]
+        .load(Ordering::SeqCst)
+        .is_null()
 }
 
 /// The only handler bound to [`Interrupt::DMA`].
@@ -218,6 +273,54 @@ impl DwGdmaChannel {
             w.ch1_src_osr_lmt().bits(config.src_outstanding_limit);
             w.ch1_dst_osr_lmt().bits(config.dst_outstanding_limit)
         });
+
+        unsafe {
+            ch.sstatar0()
+                .write(|w| w.bits(config.src_status_fetch_addr));
+            ch.dstatar0()
+                .write(|w| w.bits(config.dst_status_fetch_addr));
+        }
+    }
+
+    /// Programs a single block transfer through the channel registers.
+    #[inline]
+    pub(crate) fn configure_block_transfer(&self, config: BlockTransferConfig) {
+        debug_assert!(config.transfer_size_in_units > 0);
+        debug_assert!(config.transfer_size_in_units <= MAX_BLOCK_TRANSFER_SIZE_UNITS);
+
+        let ch = VDMA::regs().ch(self.channel_id as usize);
+        ch.sar0()
+            .write(|w| unsafe { w.ch1_sar0().bits(config.src.addr) });
+        unsafe { ch.sar1().write_with_zero(|w| w) };
+        ch.dar0()
+            .write(|w| unsafe { w.ch1_dar0().bits(config.dst.addr) });
+        unsafe { ch.dar1().write_with_zero(|w| w) };
+        ch.block_ts0()
+            .write(|w| unsafe { w.ch1_block_ts().bits(config.transfer_size_in_units - 1) });
+
+        ch.ctl0().write(|w| unsafe {
+            w.ch1_sms().bit(config.src.master == MasterSelect::Memory);
+            w.ch1_dms().bit(config.dst.master == MasterSelect::Memory);
+            w.ch1_sinc()
+                .bit(config.src.addr_inc_mode == AddressIncrementMode::Fixed);
+            w.ch1_dinc()
+                .bit(config.dst.addr_inc_mode == AddressIncrementMode::Fixed);
+            w.ch1_src_tr_width().bits(config.src.width);
+            w.ch1_dst_tr_width().bits(config.dst.width);
+            w.ch1_src_msize().bits(config.src.burst_size);
+            w.ch1_dst_msize().bits(config.dst.burst_size)
+        });
+
+        ch.ctl1().write(|w| unsafe {
+            w.ch1_arlen_en().set_bit();
+            w.ch1_arlen().bits(config.src.axi_burst_len);
+            w.ch1_awlen_en().set_bit();
+            w.ch1_awlen().bits(config.dst.axi_burst_len);
+            w.ch1_ioc_blktfr().bit(config.interrupt_on_block_done);
+            // A single block: no shadow-register or link-list block markers.
+            w.ch1_shadowreg_or_lli_last().clear_bit();
+            w.ch1_shadowreg_or_lli_valid().clear_bit()
+        });
     }
 
     /// Points the channel at the link-list item at `llp_addr` and enables it.
@@ -258,6 +361,21 @@ impl DwGdmaChannel {
         VDMA::regs().chen0().read().bits() & (1 << self.channel_id) != 0
     }
 
+    /// Suspends or resumes the channel.
+    #[inline]
+    pub(crate) fn set_suspended(&self, suspended: bool) {
+        let value = if suspended {
+            CHANNEL_SUSPEND_SET
+        } else {
+            CHANNEL_SUSPEND_WRITE
+        };
+        unsafe {
+            VDMA::regs()
+                .chen0()
+                .write(|w| w.bits(value << self.channel_id))
+        };
+    }
+
     /// Requests a channel abort, to recover from a transfer that does not complete.
     #[inline]
     pub(crate) fn trigger_abort(&self) {
@@ -292,11 +410,37 @@ impl DwGdmaChannel {
         unsafe { ch.intsignal_enable0().write(|w| w.bits(mask)) };
     }
 
+    /// Returns the raw interrupt status bitmap of the channel.
+    #[inline]
+    pub(crate) fn interrupt_status(&self) -> u32 {
+        VDMA::regs()
+            .ch(self.channel_id as usize)
+            .intstatus0()
+            .read()
+            .bits()
+    }
+
+    /// Clears the interrupt status bits in `mask`.
+    #[inline]
+    pub(crate) fn clear_interrupts(&self, mask: u32) {
+        let ch = VDMA::regs().ch(self.channel_id as usize);
+        unsafe { ch.intclear0().write(|w| w.bits(mask)) };
+    }
+
     /// Clears all interrupt status bits of the channel.
     #[inline]
     pub(crate) fn clear_all_interrupts(&self) {
-        let ch = VDMA::regs().ch(self.channel_id as usize);
-        unsafe { ch.intclear0().write(|w| w.bits(u32::MAX)) };
+        self.clear_interrupts(u32::MAX);
+    }
+
+    /// Returns the address that the channel writes next (`DAR`).
+    #[inline]
+    pub(crate) fn destination_address(&self) -> u32 {
+        VDMA::regs()
+            .ch(self.channel_id as usize)
+            .dar0()
+            .read()
+            .bits()
     }
 
     /// Returns the address that the channel reads next (`SAR`).
