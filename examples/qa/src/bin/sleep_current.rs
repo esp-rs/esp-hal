@@ -26,6 +26,7 @@
 //! before the hold, and checks the pattern after the hold.
 
 //% CHIP_FILTER: sleep_driver_supported && sleep_deep_sleep
+//% ENV-IF(esp32c3 || esp32s3): ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED=false
 
 #![no_std]
 #![no_main]

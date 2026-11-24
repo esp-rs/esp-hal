@@ -70,6 +70,8 @@
 //! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
 //% CHIP_FILTER: sleep_light_sleep && sleep_has_wakeup_source_timer
+//% ENV-IF(esp32c3 || esp32s3): ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED=false
+
 #![no_std]
 #![no_main]
 

@@ -26,9 +26,8 @@ working. When the option is disabled, every light sleep disconnects USB Serial/J
 
 Light sleep cannot keep USB Serial/JTAG running on this chip, so every light sleep disconnects it
 from the host. The `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option, enabled by default,
-keeps automatic light sleep from starting while a host is connected, so that the console and the
-debugger keep working. When the option is disabled, automatic light sleep also starts while a host
-is connected.
+makes light sleep refuse to start while a host is connected, so that the console and the debugger
+keep working. When the option is disabled, light sleep also starts while a host is connected.
 "#,
     _ => "",
 }]
@@ -195,26 +194,15 @@ pub enum LightSleep {
     ///
     /// The refusal holds until the state that caused it changes, so a second call refuses too.
     /// Wait for an interrupt instead.
+    #[cfg_attr(
+        all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)),
+        doc = "\n\nA USB host connected to USB Serial/JTAG also refuses the sleep, unless the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option is disabled. The disconnect of the host raises no interrupt, so try the sleep again after a delay."
+    )]
     Refused,
 }
 
 #[cfg(supports_cpu_power_down)]
 use crate::rtc_cntl::cpu_retention;
-
-/// The parts of the sleep path that an RTOS queries.
-#[cfg(sleep_driver_supported)]
-#[doc(hidden)]
-#[instability::unstable]
-pub mod __rtos_implementation {
-    /// Returns whether automatic light sleep must keep the chip awake for USB Serial/JTAG.
-    ///
-    /// Light sleep disconnects USB Serial/JTAG from the host. Automatic light sleep does not start
-    /// while a host is connected, unless the `keep-usb-serial-jtag-connected` option is disabled.
-    #[cfg(all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)))]
-    pub fn usb_serial_jtag_blocks_light_sleep() -> bool {
-        cfg!(keep_usb_serial_jtag_connected) && super::usb_serial_jtag::host_connected()
-    }
-}
 
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
@@ -382,6 +370,10 @@ impl<'d> LowPower<'d> {
     /// neither case. For the caller, a rejected sleep and a very short sleep have the same
     /// result.
     #[cfg_attr(
+        all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)),
+        doc = "\n\nThe function refuses the sleep while a USB host is connected to USB Serial/JTAG, unless the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option is disabled."
+    )]
+    #[cfg_attr(
         cpu_retention = "software",
         doc = "\n\nLight sleep suspends the caches. See [Optimization \
                level](crate#optimization-level) for the build requirement."
@@ -424,6 +416,11 @@ impl<'d> LowPower<'d> {
         config: RtcSleepConfig,
         may_sleep: Option<fn() -> bool>,
     ) -> LightSleep {
+        #[cfg(all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)))]
+        if cfg!(keep_usb_serial_jtag_connected) && usb_serial_jtag::host_connected() {
+            return LightSleep::Refused;
+        }
+
         if self.sleep(config, SleepKind::Light, true, may_sleep) {
             LightSleep::Refused
         } else {

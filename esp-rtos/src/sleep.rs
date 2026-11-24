@@ -121,13 +121,10 @@ impl DeepSleep {
 ///
 /// Each time the scheduler runs out of ready tasks, the hook disables interrupts on this core,
 /// takes the scheduler lock, and checks that:
-/// - no [`WakeLock`] is held
-/// - all cores are idle
-/// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away
-#[cfg_attr(
-    all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)),
-    doc = "- no USB host is connected to USB Serial/JTAG, unless `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` is `false`"
-)]
+/// - no [`WakeLock`] is held,
+/// - all cores are idle,
+/// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
+///
 /// If all hold, it releases the lock and enters light sleep with interrupts still disabled. The
 /// sleep path keeps interrupts disabled, and parks every other running core for the duration of
 /// the sleep. Then it checks the first two conditions again, and a failed check refuses the sleep.
@@ -186,12 +183,6 @@ extern "C" fn auto_light_sleep_hook() -> ! {
 
         let sleep = SCHEDULER.with(|scheduler| {
             if WakeLock::is_active() {
-                return false;
-            }
-
-            #[cfg(all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)))]
-            if esp_hal::rtc_cntl::sleep::__rtos_implementation::usb_serial_jtag_blocks_light_sleep()
-            {
                 return false;
             }
 
