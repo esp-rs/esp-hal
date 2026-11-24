@@ -199,6 +199,18 @@ impl<E: TaskListElement> TaskQueue<E> {
         _ = self.pop_if(|t| NonNull::from(t) == task);
     }
 
+    #[cfg(multi_core)]
+    pub fn any(&self, cond: impl Fn(&Task) -> bool) -> bool {
+        let mut current = self.head;
+        while let Some(task) = current {
+            if cond(unsafe { task.as_ref() }) {
+                return true;
+            }
+            current = E::next(task);
+        }
+        false
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.head.is_none()
     }

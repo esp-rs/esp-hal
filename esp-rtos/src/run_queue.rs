@@ -1,5 +1,7 @@
 use esp_hal::system::Cpu;
 
+#[cfg(multi_core)]
+use crate::task::Task;
 use crate::{
     scheduler::{ActiveCores, CpuState},
     task::{TaskExt, TaskPtr, TaskQueue, TaskReadyQueueElement, TaskState},
@@ -142,6 +144,13 @@ pub(crate) struct RunQueue {
     pub(crate) ready_tasks: [TaskQueue<TaskReadyQueueElement>; MaxPriority::MAX_PRIORITY + 1],
 }
 
+pub(crate) struct NextTask {
+    pub(crate) task: TaskPtr,
+
+    /// The run queue holds another task of the same priority that the CPU can run.
+    pub(crate) time_slice: bool,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RunSchedulerOn {
     DontRun,
@@ -243,25 +252,24 @@ impl RunQueue {
         }
     }
 
-    /// Removes the highest priority task that the current CPU can run.
+    /// Removes the highest priority task that `cpu` can run.
     ///
     /// `other_cpu_task` is the current task of the other CPU. The other CPU still runs on its
     /// stack, even if the task is ready again, so this function does not return it.
     #[esp_hal::ram]
     pub(crate) fn pop(
         &mut self,
-        #[cfg(multi_core)] other_cpu_task: *const crate::task::Task,
-    ) -> Option<TaskPtr> {
+        #[cfg(multi_core)] cpu: Cpu,
+        #[cfg(multi_core)] other_cpu_task: *const Task,
+    ) -> Option<NextTask> {
         let current_prio = self.ready_priority.ready();
         trace!("pop - from level: {}", current_prio);
 
         cfg_select! {
             multi_core => {
-                use esp_hal::system::Cpu;
-
-                let other = match Cpu::current() {
-                    Cpu::AppCpu => Cpu::ProCpu,
-                    Cpu::ProCpu => Cpu::AppCpu,
+                let can_run = |t: &Task| {
+                    t.pinned_to.is_none_or(|pinned_to| pinned_to == cpu)
+                        && !core::ptr::eq(t, other_cpu_task)
                 };
 
                 // Look iteratively through priority levels - this will ensure we can find a task
@@ -271,9 +279,7 @@ impl RunQueue {
                 let mut current_prio = current_prio;
                 let mut popped;
                 loop {
-                    popped = self.ready_tasks[current_prio].pop_if(|t| {
-                        t.pinned_to != Some(other) && !core::ptr::eq(t, other_cpu_task)
-                    });
+                    popped = self.ready_tasks[current_prio].pop_if(can_run);
 
                     if popped.is_none() {
                         priority_level.unmark(current_prio);
@@ -286,9 +292,12 @@ impl RunQueue {
 
                     break;
                 }
+
+                let time_slice = self.ready_tasks[current_prio].any(can_run);
             }
             _ => {
                 let popped = self.ready_tasks[current_prio].pop();
+                let time_slice = !self.ready_tasks[current_prio].is_empty();
             }
         }
 
@@ -297,11 +306,7 @@ impl RunQueue {
             debug!("pop - New prio level: {}", self.ready_priority.ready());
         }
 
-        popped
-    }
-
-    pub(crate) fn is_level_empty(&self, level: Priority) -> bool {
-        self.ready_tasks[level.get()].is_empty()
+        popped.map(|task| NextTask { task, time_slice })
     }
 
     /// Returns `true` if any task is ready to run (queued at any priority level).
