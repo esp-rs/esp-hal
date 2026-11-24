@@ -7,7 +7,7 @@ use crate::{
     task::{TaskExt, TaskPtr, TaskQueue, TaskReadyQueueElement, TaskState},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct MaxPriority {
     // Using Priority here tells the compiler about the maximum value, removing bounds checks.
     max: Priority,
@@ -21,25 +21,25 @@ impl MaxPriority {
         P::MAX as usize
     };
 
-    const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             max: Priority::ZERO,
             mask: 0,
         }
     }
 
-    fn mark_ready(&mut self, level: Priority) {
+    pub(crate) fn mark_ready(&mut self, level: Priority) {
         self.max = if level > self.max { level } else { self.max };
         self.mask |= 1 << level.get();
     }
 
-    fn unmark(&mut self, level: usize) {
+    pub(crate) fn unmark(&mut self, level: usize) {
         self.mask &= !(1 << level);
         self.max =
             Priority::new(Self::MAX_PRIORITY.saturating_sub(self.mask.leading_zeros() as usize));
     }
 
-    fn ready(&self) -> usize {
+    pub(crate) fn ready(&self) -> usize {
         // Priority 0 must always be ready
         self.max.get()
     }

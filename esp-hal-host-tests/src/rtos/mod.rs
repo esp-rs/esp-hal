@@ -5,7 +5,7 @@ use core::ptr::{self, NonNull};
 use esp_hal::system::Cpu;
 
 use crate::{
-    run_queue::RunQueue,
+    run_queue::{MaxPriority, Priority, RunQueue},
     scheduler::{ActiveCores, CpuState},
     task::Task,
 };
@@ -79,4 +79,71 @@ fn check_pop(
     );
 
     Some((popped, next.time_slice))
+}
+
+const LEVELS: usize = MaxPriority::MAX_PRIORITY + 1;
+
+#[derive(Clone, Copy)]
+enum PriorityOp {
+    MarkReady(usize),
+    Unmark(usize),
+}
+
+/// Returns the highest level that `mask` has a bit for, or 0 when `mask` is empty.
+fn highest_level(mask: u32) -> usize {
+    let mut highest = 0;
+    for level in 0..LEVELS {
+        if mask & (1 << level) != 0 {
+            highest = level;
+        }
+    }
+    highest
+}
+
+fn max_priority_from_mask(mask: u32) -> MaxPriority {
+    let mut max_priority = MaxPriority::new();
+    for level in 0..LEVELS {
+        if mask & (1 << level) != 0 {
+            max_priority.mark_ready(Priority::new(level));
+        }
+    }
+    max_priority
+}
+
+/// Applies `op` to the `MaxPriority` that has the levels of `mask` marked, and returns the ready
+/// level after it.
+///
+/// Panics unless:
+/// - `ready` gives the highest marked level, or 0 when no level is marked, before and after `op`.
+/// - After `op`, the state equals the one built from the new mask.
+fn check_max_priority(mask: u32, op: PriorityOp) -> usize {
+    let mut max_priority = max_priority_from_mask(mask);
+    assert_eq!(
+        max_priority.ready(),
+        highest_level(mask),
+        "the ready level is the highest marked level"
+    );
+
+    let mask = match op {
+        PriorityOp::MarkReady(level) => {
+            max_priority.mark_ready(Priority::new(level));
+            mask | (1 << level)
+        }
+        PriorityOp::Unmark(level) => {
+            max_priority.unmark(level);
+            mask & !(1 << level)
+        }
+    };
+
+    assert_eq!(
+        max_priority.ready(),
+        highest_level(mask),
+        "the ready level after the operation is the highest marked level"
+    );
+    assert!(
+        max_priority == max_priority_from_mask(mask),
+        "the operation gives the state built from the new mask"
+    );
+
+    max_priority.ready()
 }

@@ -3,7 +3,7 @@ use core::array;
 use esp_hal::system::Cpu;
 use kani::{any, any_where, assume};
 
-use super::check_pop;
+use super::{LEVELS, PriorityOp, check_max_priority, check_pop};
 use crate::task::Task;
 
 const TASKS: usize = 4;
@@ -49,4 +49,31 @@ fn pop_selects_the_task_and_the_time_slice() {
     }
 
     check_pop(&mut tasks, &queued, cpu, other_cpu_task);
+}
+
+/// Proves that `MaxPriority::ready()` gives the highest marked level, or 0 when no level is
+/// marked, in every state that `mark_ready` and `unmark` can reach.
+///
+/// The mask, the operation and its level are symbolic, so `check_max_priority` runs for all 2^32
+/// masks and all 64 operations at once.
+///
+/// The check proves one step, not a sequence of operations. Each reachable state is one built
+/// from a mask: the empty state is built from mask 0, and the state-equality check carries this
+/// over each operation. So one step from every mask covers every reachable state. A sequence
+/// would need a loop over the steps, which makes the proof slower and covers no more states.
+///
+/// `unwind(33)`: each loop in `check_max_priority` runs once per level, 32 times. The proof takes
+/// a few seconds. CI can't try every mask, so it runs every mask of the 4 lowest and 4 highest
+/// levels instead.
+#[kani::proof]
+#[kani::unwind(33)]
+fn max_priority_ready_gives_the_highest_marked_level() {
+    let level = any_where(|level: &usize| *level < LEVELS);
+    let op = if any() {
+        PriorityOp::MarkReady(level)
+    } else {
+        PriorityOp::Unmark(level)
+    };
+
+    check_max_priority(any(), op);
 }

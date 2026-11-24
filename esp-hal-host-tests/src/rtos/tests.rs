@@ -2,7 +2,7 @@ use core::array;
 
 use esp_hal::system::Cpu;
 
-use super::check_pop;
+use super::{LEVELS, PriorityOp, check_max_priority, check_pop};
 use crate::task::Task;
 
 #[test]
@@ -72,4 +72,38 @@ fn lower_priority_task_when_the_higher_one_is_pinned_to_the_other_cpu() {
     let next = check_pop(&mut tasks, &[true, true], Cpu::ProCpu, None);
 
     assert_eq!(next, Some((1, false)));
+}
+
+#[test]
+fn unmark_of_the_highest_level_gives_the_next_marked_level() {
+    let ready = check_max_priority(1 << 31 | 1 << 5, PriorityOp::Unmark(31));
+
+    assert_eq!(ready, 5);
+}
+
+#[test]
+fn unmark_of_the_last_level_gives_zero() {
+    let ready = check_max_priority(1 << 3, PriorityOp::Unmark(3));
+
+    assert_eq!(ready, 0);
+}
+
+#[test]
+fn mark_ready_below_the_highest_level_keeps_it() {
+    let ready = check_max_priority(1 << 4, PriorityOp::MarkReady(2));
+
+    assert_eq!(ready, 4);
+}
+
+/// Checks every mask of the 4 lowest and the 4 highest levels, with each operation on each level.
+#[test]
+#[cfg_attr(miri, ignore = "too slow under Miri")]
+fn max_priority_follows_the_property_for_the_lowest_and_highest_levels() {
+    for bits in 0..1u32 << 8 {
+        let mask = (bits & 0xF) | (bits >> 4) << 28;
+        for level in 0..LEVELS {
+            check_max_priority(mask, PriorityOp::MarkReady(level));
+            check_max_priority(mask, PriorityOp::Unmark(level));
+        }
+    }
 }
