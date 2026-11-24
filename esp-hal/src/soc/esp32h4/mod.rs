@@ -49,7 +49,6 @@ pub(crate) fn pre_init() {
 /// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[crate::ram]
-#[expect(dead_code, reason = "No enabled driver needs cache maintenance yet.")]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(addr: u32, size: u32);
@@ -88,7 +87,6 @@ pub(crate) fn cache_writeback_all() {
 /// Invalidate a specific range of addresses in the cache.
 #[doc(hidden)]
 #[crate::ram]
-#[expect(dead_code, reason = "No enabled driver needs cache maintenance yet.")]
 pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 

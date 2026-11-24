@@ -471,6 +471,7 @@ support_status = "not_supported"
 support_status = { status = "partial", issue = 6754 }
 gdma_version = 3
 separate_in_out_interrupts = true
+psram_max_burst = 64
 engines = [
     {
         name = "AHB_GDMA",
