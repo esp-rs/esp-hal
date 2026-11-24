@@ -1,0 +1,34 @@
+[package]
+name    = "camera-preview"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+esp-alloc = { path = "../../esp-alloc" }
+esp-backtrace = { path = "../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
+esp-println = { path = "../../esp-println", features = ["log-04"] }
+
+[features]
+esp32p4 = [
+    "esp-alloc/esp32p4",
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-hal/esp32p4",
+    "esp-println/esp32p4",
+]
+
+[profile.dev]
+opt-level = 2
+
+[profile.release]
+codegen-units    = 1
+debug            = true
+debug-assertions = false
+lto              = "fat"
+opt-level        = 3
