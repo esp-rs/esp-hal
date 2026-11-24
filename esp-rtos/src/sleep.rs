@@ -243,14 +243,16 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 // running, so its alarm is still valid.
                 if result == LightSleep::Ended {
                     time_driver.rearm(crate::now());
-                }
 
-                // Trigger the scheduler on the other core to prevent it from putting
-                // the system back to sleep immediately.
-                #[cfg(multi_core)]
-                for cpu in Cpu::other() {
-                    if scheduler.active_cores.contains(cpu) {
-                        task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
+                    // Trigger the scheduler on the other core to prevent it from putting
+                    // the system back to sleep immediately. Do not do this after a refusal:
+                    // the other core would try the same sleep, and the two cores would wake each
+                    // other until the refusal ends.
+                    #[cfg(multi_core)]
+                    for cpu in Cpu::other() {
+                        if scheduler.active_cores.contains(cpu) {
+                            task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
+                        }
                     }
                 }
             });
