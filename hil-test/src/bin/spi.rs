@@ -1359,7 +1359,11 @@ mod tests {
                 assert_eq!(
                     source_hz.div_ceil(n * pre),
                     requested,
-                    "source: {source:?} ({source_hz} Hz), n={n}, pre={pre}"
+                    "source: {:?} ({} Hz), n={}, pre={}",
+                    source,
+                    source_hz,
+                    n,
+                    pre
                 );
             }
         }
@@ -1371,14 +1375,14 @@ mod tests {
         check_typical_values(&mut ctx, SpiFunctionClockConfig::default());
     }
 
-    #[cfg(all(pcnt_driver_supported, spi_master_supports_dma))]
+    #[cfg(spi_master_supports_dma)]
     #[test]
     fn test_sck_frequency_matches_configuration(ctx: Context) {
         use esp_hal::spi::master::ClockSource;
 
         const SCK: Rate = Rate::from_mhz(2);
+        const TRANSFER_BYTES: usize = 8 * 1024;
 
-        let counter = set_up_pcnt!(ctx, sclk_input);
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
         let mut buffer = DmaTxBuf::new(
             DmaAlignedMut::new(ctx.tx_descriptors).unwrap(),
@@ -1386,10 +1390,12 @@ mod tests {
         )
         .unwrap();
 
+        buffer.set_length(TRANSFER_BYTES);
         let config = Config::default().with_frequency(SCK);
-        let expected_hz = u64::from(SCK.as_hz());
+        let expected_us = TRANSFER_BYTES as u64 * 8 * 1_000_000 / u64::from(SCK.as_hz());
+
         for source in [
-            // On C5, select XTAL before each PLL to reset the PCR pre-divider to /1.
+            // Select XTAL before each PLL to reset the PCR pre-divider on C5 and C61.
             #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
             ClockSource::Xtal,
             ClockSource::default(),
@@ -1399,22 +1405,17 @@ mod tests {
             ClockSource::PllF120m,
         ] {
             spi.apply_config(&config.with_clock_source(source)).unwrap();
-            let transfer = spi.write_buffer(1024, buffer).map_err(|err| err.0).unwrap();
-            counter.clear();
             let start = Instant::now();
-            while start.elapsed() < Duration::from_micros(500) {}
-            let pulses = u64::try_from(counter.value()).unwrap();
-            let elapsed_us = start.elapsed().as_micros();
-            assert!(
-                !transfer.is_done(),
-                "{source:?}: SPI transfer ended during SCK measurement"
-            );
+            let transfer = spi
+                .write_buffer(TRANSFER_BYTES, buffer)
+                .map_err(|err| err.0)
+                .unwrap();
             (spi, buffer) = transfer.wait();
+            let elapsed_us = start.elapsed().as_micros();
 
-            let actual_hz = pulses * 1_000_000 / elapsed_us;
             assert!(
-                actual_hz.abs_diff(expected_hz) <= expected_hz / 20,
-                "{source:?}: SCK was {actual_hz} Hz, expected {expected_hz} Hz"
+                elapsed_us.abs_diff(expected_us) <= expected_us / 20,
+                "{source:?}: SPI write took {elapsed_us} us, expected {expected_us} us"
             );
         }
     }
