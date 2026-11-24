@@ -16,8 +16,20 @@ pub(crate) use esp32s31 as pac;
 
 use crate::peripherals::{HP_APM, HP_MEM_APM, LP_APM};
 
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", not(code_in_psram)))]
 pub(crate) fn riscv_preinit() {}
+
+/// Copies the code into PSRAM. `_setup_interrupts` must call this function first, after `_start`
+/// zeroes `.bss`: code that runs before it could reach `.text`, which is not in PSRAM yet.
+///
+/// The link check on `.boot.code_in_psram` cannot see a call through a pointer or an address made
+/// from constants, so the start-up must use neither. See [`crate::psram::code_in_psram`].
+#[cfg(all(feature = "rt", code_in_psram))]
+#[unsafe(link_section = ".boot.code_in_psram")]
+#[inline(never)]
+pub(crate) fn riscv_preinit() {
+    crate::psram::code_in_psram::start();
+}
 
 pub(crate) fn pre_init() {
     if crate::system::Cpu::current() == crate::system::Cpu::ProCpu {

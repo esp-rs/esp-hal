@@ -64,24 +64,45 @@
 //!   including a read.
 //! - Each operation suspends the caches. See [Optimization level](crate#optimization-level) for the
 //!   build requirement.
+#![cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "
+## With `code-in-psram`
+
+Nothing fetches from flash, so a flash operation leaves interrupts enabled, the caches on, and the
+other core running. The limits above on the cache and the other core do not apply."
+)]
+#![cfg_attr(
+    all(psram_supports_code_in_psram, multi_core),
+    doc = "[`MultiCoreStrategy`] has no effect."
+)]
+#![cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "
+These limits apply:
+
+- Don't map flash during an erase or a write.
+- On a chip with two cores, don't start a flash operation inside a critical section.
+- A light sleep returns `Refused` while a core holds the flash lock.
+- esp-storage does not take esp-hal's flash lock, so it is not compatible with code in PSRAM."
+)]
 
 use core::marker::PhantomData;
 
+#[cfg(not(code_in_psram))]
 use esp_sync::{
     RestoreState,
     raw::{RawLock, SingleCoreInterruptLock},
 };
+#[cfg(code_in_psram)]
+use portable_atomic::Ordering;
 use procmacros::{BuilderLite, ram};
 
-#[cfg(multi_core)]
+#[cfg(all(multi_core, not(code_in_psram)))]
 use crate::system::{Cpu, multi_core};
-use crate::{
-    Blocking,
-    DriverMode,
-    interrupt::free,
-    peripherals::FLASH,
-    soc::{cache, is_slice_in_dram},
-};
+use crate::{Blocking, DriverMode, peripherals::FLASH, soc::is_slice_in_dram};
+#[cfg(not(code_in_psram))]
+use crate::{interrupt::free, soc::cache};
 
 mod mmu;
 mod rom;
@@ -118,6 +139,10 @@ pub struct Config {
 }
 
 /// Strategy for the other core during flash operations.
+#[cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "\n\nWith `code-in-psram`, nothing fetches from flash, so the strategy has no effect."
+)]
 #[cfg(multi_core)]
 #[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -292,6 +317,11 @@ pub fn flash_mmu_drom_entries() -> core::ops::Range<u32> {
 ///
 /// Returns `None` when `index` is outside [`flash_mmu_drom_entries`], or when
 /// the entry is invalid or maps PSRAM.
+#[cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "\n\nWith `code-in-psram`, the start-up unmaps flash. For entry `end - 1`, the function \
+           returns the offset of the app's first page, which the bootloader mapped."
+)]
 #[instability::unstable]
 pub fn flash_mmu_entry_offset(index: u32) -> Option<u32> {
     mmu::drom_entry_offset(index)
@@ -404,7 +434,7 @@ impl<'d> Flash<'d, Blocking> {
     /// - [`Error::OutOfBounds`] if the range exceeds [`Self::capacity`].
     /// - [`Error::NotSupported`] if `data` is not in DRAM.
     #[cfg_attr(
-        multi_core,
+        all(multi_core, not(code_in_psram)),
         doc = "- [`Error::OtherCoreRunning`] on dual-core chips with [`MultiCoreStrategy::Error`]."
     )]
     /// - [`Error::IoError`], [`Error::IoTimeout`], or [`Error::Unknown`] if the ROM reports an I/O
@@ -438,7 +468,7 @@ impl<'d> Flash<'d, Blocking> {
     /// - [`Error::OutOfBounds`] if the range exceeds [`Self::capacity`].
     /// - [`Error::NotSupported`] if `data` is not in DRAM.
     #[cfg_attr(
-        multi_core,
+        all(multi_core, not(code_in_psram)),
         doc = "- [`Error::OtherCoreRunning`] on dual-core chips with [`MultiCoreStrategy::Error`]."
     )]
     /// - [`Error::IoError`], [`Error::IoTimeout`], or [`Error::Unknown`] if the ROM reports an I/O
@@ -477,7 +507,7 @@ impl<'d> Flash<'d, Blocking> {
     /// - [`Error::NotAligned`] if `from != to` and `from` or `to` is not a multiple of 4096.
     /// - [`Error::OutOfBounds`] if `from > to` or the range exceeds [`Self::capacity`].
     #[cfg_attr(
-        multi_core,
+        all(multi_core, not(code_in_psram)),
         doc = "- [`Error::OtherCoreRunning`] on dual-core chips with [`MultiCoreStrategy::Error`]."
     )]
     /// - [`Error::IoError`], [`Error::IoTimeout`], or [`Error::Unknown`] if the ROM reports an I/O
@@ -519,7 +549,7 @@ impl<'d> Flash<'d, Blocking> {
     /// - [`Error::OutOfBounds`] if the range exceeds [`Self::capacity`].
     /// - [`Error::NotSupported`] if `data` is not in DRAM or no MMU entry is available.
     #[cfg_attr(
-        multi_core,
+        all(multi_core, not(code_in_psram)),
         doc = "- [`Error::OtherCoreRunning`] on dual-core chips with [`MultiCoreStrategy::Error`]."
     )]
     #[instability::unstable]
@@ -564,7 +594,7 @@ impl<'d> Flash<'d, Blocking> {
     /// - [`Error::NotSupported`] if `data` is not in DRAM, or on ESP32 if reading a row neighbor
     ///   fails because no MMU entry is available.
     #[cfg_attr(
-        multi_core,
+        all(multi_core, not(code_in_psram)),
         doc = "- [`Error::OtherCoreRunning`] on dual-core chips with [`MultiCoreStrategy::Error`]."
     )]
     /// - [`Error::IoError`], [`Error::IoTimeout`], or [`Error::Unknown`] if the ROM reports an I/O
@@ -726,7 +756,7 @@ impl Flash<'_, Blocking> {
         Ok(())
     }
 
-    /// Park and disable interrupts without suspending the cache.
+    /// With code in flash, park and disable interrupts without suspending the cache.
     ///
     /// Encrypted reads map flash through the MMU and copy with the cache on, so
     /// neither this guard nor anything it calls has to live in RAM.
@@ -734,8 +764,17 @@ impl Flash<'_, Blocking> {
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<R, Error>,
     ) -> Result<R, Error> {
-        let _park = ParkGuard::enter(self)?;
-        free(|| f(self))
+        cfg_select! {
+            code_in_psram => {
+                // The read goes through the cache, so it must not meet an erase or a write.
+                let _chip = FlashChipGuard::enter();
+                f(self)
+            }
+            _ => {
+                let _park = ParkGuard::enter(self)?;
+                free(|| f(self))
+            }
+        }
     }
 
     /// Plaintext of row halves the write will touch but not replace.
@@ -765,15 +804,26 @@ impl Flash<'_, Blocking> {
         invalidate: Option<(u32, u32)>,
         f: impl FnOnce() -> Result<R, rom::RomError>,
     ) -> Result<R, Error> {
-        let _park = ParkGuard::enter(self)?;
-        free(|| {
-            let result = with_caches_suspended(invalidate.is_some(), f);
-            #[cfg(not(esp32))]
-            if let Some((start, len)) = invalidate {
-                mmu::invalidate_mapped(start, len);
+        cfg_select! {
+            // No flash page is mapped, so the operation does not invalidate the cache.
+            code_in_psram => {
+                let _ = invalidate;
+                // A light sleep requested while the guard is held is refused.
+                let _chip = FlashChipGuard::enter();
+                Ok(f()?)
             }
-            Ok(result?)
-        })
+            _ => {
+                let _park = ParkGuard::enter(self)?;
+                free(|| {
+                    let result = with_caches_suspended(invalidate.is_some(), f);
+                    #[cfg(not(esp32))]
+                    if let Some((start, len)) = invalidate {
+                        mmu::invalidate_mapped(start, len);
+                    }
+                    Ok(result?)
+                })
+            }
+        }
     }
 
     #[ram]
@@ -808,6 +858,7 @@ impl Flash<'_, Blocking> {
 ///
 /// On ESP32, `flush` flushes every cache line before the caches resume. An invalidate by
 /// address is not available on ESP32.
+#[cfg(not(code_in_psram))]
 #[ram(unstable(checked))]
 fn with_caches_suspended<R>(
     #[cfg_attr(not(esp32), expect(unused_variables))] flush: bool,
@@ -832,10 +883,50 @@ fn with_caches_suspended<R>(
     result
 }
 
+/// Holds the flash chip for one ROM flash call or one encrypted read.
+///
+/// A park or a stop of the other core waits until the lock is free. A light sleep does not wait.
+/// It parks the other cores first, then refuses if the lock is held. After the park, with this
+/// core's interrupts disabled, no flash operation can start, so the lock stays free until the sleep
+/// ends.
+#[cfg(code_in_psram)]
+pub(crate) struct FlashChipGuard;
+
+#[cfg(code_in_psram)]
+impl FlashChipGuard {
+    #[inline(always)]
+    fn enter() -> Self {
+        let lock = crate::rtc_cntl::flash_chip_lock();
+        let holder = crate::system::Cpu::current() as u8 + 1;
+        let take = || {
+            lock.compare_exchange_weak(0, holder, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+        };
+        cfg_select! {
+            multi_core => crate::system::multi_core::wait_answering_parks(take),
+            _ => {
+                while !take() {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+        Self
+    }
+}
+
+#[cfg(code_in_psram)]
+impl Drop for FlashChipGuard {
+    #[inline(always)]
+    fn drop(&mut self) {
+        crate::rtc_cntl::flash_chip_lock().store(0, Ordering::Release);
+    }
+}
+
 /// Stops the other core according to [`MultiCoreStrategy`], and masks the interrupts of the
 /// current core. [`Drop`] releases that core, then ends the mask.
 ///
 /// An interrupt handler of the current core thus never runs while the other core is parked.
+#[cfg(not(code_in_psram))]
 struct ParkGuard {
     /// The core that the guard parked.
     #[cfg(multi_core)]
@@ -843,6 +934,7 @@ struct ParkGuard {
     mask: RestoreState,
 }
 
+#[cfg(not(code_in_psram))]
 impl ParkGuard {
     #[ram]
     fn enter(_flash: &Flash<'_, Blocking>) -> Result<Self, Error> {
@@ -873,6 +965,7 @@ impl ParkGuard {
     }
 }
 
+#[cfg(not(code_in_psram))]
 impl Drop for ParkGuard {
     #[ram]
     fn drop(&mut self) {

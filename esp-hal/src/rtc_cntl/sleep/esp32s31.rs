@@ -3,7 +3,7 @@ use core::ops::Not;
 
 use crate::{
     peripherals::{HP_ALIVE_SYS, HP_SYS_CLKRST, IOMUX_MSPI_PIN, LP_SYS as LP_AON, MEMSPI2, PMU},
-    psram::psram_range,
+    psram,
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
@@ -87,7 +87,7 @@ impl AnalogSleepConfig {
         // Without the reference current, PSRAM loses its data and its mode register settings in
         // light sleep.
         // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L223-L229>.
-        if !pd_flags.pd_xtal() || !psram_range().is_empty() {
+        if !pd_flags.pd_xtal() || psram::in_use() {
             this.hp_sys.bias.set_pd_cur(false);
             this.lp_sys_sleep.bias.set_pd_cur(false);
         }
@@ -881,7 +881,7 @@ fn disable_bbpll() {
 /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/port/esp32s31/pmu_sleep.c#L355-L398>.
 #[crate::ram(unstable(checked))]
 pub(crate) fn pmu_sleep_start(saved: &SavedState) -> bool {
-    let psram = !psram_range().is_empty();
+    let psram = psram::in_use();
     if psram {
         // Bits 26–31 are the six FIFO-empty bits.
         const ALL_TRANSACTION_DONE: u32 = 0xfc00_0000;
@@ -912,7 +912,7 @@ pub(crate) fn pmu_sleep_start(saved: &SavedState) -> bool {
 pub(crate) fn pmu_sleep_finish(saved: &SavedState) {
     wait_for_efuse_idle();
 
-    let psram = !psram_range().is_empty();
+    let psram = psram::in_use();
     if let Some(mpll_mhz) = saved.mpll_mhz {
         // The MPLL must have power before the rate is set.
         clocks::set_mpll_power(true);

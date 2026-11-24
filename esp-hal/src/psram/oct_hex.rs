@@ -1,27 +1,33 @@
+//! The PSRAM controller of the ESP32-P4 and the ESP32-S31, and the AP OCT PSRAM chip.
+//!
+//! The ESP32-S31 start-up calls functions here before the code is in PSRAM. A function that it
+//! calls must not call a panic handler or a logger, so each caller logs the result. With
+//! `code-in-psram`, each function the start-up calls is inlined into it, because these functions
+//! are otherwise in `.text`, which is not in PSRAM yet.
+
 use crate::{
-    clock::ll::PsramInstance,
     pac::{generic::Reg, iomux_mspi_pin::psram_d_pin0::PSRAM_D_PIN0_SPEC},
     peripherals::{IOMUX_MSPI_PIN, MEMSPI2, MEMSPI3},
-    psram::{EXTMEM_ORIGIN, PsramTimingParams},
+    psram::PsramTimingParams,
 };
 
 /// Detect PSRAM size by reading mode register MR2 via MSPI1.
-pub(super) fn psram_detect_size(speed_params: &PsramTimingParams) -> usize {
+///
+/// Returns `Err` with MR2 when its density field is not one of the known sizes.
+#[cfg_attr(code_in_psram, inline(always))]
+pub(super) fn psram_detect_size(speed_params: &PsramTimingParams) -> Result<usize, u8> {
     let (mr2, _mr3) = psram_mr_read(speed_params, MR_ADDR_MR2_MR3);
     match mr2 & 0x7 {
-        0x1 => 4 * 1024 * 1024,  //  32 Mbit
-        0x3 => 8 * 1024 * 1024,  //  64 Mbit
-        0x5 => 16 * 1024 * 1024, // 128 Mbit
-        0x6 => 64 * 1024 * 1024, // 512 Mbit
-        0x7 => 32 * 1024 * 1024, // 256 Mbit
-        _ => {
-            // unknown -> EV Board default
-            warn!("Unknown PSRAM size: mr2={:#x}", mr2);
-            32 * 1024 * 1024
-        }
+        0x1 => Ok(4 * 1024 * 1024),  //  32 Mbit
+        0x3 => Ok(8 * 1024 * 1024),  //  64 Mbit
+        0x5 => Ok(16 * 1024 * 1024), // 128 Mbit
+        0x6 => Ok(64 * 1024 * 1024), // 512 Mbit
+        0x7 => Ok(32 * 1024 * 1024), // 256 Mbit
+        _ => Err(mr2),
     }
 }
 
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn write_psram_mmu_entry(entry_id: u32, page: u16) {
     MEMSPI2::regs()
         .mmu_item_index()
@@ -45,6 +51,7 @@ pub(super) fn write_psram_mmu_entry(entry_id: u32, page: u16) {
 ///   - bit  10    : `SOC_MMU_ACCESS_PSRAM` (selects PSRAM vs flash)
 ///   - bit  11    : `SOC_MMU_PSRAM_VALID`
 ///   - bit  12    : `SOC_MMU_PSRAM_SENSITIVE` (set only when cache encryption is on)
+#[cfg(not(code_in_psram))]
 pub(super) fn mmu_map_psram(size: usize) {
     const MMU_PAGE_SIZE: usize = property!("mmu.page_size");
 
@@ -60,7 +67,7 @@ pub(super) fn mmu_map_psram(size: usize) {
     }
 
     // Invalidate the newly mapped PSRAM window.
-    unsafe { crate::soc::cache_invalidate_addr(EXTMEM_ORIGIN as u32, size as u32) };
+    unsafe { crate::soc::cache_invalidate_addr(crate::psram::EXTMEM_ORIGIN as u32, size as u32) };
 }
 
 /// Configures PSRAM_MSPI0 (AXI cache) for (OCT or HEX)/DDR access.
@@ -68,6 +75,7 @@ pub(super) fn mmu_map_psram(size: usize) {
 /// Faithful port of IDF `s_config_mspi_for_psram` from
 /// `esp_psram_impl_ap_oct.c`. Each register field is named after its
 /// `psram_ctrlr_ll_*` setter so the mapping is straightforward to verify.
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn configure_psram_mspi(timing: &PsramTimingParams, is_hex: bool) {
     // Dummy bit-counts come from the active speed parameter table.
     MEMSPI2::regs().cache_sctrl().modify(|_, w| unsafe {
@@ -130,38 +138,45 @@ pub(super) fn configure_psram_mspi(timing: &PsramTimingParams, is_hex: bool) {
     });
 }
 
-/// Sets bus-clock divider for both PSRAM_MSPI0 and PSRAM_MSPI1.
-pub(super) fn set_bus_clock(clock: u32) -> bool {
-    let source_mhz = PsramInstance::Psram.function_clock_frequency() / 1_000_000;
+/// Sets the bus-clock divider for both PSRAM_MSPI0 and PSRAM_MSPI1, from a source clock of
+/// `source_mhz`.
+///
+/// Returns `false` when `clock` is 0 or does not divide `source_mhz`. The caller passes the source
+/// clock. The ESP32-S31 start-up calls this function before `esp_hal::init`, and the clock tree
+/// holds a clock's frequency only after `init` configures that clock.
+#[cfg_attr(code_in_psram, inline(always))]
+pub(super) fn set_bus_clock(source_mhz: u32, clock: u32) -> bool {
+    let Some(div) = source_mhz.checked_div(clock) else {
+        return false;
+    };
     if !source_mhz.is_multiple_of(clock) {
-        error!(
-            "PSRAM source clock frequency must be an integer multiple of PSRAM frequency. Source={} MHz, PSRAM={} MHz",
-            source_mhz, clock
-        );
         return false;
     }
 
-    write_bus_clock_divider((source_mhz / clock) as u8);
+    let div = div as u8;
+    write_bus_clock_divider(div);
 
     #[cfg(psram_idle_low_speed_switch)]
-    low_speed::set_divider(source_mhz, clock);
+    low_speed::set_divider(source_mhz, clock, div);
 
     true
 }
 
 /// Returns the value of MSPI2 `SRAM_CLK` and MSPI3 `CLOCK` for a bus clock divider. Both
 /// registers have the same layout.
+#[cfg_attr(code_in_psram, inline(always))]
 const fn bus_clock_bits(div: u8) -> u32 {
     const EQU_SYSCLK: u32 = 1 << 31;
     if div <= 1 {
         EQU_SYSCLK
     } else {
-        let n = (div - 1) as u32;
-        let h = (div / 2 - 1) as u32;
+        let n = div.wrapping_sub(1) as u32;
+        let h = (div / 2).wrapping_sub(1) as u32;
         (n << 16) | (h << 8) | n
     }
 }
 
+#[cfg_attr(code_in_psram, inline(always))]
 fn write_bus_clock_divider(div: u8) {
     let bits = bus_clock_bits(div);
     MEMSPI2::regs()
@@ -191,8 +206,16 @@ pub(crate) mod low_speed {
     /// The bus clock register value of the configured speed.
     static CONFIGURED_BITS: AtomicU32 = AtomicU32::new(0);
 
-    pub(super) fn set_divider(source_mhz: u32, clock_mhz: u32) {
-        let xtal_mhz = crate::soc::clocks::xtal_clk_frequency() / 1_000_000;
+    /// Records the low-speed divider for a source clock of `source_mhz` and the configured
+    /// divider `div`, which gives `clock_mhz`.
+    #[cfg_attr(code_in_psram, inline(always))]
+    pub(super) fn set_divider(source_mhz: u32, clock_mhz: u32, div: u8) {
+        // The ESP32-S31 start-up calls this function before `esp_hal::init` configures the clock
+        // tree, so the S31 uses its fixed crystal frequency.
+        let xtal_mhz = cfg_select! {
+            esp32s31 => crate::soc::clocks::XTAL_MHZ,
+            _ => crate::soc::clocks::xtal_clk_frequency() / 1_000_000,
+        };
         // The limits of ESP-IDF `BELOW_FREQ_THRESHOLD`.
         let too_fast = cfg_select! {
             // The PSRAM clock must not exceed the CPU clock.
@@ -206,10 +229,7 @@ pub(crate) mod low_speed {
             0
         };
         LOW_SPEED_BITS.store(bits, Ordering::Relaxed);
-        CONFIGURED_BITS.store(
-            super::bus_clock_bits((source_mhz / clock_mhz) as u8),
-            Ordering::Relaxed,
-        );
+        CONFIGURED_BITS.store(super::bus_clock_bits(div), Ordering::Relaxed);
     }
 
     /// Switches PSRAM to the low speed, if its configured speed is too fast.
@@ -254,6 +274,7 @@ pub(crate) mod low_speed {
 }
 
 /// Enables DLL timing calibration for both controllers.
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn enable_dll() {
     MEMSPI2::regs()
         .timing_cali()
@@ -267,7 +288,9 @@ pub(super) fn enable_dll() {
 ///
 /// Mirrors IDF `mspi_timing_ll_pin_drv_set(2)` +
 /// `mspi_timing_ll_enable_dqs(true)`.
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn psram_pad_init(_is_hex: bool) {
+    #[cfg_attr(code_in_psram, inline(always))]
     fn init_pin_drv(reg: &Reg<PSRAM_D_PIN0_SPEC>) {
         reg.modify(|_, w| unsafe { w.drv().bits(2) });
     }
@@ -314,6 +337,7 @@ pub(super) fn psram_pad_init(_is_hex: bool) {
 /// Sets PSRAM CS timing on the AXI controller's SMEM_AC register.
 /// SMEM_CS_SETUP=1, SMEM_CS_HOLD=1, setup_time=N-1,
 /// hold_time=N-1, hold_delay=N-1, split_trans_en=1.
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn set_cs_timing() {
     /// CS timing constants (matches IDF AP_OCT_PSRAM_CS_*). Independent of
     /// `SpiRamFreq` -- IDF uses the same values across all speed branches.
@@ -351,6 +375,7 @@ const MR_ADDR_MR8_MR9: u32 = 0x8;
 /// Returns `(low, high)` where:
 ///   - `low`  = the MR at `mr_addr`
 ///   - `high` = the MR at `mr_addr + 1`
+#[cfg_attr(code_in_psram, inline(always))]
 fn psram_mr_read(timing: &PsramTimingParams, mr_addr: u32) -> (u8, u8) {
     let pair = mspi1_reg_read16(timing, mr_addr);
     ((pair & 0xFF) as u8, ((pair >> 8) & 0xFF) as u8)
@@ -361,6 +386,7 @@ fn psram_mr_read(timing: &PsramTimingParams, mr_addr: u32) -> (u8, u8) {
 /// `low` goes to the MR at `mr_addr`, `high` goes to the MR at
 /// `mr_addr + 1`. For pair addresses whose high slot is reserved, pass
 /// the value previously read back (read-modify-write).
+#[cfg_attr(code_in_psram, inline(always))]
 fn psram_mr_write(mr_addr: u32, low: u8, high: u8) {
     let pair = (low as u16) | ((high as u16) << 8);
     mspi1_reg_write16(mr_addr, pair)
@@ -371,6 +397,7 @@ fn psram_mr_write(mr_addr: u32, low: u8, high: u8) {
 /// MR0: drive_str[1:0], read_latency[4:2], lt[5]
 /// MR4: wr_latency[7:5]
 /// MR8: bl[1:0], bt[2], rbx[3], x16[6].
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn init_mr_registers(timing: &PsramTimingParams, is_hex: bool) {
     // Read+modify+write MR0 (preserve MR1 high byte).
     let (mut mr0, mr1) = psram_mr_read(timing, MR_ADDR_MR0_MR1);
@@ -434,8 +461,9 @@ unsafe extern "C" {
 /// bounded for completion. Replacement for ROM `esp_rom_spi_cmd_start`,
 /// which polls forever; a hang there gives no diagnostic, while the
 /// bounded variant surfaces a real failure as a returned error. After
-/// the bit clears, copies MISO bytes from W0..W{N} into `rx_buf`.
-fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
+/// the bit clears, returns W0, which holds the first four MISO bytes.
+#[cfg_attr(code_in_psram, inline(always))]
+fn mspi1_kick_and_collect() -> Result<u32, ()> {
     const SPI_USR_TRIGGER: u32 = 1 << 18;
     const MAX_ITERS: u32 = 1_000_000;
 
@@ -452,35 +480,21 @@ fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
 
     let mut t = MAX_ITERS;
     while MEMSPI3::regs().cmd().read().bits() & SPI_USR_TRIGGER != 0 {
-        t -= 1;
+        t = t.wrapping_sub(1);
         if t == 0 {
             return Err(());
         }
         core::hint::spin_loop();
     }
 
-    // Copy MISO bytes from W0..W{N}.
-    if !rx.is_empty() {
-        let n_bytes = rx.len();
-        let n_words = n_bytes.div_ceil(4);
-        for i in 0..n_words {
-            let word = MEMSPI3::regs().w(i).read().bits();
-            for b in 0..4 {
-                let off = i * 4 + b;
-                if off >= n_bytes {
-                    break;
-                }
-                rx[off] = ((word >> (b * 8)) & 0xFF) as u8;
-            }
-        }
-    }
-    Ok(())
+    Ok(MEMSPI3::regs().w(0).read().bits())
 }
 
 /// Issue an AP OCT PSRAM register-read command (0x4040, 16-bit cmd,
 /// 32-bit address, 16-bit MISO) through `PSRAM_MSPI1`. Setup via ROM
 /// helpers (`set_op_mode` + `cmd_config`); kick + poll done manually
 /// with a timeout (avoids ROM `cmd_start` poll-forever pitfall).
+#[cfg_attr(code_in_psram, inline(always))]
 fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
     const REG_READ_CMD: u16 = 0x4040;
     const CMD_BITLEN: u16 = 16;
@@ -488,7 +502,7 @@ fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
     const DATA_BITLEN: u32 = 16;
 
     let mut addr_local = addr;
-    let mut rx: [u8; 2] = [0; 2];
+    let mut rx: u32 = 0;
     let mut conf = EspRomSpiCmd {
         cmd: REG_READ_CMD,
         cmd_bit_len: CMD_BITLEN,
@@ -496,7 +510,7 @@ fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
         addr_bit_len: ADDR_BITLEN,
         tx_data: core::ptr::null_mut(),
         tx_data_bit_len: 0,
-        rx_data: rx.as_mut_ptr().cast::<u32>(),
+        rx_data: &raw mut rx,
         rx_data_bit_len: DATA_BITLEN,
         dummy_bit_len: timing.reg_dummy_bits,
     };
@@ -505,13 +519,14 @@ fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
         esp_rom_spi_set_op_mode(ROM_SPI_PSRAM_CMD_NUM, ESP_ROM_SPIFLASH_OPI_DTR_MODE);
         esp_rom_spi_cmd_config(ROM_SPI_PSRAM_CMD_NUM, &raw mut conf);
     }
-    let _ = mspi1_kick_and_collect(&mut rx);
-    u16::from_le_bytes(rx)
+    // A timeout reads as 0.
+    mspi1_kick_and_collect().unwrap_or(0) as u16
 }
 
 /// Issue an AP OCT PSRAM register-write command (0xC0C0) with 16-bit
 /// data through `PSRAM_MSPI1`. Same setup-via-ROM + manual-kick pattern
 /// as `mspi1_reg_read16`.
+#[cfg_attr(code_in_psram, inline(always))]
 fn mspi1_reg_write16(addr: u32, data: u16) {
     const REG_WRITE_CMD: u16 = 0xC0C0;
     const CMD_BITLEN: u16 = 16;
@@ -536,6 +551,5 @@ fn mspi1_reg_write16(addr: u32, data: u16) {
         esp_rom_spi_set_op_mode(ROM_SPI_PSRAM_CMD_NUM, ESP_ROM_SPIFLASH_OPI_DTR_MODE);
         esp_rom_spi_cmd_config(ROM_SPI_PSRAM_CMD_NUM, &raw mut conf);
     }
-    let mut empty: [u8; 0] = [];
-    let _ = mspi1_kick_and_collect(&mut empty);
+    let _ = mspi1_kick_and_collect();
 }

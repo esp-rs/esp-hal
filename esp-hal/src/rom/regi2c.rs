@@ -13,17 +13,24 @@ impl RegI2cMaster {
     }
 
     // The ESP32-S31 light sleep sets the MPLL with the caches suspended, through the RAM `read` and
-    // `write` in `soc::esp32s31::regi2c`. The accessors in this file must then be inlined into the
-    // RAM caller. On other chips, the accessors end in flash or ROM code anyway, and inlining only
-    // copies them into each call site.
+    // `write` in `soc::esp32s31::regi2c`. With code in PSRAM, the ESP32-C5 switches its clocks from
+    // RAM, and its accessors end in ROM code. The accessors in this file must then be inlined into
+    // the RAM caller. On other chips, the accessors end in flash or ROM code anyway, and inlining
+    // only copies them into each call site.
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    #[cfg_attr(
+        all(any(esp32s31, all(esp32c5, code_in_psram)), not(is_debug_build)),
+        inline(always)
+    )]
     pub fn write(&self, reg: u8, data: u8) {
         regi2c_write(self.master, self.host_id, reg, data);
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    #[cfg_attr(
+        all(any(esp32s31, all(esp32c5, code_in_psram)), not(is_debug_build)),
+        inline(always)
+    )]
     pub fn read(&self, reg: u8) -> u8 {
         regi2c_read(self.master, self.host_id, reg)
     }
@@ -42,13 +49,19 @@ impl RegI2cRegister {
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    #[cfg_attr(
+        all(any(esp32s31, all(esp32c5, code_in_psram)), not(is_debug_build)),
+        inline(always)
+    )]
     pub fn write_reg(&self, data: u8) {
         self.master.write(self.reg_add, data);
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    #[cfg_attr(
+        all(any(esp32s31, all(esp32c5, code_in_psram)), not(is_debug_build)),
+        inline(always)
+    )]
     pub fn read(&self) -> u8 {
         self.master.read(self.reg_add)
     }
@@ -69,28 +82,38 @@ impl RawRegI2cField {
         Self { register, msb, lsb }
     }
 
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    #[cfg_attr(
+        all(any(esp32s31, all(esp32c5, code_in_psram)), not(is_debug_build)),
+        inline(always)
+    )]
     const fn mask(&self) -> u8 {
         const fn lower_n_bits(bits: u8) -> u8 {
-            !((u32::MAX << bits) as u8)
+            !(u32::MAX.wrapping_shl(bits as u32) as u8)
         }
 
-        lower_n_bits(self.msb - self.lsb + 1)
+        lower_n_bits(self.msb.wrapping_sub(self.lsb).wrapping_add(1))
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    #[cfg_attr(
+        all(any(esp32s31, all(esp32c5, code_in_psram)), not(is_debug_build)),
+        inline(always)
+    )]
     pub fn read(&self) -> u8 {
-        (self.register.read() >> self.lsb) & self.mask()
+        self.register.read().wrapping_shr(u32::from(self.lsb)) & self.mask()
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    #[cfg_attr(
+        all(any(esp32s31, all(esp32c5, code_in_psram)), not(is_debug_build)),
+        inline(always)
+    )]
     pub fn write_field(&self, data: u8) {
-        let mask = self.mask() << self.lsb;
+        let lsb = u32::from(self.lsb);
+        let mask = self.mask().wrapping_shl(lsb);
         let bits = self.register.read();
         self.register
-            .write_reg((bits & !mask) | ((data << self.lsb) & mask));
+            .write_reg((bits & !mask) | (data.wrapping_shl(lsb) & mask));
     }
 }
 

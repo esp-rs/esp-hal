@@ -180,7 +180,21 @@ fn main() -> ! {
 //! With `-Z stack-protector`, the code of these operations is instrumented too. If it detects
 //! stack corruption while the caches are suspended, the panic handler cannot run, because it lives
 //! in flash, and the chip locks up instead of reporting the corruption.
-//!
+#![cfg_attr(psram_supports_code_in_psram, doc = "")]
+#![cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "With the `code-in-psram` option, every application uses these operations, so esp-hal \
+           must be built at `opt-level` 2 or 3."
+)]
+#![cfg_attr(psram_separate_window, doc = "")]
+#![cfg_attr(
+    psram_separate_window,
+    doc = "The `code-in-psram` option adds a second rule. The start-up runs before the code is in \
+           PSRAM, so it must not call code outside RAM. The link fails with `prohibited cross \
+           reference from '.boot.code_in_psram'` when the start-up refers to a function in \
+           `.text` or `.rwtext`."
+)]
+#![doc = ""]
 //! ## Don't use `core::mem::forget`
 //!
 //! You should never use `core::mem::forget` on any type defined in [esp crates].
@@ -350,6 +364,8 @@ pub use procmacros::handler;
 pub use procmacros::load_lp_code;
 #[cfg(feature = "rt")]
 pub use procmacros::main;
+#[instability::unstable]
+pub use procmacros::psram;
 pub use procmacros::ram;
 
 #[instability::unstable]
@@ -657,6 +673,16 @@ pub mod __macro_implementation {
 
     pub const fn assert_is_uninit<T: super::Uninit>() {}
 
+    // Only the code-in-PSRAM start-up maps PSRAM before `main` and zeroes `.bss.psram`. A chip that
+    // opts in to code in PSRAM must include `psram.x` in its linker script. Without it,
+    // `.bss.psram` matches `.bss.*` and is placed in RAM.
+    #[instability::unstable]
+    pub const fn assert_psram_available() {
+        if !cfg!(code_in_psram) {
+            core::panic!("`psram` needs the `code-in-psram` option");
+        }
+    }
+
     #[cfg(feature = "rt")]
     #[cfg(riscv)]
     pub use esp_riscv_rt::entry as __entry;
@@ -799,6 +825,9 @@ pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 
     crate::clock::init(config.clock_config());
+
+    #[cfg(code_in_psram)]
+    crate::psram::start_with_code();
 
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.RTC_TIMER.reborrow());

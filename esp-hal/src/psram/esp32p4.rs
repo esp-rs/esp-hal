@@ -151,7 +151,12 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     });
 
     // Controller + PHY pad bring-up.
-    if !oct_hex::set_bus_clock(config.timing.clock) {
+    let source_mhz = PsramInstance::Psram.function_clock_frequency() / 1_000_000;
+    if !oct_hex::set_bus_clock(source_mhz, config.timing.clock) {
+        error!(
+            "PSRAM source clock frequency must be an integer multiple of PSRAM frequency. Source={} MHz, PSRAM={} MHz",
+            source_mhz, config.timing.clock
+        );
         return false;
     }
     let is_hex = matches!(config.mode, PsramMode::Hex);
@@ -163,7 +168,12 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     oct_hex::init_mr_registers(&config.timing, is_hex);
 
     if config.size.is_auto() {
-        config.size = PsramSize::Size(oct_hex::psram_detect_size(&config.timing));
+        let size = oct_hex::psram_detect_size(&config.timing).unwrap_or_else(|mr2| {
+            // unknown -> EV Board default
+            warn!("Unknown PSRAM size: mr2={:#x}", mr2);
+            32 * 1024 * 1024
+        });
+        config.size = PsramSize::Size(size);
     }
 
     // basic AXI configuration here
