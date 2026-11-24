@@ -7,7 +7,15 @@ pub(crate) static LOCK: CountingLock = CountingLock::new();
 
 /// Locks the analog I2C master, for callers outside esp-hal that access it.
 ///
-/// Calls nest, and each one must be paired with a [`regi2c_exit_critical`] on the same core.
+/// The lock disables interrupts on the calling core. Calls nest, and only the outermost
+/// [`regi2c_exit_critical`] releases the lock and restores the interrupt state.
+///
+/// # Safety
+///
+/// - Each call must be paired with a [`regi2c_exit_critical`] on the same core.
+/// - The caller must release this lock and all other locks, including critical sections, in the
+///   reverse order it acquired them. Otherwise a release restores the interrupt state while a lock
+///   taken later still needs interrupts disabled.
 #[cfg(feature = "rt")]
 #[crate::ram]
 #[unsafe(no_mangle)]
@@ -16,6 +24,15 @@ unsafe extern "C" fn regi2c_enter_critical() {
 }
 
 /// Unlocks the analog I2C master locked by [`regi2c_enter_critical`].
+///
+/// # Panics
+///
+/// Panics if the lock is not acquired.
+///
+/// # Safety
+///
+/// - Each call must be paired with an earlier [`regi2c_enter_critical`] on the same core.
+/// - The release order must follow the rules of [`regi2c_enter_critical`].
 #[cfg(feature = "rt")]
 #[crate::ram]
 #[unsafe(no_mangle)]
