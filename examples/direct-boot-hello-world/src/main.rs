@@ -7,7 +7,7 @@
 //! deep-sleep wakeup. Initialized RTC fast memory statics are loaded from flash after any other
 //! reset, and keep their values over deep sleep.
 
-//% CHIP_FILTER: !esp32 && !esp32s2
+//% CHIP_FILTER: !esp32 && !esp32s2 && !esp32h21
 
 #![no_std]
 #![no_main]

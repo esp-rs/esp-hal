@@ -127,7 +127,7 @@ unsafe extern "C" {
             fn Cache_Suspend_Cache() -> u32;
             fn Cache_Resume_Cache(autoload: u32);
         }
-        any(esp32c2, esp32c3, esp32c6, esp32h2) => {
+        any(esp32c2, esp32c3, esp32c6, esp32h2, esp32h21) => {
             fn Cache_Suspend_ICache() -> u32;
             fn Cache_Resume_ICache(autoload: u32);
         }

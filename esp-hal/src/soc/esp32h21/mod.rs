@@ -1,0 +1,49 @@
+//! # SOC (System-on-Chip) module (ESP32-H21)
+//!
+//! ## Overview
+//!
+//! The `SOC` module provides access, functions and structures that are useful
+//! for interacting with various system-related peripherals on `ESP32-H21` chip.
+
+crate::unstable_module! {
+    pub mod clocks;
+}
+pub(crate) mod regi2c;
+
+pub(crate) use esp32h21 as pac;
+
+#[cfg(feature = "rt")]
+pub(crate) fn riscv_preinit() {}
+
+pub(crate) fn pre_init() {
+    // By default, these access path filters are enabled and allow the access to
+    // masters only if they are in TEE mode.
+    //
+    // Since all masters except HP CPU boot in REE mode, default setting of these
+    // filters will deny the access by all masters except HP CPU.
+    //
+    // So, disabling these filters early. Mirrors ESP-IDF's `bootloader_init_mem`.
+
+    crate::peripherals::LP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0x0) });
+    crate::peripherals::LP_APM0::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0x0) });
+    crate::peripherals::HP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0x0) });
+}
+
+/// Invalidate a specific range of addresses in the cache.
+#[cfg(feature = "unstable")]
+#[crate::ram]
+#[expect(dead_code, reason = "No enabled driver needs cache maintenance yet.")]
+pub(crate) unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+    }
+    unsafe {
+        Cache_Invalidate_Addr(addr, size);
+    }
+}

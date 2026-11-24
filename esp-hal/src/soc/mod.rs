@@ -15,6 +15,7 @@ use crate::efuse::ChipRevision;
 #[cfg_attr(esp32c61, path = "esp32c61/mod.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2/mod.rs")]
 #[cfg_attr(esp32h4, path = "esp32h4/mod.rs")]
+#[cfg_attr(esp32h21, path = "esp32h21/mod.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4/mod.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
@@ -24,13 +25,16 @@ mod implementation;
 #[cfg(soc_cpu_has_branch_predictor)]
 pub(crate) mod branch_predictor;
 
-#[cfg(any(feature = "unstable", cpu_retention = "software"))]
+#[cfg(any(
+    all(feature = "unstable", flash_driver_supported),
+    cpu_retention = "software"
+))]
 pub(crate) mod cache;
 
 #[cfg(soc_has_xtal32k_pads)]
 pub(crate) mod xtal32k;
 
-#[cfg(soc_has_usb_device)]
+#[cfg(all(soc_has_usb_device, gpio_driver_supported))]
 pub(crate) mod usb_phy;
 
 #[cfg(soc_has_bus_clock_update)]

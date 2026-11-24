@@ -151,6 +151,7 @@ type PrinterImpl = noop::Printer;
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h21",
         feature = "esp32h4",
         feature = "esp32p4",
         feature = "esp32s3",
@@ -179,7 +180,8 @@ mod auto_printer {
                 feature = "esp32c5",
                 feature = "esp32c6",
                 feature = "esp32c61",
-                feature = "esp32h2"
+                feature = "esp32h2",
+                feature = "esp32h21"
             ))]
             const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
             #[cfg(feature = "esp32s3")]
@@ -222,6 +224,7 @@ mod auto_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h21",
         feature = "esp32h4",
         feature = "esp32p4",
         feature = "esp32s3",
@@ -241,6 +244,7 @@ mod auto_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h21",
         feature = "esp32h4",
         feature = "esp32p4",
         feature = "esp32s3",
@@ -262,14 +266,16 @@ mod serial_jtag_printer {
         feature = "esp32c5",
         feature = "esp32c6",
         feature = "esp32c61",
-        feature = "esp32h2"
+        feature = "esp32h2",
+        feature = "esp32h21"
     ))]
     const SERIAL_JTAG_FIFO_REG: usize = 0x6000_F000;
     #[cfg(any(
         feature = "esp32c5",
         feature = "esp32c6",
         feature = "esp32c61",
-        feature = "esp32h2"
+        feature = "esp32h2",
+        feature = "esp32h21"
     ))]
     const SERIAL_JTAG_CONF_REG: usize = 0x6000_F004;
 
@@ -437,6 +443,7 @@ mod uart_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h21",
         feature = "esp32h4"
     ))]
     impl Functions for Device {

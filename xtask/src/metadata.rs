@@ -63,6 +63,9 @@ pub enum Chip {
     Esp32h2,
     /// ESP32-H4
     Esp32h4,
+    /// ESP32-H21
+    #[value(alias = "h21")]
+    Esp32h21,
     /// ESP32-P4 (chip revision v3.x / eco5 only)
     #[value(alias = "p4")]
     Esp32p4,
