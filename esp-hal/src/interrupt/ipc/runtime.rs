@@ -158,7 +158,7 @@ pub(crate) fn defer_context_switch() {
 /// # Safety
 ///
 /// The call must match an earlier call to [`defer_context_switch`] on the current CPU.
-#[inline(always)]
+#[crate::ram]
 pub(crate) unsafe fn resume_context_switch() {
     // The active deferral keeps the thread on the current CPU.
     let core = Cpu::current();
