@@ -11,7 +11,8 @@ use crate::{
 pub(crate) struct MaxPriority {
     // Using Priority here tells the compiler about the maximum value, removing bounds checks.
     max: Priority,
-    mask: usize,
+    // `leading_zeros` counts the bits of this type. A `usize` mask has 64 bits on a 64-bit host.
+    mask: u32,
 }
 
 impl MaxPriority {
