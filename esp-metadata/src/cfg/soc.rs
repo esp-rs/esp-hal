@@ -1591,12 +1591,24 @@ pub struct PeripheralClock {
     #[serde(default)]
     template_params: HashMap<String, String>,
 
-    /// When true, prevents resetting and disabling the peripheral on startup.
-    // TODO: we should do something better, as we keep too many things running. USB/UART depends on
-    // esp-println's output option and whether the USB JTAG is connected, TIMG0 is not necessary
-    // outside of clock calibrations when the device has Systimer.
+    /// Prevents resetting and disabling the peripheral on startup. Either `true`, or the name of
+    /// a cfg (usually an esp-hal config option) that decides it when esp-hal is compiled.
+    // TODO: TIMG0 is not necessary outside of clock calibrations when the device has Systimer.
     #[serde(default)]
-    keep_enabled: bool,
+    keep_enabled: KeepEnabled,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum KeepEnabled {
+    Bool(bool),
+    Cfg(String),
+}
+
+impl Default for KeepEnabled {
+    fn default() -> Self {
+        Self::Bool(false)
+    }
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -1629,9 +1641,15 @@ impl PeripheralClocks {
             .map(|clock| format_ident!("{}", clock.name))
             .collect::<Vec<_>>();
         let keep_enabled = clocks.iter().filter_map(|clock| {
-            clock
-                .keep_enabled
-                .then_some(format_ident!("{}", clock.name))
+            let name = format_ident!("{}", clock.name);
+            match &clock.keep_enabled {
+                KeepEnabled::Bool(true) => Some(quote! { Self::#name, }),
+                KeepEnabled::Bool(false) => None,
+                KeepEnabled::Cfg(cfg) => {
+                    let cfg = format_ident!("{}", cfg);
+                    Some(quote! { #[cfg(#cfg)] Self::#name, })
+                }
+            }
         });
 
         let clk_en_arms = clocks
@@ -1682,9 +1700,7 @@ impl PeripheralClocks {
 
                     impl Peripheral {
                         const KEEP_ENABLED: &[Peripheral] = &[
-                            #(
-                                Self::#keep_enabled,
-                            )*
+                            #(#keep_enabled)*
                         ];
 
                         const COUNT: usize = Self::ALL.len();

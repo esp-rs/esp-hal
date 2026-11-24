@@ -107,10 +107,17 @@ timestamp = []
 #! This can confuse the `auto` feature. If you experience no log output, try selecting an output interface instead of relying on `auto`.
 
 ## Automatically select the best output interface for the target. An explicit interface takes precedence.
+##
+## With esp-hal, leave `ESP_HAL_CONFIG_KEEP_UART0_ENABLED` and
+## `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_ENABLED` at their default, `true`.
 auto        = ["dep:portable-atomic"]
 ## Use the `USB_SERIAL_JTAG` interface for printing. Available on ESP32-C3, ESP32-C5, ESP32-C6, ESP32-H2, and ESP32-S3.
+##
+## With esp-hal, leave `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_ENABLED` at its default, `true`.
 jtag-serial = ["dep:portable-atomic"]
 ## Use the `UART0` peripheral for printing. Available on all devices.
+##
+## With esp-hal, leave `ESP_HAL_CONFIG_KEEP_UART0_ENABLED` at its default, `true`.
 uart        = []
 ## Don't print anything
 no-op       = []

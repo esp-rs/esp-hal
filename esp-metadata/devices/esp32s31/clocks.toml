@@ -248,7 +248,7 @@ peripheral_clocks = { templates = [
     { name = "no_rst",                value = "let _ = reset;" },
     { name = "uart_rst",              value = ".core_rst_en().bit(reset).apb_rst_en().bit(reset)" },
 ], peripheral_clocks = [
-    { name = "Uart0", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(0)" }, keep_enabled = true },
+    { name = "Uart0", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(0)" }, keep_enabled = "keep_uart0_enabled" },
     { name = "Uart1", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(1)" } },
     { name = "Uart2", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(2)" } },
     { name = "Uart3", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(3)" } },
@@ -289,7 +289,7 @@ peripheral_clocks = { templates = [
         clk_en = "{{apb_clk}}",
         clk_en_template = "{{default_clk_template}} crate::peripherals::CNNT_SYS::regs().sys_hp_usb_device_ctrl().modify(|_, w| w.sys_usb_device_48m_clk_en().bit(enable));",
         rst_template = "crate::peripherals::CNNT_SYS::regs().sys_hp_usb_device_ctrl().modify(|_, w| w.sys_usb_device_rst_en().bit(reset));"
-    }, keep_enabled = true },
+    }, keep_enabled = "keep_usb_serial_jtag_enabled" },
     # Crypto - crypto_sys_clk_en and crypto_sec_clk_en gate the whole domain, CRYPTO_CLK drives those
     { name = "Aes", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Ecc", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },

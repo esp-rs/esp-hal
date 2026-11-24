@@ -149,7 +149,7 @@ peripheral_clocks = { templates = [
     { name = "Spi3Dma" },
     #{ name = "Pwm3" },
     #{ name = "Pwm2" },
-    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
+    { name = "UartMem", keep_enabled = "keep_uart0_enabled" },
     { name = "UsbFs", template_params = { peripheral = "usb" } },
     { name = "Spi2Dma" },
     { name = "Mcpwm1", template_params = { peripheral = "pwm1" } },
@@ -171,7 +171,7 @@ peripheral_clocks = { templates = [
     { name = "Uart1" },
     { name = "I2s0" },
     { name = "Wdg" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = "keep_uart0_enabled" },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

@@ -3753,8 +3753,14 @@ macro_rules! implement_peripheral_clocks {
             UartMem,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] =
-                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UartMem];
+            const KEEP_ENABLED: &[Peripheral] = &[
+                Self::Systimer,
+                Self::Timg0,
+                #[cfg(keep_uart0_enabled)]
+                Self::Uart0,
+                #[cfg(keep_uart0_enabled)]
+                Self::UartMem,
+            ];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::AhbGdma,

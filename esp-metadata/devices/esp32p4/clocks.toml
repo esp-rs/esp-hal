@@ -248,7 +248,7 @@ peripheral_clocks = { templates = [
 ], peripheral_clocks = [
     # Ref: TRM v0.5 Ch 12 (Reset and Clock), Ch 22 (System Registers).
     # UARTs -- sys_clk + apb_clk; reset asserts both core+apb together.
-    { name = "Uart0", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" }, keep_enabled = true },
+    { name = "Uart0", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" }, keep_enabled = "keep_uart0_enabled" },
     { name = "Uart1", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },
     { name = "Uart2", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },
     { name = "Uart3", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },
@@ -284,7 +284,7 @@ peripheral_clocks = { templates = [
     # USB -- reset is via LP-domain registers, leave rst as no-op here.
     { name = "UsbFs",  template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "usb_otg11", rst_template = "{{no_rst}}" } },
     { name = "UsbHs",  template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "usb_otg20", rst_template = "{{no_rst}}" } },
-    { name = "UsbDevice", template_params = { clk_en_template = "{{apb_clk_template}}", rst_template = "{{no_rst}}" }, keep_enabled = true },
+    { name = "UsbDevice", template_params = { clk_en_template = "{{apb_clk_template}}", rst_template = "{{no_rst}}" }, keep_enabled = "keep_usb_serial_jtag_enabled" },
     # Connectivity -- EMAC and SDMMC reset live in dedicated registers, no HP_RST_EN gate.
     { name = "Emac",  template_params = { clk_en_template = "{{sys_clk_template}}", rst_template = "{{no_rst}}" } },
     { name = "SdioHost", template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "sdmmc", rst_template = "crate::peripherals::LP_AON_CLKRST::regs().lp_aonclkrst_hp_sdmmc_emac_rst_ctrl().modify(|_, w| w.lp_aonclkrst_rst_en_sdmmc().bit(reset));" } },

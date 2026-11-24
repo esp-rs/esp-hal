@@ -42,6 +42,11 @@ static PERIPHERAL_REF_COUNT: NonReentrantMutex<RefCounts> =
 /// Peripherals listed in [KEEP_ENABLED] are NOT disabled.
 #[cfg_attr(not(feature = "rt"), expect(dead_code))]
 pub(crate) fn disable_peripherals() {
+    // Gating the clock alone leaves the D+ pull-up on, and the host keeps talking to a device that
+    // no longer answers.
+    #[cfg(all(soc_has_usb_device, not(keep_usb_serial_jtag_enabled)))]
+    crate::soc::usb_phy::disconnect_usj();
+
     // Take the critical section up front to avoid taking it multiple times.
     PERIPHERAL_REF_COUNT.with(|refcounts| {
         for p in Peripheral::KEEP_ENABLED {
