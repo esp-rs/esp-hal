@@ -149,7 +149,8 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
-    esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
+    let psram = qa_test::psram!(peripherals, Default::default());
+    esp_alloc::psram_allocator!(&psram);
 
     println!("Going to access PSRAM");
     let mut psram_a = Vec::<u8>::with_capacity(PSRAM_BENCH_BYTES);

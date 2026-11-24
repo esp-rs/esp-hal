@@ -128,6 +128,37 @@ macro_rules! i2c_pins {
     }};
 }
 
+// The PSRAM pins of the ESP32-WROVER module.
+#[macro_export]
+macro_rules! psram_pins {
+    ($peripherals:expr) => {
+        esp_hal::psram::PsramPins {
+            clk: $peripherals.GPIO17.into(),
+            cs: $peripherals.GPIO16.into(),
+            spiq: $peripherals.GPIO7.into(),
+            spid: $peripherals.GPIO8.into(),
+            spihd: $peripherals.GPIO9.into(),
+            spiwp: $peripherals.GPIO10.into(),
+        }
+    };
+}
+
+// Adds the PSRAM to the heap.
+#[macro_export]
+macro_rules! psram_allocator {
+    ($peripherals:expr) => {
+        let psram = cfg_select! {
+            esp32 => esp_hal::psram::Psram::new(
+                $peripherals.PSRAM,
+                $crate::psram_pins!($peripherals),
+                Default::default(),
+            ),
+            _ => esp_hal::psram::Psram::new($peripherals.PSRAM, Default::default()),
+        };
+        esp_alloc::psram_allocator!(&psram);
+    };
+}
+
 #[macro_export]
 macro_rules! common_test_pins {
     ($peripherals:expr) => {{

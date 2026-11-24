@@ -24,6 +24,28 @@ pub mod __private {
     pub use esp_println::println;
 }
 
+/// Initializes PSRAM with `config`. On ESP32, uses the PSRAM pins of an ESP32-WROVER module.
+#[macro_export]
+macro_rules! psram {
+    ($peripherals:expr, $config:expr) => {
+        cfg_select! {
+            feature = "esp32" => esp_hal::psram::Psram::new(
+                $peripherals.PSRAM,
+                esp_hal::psram::PsramPins {
+                    clk: $peripherals.GPIO17.into(),
+                    cs: $peripherals.GPIO16.into(),
+                    spiq: $peripherals.GPIO7.into(),
+                    spid: $peripherals.GPIO8.into(),
+                    spihd: $peripherals.GPIO9.into(),
+                    spiwp: $peripherals.GPIO10.into(),
+                },
+                $config,
+            ),
+            _ => esp_hal::psram::Psram::new($peripherals.PSRAM, $config),
+        }
+    };
+}
+
 /// Prints a line and waits 20 ms for the UART to send it. A light sleep or a reset loses unsent
 /// UART data, and 20 ms sends about 230 bytes at 115200 baud.
 #[macro_export]

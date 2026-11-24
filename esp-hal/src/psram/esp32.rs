@@ -1,6 +1,7 @@
 use core::ops::Range;
 
 use super::{EXTMEM_ORIGIN, PsramSize};
+use crate::gpio::{AnyPin, Pin};
 
 /// Cache Speed
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Default)]
@@ -45,10 +46,31 @@ pub struct PsramConfig {
     pub psram_vaddr_mode: PsramVaddrMode,
 }
 
+/// The pins of the PSRAM.
+///
+/// The PSRAM shares its data lines with the flash, so `spiq`, `spid`, `spihd`, and `spiwp` must
+/// be the data pins of the flash. ESP32-D0WD has no PSRAM in the package and can use any output
+/// pins for `clk` and `cs`. On the other packages, `clk` and `cs` must be the pins of the PSRAM in
+/// the package.
+pub struct PsramPins {
+    /// The clock pin, GPIO17 on an ESP32-WROVER module.
+    pub clk: AnyPin<'static>,
+    /// The chip select pin, GPIO16 on an ESP32-WROVER module.
+    pub cs: AnyPin<'static>,
+    /// The SPIQ (SD0) pin, GPIO7 with the default flash pins.
+    pub spiq: AnyPin<'static>,
+    /// The SPID (SD1) pin, GPIO8 with the default flash pins.
+    pub spid: AnyPin<'static>,
+    /// The SPIHD (SD2) pin, GPIO9 with the default flash pins.
+    pub spihd: AnyPin<'static>,
+    /// The SPIWP (SD3) pin, GPIO10 with the default flash pins.
+    pub spiwp: AnyPin<'static>,
+}
+
 /// Initializes PSRAM to be used for data.
 #[procmacros::ram]
-pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
-    utils::psram_init(config);
+pub(crate) fn init_psram(config: &mut PsramConfig, pins: &PsramPins) -> bool {
+    utils::psram_init(config, pins);
 
     if config.size.is_auto() {
         const MAX_MEM_SIZE: usize = 4 * 1024 * 1024;
@@ -178,10 +200,6 @@ pub(crate) mod utils {
     ) -> i32 {
         unsafe { cache_sram_mmu_set_rom(cpu_no, pid, vaddr, paddr, psize, num) }
     }
-
-    const D0WD_PSRAM_CLK_IO: u8 =
-        esp_config::esp_config_int!(u8, "ESP_HAL_CONFIG_D0WD_PSRAM_CLK_IO");
-    const D0WD_PSRAM_CS_IO: u8 = esp_config::esp_config_int!(u8, "ESP_HAL_CONFIG_D0WD_PSRAM_CS_IO");
 
     const D2WD_PSRAM_CLK_IO: u8 = 9; // Default value is 9
     const D2WD_PSRAM_CS_IO: u8 = 10; // Default value is 10
@@ -345,7 +363,7 @@ pub(crate) mod utils {
     }
 
     #[ram]
-    pub(crate) fn psram_init(config: &PsramConfig) {
+    pub(crate) fn psram_init(config: &PsramConfig, pins: &PsramPins) {
         let chip = crate::efuse::chip_type();
 
         let mode = config.cache_speed;
@@ -355,8 +373,8 @@ pub(crate) mod utils {
         match chip {
             crate::efuse::ChipType::Esp32D0wdq6 | crate::efuse::ChipType::Esp32D0wdq5 => {
                 clk_mode = PsramClkMode::PsramClkModeNorm;
-                psram_io.psram_clk_io = D0WD_PSRAM_CLK_IO;
-                psram_io.psram_cs_io = D0WD_PSRAM_CS_IO;
+                psram_io.psram_clk_io = pins.clk.number();
+                psram_io.psram_cs_io = pins.cs.number();
             }
             crate::efuse::ChipType::Esp32D2wdq5 => {
                 clk_mode = PsramClkMode::PsramClkModeDclk;
@@ -434,6 +452,29 @@ pub(crate) mod utils {
             // psram_io.psram_spiwp_sd3_io = bootloader_flash_get_wp_pin();
         }
         info!("PS-RAM pins {:?}", &psram_io);
+
+        for (name, pin, number) in [
+            ("CLK", &pins.clk, psram_io.psram_clk_io),
+            ("CS", &pins.cs, psram_io.psram_cs_io),
+            ("SPIQ", &pins.spiq, psram_io.psram_spiq_sd0_io),
+            ("SPID", &pins.spid, psram_io.psram_spid_sd1_io),
+            ("SPIHD", &pins.spihd, psram_io.psram_spihd_sd2_io),
+            ("SPIWP", &pins.spiwp, psram_io.psram_spiwp_sd3_io),
+        ] {
+            assert!(
+                pin.is_output(),
+                "The PSRAM {} pin GPIO{} is not an output",
+                name,
+                pin.number()
+            );
+            assert!(
+                pin.number() == number,
+                "The PSRAM {} pin must be GPIO{}, not GPIO{}",
+                name,
+                number,
+                pin.number()
+            );
+        }
 
         unsafe {
             SPI0::regs().ext3().modify(|_, w| w.bits(0x1));

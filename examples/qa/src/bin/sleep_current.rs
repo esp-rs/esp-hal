@@ -450,8 +450,7 @@ fn main() -> ! {
 
     #[cfg(psram_driver_supported)]
     let psram_words: &mut [u32] = {
-        let psram =
-            esp_hal::psram::Psram::new(peripherals.PSRAM, esp_hal::psram::PsramConfig::default());
+        let psram = qa_test::psram!(peripherals, esp_hal::psram::PsramConfig::default());
         let (start, size) = psram.raw_parts();
         if size == 0 {
             &mut []

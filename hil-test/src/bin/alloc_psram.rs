@@ -34,7 +34,7 @@ mod tests {
     fn init() {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
-        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+        hil_test::psram_allocator!(p);
     }
 
     // alloc::vec::Vec tests
@@ -213,7 +213,7 @@ mod multi_core_tests {
     fn init() -> CPU_CTRL<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
-        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+        hil_test::psram_allocator!(p);
 
         p.CPU_CTRL
     }
@@ -274,7 +274,7 @@ mod multi_core_cache_tests {
     fn init() -> CPU_CTRL<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
-        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+        hil_test::psram_allocator!(p);
 
         p.CPU_CTRL
     }
@@ -385,7 +385,7 @@ mod flash_tests {
     fn init() -> Context<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
-        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+        hil_test::psram_allocator!(p);
 
         Context { flash: p.FLASH }
     }
@@ -472,6 +472,7 @@ mod normal_vaddr_mode_tests {
         let p = esp_hal::init(config);
         let psram = Psram::new(
             p.PSRAM,
+            hil_test::psram_pins!(p),
             PsramConfig {
                 psram_vaddr_mode: PsramVaddrMode::Normal,
                 ..Default::default()

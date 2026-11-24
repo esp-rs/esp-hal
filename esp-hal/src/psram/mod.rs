@@ -40,6 +40,26 @@
 //! let string = String::from("A string allocated in PSRAM");
 //! # {after_snippet}
 //! ```
+#![cfg_attr(
+    esp32,
+    doc = r#"
+On ESP32, [`Psram::new`] also takes the PSRAM pins. Create the [`Psram`] and give it to the
+macro:
+
+```rust, ignore
+let pins = PsramPins {
+    clk: peripherals.GPIO17.into(),
+    cs: peripherals.GPIO16.into(),
+    spiq: peripherals.GPIO7.into(),
+    spid: peripherals.GPIO8.into(),
+    spihd: peripherals.GPIO9.into(),
+    spiwp: peripherals.GPIO10.into(),
+};
+let psram = Psram::new(peripherals.PSRAM, pins, PsramConfig::default());
+esp_alloc::psram_allocator!(&psram);
+```
+"#
+)]
 
 use core::ops::Range;
 
@@ -109,12 +129,32 @@ unsafe fn set_psram_range(range: Range<usize>) {
 /// Enables externally-connected Pseudo-static RAM.
 pub struct Psram {
     _peri: PSRAM<'static>,
+    #[cfg(esp32)]
+    _pins: PsramPins,
 }
 
 impl Psram {
     /// Initializes PSRAM.
-    pub fn new(peri: PSRAM<'static>, mut config: PsramConfig) -> Self {
-        if init_psram(&mut config) {
+    #[cfg_attr(
+        esp32,
+        doc = r#"
+
+`pins` are the pins of the PSRAM, see [`PsramPins`].
+
+# Panics
+
+Panics if a pin in `pins` is not an output, or is not the pin that the chip uses for the PSRAM."#
+    )]
+    pub fn new(
+        peri: PSRAM<'static>,
+        #[cfg(esp32)] pins: PsramPins,
+        mut config: PsramConfig,
+    ) -> Self {
+        #[cfg(esp32)]
+        let found = init_psram(&mut config, &pins);
+        #[cfg(not(esp32))]
+        let found = init_psram(&mut config);
+        if found {
             info!("PSRAM size: {} MB", config.size.get() / 1_024 / 1_024);
             let range = map_psram(config);
 
@@ -123,7 +163,11 @@ impl Psram {
             #[cfg(all(cache_livelock_workaround, feature = "rt"))]
             crate::soc::cache_livelock::psram_mapped();
         }
-        Self { _peri: peri }
+        Self {
+            _peri: peri,
+            #[cfg(esp32)]
+            _pins: pins,
+        }
     }
 
     /// Returns the address and size of the available in external memory.

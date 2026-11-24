@@ -954,8 +954,7 @@ fn main() -> ! {
 
     #[cfg(psram_driver_supported)]
     let psram = {
-        let psram =
-            esp_hal::psram::Psram::new(peripherals.PSRAM, esp_hal::psram::PsramConfig::default());
+        let psram = qa_test::psram!(peripherals, esp_hal::psram::PsramConfig::default());
         let (start, size) = psram.raw_parts();
         Words {
             start: start.cast::<u32>(),
