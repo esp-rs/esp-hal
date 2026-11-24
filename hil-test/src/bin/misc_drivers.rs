@@ -67,6 +67,10 @@ mod tsens {
             assert!(uncalibrated < f32::from(u8::MAX) * ADC_STEP_CELSIUS + ADC_ZERO_CELSIUS);
             check_temperature(&sample);
             let calibrated = sample.to_celsius();
+            // The test boards are at room temperature.
+            if let Some(celsius) = calibrated {
+                assert!((10.0..45.0).contains(&celsius));
+            }
             drop(sensor);
             assert_eq!(sample.to_uncalibrated_celsius(), uncalibrated);
             assert_eq!(sample.to_celsius(), calibrated);
