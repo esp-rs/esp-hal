@@ -619,6 +619,68 @@ impl ParlIoInstance {
     }
 }
 
+impl LcdCamInstance {
+    fn enable_lcd_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl19()
+            .modify(|_, w| w.lcd_clk_en().bit(en));
+    }
+
+    fn configure_lcd_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamLcdClockConfig>,
+        new_config: LcdCamLcdClockConfig,
+    ) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl19()
+            .modify(|_, w| unsafe {
+                w.lcd_clk_src_sel().bits(match new_config.sclk() {
+                    LcdCamLcdClockSclk::XtalClk => 0,
+                    LcdCamLcdClockSclk::PllF160m => 1,
+                })
+            });
+        // The register stores N - 1.
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl110()
+            .modify(|_, w| unsafe {
+                w.lcd_clk_div_num().bits((new_config.div_num() - 1) as u8);
+                w.lcd_clk_div_denominator().bits(new_config.div_a() as u8);
+                w.lcd_clk_div_numerator().bits(new_config.div_b() as u8)
+            });
+    }
+
+    fn enable_cam_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl119()
+            .modify(|_, w| w.cam_clk_en().bit(en));
+    }
+
+    fn configure_cam_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamCamClockConfig>,
+        new_config: LcdCamCamClockConfig,
+    ) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl119()
+            .modify(|_, w| unsafe {
+                w.cam_clk_src_sel().bits(match new_config.sclk() {
+                    LcdCamCamClockSclk::XtalClk => 0,
+                    LcdCamCamClockSclk::PllF160m => 1,
+                })
+            });
+        // The register stores N - 1.
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl120()
+            .modify(|_, w| unsafe {
+                w.cam_clk_div_num().bits((new_config.div_num() - 1) as u8);
+                w.cam_clk_div_denominator().bits(new_config.div_a() as u8);
+                w.cam_clk_div_numerator().bits(new_config.div_b() as u8)
+            });
+    }
+}
+
 // System clock impl functions
 
 // Mux enable stubs (mux nodes need enable functions too)

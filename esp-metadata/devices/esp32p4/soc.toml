@@ -111,6 +111,7 @@ peripherals = [
     { name = "AXI_GDMA", pac = "AXI_DMA" },
     { name = "DMA2D" },
     { name = "JPEG", interrupts = { peri = "JPEG" } },
+    { name = "LCD_CAM", interrupts = { peri = "LCD_CAM" }, clock_group = "LCD_CAM" },
     { name = "PPA" },
 
     { name = "ETH", virtual = true, interrupts = { peri = "ETH_MAC" } },
@@ -247,9 +248,9 @@ engines = [
         name = "AXI_GDMA",
         max_priority = 5,
         burst_sizes = [8, 16, 32, 64, 128],
-        drivers = ["aes", "sha", "spi_master", "spi_slave", "parl_io"],
+        drivers = ["aes", "sha", "spi_master", "spi_slave", "lcd_cam", "parl_io"],
         peripheral_instances = [
-            # LCD_CAM
+            { name = "LCD_CAM", dma_id = 0 },
             { name = "SPI2", dma_id = 1 },
             { name = "SPI3", dma_id = 2 },
             { name = "PARL_IO", dma_id = 3 },
@@ -300,7 +301,7 @@ support_status = "not_supported"
 [device.bit_scrambler]
 support_status = "not_supported"
 [device.camera]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6751 }
 [device.ds]
 support_status = "not_supported"
 [device.ecdsa]
@@ -416,7 +417,7 @@ instances = {
     },
 }
 [device.rgb_display]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6744 }
 output_lines = 24
 
 [device.rmt]
