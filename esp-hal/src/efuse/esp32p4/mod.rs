@@ -32,6 +32,76 @@ pub fn block_version() -> (u8, u8) {
     )
 }
 
+/// Returns `(dref, mul)` for a 1.8 V output on LDO unit 3 (channel 4).
+///
+/// This mirrors esp-idf's `ldo_ll_voltage_to_dref_mul`: the eFuse holds a
+/// per-unit gain (`K`), offset (`Vos`) and multiplier (`C`) calibration for
+/// `Vout = (Vref * K + Vos) * (1 + 0.25 * mul * C)`. Uncalibrated parts fall
+/// back to the nominal `dref = 6`, `mul = 5`.
+#[allow(dead_code)]
+pub(crate) fn ldo_vo4_1v8_dref_mul() -> (u8, u8) {
+    let (major, minor) = block_version();
+    let calibrated = major != 0 || minor != 0;
+
+    // Fixed-point by 1000, matching esp-idf's integer implementation.
+    let mut k_1000 = 1000i32;
+    let mut vos_1000 = 0i32;
+    let mut c_1000 = 1000i32;
+
+    if calibrated {
+        // LDO_VO4_K is the combined 8-bit value: two high bits in
+        // `rd_mac_sys_4` and six low bits in `rd_mac_sys_3`.
+        let k = super::read_field_le::<u8>(LDO_VO4_K) as i32;
+        let vos = super::read_field_le::<u8>(LDO_VO4_VOS) as i32;
+        let c = super::read_field_le::<u8>(LDO_VO4_C) as i32;
+
+        if k != 0 {
+            k_1000 = if k & 0x80 != 0 {
+                975 - (k & 0x7f)
+            } else {
+                k + 975
+            };
+        }
+        if vos != 0 {
+            vos_1000 = if vos & 0x20 != 0 {
+                -(vos & 0x1f) - 3
+            } else {
+                vos - 3
+            };
+        }
+        if c != 0 {
+            c_1000 = if c & 0x20 != 0 {
+                990 - (c & 0x1f)
+            } else {
+                c + 990
+            };
+        }
+    }
+
+    // Search the dref/mul grid for the value closest to 1.8 V.
+    let mut best_diff = i32::MAX;
+    let mut best_dref = 6u8;
+    let mut best_mul = 5u8;
+    for dref in 0..16i32 {
+        let vref_20 = if dref < 9 {
+            10 + dref
+        } else {
+            20 + (dref - 9) * 2
+        };
+        for mul in 0..8i32 {
+            let vout = (vref_20 * k_1000 + 20 * vos_1000) * (4000 + mul * c_1000);
+            let diff = (1800 * 80_000 - vout).abs();
+            if diff < best_diff {
+                best_diff = diff;
+                best_dref = dref as u8;
+                best_mul = mul as u8;
+            }
+        }
+    }
+
+    (best_dref, best_mul)
+}
+
 /// Returns the version of RTC calibration block.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L21>
