@@ -62,6 +62,10 @@ name              = "lcd_cam"
 harness           = false
 
 [[bin]]
+name              = "mipi_csi"
+harness           = false
+
+[[bin]]
 name              = "canfd"
 harness           = false
 
