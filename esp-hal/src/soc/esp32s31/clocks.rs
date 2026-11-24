@@ -294,7 +294,7 @@ fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
     set_mpll_power(en);
 
     if let Some(mpll_mhz) = mpll_mhz {
-        crate::rom::regi2c::lock(|| set_mpll_frequency(mpll_mhz));
+        crate::rom::regi2c::LOCK.lock(|| set_mpll_frequency(mpll_mhz));
     }
 }
 

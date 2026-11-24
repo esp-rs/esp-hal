@@ -3,7 +3,7 @@ use esp_sync::CountingLock;
 use crate::soc::regi2c::{regi2c_read, regi2c_write};
 
 /// Serializes accesses to the analog I2C master, which esp-hal shares with the PHY library.
-static LOCK: CountingLock = CountingLock::new();
+pub(crate) static LOCK: CountingLock = CountingLock::new();
 
 /// Locks the analog I2C master, for callers outside esp-hal that access it.
 ///
@@ -21,13 +21,6 @@ unsafe extern "C" fn regi2c_enter_critical() {
 #[unsafe(no_mangle)]
 unsafe extern "C" fn regi2c_exit_critical() {
     unsafe { LOCK.release() };
-}
-
-/// Runs `f` with the analog I2C master locked, so that a sequence of `*_unlocked` accesses is
-/// atomic.
-#[allow(unused)]
-pub(crate) fn lock<R>(f: impl FnOnce() -> R) -> R {
-    LOCK.lock(f)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
