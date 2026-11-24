@@ -102,7 +102,7 @@ fn unmap_flash_page(guard: FlashMmapGuard) {
 
 /// Read decrypted flash bytes via temporary MMU mappings.
 ///
-/// The cache must stay on. Callers park the other core and disable interrupts.
+/// The cache must stay on. With code in flash, callers park the other core and disable interrupts.
 pub(super) fn read_flash_encrypted(offset: u32, data: &mut [u32]) -> Result<(), Error> {
     if data.is_empty() {
         return Ok(());
@@ -182,7 +182,7 @@ fn invalidate_cache(_vaddr: u32, _size: u32) {
 /// IDF invalidates in this order (`spi_flash_check_and_flush_cache` after the
 /// operation's cache-restore path). ESP32 cannot invalidate by address and
 /// flushes while still off instead.
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, code_in_psram)))]
 pub(super) fn invalidate_mapped(start: u32, len: u32) {
     if len == 0 {
         return;
@@ -203,7 +203,7 @@ pub(super) fn invalidate_mapped(start: u32, len: u32) {
 /// One physical page can appear more than once. On C2, C3, and S3 the same
 /// entry is also visible through a separate I-bus window, so both vaddrs are
 /// invalidated.
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, code_in_psram)))]
 fn invalidate_mapped_page(page_paddr: u32, page_size: u32) {
     let page = flash_page_number(page_paddr);
 
@@ -217,7 +217,7 @@ fn invalidate_mapped_page(page_paddr: u32, page_size: u32) {
     }
 }
 
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, code_in_psram)))]
 fn invalidate_entry_caches(entry_id: u32, page_size: u32) {
     cfg_select! {
         esp32s2 => {
@@ -306,7 +306,7 @@ fn data_entries() -> Range<u32> {
 }
 
 /// Every entry that can map flash, including windows that only serve code.
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, code_in_psram)))]
 fn all_entries() -> Range<u32> {
     cfg_select! {
         // Include the S2 I-bus slots (0..0x80). Skip DBUS2/DPORT (0x140..).

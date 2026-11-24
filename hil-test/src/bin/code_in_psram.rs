@@ -2,7 +2,7 @@
 
 //% CHIP_FILTER: psram_supports_code_in_psram
 //% ENV: ESP_HAL_CONFIG_CODE_IN_PSRAM=true
-//% FEATURES: unstable
+//% FEATURES: unstable esp-alloc embassy
 
 #![no_std]
 #![no_main]
@@ -87,10 +87,12 @@ fn booted_image(
     (app, app_len, offset)
 }
 
+const BLOCK: u32 = 0x1_0000;
+const SECTOR: u32 = 0x1000;
+
 /// Returns the flash offset of a random 64 KiB block after the image in the booted partition. A
 /// random block spreads the wear of the tests over the partition.
 fn scratch_block(flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>) -> u32 {
-    const BLOCK: u32 = 0x1_0000;
     // The checksum and the hash after the last segment fit in the next block.
     let (app, app_len, end) = booted_image(flash, |_, _, _, _| {});
     let first = (end + BLOCK).div_ceil(BLOCK);
@@ -102,6 +104,40 @@ fn scratch_block(flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>) -> u3
     let block = (first + esp_hal::rng::Rng::new().random() % (last - first)) * BLOCK;
     defmt::info!("scratch block at {:#x}", block);
     block
+}
+
+/// 4 KiB of pattern for [`write_sectors`]. A `static mut` with a value other than zero is in
+/// internal RAM, where a ROM flash routine can read it, and it is never written.
+static mut SECTOR_PATTERN: [u32; SECTOR as usize / 4] = [0x5AA5_C33C; SECTOR as usize / 4];
+
+/// Writes the pattern over the 15 sectors after the first sector of the 64 KiB block at `block`,
+/// one sector in each flash operation. An erase of written sectors takes longer than an erase of
+/// blank sectors, so a test has more time inside it.
+fn write_sectors(flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>, block: u32) {
+    // SAFETY: nothing writes `SECTOR_PATTERN`.
+    let pattern = unsafe { &*core::ptr::addr_of!(SECTOR_PATTERN) };
+    for sector in 1..16 {
+        // SAFETY: the callers pass a block in the booted partition, after the image.
+        unsafe { flash.write(block + sector * SECTOR, pattern) }.unwrap();
+    }
+}
+
+/// Erases the 15 sectors after the first sector of the 64 KiB block at `block`, in one flash
+/// operation. The range does not start at a block, so the operation is 15 ROM calls.
+fn erase_sectors(
+    flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>,
+    block: u32,
+) -> Result<(), esp_hal::flash::Error> {
+    // SAFETY: the callers pass a block in the booted partition, after the image.
+    unsafe { flash.erase(block + SECTOR, block + 16 * SECTOR) }
+}
+
+fn sectors_erased(flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>, block: u32) -> bool {
+    let mut words = [0u32; SECTOR as usize / 4];
+    (1..16).all(|sector| {
+        flash.read(block + sector * SECTOR, &mut words).is_ok()
+            && words.iter().all(|&word| word == u32::MAX)
+    })
 }
 
 /// The number of `u32` words in 256 KiB, the size of the PSRAM data that the tests write and read
@@ -327,8 +363,6 @@ mod tests {
     // The heap and a PSRAM static keep their content over a flash erase, a write and a read.
     #[test]
     fn test_psram_survives_flash_operations() {
-        const BLOCK: u32 = 0x1_0000;
-
         let peripherals = esp_hal::init(esp_hal::Config::default());
         hil_test::init_logger!(peripherals);
         let psram = Psram::new(peripherals.PSRAM, PsramConfig::default());
@@ -538,5 +572,389 @@ mod tests {
         assert_eq!(mpll_clk_frequency(), before);
         assert_eq!(mpll_in_hardware(), before);
         assert_eq!(in_text(), 0x5053_524D);
+    }
+}
+
+/// Flash operations with code in PSRAM.
+#[embedded_test::tests(default_timeout = 30)]
+mod flash_operations {
+    use allocator_api2::boxed::Box;
+    use esp_alloc::ExternalMemory;
+    use esp_hal::flash::{Config, Error, Flash};
+
+    use super::*;
+
+    /// Asserts that no MMU entry maps flash, as after the start-up. On the ESP32-S31, this MMU maps
+    /// only flash.
+    fn assert_no_flash_mapped(after: &str) {
+        let spi0 = esp_hal::peripherals::SPI0::regs();
+        let mapped = (0..property!("mmu.entry_num")).find(|&i| {
+            spi0.mmu_item_index().write(|w| unsafe { w.bits(i) });
+            spi0.mmu_item_content().read().valid().bit_is_set()
+        });
+        assert_eq!(mapped, None, "an entry maps flash after {after}");
+    }
+
+    // Fails if a page stays mapped, or its cache lines stay: the second `read_encrypted` returns
+    // the old words.
+    #[test]
+    fn test_read_encrypted_sees_new_data() {
+        let p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
+        let mut flash = Flash::new(p.FLASH, Config::default()).unwrap();
+        let block = scratch_block(&mut flash);
+        let mut plain = [0u32; 256];
+        let mut through_mmu = [0u32; 256];
+
+        flash.read(block, &mut plain).unwrap();
+        flash.read_encrypted(block, &mut through_mmu).unwrap();
+        assert_no_flash_mapped("the first read_encrypted");
+        assert_eq!(plain, through_mmu);
+
+        let data = plain.map(|word| !word);
+        // SAFETY: the block is in the booted partition, after the image.
+        unsafe {
+            flash.erase(block, block + BLOCK).unwrap();
+            flash.write(block, &data).unwrap();
+        }
+        flash.read_encrypted(block, &mut through_mmu).unwrap();
+        assert_no_flash_mapped("the second read_encrypted");
+        assert_eq!(through_mmu, data);
+    }
+
+    #[test]
+    fn test_read_into_psram_is_refused() {
+        let p = esp_hal::init(esp_hal::Config::default());
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+        let mut flash = Flash::new(p.FLASH, Config::default()).unwrap();
+        let mut buffer = Box::new_in([0u32; 4], ExternalMemory);
+        assert_eq!(
+            flash.read(0x1_0000, &mut buffer[..]),
+            Err(Error::NotSupported)
+        );
+    }
+}
+
+/// Latency during flash operations, with code in PSRAM: interrupts and threads wait far less than
+/// the operation.
+///
+/// Each test writes 15 sectors, erases them, and reads them back, and measures the worst case of
+/// each latency during each of the three. A sample counts when it falls due during the operation.
+/// The bound of [`BOUND`] is far above the latency of any of these chips without a flash operation,
+/// and far below one sector erase. Without code in PSRAM, an operation makes each latency as long
+/// as one ROM call.
+///
+/// The scheduler starts in this module only, because its tick interrupt would run under every other
+/// test.
+#[embedded_test::tests(default_timeout = 30, executor = esp_rtos::embassy::Executor::new())]
+mod latency_during_flash_operations {
+    use core::sync::atomic::AtomicBool;
+
+    use allocator_api2::vec::Vec;
+    use esp_alloc::ExternalMemory;
+    use esp_hal::{
+        Blocking,
+        flash::{Config, Flash},
+        handler,
+        interrupt::InterruptHandler,
+        peripherals::Peripherals,
+        time::{Duration, Instant},
+        timer::{PeriodicTimer, systimer::SystemTimer, timg::TimerGroup},
+    };
+    #[cfg(multi_core)]
+    use esp_hal::{
+        peripherals::CPU_CTRL,
+        system::{CpuControl, Stack as CoreStack},
+        timer::systimer::Alarm,
+    };
+    use esp_rtos::{
+        CurrentThreadHandle,
+        thread::{Stack, ThreadSpawner},
+    };
+    use static_cell::ConstStaticCell;
+
+    use super::*;
+
+    const BOUND: u32 = 1_000;
+    const PERIOD: Duration = Duration::from_micros(200);
+    /// The samples of each latency that show that it was measured during the operation.
+    const SAMPLES_MIN: u32 = 100;
+    /// How long the test reads the sectors in a loop, to get [`SAMPLES_MIN`] samples.
+    const READ_TIME: Duration = Duration::from_millis(50);
+
+    #[derive(Clone, Copy, Debug, defmt::Format)]
+    enum Latency {
+        InterruptSameCore,
+        ThreadSameCore,
+        InterruptOtherCore,
+        ThreadOtherCore,
+        BareLoopOtherCore,
+    }
+
+    static WORST: [AtomicU32; 5] = [const { AtomicU32::new(0) }; 5];
+    static SAMPLES: [AtomicU32; 5] = [const { AtomicU32::new(0) }; 5];
+    /// The operation, in the low 32 bits of the time since boot in microseconds: from `START`, and
+    /// while `OPEN` is set or to `END`.
+    static START: AtomicU32 = AtomicU32::new(0);
+    static END: AtomicU32 = AtomicU32::new(0);
+    static OPEN: AtomicBool = AtomicBool::new(false);
+    static THREAD_STACK: ConstStaticCell<Stack<4096>> = ConstStaticCell::new(Stack::new());
+
+    fn now_us() -> u32 {
+        Instant::now().duration_since_epoch().as_micros() as u32
+    }
+
+    fn during_the_operation(time: u32) -> bool {
+        time.wrapping_sub(START.load(Ordering::Acquire)) as i32 >= 0
+            && (OPEN.load(Ordering::Acquire)
+                || END.load(Ordering::Acquire).wrapping_sub(time) as i32 >= 0)
+    }
+
+    fn record(latency: Latency, due: u32, ran: u32) {
+        if during_the_operation(due) {
+            // An alarm on time after a late one runs less than one period after it.
+            let late = (ran.wrapping_sub(due) as i32).max(0) as u32;
+            WORST[latency as usize].fetch_max(late, Ordering::Relaxed);
+            SAMPLES[latency as usize].fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// A periodic timer alarm. Its handler records the time from its last run, less one period, as
+    /// the latency of the run. Interrupts masked for a time T give a sample of about T.
+    struct GapProbe {
+        timer: Mutex<RefCell<Option<PeriodicTimer<'static, Blocking>>>>,
+        last: AtomicU32,
+        latency: Latency,
+    }
+
+    impl GapProbe {
+        const fn new(latency: Latency) -> Self {
+            Self {
+                timer: Mutex::new(RefCell::new(None)),
+                last: AtomicU32::new(0),
+                latency,
+            }
+        }
+
+        /// Starts the alarms. The handler runs on the current core.
+        fn start(&self, mut timer: PeriodicTimer<'static, Blocking>, handler: InterruptHandler) {
+            timer.set_interrupt_handler(handler);
+            timer.listen();
+            self.last.store(now_us(), Ordering::Relaxed);
+            // Stored before it can interrupt, so that the handler can clear the interrupt.
+            critical_section::with(|cs| {
+                let mut stored = self.timer.borrow_ref_mut(cs);
+                stored.insert(timer).start(PERIOD).unwrap();
+            });
+        }
+
+        fn run(&self) {
+            critical_section::with(|cs| {
+                if let Some(timer) = self.timer.borrow_ref_mut(cs).as_mut() {
+                    timer.clear_interrupt();
+                }
+            });
+            let now = now_us();
+            let last = self.last.swap(now, Ordering::Relaxed);
+            record(
+                self.latency,
+                last.wrapping_add(PERIOD.as_micros() as u32),
+                now,
+            );
+        }
+    }
+
+    static PROBE_SAME: GapProbe = GapProbe::new(Latency::InterruptSameCore);
+    #[cfg(multi_core)]
+    static PROBE_OTHER: GapProbe = GapProbe::new(Latency::InterruptOtherCore);
+
+    #[handler]
+    fn probe_same_handler() {
+        PROBE_SAME.run();
+    }
+
+    #[cfg(multi_core)]
+    #[handler]
+    fn probe_other_handler() {
+        PROBE_OTHER.run();
+    }
+
+    fn measure_thread(latency: Latency) -> ! {
+        loop {
+            let due = Instant::now() + PERIOD;
+            CurrentThreadHandle::get().delay_until(due);
+            record(
+                latency,
+                due.duration_since_epoch().as_micros() as u32,
+                now_us(),
+            );
+        }
+    }
+
+    /// Records the longest gap between two readings of the clock, forever.
+    #[cfg(multi_core)]
+    fn measure_bare_loop() -> ! {
+        let mut last = now_us();
+        loop {
+            let now = now_us();
+            if during_the_operation(now) || during_the_operation(last) {
+                WORST[Latency::BareLoopOtherCore as usize]
+                    .fetch_max(now.wrapping_sub(last), Ordering::Relaxed);
+                SAMPLES[Latency::BareLoopOtherCore as usize].fetch_add(1, Ordering::Relaxed);
+            }
+            last = now;
+        }
+    }
+
+    struct Context {
+        flash: Flash<'static, Blocking>,
+        /// 256 KiB of PSRAM heap with a pattern, so that most of it is read back from PSRAM.
+        heap: Vec<u32, ExternalMemory>,
+        seed: u32,
+        #[cfg(multi_core)]
+        cpu_ctrl: CPU_CTRL<'static>,
+        #[cfg(multi_core)]
+        alarm: Alarm<'static>,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+        let systimer = SystemTimer::new(p.SYSTIMER);
+        PROBE_SAME.start(PeriodicTimer::new(systimer.alarm0), probe_same_handler);
+        CurrentThreadHandle::get().set_priority(1);
+        ThreadSpawner::from_static(THREAD_STACK.take())
+            .with_priority(2)
+            .with_pinned_to(esp_hal::system::Cpu::ProCpu)
+            .spawn(|| measure_thread(Latency::ThreadSameCore))
+            .detach();
+
+        let mut heap = Vec::with_capacity_in(UNCACHED_WORDS, ExternalMemory);
+        heap.resize(UNCACHED_WORDS, 0);
+        let seed = fresh_seed();
+        fill_pattern(&mut heap, seed);
+        Context {
+            flash: Flash::new(p.FLASH, Config::default()).unwrap(),
+            heap,
+            seed,
+            #[cfg(multi_core)]
+            cpu_ctrl: p.CPU_CTRL,
+            #[cfg(multi_core)]
+            alarm: systimer.alarm1,
+        }
+    }
+
+    /// Asserts that each latency in `measured` stays below [`BOUND`] during `operation`.
+    fn assert_latency_during(what: &str, measured: &[Latency], operation: impl FnOnce()) {
+        for latency in 0..WORST.len() {
+            WORST[latency].store(0, Ordering::Relaxed);
+            SAMPLES[latency].store(0, Ordering::Relaxed);
+        }
+        START.store(now_us(), Ordering::Release);
+        OPEN.store(true, Ordering::Release);
+        operation();
+        END.store(now_us(), Ordering::Release);
+        OPEN.store(false, Ordering::Release);
+        // A late sample still counts by its due time.
+        let settle = Instant::now() + Duration::from_millis(5);
+        while Instant::now() < settle {}
+
+        for &latency in measured {
+            let worst = WORST[latency as usize].load(Ordering::Relaxed);
+            let samples = SAMPLES[latency as usize].load(Ordering::Relaxed);
+            defmt::info!("{}, {}: {} µs, {} samples", what, latency, worst, samples);
+            assert!(
+                samples >= SAMPLES_MIN,
+                "{}, {:?}: {} samples",
+                what,
+                latency,
+                samples
+            );
+            assert!(worst < BOUND, "{}, {:?}: {} µs", what, latency, worst);
+        }
+    }
+
+    /// Asserts that each latency in `measured` stays below [`BOUND`] during a write, an erase, and
+    /// a read of 15 sectors, and that `heap` still holds the pattern for `seed`.
+    fn assert_latency_during_flash_operations(
+        flash: &mut Flash<'static, Blocking>,
+        heap: &[u32],
+        seed: u32,
+        measured: &[Latency],
+    ) {
+        let block = scratch_block(flash);
+        erase_sectors(flash, block).unwrap();
+
+        assert_latency_during("write", measured, || write_sectors(flash, block));
+        assert_latency_during("erase", measured, || erase_sectors(flash, block).unwrap());
+        let mut erased = true;
+        assert_latency_during("read", measured, || {
+            let end = Instant::now() + READ_TIME;
+            while Instant::now() < end {
+                erased &= sectors_erased(flash, block);
+            }
+        });
+
+        assert!(erased, "the sectors read back not erased");
+        assert_pattern(heap, seed, "the heap after the flash operations");
+    }
+
+    #[test]
+    fn test_latency_on_this_core_and_a_bare_other_core(mut ctx: Context) {
+        #[cfg(multi_core)]
+        {
+            static CORE1_STACK: ConstStaticCell<CoreStack<8192>> =
+                ConstStaticCell::new(CoreStack::new());
+            static STARTED: AtomicBool = AtomicBool::new(false);
+            let alarm = PeriodicTimer::new(ctx.alarm);
+            let mut cpu_control = CpuControl::new(ctx.cpu_ctrl);
+            let guard = cpu_control
+                .start_app_core(CORE1_STACK.take(), move || {
+                    PROBE_OTHER.start(alarm, probe_other_handler);
+                    STARTED.store(true, Ordering::Release);
+                    measure_bare_loop()
+                })
+                .unwrap();
+            core::mem::forget(guard);
+            while !STARTED.load(Ordering::Acquire) {}
+        }
+
+        assert_latency_during_flash_operations(
+            &mut ctx.flash,
+            &ctx.heap,
+            ctx.seed,
+            &[
+                Latency::InterruptSameCore,
+                Latency::ThreadSameCore,
+                #[cfg(multi_core)]
+                Latency::InterruptOtherCore,
+                #[cfg(multi_core)]
+                Latency::BareLoopOtherCore,
+            ],
+        );
+    }
+
+    #[cfg(multi_core)]
+    #[test]
+    fn test_thread_latency_on_the_other_core(mut ctx: Context) {
+        static CORE1_STACK: ConstStaticCell<CoreStack<8192>> =
+            ConstStaticCell::new(CoreStack::new());
+        static STARTED: AtomicBool = AtomicBool::new(false);
+        esp_rtos::start_second_core(ctx.cpu_ctrl, CORE1_STACK.take(), || {
+            STARTED.store(true, Ordering::Release);
+            measure_thread(Latency::ThreadOtherCore)
+        });
+        while !STARTED.load(Ordering::Acquire) {}
+
+        assert_latency_during_flash_operations(
+            &mut ctx.flash,
+            &ctx.heap,
+            ctx.seed,
+            &[Latency::ThreadOtherCore],
+        );
     }
 }

@@ -395,7 +395,9 @@ mod tests {
         while COUNTER.load(Ordering::Relaxed) == before {}
     }
 
-    #[cfg(multi_core)]
+    // With code in PSRAM, a flash operation does not park the other core, so the two cores' ROM
+    // calls would overlap.
+    #[cfg(all(multi_core, not(code_in_psram)))]
     #[test]
     fn test_auto_park_from_both_cores_at_the_same_time() {
         use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -477,10 +479,13 @@ mod tests {
         .unwrap();
 
         let mut buf = [0u32; 1];
-        assert_eq!(
-            flash.read(APP_DESC_OFFSET, &mut buf),
+        // With code in PSRAM, nothing fetches from flash, so the strategy has no effect.
+        let expected = if cfg!(code_in_psram) {
+            Ok(())
+        } else {
             Err(Error::OtherCoreRunning)
-        );
+        };
+        assert_eq!(flash.read(APP_DESC_OFFSET, &mut buf), expected);
     }
 
     /// HIL boards have no encryption key burned, so `read_encrypted` returns
