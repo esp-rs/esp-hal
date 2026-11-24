@@ -27,8 +27,8 @@ cfg_select! {
         pub(crate) mod park;
         mod start;
 
-        pub(crate) use park::unpark;
-        use park::{park_request, park_stall, stop_app_core};
+        use park::{park_request, park_stall};
+        pub(crate) use park::{stop_app_core, unpark};
         pub(crate) use start::app_core_takes_ipc;
         use start::{APP_CORE_STOPPING, APP_CORE_TAKES_IPC, app_core_running, start_app_core};
 
@@ -78,7 +78,7 @@ cfg_select! {
         }
 
         #[inline(always)]
-        fn stop_app_core() {
+        pub(crate) fn stop_app_core() {
             unsafe { esp_hal_stop_app_core() }
         }
     }
@@ -216,6 +216,15 @@ impl<const SIZE: usize> Stack<SIZE> {
 /// APP core never takes the IPC interrupt, the drop waits forever. The APP core then stays parked,
 /// also after the last [`ParkGuard`] drops.
 /// [`CpuControl::start_app_core`] can start the APP core again.
+#[cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "\n\nWith the `code-in-psram` option, if the APP core is in a flash operation, the drop \
+           waits until the operation ends. The APP core stops before the flash call returns. If a \
+           [`ParkGuard`] holds the APP core inside the operation, the drop also waits until that \
+           park ends. So do not drop the guard while the same thread holds that [`ParkGuard`]. If \
+           an interrupt handler of the APP core drops the guard inside a flash operation of the \
+           APP core, that operation stops unfinished, as at a reset."
+)]
 #[must_use = "Dropping this guard will stop the APP core"]
 #[instability::unstable]
 pub struct AppCoreGuard<'a> {

@@ -540,6 +540,30 @@ mod tests {
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
     }
 
+    #[cfg(code_in_psram)]
+    #[test]
+    fn test_write_encrypted_marks_the_operation() {
+        use esp_hal::timer::{PeriodicTimer, systimer::SystemTimer};
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+        let timer = PeriodicTimer::new(SystemTimer::new(peripherals.SYSTIMER).alarm0);
+        let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
+
+        let sector = flash.chip_info().sector_size;
+        // SAFETY: NVS is not mapped firmware.
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+        let zeros = [0u32; 1024];
+        hil_test::assert_flash_value_marks(
+            timer,
+            // SAFETY: as above.
+            || unsafe { flash.write_encrypted(NVS, &zeros).unwrap() },
+            "encrypted write",
+        );
+        // SAFETY: as above.
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+    }
+
     #[test]
     fn test_write_encrypted_alignment_and_bounds() {
         let peripherals = esp_hal::init(esp_hal::Config::default());

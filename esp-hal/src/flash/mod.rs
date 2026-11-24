@@ -81,7 +81,11 @@ other core running. The limits above on the cache and the other core do not appl
     doc = "
 These limits apply:
 
-- Do not map flash during an erase or a write."
+- Do not map flash during an erase or a write.
+- A light sleep during a flash operation returns `Refused`.
+- The deprecated esp-storage is not compatible with code in PSRAM. It can start a ROM flash call
+  during a flash operation of this driver, on the other core or in a thread that preempts the
+  operation."
 )]
 
 use core::marker::PhantomData;
@@ -91,6 +95,8 @@ use esp_sync::{
     RestoreState,
     raw::{RawLock, SingleCoreInterruptLock},
 };
+#[cfg(code_in_psram)]
+use portable_atomic::Ordering;
 use procmacros::{BuilderLite, ram};
 
 #[cfg(all(multi_core, not(code_in_psram)))]
@@ -448,6 +454,8 @@ impl<'d> Flash<'d, Blocking> {
         self.check_word_offset(offset)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
+        #[cfg(code_in_psram)]
+        let _operation = FlashOperation::start();
         self.with_guard(None, || rom::read(offset, data))
     }
 
@@ -489,6 +497,8 @@ impl<'d> Flash<'d, Blocking> {
         self.check_word_offset(offset)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
+        #[cfg(code_in_psram)]
+        let _operation = FlashOperation::start();
         self.with_guard(Some((offset, len as u32)), || rom::write(offset, data))
     }
 
@@ -529,6 +539,8 @@ impl<'d> Flash<'d, Blocking> {
 
         self.check_alignment(SECTOR_SIZE, from, len)?;
         self.check_bounds(from, len)?;
+        #[cfg(code_in_psram)]
+        let _operation = FlashOperation::start();
         self.erase_range(from, to)
     }
 
@@ -563,6 +575,8 @@ impl<'d> Flash<'d, Blocking> {
         self.check_word_offset(offset)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
+        #[cfg(code_in_psram)]
+        let _operation = FlashOperation::start();
         self.with_mmu_guard(|_| mmu::read_flash_encrypted(offset, data))
     }
 
@@ -627,6 +641,8 @@ impl<'d> Flash<'d, Blocking> {
 
         #[cfg(esp32)]
         let neighbors = self.esp32_row_neighbors(offset, len)?;
+        #[cfg(code_in_psram)]
+        let _operation = FlashOperation::start();
         let data = words_as_bytes(data);
         let mut row = EncryptRow([0; XTS_AES_BLOCK_MAX]);
         let mut i = 0;
@@ -876,6 +892,47 @@ fn with_caches_suspended<R>(
     }
     drop(cache);
     result
+}
+
+/// Marks one flash operation in esp-hal's flash value, from the first access to the chip or the
+/// MMU until the public method returns.
+#[cfg(code_in_psram)]
+struct FlashOperation;
+
+#[cfg(code_in_psram)]
+impl FlashOperation {
+    #[inline(always)]
+    fn start() -> Self {
+        let value = crate::system::Cpu::current() as u32 + 1;
+        let previous = crate::rtc_cntl::flash_operation().swap(value, Ordering::AcqRel);
+        // Safe code cannot start a second operation: `Flash::new` takes the `FLASH` singleton, and
+        // each operation takes `&mut self`.
+        debug_assert_eq!(
+            previous & !crate::rtc_cntl::FLASH_STOP_PENDING,
+            0,
+            "A flash operation started during another flash operation"
+        );
+        Self
+    }
+}
+
+#[cfg(code_in_psram)]
+impl Drop for FlashOperation {
+    #[inline(always)]
+    fn drop(&mut self) {
+        let value = crate::rtc_cntl::flash_operation();
+        cfg_select! {
+            multi_core => {
+                let previous = value.swap(0, Ordering::AcqRel);
+                // Only an operation of the APP core finds the mark. The APP core stops here, before
+                // the flash call returns.
+                if previous & crate::rtc_cntl::FLASH_STOP_PENDING != 0 {
+                    crate::system::multi_core::stop_app_core();
+                }
+            }
+            _ => value.store(0, Ordering::Release),
+        }
+    }
 }
 
 /// Stops the other core according to [`MultiCoreStrategy`], and masks the interrupts of the

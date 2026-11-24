@@ -149,6 +149,13 @@ pub enum LightSleep {
     ///
     /// The refusal holds until the state that caused it changes, so a second call refuses too.
     /// Wait for an interrupt instead.
+    #[cfg_attr(
+        psram_supports_code_in_psram,
+        doc = "\n\nWith the `code-in-psram` option, a light sleep during a flash operation also \
+               returns this result. No interrupt marks the end of the operation, so the caller \
+               must block or delay before the next call. A thread that retries at once can keep a \
+               lower-priority thread from finishing the operation."
+    )]
     Refused,
 }
 
@@ -229,6 +236,12 @@ impl<'d> LowPower<'d> {
     /// A wakeup source cannot refuse this sleep. The wake resets the chip, so the call cannot
     /// return a refusal. [`Self::sleep_light`] reports a refusal.
     #[cfg_attr(
+        psram_supports_code_in_psram,
+        doc = "\n\nWith the `code-in-psram` option, a deep sleep does not wait for a flash \
+               operation in progress on another core or in another thread. The operation stops \
+               unfinished, as at a reset."
+    )]
+    #[cfg_attr(
         cpu_retention = "software",
         doc = "\n\nDeep sleep shares the entry code of light sleep. See [Optimization \
                level](crate#optimization-level) for the build requirement.\n"
@@ -303,6 +316,11 @@ impl<'d> LowPower<'d> {
     /// hardware rejects the request because a wakeup source is already asserted. It reports
     /// neither case. For the caller, a rejected sleep and a very short sleep have the same
     /// result.
+    #[cfg_attr(
+        psram_supports_code_in_psram,
+        doc = "\n\nWith the `code-in-psram` option, returns [`LightSleep::Refused`] during a \
+               flash operation on any core or in any thread."
+    )]
     #[cfg_attr(
         cpu_retention = "software",
         doc = "\n\nLight sleep suspends the caches. See [Optimization \
@@ -419,12 +437,18 @@ impl<'d> LowPower<'d> {
         allow_reject: bool,
         may_sleep: Option<fn() -> bool>,
     ) -> bool {
-        // First, so that no other core changes what the check and the hooks read. Dropped last, so
+        // First, so that no other core changes what the checks and the hooks read. Dropped last, so
         // that the other cores run again with the time base and the wakeup cause of this sleep.
         #[cfg(multi_core)]
         let _parked = ParkedCores::new(kind);
 
-        if kind == SleepKind::Light && may_sleep.is_some_and(|may_sleep| !may_sleep()) {
+        // After the park, no flash operation can start until the sleep ends: the other cores are
+        // parked, and this core runs with interrupts disabled. A deep sleep does not wait for an
+        // operation in progress, which stops unfinished, as at a reset.
+        if kind == SleepKind::Light
+            && (crate::rtc_cntl::flash_operation_in_progress()
+                || may_sleep.is_some_and(|may_sleep| !may_sleep()))
+        {
             return true;
         }
 

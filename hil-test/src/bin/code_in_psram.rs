@@ -106,13 +106,15 @@ fn scratch_block(flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>) -> u3
     block
 }
 
-/// 4 KiB of pattern for [`write_sectors`]. A `static mut` with a value other than zero is in
-/// internal RAM, where a ROM flash routine can read it, and it is never written.
+/// The flash operations that a test tries before it fails.
+#[cfg(multi_core)]
+const ATTEMPTS: u32 = 8;
+
+/// The pattern for [`write_sectors`]. A nonzero `static mut` is in internal RAM, where a ROM flash
+/// routine can read it.
 static mut SECTOR_PATTERN: [u32; SECTOR as usize / 4] = [0x5AA5_C33C; SECTOR as usize / 4];
 
-/// Writes the pattern over the 15 sectors after the first sector of the 64 KiB block at `block`,
-/// one sector in each flash operation. An erase of written sectors takes longer than an erase of
-/// blank sectors, so a test has more time inside it.
+/// Writes the pattern over the 15 sectors of [`erase_sectors`], one sector in each flash operation.
 fn write_sectors(flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>, block: u32) {
     // SAFETY: nothing writes `SECTOR_PATTERN`.
     let pattern = unsafe { &*core::ptr::addr_of!(SECTOR_PATTERN) };
@@ -580,7 +582,11 @@ mod tests {
 mod flash_operations {
     use allocator_api2::boxed::Box;
     use esp_alloc::ExternalMemory;
-    use esp_hal::flash::{Config, Error, Flash};
+    use esp_hal::{
+        flash::{Config, Error, Flash},
+        timer::{PeriodicTimer, systimer::SystemTimer},
+    };
+    use hil_test::{assert_flash_value_marks, mk_static};
 
     use super::*;
 
@@ -622,6 +628,31 @@ mod flash_operations {
         assert_eq!(through_mmu, data);
     }
 
+    // The `flash` test covers `write_encrypted`, which needs its test build.
+    #[test]
+    fn test_value_marks_the_operation() {
+        let p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
+        let timer = PeriodicTimer::new(SystemTimer::new(p.SYSTIMER).alarm0);
+        let mut flash = Flash::new(p.FLASH, Config::default()).unwrap();
+        let block = scratch_block(&mut flash);
+        let (app, _, _) = booted_image(&mut flash, |_, _, _, _| {});
+        let buffer = mk_static!([u32; 0x4000], [0; 0x4000]);
+
+        let timer = assert_flash_value_marks(
+            timer,
+            || flash.read_encrypted(app, buffer).unwrap(),
+            "read_encrypted",
+        );
+        write_sectors(&mut flash, block);
+        assert_flash_value_marks(
+            timer,
+            || erase_sectors(&mut flash, block).unwrap(),
+            "erase of 15 sectors",
+        );
+    }
+
+    // A regression test: `check_buffer` must still refuse a buffer outside DRAM.
     #[test]
     fn test_read_into_psram_is_refused() {
         let p = esp_hal::init(esp_hal::Config::default());
@@ -635,17 +666,607 @@ mod flash_operations {
     }
 }
 
-/// Latency during flash operations, with code in PSRAM: interrupts and threads wait far less than
-/// the operation.
+/// A stop or a park of the APP core, and a light sleep, during a flash operation.
 ///
-/// Each test writes 15 sectors, erases them, and reads them back, and measures the worst case of
-/// each latency during each of the three. A sample counts when it falls due during the operation.
-/// The bound of [`BOUND`] is far above the latency of any of these chips without a flash operation,
-/// and far below one sector erase. Without code in PSRAM, an operation makes each latency as long
-/// as one ROM call.
+/// In most tests, the APP core erases 15 sectors in one operation. Its timer handler holds it
+/// inside the erase until the PRO core releases it, so the stop or the park starts there. No light
+/// sleep happens, so the debug probe stays connected.
+#[cfg(multi_core)]
+#[embedded_test::tests(default_timeout = 30)]
+mod stop_and_park_during_erase {
+    use core::{ptr::addr_of_mut, sync::atomic::AtomicBool};
+
+    use esp_hal::{
+        Blocking,
+        flash::{Config, Flash},
+        handler,
+        interrupt::InterruptHandler,
+        peripherals::{LPWR, Peripherals, TIMG1},
+        rtc_cntl::sleep::{LightSleep, LowPower, RtcSleepConfig},
+        system::{AppCoreGuard, Cpu, CpuControl, ParkGuard, Stack, is_running},
+        time::{Duration, Instant},
+        timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup},
+    };
+    use hil_test::flash_operation;
+
+    use super::*;
+
+    const APP_PERIOD: Duration = Duration::from_micros(200);
+    /// The hang bound on one cycle of the APP core's loop.
+    const RESUME_BOUND: Duration = Duration::from_secs(4);
+    /// The delay from [`arm_pro_timer`] to the PRO core's timer handler.
+    const RELEASE_AFTER: Duration = Duration::from_millis(1);
+    /// The longest time that the chip needs for a sector erase that the APP core left in progress.
+    const SECTOR_ERASE_BOUND: Duration = Duration::from_secs(1);
+
+    const WRITE: u32 = 0;
+    const ERASE: u32 = 1;
+
+    static PHASE: AtomicU32 = AtomicU32::new(WRITE);
+    /// The erases that the APP core finished, and the read-backs after them.
+    static ERASES: AtomicU32 = AtomicU32::new(0);
+    static CYCLES: AtomicU32 = AtomicU32::new(0);
+    static ERASE_FAILED: AtomicBool = AtomicBool::new(false);
+    static READ_BACK_FAILED: AtomicBool = AtomicBool::new(false);
+    static HOLD: AtomicBool = AtomicBool::new(false);
+    static HELD: AtomicBool = AtomicBool::new(false);
+    static RELEASE: AtomicBool = AtomicBool::new(false);
+    static RESUMED: AtomicBool = AtomicBool::new(false);
+    static APP_RUNS: AtomicU32 = AtomicU32::new(0);
+    /// Whether the APP core's timer handler drops [`APP_GUARD`] inside the APP core's erase.
+    static STOP_IN_APP_HANDLER: AtomicBool = AtomicBool::new(false);
+    /// Whether the PRO core's timer handler ended the park of [`PARKED`].
+    static UNPARKED: AtomicBool = AtomicBool::new(false);
+    static STOPPED: AtomicBool = AtomicBool::new(false);
+    static VALUE_BEFORE_STOP: AtomicU32 = AtomicU32::new(u32::MAX);
+    static VALUE_AFTER_STOP: AtomicU32 = AtomicU32::new(u32::MAX);
+    static CONDITION_RAN: AtomicBool = AtomicBool::new(false);
+
+    /// The APP core's timer. After the APP core starts it, only the handler uses it.
+    static mut APP_TIMER: Option<PeriodicTimer<'static, Blocking>> = None;
+    /// The PRO core's timer, used in the same way.
+    static mut PRO_TIMER: Option<OneShotTimer<'static, Blocking>> = None;
+    /// A park of the APP core that the PRO core's timer handler ends.
+    static mut PARKED: Option<ParkGuard<'static>> = None;
+    static mut APP_GUARD: Option<AppCoreGuard<'static>> = None;
+    /// The stack of the APP core, which a test can start again after a stop.
+    static mut APP_STACK: Stack<8192> = Stack::new();
+
+    const APP_OPERATION: u32 = Cpu::AppCpu as u32 + 1;
+    const PRO_OPERATION: u32 = Cpu::ProCpu as u32 + 1;
+
+    /// The condition of the tests' light sleeps. The light sleep calls it only after its flash
+    /// check passed.
+    fn may_sleep() -> bool {
+        CONDITION_RAN.store(true, Ordering::Release);
+        false
+    }
+
+    // Runs on the APP core. The flash value names the APP core for the whole erase, so a handler
+    // that finds it in the erase phase interrupted the erase.
+    #[handler]
+    fn app_timer_handler() {
+        // SAFETY: after the APP core starts the timer, only this handler uses `APP_TIMER`.
+        let timer = unsafe { (*addr_of_mut!(APP_TIMER)).as_mut() }.unwrap();
+        timer.clear_interrupt();
+        APP_RUNS.fetch_add(1, Ordering::Release);
+        if PHASE.load(Ordering::Acquire) != ERASE || flash_operation() != APP_OPERATION {
+            return;
+        }
+        if STOP_IN_APP_HANDLER.load(Ordering::Acquire) {
+            // SAFETY: the test stored the guard first, and does not use it again.
+            let guard = unsafe { (*addr_of_mut!(APP_GUARD)).take() };
+            // The drop stops the APP core here, and does not return.
+            drop(guard);
+        }
+        if !HOLD.load(Ordering::Acquire) || HELD.load(Ordering::Relaxed) {
+            return;
+        }
+        HELD.store(true, Ordering::Release);
+        while !RELEASE.load(Ordering::Acquire) {}
+        // A stop or a park that returns without this store did not wait.
+        RESUMED.store(true, Ordering::Release);
+    }
+
+    fn clear_pro_timer() {
+        // SAFETY: after the test arms the timer, only its handler uses `PRO_TIMER`.
+        if let Some(timer) = unsafe { (*addr_of_mut!(PRO_TIMER)).as_mut() } {
+            timer.clear_interrupt();
+        }
+    }
+
+    #[handler]
+    fn release() {
+        clear_pro_timer();
+        RELEASE.store(true, Ordering::Release);
+        // SAFETY: the test stores the guard before it arms the timer, and does not use it again.
+        if let Some(parked) = unsafe { (*addr_of_mut!(PARKED)).take() } {
+            UNPARKED.store(true, Ordering::Release);
+            drop(parked);
+        }
+    }
+
+    // Runs inside the PRO core's erase.
+    #[handler]
+    fn stop_app_core() {
+        clear_pro_timer();
+        // SAFETY: the test stores the guard before it arms the timer, and does not use it again.
+        let guard = unsafe { (*addr_of_mut!(APP_GUARD)).take() };
+        VALUE_BEFORE_STOP.store(flash_operation(), Ordering::Relaxed);
+        drop(guard);
+        VALUE_AFTER_STOP.store(flash_operation(), Ordering::Relaxed);
+        STOPPED.store(true, Ordering::Release);
+    }
+
+    struct Context {
+        flash: Flash<'static, Blocking>,
+        timg1: TIMG1<'static>,
+        cpu_control: CpuControl<'static>,
+        lpwr: LPWR<'static>,
+    }
+
+    /// `pro_timer_handler` runs on the PRO core, [`RELEASE_AFTER`] after [`arm_pro_timer`].
+    fn setup(pro_timer_handler: InterruptHandler) -> Context {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let mut timer = OneShotTimer::new(timg0.timer0);
+        timer.set_interrupt_handler(pro_timer_handler);
+        // SAFETY: the timer is not armed yet, so the handler does not use `PRO_TIMER`.
+        unsafe { (*addr_of_mut!(PRO_TIMER)).insert(timer) }.listen();
+        Context {
+            flash: Flash::new(p.FLASH, Config::default()).unwrap(),
+            timg1: p.TIMG1,
+            cpu_control: CpuControl::new(p.CPU_CTRL),
+            lpwr: p.LPWR,
+        }
+    }
+
+    fn arm_pro_timer() {
+        // SAFETY: the timer is not armed, so the handler does not use `PRO_TIMER`.
+        let timer = unsafe { (*addr_of_mut!(PRO_TIMER)).as_mut() }.unwrap();
+        timer.schedule(RELEASE_AFTER).unwrap();
+    }
+
+    /// Starts the APP core's timer. It must run on the APP core, so that the handler runs there.
+    fn start_app_timer(timg1: TIMG1<'static>) {
+        let mut timer = PeriodicTimer::new(TimerGroup::new(timg1).timer0);
+        timer.set_interrupt_handler(app_timer_handler);
+        // SAFETY: the timer does not run yet, so the handler does not use `APP_TIMER`.
+        let timer = unsafe { (*addr_of_mut!(APP_TIMER)).insert(timer) };
+        timer.listen();
+        timer.start(APP_PERIOD).unwrap();
+    }
+
+    fn app_stack() -> &'static mut Stack<8192> {
+        // SAFETY: the APP core does not run at any call.
+        unsafe { &mut *addr_of_mut!(APP_STACK) }
+    }
+
+    /// Starts the APP core, which writes, erases, and reads back the 15 sectors of `block` in a
+    /// loop, through the caller's `flash`. The APP core starts its timer if it gets `timg1`.
+    fn start_erasing<'a>(
+        cpu_control: &mut CpuControl<'static>,
+        flash: &'a mut Flash<'static, Blocking>,
+        timg1: Option<TIMG1<'static>>,
+        block: u32,
+    ) -> AppCoreGuard<'a> {
+        cpu_control
+            .start_app_core(app_stack(), move || {
+                PHASE.store(WRITE, Ordering::Release);
+                if let Some(timg1) = timg1 {
+                    start_app_timer(timg1);
+                }
+                loop {
+                    write_sectors(flash, block);
+                    PHASE.store(ERASE, Ordering::Release);
+                    if erase_sectors(flash, block).is_err() {
+                        ERASE_FAILED.store(true, Ordering::Relaxed);
+                    }
+                    PHASE.store(WRITE, Ordering::Release);
+                    ERASES.fetch_add(1, Ordering::Release);
+                    if !sectors_erased(flash, block) {
+                        READ_BACK_FAILED.store(true, Ordering::Relaxed);
+                    }
+                    CYCLES.fetch_add(1, Ordering::Release);
+                }
+            })
+            .unwrap()
+    }
+
+    /// Returns once the APP core's timer handler holds the APP core inside an erase.
+    fn hold_in_erase() {
+        HOLD.store(true, Ordering::Release);
+        while !HELD.load(Ordering::Acquire) {
+            assert!(
+                ERASES.load(Ordering::Acquire) < ATTEMPTS,
+                "the APP core's timer never held it inside an erase, in {ATTEMPTS} erases"
+            );
+        }
+    }
+
+    /// Asserts that the APP core's timer handler does not run for `periods` of its periods.
+    fn assert_app_core_idle(periods: u32, action: &str) {
+        let runs = APP_RUNS.load(Ordering::Acquire);
+        let end = Instant::now() + APP_PERIOD * periods;
+        while Instant::now() < end {}
+        assert_eq!(
+            APP_RUNS.load(Ordering::Acquire),
+            runs,
+            "the APP core ran after the {action}"
+        );
+    }
+
+    /// Asserts that a stop inside the held erase, after `erases` erases, let the APP core finish
+    /// that erase and run no code after it.
+    fn assert_stopped_at_the_end_of_the_erase(
+        flash: &mut Flash<'static, Blocking>,
+        block: u32,
+        erases: u32,
+    ) {
+        assert!(
+            RESUMED.load(Ordering::Acquire),
+            "the stop returned before the APP core left its timer handler"
+        );
+        assert_eq!(flash_operation(), 0, "the flash value after the stop");
+        assert!(!is_running(Cpu::AppCpu), "the APP core runs after the stop");
+        assert_eq!(
+            (
+                PHASE.load(Ordering::Acquire),
+                ERASES.load(Ordering::Acquire)
+            ),
+            (ERASE, erases),
+            "the APP core ran code after its erase"
+        );
+        assert_app_core_idle(50, "stop");
+        assert!(!ERASE_FAILED.load(Ordering::Relaxed), "an erase failed");
+        // Before the PRO core erases anything. A stop inside the erase leaves the pattern.
+        assert!(
+            sectors_erased(flash, block),
+            "the stop did not wait for the end of the APP core's erase"
+        );
+    }
+
+    // Fails if `stop_app_core` does not wait: the flash value stays set, and sectors of the range
+    // hold the pattern.
+    #[test]
+    fn test_stop_waits_for_the_end_of_the_app_core_erase() {
+        let mut ctx = setup(release);
+        let block = scratch_block(&mut ctx.flash);
+
+        let guard = start_erasing(&mut ctx.cpu_control, &mut ctx.flash, Some(ctx.timg1), block);
+        hold_in_erase();
+        let erases = ERASES.load(Ordering::Acquire);
+        let before = Instant::now();
+        arm_pro_timer();
+        drop(guard);
+        defmt::info!("the stop took {} µs", (Instant::now() - before).as_micros());
+
+        assert_stopped_at_the_end_of_the_erase(&mut ctx.flash, block, erases);
+    }
+
+    // A park does not wait for a flash operation.
+    #[test]
+    fn test_park_lands_inside_the_app_core_erase() {
+        let mut ctx = setup(release);
+        let block = scratch_block(&mut ctx.flash);
+        let mut lpwr = LowPower::new(ctx.lpwr);
+
+        let _running = start_erasing(&mut ctx.cpu_control, &mut ctx.flash, Some(ctx.timg1), block);
+        hold_in_erase();
+        let cycles = CYCLES.load(Ordering::Acquire);
+        arm_pro_timer();
+        let parked = ctx.cpu_control.park_core(Cpu::AppCpu);
+
+        assert!(
+            RESUMED.load(Ordering::Acquire),
+            "the park returned before the APP core left its timer handler"
+        );
+        assert_eq!(
+            flash_operation(),
+            APP_OPERATION,
+            "the park did not land inside the APP core's erase"
+        );
+        assert_app_core_idle(50, "park");
+        assert_eq!(
+            lpwr.sleep_light_if(RtcSleepConfig::default(), may_sleep),
+            LightSleep::Refused
+        );
+        assert!(
+            !CONDITION_RAN.load(Ordering::Acquire),
+            "a light sleep reached its condition during the APP core's erase"
+        );
+
+        drop(parked);
+        let resumed = Instant::now();
+        while CYCLES.load(Ordering::Acquire) == cycles {
+            assert!(
+                Instant::now() - resumed < RESUME_BOUND,
+                "the APP core did not finish its erase after the park"
+            );
+        }
+        assert!(!ERASE_FAILED.load(Ordering::Relaxed), "the erase failed");
+        assert!(
+            !READ_BACK_FAILED.load(Ordering::Relaxed),
+            "the range was not erased after the park"
+        );
+    }
+
+    // Fails if `stop_app_core` does not wait: the drop returns before the timer handler ends the
+    // park.
+    #[test]
+    fn test_stop_joins_a_park_inside_the_erase() {
+        let mut ctx = setup(release);
+        let block = scratch_block(&mut ctx.flash);
+
+        let guard = start_erasing(&mut ctx.cpu_control, &mut ctx.flash, Some(ctx.timg1), block);
+        hold_in_erase();
+        let erases = ERASES.load(Ordering::Acquire);
+        arm_pro_timer();
+        let parked = ctx.cpu_control.park_core(Cpu::AppCpu);
+        assert_eq!(
+            flash_operation(),
+            APP_OPERATION,
+            "the park did not land inside the APP core's erase"
+        );
+
+        // SAFETY: `ctx.cpu_control` lives until the test ends, after the handler drops the guard.
+        // The handler runs on the core that parked.
+        unsafe {
+            *addr_of_mut!(PARKED) = Some(
+                core::mem::transmute::<ParkGuard<'_>, ParkGuard<'static>>(parked),
+            );
+        }
+        arm_pro_timer();
+        drop(guard);
+
+        assert!(
+            UNPARKED.load(Ordering::Acquire),
+            "the stop returned while a park held the APP core inside its erase"
+        );
+        assert_stopped_at_the_end_of_the_erase(&mut ctx.flash, block, erases);
+    }
+
+    // As without code in PSRAM: the stop does not wait for the park to end.
+    #[test]
+    fn test_stop_joins_a_park_outside_an_operation() {
+        let mut ctx = setup(release);
+        let timg1 = ctx.timg1;
+
+        let guard = ctx
+            .cpu_control
+            .start_app_core(app_stack(), move || {
+                start_app_timer(timg1);
+                loop {}
+            })
+            .unwrap();
+        while APP_RUNS.load(Ordering::Acquire) == 0 {}
+
+        let parked = ctx.cpu_control.park_core(Cpu::AppCpu);
+        assert_eq!(flash_operation(), 0);
+        // A stop that waits for the park never returns, because the park ends after the drop.
+        drop(guard);
+        assert!(!is_running(Cpu::AppCpu), "the APP core runs after the stop");
+        drop(parked);
+        assert_app_core_idle(50, "stop");
+    }
+
+    // The operation stops unfinished. Fails if `stop_current_core` does not clear the flash value:
+    // the value stays set, and the light sleep is refused before its condition.
+    #[test]
+    fn test_app_core_stops_itself_inside_its_erase() {
+        let mut ctx = setup(release);
+        let block = scratch_block(&mut ctx.flash);
+        let mut lpwr = LowPower::new(ctx.lpwr);
+
+        let guard = start_erasing(&mut ctx.cpu_control, &mut ctx.flash, Some(ctx.timg1), block);
+        // SAFETY: the APP core's timer handler drops the guard. The test does not use the guard or
+        // `ctx.flash` again.
+        unsafe {
+            *addr_of_mut!(APP_GUARD) = Some(core::mem::transmute::<
+                AppCoreGuard<'_>,
+                AppCoreGuard<'static>,
+            >(guard));
+        }
+        STOP_IN_APP_HANDLER.store(true, Ordering::Release);
+        let deadline = Instant::now() + RESUME_BOUND;
+        while is_running(Cpu::AppCpu) {
+            assert!(
+                Instant::now() < deadline,
+                "the APP core did not stop itself"
+            );
+        }
+
+        assert_eq!(PHASE.load(Ordering::Acquire), ERASE);
+        assert_eq!(flash_operation(), 0, "the stop left the flash value set");
+        assert_eq!(
+            lpwr.sleep_light_if(RtcSleepConfig::default(), may_sleep),
+            LightSleep::Refused
+        );
+        assert!(
+            CONDITION_RAN.load(Ordering::Acquire),
+            "a light sleep after the stop was refused before its condition"
+        );
+        assert_app_core_idle(50, "stop");
+
+        // The next test resets the chip, so the flash chip must first finish the APP core's sector
+        // erase.
+        let idle = Instant::now() + SECTOR_ERASE_BOUND;
+        while Instant::now() < idle {}
+    }
+
+    // The flash value names the PRO core, so the stop does not wait for the operation. Fails if
+    // the stop waits while the value is not 0: the handler never returns.
+    #[test]
+    fn test_stop_completes_during_a_pro_core_erase() {
+        let mut ctx = setup(stop_app_core);
+        let block = scratch_block(&mut ctx.flash);
+        let timg1 = ctx.timg1;
+        write_sectors(&mut ctx.flash, block);
+
+        let guard = ctx
+            .cpu_control
+            .start_app_core(app_stack(), move || {
+                start_app_timer(timg1);
+                loop {}
+            })
+            .unwrap();
+        while APP_RUNS.load(Ordering::Acquire) == 0 {}
+        // SAFETY: the PRO core's timer is not armed, so its handler does not use `APP_GUARD`.
+        unsafe { *addr_of_mut!(APP_GUARD) = Some(guard) };
+
+        arm_pro_timer();
+        erase_sectors(&mut ctx.flash, block).unwrap();
+
+        assert!(
+            STOPPED.load(Ordering::Acquire),
+            "the timer handler did not run during the erase"
+        );
+        assert_eq!(
+            VALUE_BEFORE_STOP.load(Ordering::Relaxed),
+            PRO_OPERATION,
+            "the stop did not start inside the PRO core's erase"
+        );
+        assert_eq!(
+            VALUE_AFTER_STOP.load(Ordering::Relaxed),
+            PRO_OPERATION,
+            "the stop did not return inside the PRO core's erase"
+        );
+        assert!(!is_running(Cpu::AppCpu), "the APP core runs after the stop");
+        assert_app_core_idle(50, "stop");
+        assert_eq!(flash_operation(), 0, "the flash value after the erase");
+        assert!(
+            sectors_erased(&mut ctx.flash, block),
+            "the range is not erased"
+        );
+    }
+}
+
+/// A light sleep that a timer handler requests inside a flash erase of its own core.
 ///
-/// The scheduler starts in this module only, because its tick interrupt would run under every other
-/// test.
+/// `sleep_light_if` calls its condition only after the flash check passed. The condition refuses
+/// every light sleep, so the debug probe stays connected.
+#[embedded_test::tests(default_timeout = 30)]
+mod sleep_during_erase {
+    use core::{ptr::addr_of_mut, sync::atomic::AtomicBool};
+
+    use esp_hal::{
+        Blocking,
+        flash::{Config, Flash},
+        handler,
+        peripherals::{LPWR, Peripherals},
+        rtc_cntl::sleep::{LightSleep, LowPower, RtcSleepConfig},
+        time::{Duration, Instant},
+        timer::{PeriodicTimer, systimer::SystemTimer},
+    };
+
+    use super::*;
+
+    const PERIOD: Duration = Duration::from_micros(200);
+    /// The requests that show that the handler ran inside the erase.
+    const REQUESTS: u32 = 10;
+
+    static REQUESTING: AtomicBool = AtomicBool::new(false);
+    /// The handler requests no light sleep from this time on, in microseconds since boot.
+    static REQUEST_UNTIL: AtomicU32 = AtomicU32::new(0);
+    static REQUESTED: AtomicU32 = AtomicU32::new(0);
+    static NOT_REFUSED: AtomicU32 = AtomicU32::new(0);
+    static CONDITION_RUNS: AtomicU32 = AtomicU32::new(0);
+
+    /// The timer of the requests. After the test starts it, only the handler uses it.
+    static mut TIMER: Option<PeriodicTimer<'static, Blocking>> = None;
+
+    fn now_us() -> u32 {
+        Instant::now().duration_since_epoch().as_micros() as u32
+    }
+
+    fn may_sleep() -> bool {
+        CONDITION_RUNS.fetch_add(1, Ordering::Relaxed);
+        false
+    }
+
+    #[handler]
+    fn sleep_in_erase() {
+        // SAFETY: after the test starts the timer, only this handler uses `TIMER`.
+        if let Some(timer) = unsafe { (*addr_of_mut!(TIMER)).as_mut() } {
+            timer.clear_interrupt();
+        }
+        let left = REQUEST_UNTIL.load(Ordering::Relaxed).wrapping_sub(now_us()) as i32;
+        if !REQUESTING.load(Ordering::Acquire) || left <= 0 {
+            return;
+        }
+        let mut lpwr = LowPower::new(unsafe { LPWR::steal() });
+        let result = lpwr.sleep_light_if(RtcSleepConfig::default(), may_sleep);
+        REQUESTED.fetch_add(1, Ordering::Relaxed);
+        if result != LightSleep::Refused {
+            NOT_REFUSED.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    // The requests cover the first half of an erase of 15 sectors. Fails if the light sleep does
+    // not check for a flash operation: every request reaches its condition.
+    #[test]
+    fn test_sleep_from_a_handler_inside_an_erase_is_refused() {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
+        let mut flash = Flash::new(p.FLASH, Config::default()).unwrap();
+        let block = scratch_block(&mut flash);
+
+        // The length of the erase, so that the requests end well before the erase does.
+        write_sectors(&mut flash, block);
+        let before = Instant::now();
+        erase_sectors(&mut flash, block).unwrap();
+        let took = Instant::now() - before;
+        write_sectors(&mut flash, block);
+
+        // A SYSTIMER alarm: see `assert_flash_value_marks`.
+        let mut timer = PeriodicTimer::new(SystemTimer::new(p.SYSTIMER).alarm0);
+        timer.set_interrupt_handler(sleep_in_erase);
+        // SAFETY: the timer does not run yet, so the handler does not use `TIMER`.
+        let timer = unsafe { (*addr_of_mut!(TIMER)).insert(timer) };
+        timer.listen();
+
+        REQUEST_UNTIL.store(
+            now_us().wrapping_add((took / 2).as_micros() as u32),
+            Ordering::Relaxed,
+        );
+        REQUESTING.store(true, Ordering::Release);
+        // The first request comes one period after the start, inside the erase.
+        timer.start(PERIOD).unwrap();
+        let erased = erase_sectors(&mut flash, block);
+        REQUESTING.store(false, Ordering::Release);
+        timer.cancel().unwrap();
+        erased.unwrap();
+
+        let requested = REQUESTED.load(Ordering::Relaxed);
+        defmt::info!(
+            "{} light sleeps requested in an erase of {} µs",
+            requested,
+            took.as_micros()
+        );
+        assert!(
+            requested >= REQUESTS,
+            "the handler requested {requested} light sleeps inside the erase"
+        );
+        assert_eq!(
+            NOT_REFUSED.load(Ordering::Relaxed),
+            0,
+            "light sleeps inside the erase were not refused"
+        );
+        assert_eq!(
+            CONDITION_RUNS.load(Ordering::Relaxed),
+            0,
+            "light sleeps reached their condition inside the erase"
+        );
+        assert!(sectors_erased(&mut flash, block), "the range is not erased");
+    }
+}
+
+/// Latency during flash operations, with code in PSRAM. Interrupts and threads must wait less than
+/// [`BOUND`] microseconds during a write, an erase, and a read of 15 sectors, and while a stop of
+/// the APP core waits for its erase.
+///
+/// The scheduler starts in this module only, because its tick would run under every other test.
 #[embedded_test::tests(default_timeout = 30, executor = esp_rtos::embassy::Executor::new())]
 mod latency_during_flash_operations {
     use core::sync::atomic::AtomicBool;
@@ -664,13 +1285,15 @@ mod latency_during_flash_operations {
     #[cfg(multi_core)]
     use esp_hal::{
         peripherals::CPU_CTRL,
-        system::{CpuControl, Stack as CoreStack},
+        system::{Cpu, CpuControl, Stack as CoreStack, is_running},
         timer::systimer::Alarm,
     };
     use esp_rtos::{
         CurrentThreadHandle,
         thread::{Stack, ThreadSpawner},
     };
+    #[cfg(multi_core)]
+    use hil_test::flash_operation;
     use static_cell::ConstStaticCell;
 
     use super::*;
@@ -906,7 +1529,7 @@ mod latency_during_flash_operations {
     #[test]
     fn test_latency_on_this_core_and_a_bare_other_core(mut ctx: Context) {
         #[cfg(multi_core)]
-        {
+        let _guard = {
             static CORE1_STACK: ConstStaticCell<CoreStack<8192>> =
                 ConstStaticCell::new(CoreStack::new());
             static STARTED: AtomicBool = AtomicBool::new(false);
@@ -919,9 +1542,9 @@ mod latency_during_flash_operations {
                     measure_bare_loop()
                 })
                 .unwrap();
-            core::mem::forget(guard);
             while !STARTED.load(Ordering::Acquire) {}
-        }
+            guard
+        };
 
         assert_latency_during_flash_operations(
             &mut ctx.flash,
@@ -955,6 +1578,45 @@ mod latency_during_flash_operations {
             &ctx.heap,
             ctx.seed,
             &[Latency::ThreadOtherCore],
+        );
+    }
+
+    // The current core must not defer its context switches while the stop waits. Fails if the stop
+    // keeps its `SchedulerSuspendGuard` for the wait: the thread does not run. Fails if
+    // `stop_app_core` does not wait: the drop returns before enough samples.
+    #[cfg(multi_core)]
+    #[test]
+    fn test_a_thread_runs_while_a_stop_waits(mut ctx: Context) {
+        static CORE1_STACK: ConstStaticCell<CoreStack<8192>> =
+            ConstStaticCell::new(CoreStack::new());
+
+        let block = scratch_block(&mut ctx.flash);
+        write_sectors(&mut ctx.flash, block);
+
+        // esp-rtos runs on the PRO core only, so no thread moves to or from the APP core.
+        let mut cpu_control = CpuControl::new(ctx.cpu_ctrl);
+        let flash = &mut ctx.flash;
+        let guard = cpu_control
+            .start_app_core(CORE1_STACK.take(), move || {
+                // The stop takes effect before the erase returns.
+                let _ = erase_sectors(flash, block);
+            })
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(1);
+        while flash_operation() != Cpu::AppCpu as u32 + 1 {
+            assert!(
+                Instant::now() < deadline,
+                "the APP core did not start its erase"
+            );
+        }
+
+        assert_latency_during("stop", &[Latency::ThreadSameCore], || drop(guard));
+
+        assert_eq!(flash_operation(), 0, "the flash value after the stop");
+        assert!(!is_running(Cpu::AppCpu), "the APP core runs after the stop");
+        assert!(
+            sectors_erased(&mut ctx.flash, block),
+            "the stop did not wait for the end of the APP core's erase"
         );
     }
 }

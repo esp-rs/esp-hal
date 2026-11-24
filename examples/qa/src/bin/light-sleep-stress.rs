@@ -43,11 +43,14 @@
 //! - Between sleeps, the core reads, checks, and writes back part of the kept PSRAM, so that cache
 //!   lines are dirty when a sleep starts.
 //! - About every 100 ms, a core that is not sleeping erases, writes, and reads back one flash
-//!   sector of the free space after the image. The sector must read back what was written. On a
-//!   chip with two cores, each flash operation first parks the other core, which masks its
-//!   interrupts and waits in RAM until the operation ends. A core that wakes while an operation
-//!   waits for it joins that park before its sleep call returns. So a sleep or a wait during a
-//!   flash cycle does not get an upper bound.
+//!   sector of the free space after the image. The sector must read back what was written. A sleep
+//!   or a wait during a flash cycle does not get an upper bound, because a flash operation can
+//!   delay its end.
+//! - Without code in PSRAM, a flash operation masks its core's interrupts and parks the other core,
+//!   so no sleep is requested during one.
+//! - With code in PSRAM, a light sleep during a flash operation returns `Refused`. A phase in which
+//!   that can happen fails when no sleep was refused, and a refusal without a flash cycle fails the
+//!   phase.
 //! - Every [`REPORT_EVERY`], core 0 prints the counts. The logger masks the interrupts of core 0
 //!   until the UART sends the line, about 12 ms. The interrupt that ends a wait runs on core 0, so
 //!   a wait on the other core stays blocked for that time. A sleep or a wait during a report does
@@ -55,6 +58,8 @@
 //! - On a chip with two cores, a random core requests each sleep while the other core works. The
 //!   working core must return from the park, and with CPU retention from the rendezvous, with its
 //!   state intact. A core that makes no progress for [`STALL_REPORTS`] reports fails the phase.
+//!
+//! Set `ESP_HAL_CONFIG_CODE_IN_PSRAM=true` to build with code in PSRAM.
 //!
 //! Each phase ends with `PASS <phase>` or `FAIL <phase>: <reason>`. When a check fails, the
 //! program prints the wrong value at once, on a line that starts with `core <n>:`. To repeat a
@@ -99,7 +104,7 @@ use esp_hal::{
 };
 use esp_rtos::{CurrentThreadHandle, thread::ThreadSpawner};
 use portable_atomic::{AtomicBool, AtomicU32, Ordering};
-use qa_test::{Progress, ProgressWord, free_flash, report};
+use qa_test::{Progress, ProgressWord, code_in_psram, free_flash, report};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -597,6 +602,12 @@ impl Stalls {
         };
         ran(self.flash, &FLASH_GEN) || ran(self.report, &REPORT_GEN)
     }
+
+    /// Returns whether a flash cycle was active when [`Stalls::now`] read the counts, or started
+    /// after that.
+    fn flash_ran(self) -> bool {
+        self.flash % 2 == 1 || FLASH_GEN.load(Ordering::Acquire) != self.flash
+    }
 }
 
 /// Returns whether a long sleep or a wait ended within its bounds, and records by how much it ended
@@ -661,6 +672,9 @@ fn sleep_round(core: usize, lpwr: &mut LowPower<'_>, rng: &mut Rng, retention: b
     let n = count(&COUNTS.sleeps);
     if result == LightSleep::Refused {
         count(&COUNTS.refused);
+        if !stalls.flash_ran() {
+            problem!("core {core}: sleep {n}: refused while no flash cycle ran");
+        }
     }
 
     if result == LightSleep::Ended && length >= LONG_SLEEP {
@@ -824,6 +838,14 @@ impl Controller {
                 if c.not_slept.load(Ordering::Relaxed) > c.long_slept.load(Ordering::Relaxed) =>
             {
                 Some("more long sleeps returned without a sleep than ended within their bounds")
+            }
+            // On one core, the main loop never requests a sleep during its own flash operation.
+            Caller::Bare | Caller::Thread
+                if code_in_psram()
+                    && (phase.caller == Caller::Thread || CORES == 2)
+                    && !made(&c.refused) =>
+            {
+                Some("no light sleep was refused")
             }
             _ => None,
         };

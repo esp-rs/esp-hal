@@ -1,4 +1,5 @@
-//! Shared parts of the qa examples: the console, the progress across resets, and the free flash.
+//! Shared parts of the qa examples: the console, the progress across resets, the free flash,
+//! whether the build places code in PSRAM, and esp-hal's flash value.
 
 #![no_std]
 
@@ -17,6 +18,31 @@ pub const DRAM2_UNINIT_SIZE: usize = {
     let range: core::ops::Range<usize> = esp_metadata_generated::memory_range!("DRAM2_UNINIT");
     range.end - range.start
 };
+
+/// Returns whether the build places code in PSRAM. On some chips, flash and PSRAM share one
+/// address range, so the address of the code does not show it.
+pub fn code_in_psram() -> bool {
+    cfg!(code_in_psram)
+}
+
+#[cfg(code_in_psram)]
+unsafe extern "Rust" {
+    /// esp-hal's flash value. Every copy of esp-hal finds it by this name.
+    static ESP_HAL_FLASH_OPERATION: portable_atomic::AtomicU32;
+}
+
+/// Returns esp-hal's flash value: 0 while no flash operation is in progress, otherwise one more
+/// than the number of the core that started it. Bit 7 marks a stop of the APP core that waits for
+/// the end of the APP core's operation.
+pub fn flash_operation() -> u32 {
+    cfg_select! {
+        // SAFETY: esp-hal defines the static.
+        code_in_psram => unsafe {
+            ESP_HAL_FLASH_OPERATION.load(core::sync::atomic::Ordering::Acquire)
+        },
+        _ => 0,
+    }
+}
 
 #[doc(hidden)]
 pub mod __private {
@@ -188,4 +214,22 @@ pub fn free_flash(flash: &mut Flash<'_, Blocking>) -> Range<u32> {
         "no free space after the image in the booted partition"
     );
     first..last
+}
+
+/// Returns the flash offset of `count` 64 KiB blocks in a row, at a random place in [`free_flash`],
+/// so that each run wears other blocks.
+///
+/// # Panics
+///
+/// Panics as [`free_flash`] does, and when the free space holds fewer than `count` blocks.
+pub fn scratch_blocks(flash: &mut Flash<'_, Blocking>, count: u32) -> u32 {
+    const BLOCK: u32 = 0x1_0000;
+
+    let free = free_flash(flash);
+    let blocks = free.len() as u32 / BLOCK;
+    assert!(
+        blocks >= count,
+        "the free flash holds fewer than {count} blocks of 64 KiB"
+    );
+    free.start + esp_hal::rng::Rng::new().random() % (blocks - count + 1) * BLOCK
 }
