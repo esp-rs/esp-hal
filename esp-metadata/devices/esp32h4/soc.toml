@@ -1,9 +1,6 @@
 # ESP32-H4 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo xtask update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32h4"
@@ -12,7 +9,6 @@ target = "riscv32imafc-unknown-none-elf"
 cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-h4_datasheet_en.pdf"
 trm       = "https://www.espressif.com/sites/default/files/documentation/esp32-h4_technical_reference_manual_en.pdf"
-support_note = "In early stages of development."
 
 [device.mmu]
 page_size = 0x10000

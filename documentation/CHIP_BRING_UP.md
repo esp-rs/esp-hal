@@ -158,9 +158,6 @@ The next milestone is adding the new device to metadata. Create a new file (`esp
 # <CHIP> Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name = "<CHIP>"
