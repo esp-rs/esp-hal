@@ -33,7 +33,6 @@ jobs:
               [/\besp32[-_ ]?s2\b/i, "chip:esp32s2"],
               [/\besp32[-_ ]?s3\b/i, "chip:esp32s3"],
               [/\besp32[-_ ]?s31\b/i, "chip:esp32s31"],
-             
 
               [/\bci\b/i, "ci"],
               [/documentation/i, "documentation"],
