@@ -10,6 +10,9 @@
 //!    deadline.
 //! 2. The wakeup cause.
 //! 3. Every word of PSRAM, on a chip with PSRAM.
+//! 4. On a chip with an FPU, the callee-saved FPU registers and `fcsr` of each core that took part
+//!    in the sleep. They hold a pattern across the request, and a light sleep with CPU retention
+//!    powers the FPU down.
 //!
 //! The checks run at the default and at the maximum CPU clock, without and with CPU retention. On a
 //! chip with two cores, each core requests a light sleep.
@@ -35,7 +38,7 @@
 #[cfg(multi_core)]
 use core::{
     ptr::addr_of_mut,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 
 use esp_backtrace as _;
@@ -220,7 +223,7 @@ fn sleep_and_check(
         .lpwr
         .set_wakeup_deadline(Instant::now() + SLEEP_LENGTH);
     let start = Instant::now();
-    request(board)?;
+    with_fpu_pattern(|| request(board))?;
     let slept = Instant::now() - start;
     if slept < SLEEP_LENGTH * 9 / 10 {
         report!("  the light sleep returned after {slept} of {SLEEP_LENGTH}");
@@ -231,6 +234,135 @@ fn sleep_and_check(
         return Err("the light sleep did not wake on the timer");
     }
     check_psram(board)
+}
+
+/// The values of `fs0`-`fs11` while a sleep request runs.
+#[cfg(target_feature = "f")]
+const FPU_PATTERN: [u32; 12] = [
+    0x3F80_0001,
+    0x4000_0002,
+    0xC040_0003,
+    0x4080_0004,
+    0xC0A0_0005,
+    0x40C0_0006,
+    0xC0E0_0007,
+    0x4100_0008,
+    0xC110_0009,
+    0x4120_000A,
+    0xC130_000B,
+    0x4140_000C,
+];
+
+/// The value of `fcsr` while a sleep request runs: every exception flag set, and the default
+/// rounding mode. Code that runs in the request can only set flags, so the value stays.
+#[cfg(target_feature = "f")]
+const FCSR_PATTERN: u32 = 0x1F;
+
+/// Runs `f` with [`FPU_PATTERN`] in `fs0`-`fs11` and [`FCSR_PATTERN`] in `fcsr`, and checks them
+/// after `f` returns.
+///
+/// The registers are callee-saved, so a call must keep them. `f` runs from the assembly, because
+/// the compiler would not keep a value in a chosen register across a Rust call.
+#[cfg(target_feature = "f")]
+fn with_fpu_pattern<F>(f: F) -> Result<(), &'static str>
+where
+    F: FnOnce() -> Result<(), &'static str>,
+{
+    struct Call<F> {
+        f: Option<F>,
+        result: Result<(), &'static str>,
+    }
+
+    extern "C" fn trampoline<F>(call: &mut Call<F>)
+    where
+        F: FnOnce() -> Result<(), &'static str>,
+    {
+        if let Some(f) = call.f.take() {
+            call.result = f();
+        }
+    }
+
+    let mut call = Call {
+        f: Some(f),
+        result: Ok(()),
+    };
+    let mut after = [0u32; 13];
+    unsafe {
+        core::arch::asm!(
+            "frcsr s4",
+            "flw fs0, 0(s2)",
+            "flw fs1, 4(s2)",
+            "flw fs2, 8(s2)",
+            "flw fs3, 12(s2)",
+            "flw fs4, 16(s2)",
+            "flw fs5, 20(s2)",
+            "flw fs6, 24(s2)",
+            "flw fs7, 28(s2)",
+            "flw fs8, 32(s2)",
+            "flw fs9, 36(s2)",
+            "flw fs10, 40(s2)",
+            "flw fs11, 44(s2)",
+            "fscsr {fcsr}",
+            "call {trampoline}",
+            "fsw fs0, 0(s3)",
+            "fsw fs1, 4(s3)",
+            "fsw fs2, 8(s3)",
+            "fsw fs3, 12(s3)",
+            "fsw fs4, 16(s3)",
+            "fsw fs5, 20(s3)",
+            "fsw fs6, 24(s3)",
+            "fsw fs7, 28(s3)",
+            "fsw fs8, 32(s3)",
+            "fsw fs9, 36(s3)",
+            "fsw fs10, 40(s3)",
+            "fsw fs11, 44(s3)",
+            "frcsr t0",
+            "sw t0, 48(s3)",
+            "fscsr s4",
+            trampoline = sym trampoline::<F>,
+            fcsr = in(reg) FCSR_PATTERN,
+            in("a0") &mut call,
+            in("s2") FPU_PATTERN.as_ptr(),
+            in("s3") after.as_mut_ptr(),
+            out("s4") _,
+            out("fs0") _,
+            out("fs1") _,
+            out("fs2") _,
+            out("fs3") _,
+            out("fs4") _,
+            out("fs5") _,
+            out("fs6") _,
+            out("fs7") _,
+            out("fs8") _,
+            out("fs9") _,
+            out("fs10") _,
+            out("fs11") _,
+            clobber_abi("C"),
+        );
+    }
+    call.result?;
+
+    let mut lost = false;
+    for (n, (&read, &expected)) in after.iter().zip(&FPU_PATTERN).enumerate() {
+        if read != expected {
+            report!("  fs{n} read {read:#010x}, expected {expected:#010x}");
+            lost = true;
+        }
+    }
+    if after[12] != FCSR_PATTERN {
+        report!("  fcsr read {:#x}, expected {FCSR_PATTERN:#x}", after[12]);
+        lost = true;
+    }
+    if lost {
+        Err("the light sleep lost FPU registers")
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(not(target_feature = "f"))]
+fn with_fpu_pattern(f: impl FnOnce() -> Result<(), &'static str>) -> Result<(), &'static str> {
+    f()
 }
 
 fn request_on_core0(board: &mut Board<'_>) -> Result<(), &'static str> {
@@ -286,6 +418,11 @@ const IDLE: u32 = 0;
 #[cfg(multi_core)]
 const SLEEP: u32 = 1;
 
+/// Whether core 1's last light sleep lost its FPU registers. Core 1 writes it before it sets
+/// `COMMAND` back to `IDLE`.
+#[cfg(multi_core)]
+static CORE1_FPU_LOST: AtomicBool = AtomicBool::new(false);
+
 // On a chip that retains the CPU in software, core 1 cannot start a light sleep. Core 0 gets the
 // request from core 1. Core 0 parks core 1, sleeps, and releases core 1 after the wake.
 //
@@ -300,11 +437,139 @@ fn app_core_entry() -> ! {
         match COMMAND.load(Ordering::Acquire) {
             SLEEP => {
                 let mut lpwr = LowPower::new(unsafe { esp_hal::peripherals::LPWR::steal() });
-                let _ = lpwr.sleep_light(RtcSleepConfig::default());
+                let result = with_fpu_pattern(|| {
+                    let _ = lpwr.sleep_light(RtcSleepConfig::default());
+                    Ok(())
+                });
+                CORE1_FPU_LOST.store(result.is_err(), Ordering::Relaxed);
                 COMMAND.store(IDLE, Ordering::Release);
             }
             _ => core::hint::spin_loop(),
         }
+    }
+}
+
+/// The registers that [`wait_with_caller_saved_pattern`] holds a pattern in, in the order of the
+/// pattern.
+#[cfg(all(multi_core, target_feature = "f"))]
+const CALLER_SAVED: [&str; 35] = [
+    "t0", "t1", "t2", "t3", "t4", "t5", "t6", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
+    "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "ft8", "ft9", "ft10", "ft11", "fa0",
+    "fa1", "fa2", "fa3", "fa4", "fa5", "fa6", "fa7",
+];
+
+/// Sends core 1 the command to sleep, and waits for its light sleep with a pattern in every
+/// caller-saved register.
+///
+/// Core 1's request runs the sleep in the IPC handler of this core. The handler interrupts the
+/// wait loop, so the loop's registers must come back as they were. The wait has no timeout: the
+/// watchdog resets a sleep that does not return.
+#[cfg(all(multi_core, target_feature = "f"))]
+fn wait_with_caller_saved_pattern() -> Result<(), &'static str> {
+    const _: () = assert!(IDLE == 0);
+
+    let pattern: [u32; 35] =
+        core::array::from_fn(|n| 0x5A00_0000 ^ (n as u32).wrapping_mul(0x0101_0101));
+    let mut after = [0u32; 35];
+    unsafe {
+        core::arch::asm!(
+            "lw t0, 0(s2)",
+            "lw t1, 4(s2)",
+            "lw t2, 8(s2)",
+            "lw t3, 12(s2)",
+            "lw t4, 16(s2)",
+            "lw t5, 20(s2)",
+            "lw t6, 24(s2)",
+            "lw a0, 28(s2)",
+            "lw a1, 32(s2)",
+            "lw a2, 36(s2)",
+            "lw a3, 40(s2)",
+            "lw a4, 44(s2)",
+            "lw a5, 48(s2)",
+            "lw a6, 52(s2)",
+            "lw a7, 56(s2)",
+            "flw ft0, 60(s2)",
+            "flw ft1, 64(s2)",
+            "flw ft2, 68(s2)",
+            "flw ft3, 72(s2)",
+            "flw ft4, 76(s2)",
+            "flw ft5, 80(s2)",
+            "flw ft6, 84(s2)",
+            "flw ft7, 88(s2)",
+            "flw ft8, 92(s2)",
+            "flw ft9, 96(s2)",
+            "flw ft10, 100(s2)",
+            "flw ft11, 104(s2)",
+            "flw fa0, 108(s2)",
+            "flw fa1, 112(s2)",
+            "flw fa2, 116(s2)",
+            "flw fa3, 120(s2)",
+            "flw fa4, 124(s2)",
+            "flw fa5, 128(s2)",
+            "flw fa6, 132(s2)",
+            "flw fa7, 136(s2)",
+            "li s5, {sleep}",
+            "fence rw, w",
+            "sw s5, 0(s4)",
+            "1:",
+            "lw s5, 0(s4)",
+            "bnez s5, 1b",
+            "fence r, rw",
+            "sw t0, 0(s3)",
+            "sw t1, 4(s3)",
+            "sw t2, 8(s3)",
+            "sw t3, 12(s3)",
+            "sw t4, 16(s3)",
+            "sw t5, 20(s3)",
+            "sw t6, 24(s3)",
+            "sw a0, 28(s3)",
+            "sw a1, 32(s3)",
+            "sw a2, 36(s3)",
+            "sw a3, 40(s3)",
+            "sw a4, 44(s3)",
+            "sw a5, 48(s3)",
+            "sw a6, 52(s3)",
+            "sw a7, 56(s3)",
+            "fsw ft0, 60(s3)",
+            "fsw ft1, 64(s3)",
+            "fsw ft2, 68(s3)",
+            "fsw ft3, 72(s3)",
+            "fsw ft4, 76(s3)",
+            "fsw ft5, 80(s3)",
+            "fsw ft6, 84(s3)",
+            "fsw ft7, 88(s3)",
+            "fsw ft8, 92(s3)",
+            "fsw ft9, 96(s3)",
+            "fsw ft10, 100(s3)",
+            "fsw ft11, 104(s3)",
+            "fsw fa0, 108(s3)",
+            "fsw fa1, 112(s3)",
+            "fsw fa2, 116(s3)",
+            "fsw fa3, 120(s3)",
+            "fsw fa4, 124(s3)",
+            "fsw fa5, 128(s3)",
+            "fsw fa6, 132(s3)",
+            "fsw fa7, 136(s3)",
+            sleep = const SLEEP,
+            in("s2") pattern.as_ptr(),
+            in("s3") after.as_mut_ptr(),
+            in("s4") COMMAND.as_ptr(),
+            out("s5") _,
+            clobber_abi("C"),
+        );
+    }
+
+    let mut lost = false;
+    for ((name, &read), &expected) in CALLER_SAVED.iter().zip(&after).zip(&pattern) {
+        if read != expected {
+            report!("  core 0 {name} read {read:#010x}, expected {expected:#010x}");
+            lost = true;
+        }
+    }
+    if lost {
+        Err("core 0 lost caller-saved registers in core 1's light sleep")
+    } else {
+        Ok(())
     }
 }
 
@@ -323,12 +588,20 @@ fn request_on_core1(board: &mut Board<'_>) -> Result<(), &'static str> {
         core::mem::forget(guard);
         board.core1_started = true;
     }
-    COMMAND.store(SLEEP, Ordering::Release);
-    let end = Instant::now() + Duration::from_secs(1);
-    while COMMAND.load(Ordering::Acquire) != IDLE {
-        if Instant::now() > end {
-            return Err("core 1's light sleep did not return");
+    cfg_select! {
+        target_feature = "f" => wait_with_caller_saved_pattern()?,
+        _ => {
+            COMMAND.store(SLEEP, Ordering::Release);
+            let end = Instant::now() + Duration::from_secs(1);
+            while COMMAND.load(Ordering::Acquire) != IDLE {
+                if Instant::now() > end {
+                    return Err("core 1's light sleep did not return");
+                }
+            }
         }
+    }
+    if CORE1_FPU_LOST.load(Ordering::Relaxed) {
+        return Err("core 1's light sleep lost FPU registers");
     }
     Ok(())
 }
