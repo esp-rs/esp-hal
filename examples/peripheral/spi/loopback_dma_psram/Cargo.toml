@@ -49,6 +49,7 @@ esp32c61 = [
     "esp-hal/esp32c61",
 ]
 esp32h4 = [
+    "esp-log/esp32h4",
     "esp-alloc/esp32h4",
     "esp-backtrace/esp32h4",
     "esp-bootloader-esp-idf/esp32h4",
