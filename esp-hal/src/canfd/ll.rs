@@ -4,11 +4,15 @@
 //! "TRM" below means the ESP32-C5 TRM v1.1, chapter 38.
 
 use embedded_can::{ExtendedId, Id, StandardId};
+use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 
-use crate::pac::twai0::{
-    RegisterBlock,
-    mode_settings::{MODE_SETTINGS_SPEC, RTRTH_W},
-    tx_priority::{TX_PRIORITY_SPEC, TXT1P_W},
+use crate::{
+    pac::twai0::{
+        RegisterBlock,
+        mode_settings::{MODE_SETTINGS_SPEC, RTRTH_W},
+        tx_priority::{TX_PRIORITY_SPEC, TXT1P_W},
+    },
+    ram,
 };
 
 /// Words in a frame buffer: 1 format + 1 identifier + 2 timestamp + 16 data.
@@ -285,7 +289,16 @@ impl FilterSlot {
             Self::Range => 12,
         }
     }
+
+    /// Mask of the four frame kind bits of this filter in `FILTER_CONTROL`.
+    fn kinds_mask(self) -> u32 {
+        0xF << self.shift()
+    }
 }
+
+/// Mask of the frame kind bits of all four filters: the lower half of
+/// `FILTER_CONTROL`. The upper half is read-only status.
+const ALL_KINDS_MASK: u32 = 0xFFFF;
 
 /// Frame formats a filter accepts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -318,14 +331,6 @@ impl FrameKinds {
         classic_extended: true,
         fd_standard: true,
         fd_extended: true,
-    };
-
-    /// Accepts nothing, which disables the filter.
-    pub(super) const NONE: Self = Self {
-        classic_standard: false,
-        classic_extended: false,
-        fd_standard: false,
-        fd_extended: false,
     };
 
     /// Accepts the given frame formats, with identifiers of one format only.
@@ -910,11 +915,19 @@ impl Driver {
         self.r().tx_fr_ctr().read().tx_ctr_val().bits()
     }
 
-    /// Sets a mask filter's acceptance code and mask.
+    /// Gives a mask filter its identifier, its mask and the frame kinds it
+    /// accepts.
     ///
     /// The identifier word holds a base identifier in bits 28..18 and an
     /// extended one in bits 28..0 (TRM 38.3.9.9).
-    pub(super) fn set_mask_filter(&self, filter: MaskFilter, extended: bool, code: u32, mask: u32) {
+    pub(super) fn set_mask_filter(
+        &self,
+        filter: MaskFilter,
+        extended: bool,
+        code: u32,
+        mask: u32,
+        kinds: FrameKinds,
+    ) {
         let (code, mask) = if extended {
             (code & EXT_ID_MASK, mask & EXT_ID_MASK)
         } else {
@@ -924,39 +937,25 @@ impl Driver {
             )
         };
 
-        match filter {
-            MaskFilter::A => {
-                self.r()
-                    .filter_a_mask()
-                    .write(|w| unsafe { w.bit_mask_a_val().bits(mask) });
-                self.r()
-                    .filter_a_val()
-                    .write(|w| unsafe { w.bit_val_a_val().bits(code) });
-            }
-            MaskFilter::B => {
-                self.r()
-                    .filter_b_mask()
-                    .write(|w| unsafe { w.bit_mask_b_val().bits(mask) });
-                self.r()
-                    .filter_b_val()
-                    .write(|w| unsafe { w.bit_val_b_val().bits(code) });
-            }
-            MaskFilter::C => {
-                self.r()
-                    .filter_c_mask()
-                    .write(|w| unsafe { w.bit_mask_c_val().bits(mask) });
-                self.r()
-                    .filter_c_val()
-                    .write(|w| unsafe { w.bit_val_c_val().bits(code) });
-            }
-        }
+        let r = self.r();
+        let (mask_register, code_register) = match filter {
+            MaskFilter::A => (r.filter_a_mask().as_ptr(), r.filter_a_val().as_ptr()),
+            MaskFilter::B => (r.filter_b_mask().as_ptr(), r.filter_b_val().as_ptr()),
+            MaskFilter::C => (r.filter_c_mask().as_ptr(), r.filter_c_val().as_ptr()),
+        };
+        let slot = FilterSlot::Mask(filter);
+        self.change_filters(
+            &[(mask_register, mask), (code_register, code)],
+            slot.kinds_mask(),
+            kinds.bits() << slot.shift(),
+        );
     }
 
-    /// Sets the identifier range the range filter accepts.
+    /// Gives the range filter its bounds and the frame kinds it accepts.
     ///
     /// For a base identifier range the low 18 bits of the upper bound are set,
     /// so the whole base identifier is covered (TRM 38.3.9.10).
-    pub(super) fn set_range_filter(&self, extended: bool, low: u32, high: u32) {
+    pub(super) fn set_range_filter(&self, extended: bool, low: u32, high: u32, kinds: FrameKinds) {
         let (low, high) = if extended {
             (low & EXT_ID_MASK, high & EXT_ID_MASK)
         } else {
@@ -965,35 +964,121 @@ impl Driver {
                 ((high & STD_ID_MASK) << IDENTIFIER_BASE_SHIFT) | 0x3FFFF,
             )
         };
-        self.r()
-            .filter_ran_low()
-            .write(|w| unsafe { w.bit_ran_low_val().bits(low) });
-        self.r()
-            .filter_ran_high()
-            .write(|w| unsafe { w.bit_ran_high_val().bits(high) });
+
+        let r = self.r();
+        self.change_filters(
+            &[
+                (r.filter_ran_low().as_ptr(), low),
+                (r.filter_ran_high().as_ptr(), high),
+            ],
+            FilterSlot::Range.kinds_mask(),
+            kinds.bits() << FilterSlot::Range.shift(),
+        );
     }
 
-    /// Sets which frame kinds one filter accepts and leaves the others alone.
+    /// Disables one filter and leaves the others alone.
+    pub(super) fn disable_filter(&self, filter: FilterSlot) {
+        self.change_filters(&[], filter.kinds_mask(), 0);
+    }
+
+    /// Makes filter A accept every frame and disables the other filters, which
+    /// is the reset state of the filters.
+    pub(super) fn accept_all(&self) {
+        // A zero mask passes any identifier word, of either format.
+        let r = self.r();
+        self.change_filters(
+            &[
+                (r.filter_a_mask().as_ptr(), 0),
+                (r.filter_a_val().as_ptr(), 0),
+            ],
+            ALL_KINDS_MASK,
+            FrameKinds::ALL.bits() << FilterSlot::Mask(MaskFilter::A).shift(),
+        );
+    }
+
+    /// Applies one change of the acceptance filters between two frames.
     ///
-    /// The register is the only record of the kinds, so the receiving half of
-    /// a split driver and the driver itself change them the same way.
-    pub(super) fn set_filter_kinds(&self, filter: FilterSlot, kinds: FrameKinds) {
-        let shift = filter.shift();
-        self.r().filter_control_filter_status().modify(|r, w| {
-            // The upper half of the register is read-only status.
-            let others = r.bits() & 0xFFFF & !(0xF << shift);
-            unsafe { w.bits(others | (kinds.bits() << shift)) }
-        });
+    /// `words` lists the identifier registers of the change with their new
+    /// values. They are raw pointers so that the code that writes them, which
+    /// runs from RAM, has no branch per filter. `kinds` then replaces the
+    /// `kinds_mask` bits of `FILTER_CONTROL`. That register is the only record
+    /// of the frame kinds, so the receiving half of a split driver and the
+    /// driver itself change them the same way.
+    ///
+    /// The filters must not change while a frame is being received. The core
+    /// evaluates them on every clock cycle, not once per frame, and the result
+    /// gates each step of storing the frame in the RX buffer: its header at
+    /// the end of the control field, each data word, and the commit in the end
+    /// of frame field. A frame that passed when its header was stored and no
+    /// longer passes before the commit stays in the buffer unfinished, and the
+    /// data of the next frame that passes is appended to it.
+    /// See <https://github.com/Logic-Design-Services/CTU-CAN-FD/blob/dd8eda9975b493c2162a78a239fce25bff9e5dfd/src/frame_filters/frame_filters.vhd#L418-L447>
+    /// and <https://github.com/Logic-Design-Services/CTU-CAN-FD/blob/dd8eda9975b493c2162a78a239fce25bff9e5dfd/src/rx_buffer/rx_buffer_fsm.vhd#L219-L224>.
+    ///
+    /// ESP-IDF rules this out by refusing to change the filters of a node that
+    /// is enabled.
+    /// See <https://github.com/espressif/esp-idf/blob/4d80c1b29aeabc8e735ffc6e1be9bb23e95d1d5d/components/esp_driver_twai/esp_twai_onchip.c#L557>.
+    ///
+    /// This driver allows the change on the bus, for receivers whose filters
+    /// follow an address that changes at runtime. So it waits until no frame is
+    /// on the bus, and then writes every register of the change at once. The
+    /// wait ends with the frame on the bus: no frame is longer than its format
+    /// allows, and the controller is clocked for as long as the driver exists.
+    fn change_filters(&self, words: &[(*mut u32, u32)], kinds_mask: u32, kinds: u32) {
+        while !self.try_change_filters(words, kinds_mask, kinds) {
+            core::hint::spin_loop();
+        }
     }
 
-    /// Makes filter A accept every kind of frame and disables the other
-    /// filters, in one write: the reset value of `FILTER_CONTROL`.
-    pub(super) fn reset_filter_kinds(&self) {
-        let bits = FrameKinds::ALL.bits() << FilterSlot::Mask(MaskFilter::A).shift();
-        // The upper half of the register is read-only status.
-        self.r()
-            .filter_control_filter_status()
-            .write(|w| unsafe { w.bits(bits) });
+    /// Applies the change of [`Self::change_filters`] unless a frame is on the
+    /// bus, and returns whether it did.
+    ///
+    /// Once no frame is on the bus, the header of the next one is stored at
+    /// least 16 bit times later: its start of frame bit, identifier and
+    /// control field come first. The writes have to land within that time, so
+    /// this runs from RAM with interrupts masked. Neither an interrupt nor a
+    /// flash cache miss can then come between the check and the last write.
+    #[ram]
+    fn try_change_filters(&self, words: &[(*mut u32, u32)], kinds_mask: u32, kinds: u32) -> bool {
+        // SAFETY: the token is returned below, before any other one is taken.
+        let interrupts = unsafe { SingleCoreInterruptLock.enter() };
+
+        let idle = !self.frame_on_bus();
+        if idle {
+            for &(register, value) in words {
+                // SAFETY: the callers pass identifier registers of this controller, and every
+                // value is valid for their 29 bits.
+                unsafe { register.write_volatile(value) };
+            }
+            self.r()
+                .filter_control_filter_status()
+                .modify(|r, w| unsafe { w.bits(r.bits() & ALL_KINDS_MASK & !kinds_mask | kinds) });
+        }
+
+        // SAFETY: the token comes from the matching `enter` above.
+        unsafe { SingleCoreInterruptLock.exit(interrupts) };
+        idle
+    }
+
+    /// Whether the protocol state machine is inside a frame, anywhere from its
+    /// start of frame bit to the last bit of its end of frame field (TRM
+    /// 38.3.13.4).
+    ///
+    /// Between frames, in an error frame and while the controller is off the
+    /// bus, none of these fields is active.
+    #[inline(always)]
+    fn frame_on_bus(&self) -> bool {
+        let debug = self.r().debug().read();
+        debug.pc_sof().bit()
+            | debug.pc_arb().bit()
+            | debug.pc_con().bit()
+            | debug.pc_dat().bit()
+            | debug.pc_stc().bit()
+            | debug.pc_crc().bit()
+            | debug.pc_crcd().bit()
+            | debug.pc_ack().bit()
+            | debug.pc_ackd().bit()
+            | debug.pc_eof().bit()
     }
 
     pub(super) fn error_capture(&self) -> ErrorCapture {

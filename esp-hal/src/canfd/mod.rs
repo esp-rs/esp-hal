@@ -1117,53 +1117,55 @@ impl<Dm: DriverMode> CanFdRx<'_, Dm> {
     /// Filters only decide what reaches the RX buffer, so they belong to the
     /// receiving half and can change while the controller is on the bus. Only
     /// enabling acceptance filtering itself needs the controller off the bus
-    /// (TRM 38.3.9.8). The filter is disabled while its identifier and mask
-    /// are rewritten, so no frame is judged by half of each. A frame that only
-    /// this filter would accept can be lost during the rewrite.
+    /// (TRM 38.3.9.8).
+    ///
+    /// The new identifier, mask and frame formats take effect together,
+    /// between two frames: a frame is checked against either the old filter or
+    /// the new one, never against parts of both. If a frame is on the bus when
+    /// this is called, the call blocks until that frame has ended.
     pub fn set_mask_filter(&mut self, filter: MaskFilter, config: &MaskFilterConfig) {
-        let slot = FilterSlot::Mask(filter);
-        self.driver.set_filter_kinds(slot, FrameKinds::NONE);
-        self.driver
-            .set_mask_filter(filter, config.extended, config.id, config.mask);
-        self.driver.set_filter_kinds(slot, config.kinds());
+        self.driver.set_mask_filter(
+            filter,
+            config.extended,
+            config.id,
+            config.mask,
+            config.kinds(),
+        );
     }
 
     /// Disables one mask filter.
+    ///
+    /// Like every filter change, this takes effect between two frames; see
+    /// [`CanFdRx::set_mask_filter`].
     pub fn disable_mask_filter(&mut self, filter: MaskFilter) {
-        self.driver
-            .set_filter_kinds(FilterSlot::Mask(filter), FrameKinds::NONE);
+        self.driver.disable_filter(FilterSlot::Mask(filter));
     }
 
     /// Configures the range filter and enables it.
     ///
     /// Like a mask filter, the range filter can change while the controller is
-    /// on the bus, and is disabled while its bounds are rewritten; see
+    /// on the bus, and the change takes effect between two frames; see
     /// [`CanFdRx::set_mask_filter`].
     pub fn set_range_filter(&mut self, config: &RangeFilterConfig) {
         self.driver
-            .set_filter_kinds(FilterSlot::Range, FrameKinds::NONE);
-        self.driver
-            .set_range_filter(config.extended, config.low, config.high);
-        self.driver
-            .set_filter_kinds(FilterSlot::Range, config.kinds());
+            .set_range_filter(config.extended, config.low, config.high, config.kinds());
     }
 
     /// Disables the range filter.
+    ///
+    /// Like every filter change, this takes effect between two frames; see
+    /// [`CanFdRx::set_mask_filter`].
     pub fn disable_range_filter(&mut self) {
-        self.driver
-            .set_filter_kinds(FilterSlot::Range, FrameKinds::NONE);
+        self.driver.disable_filter(FilterSlot::Range);
     }
 
     /// Accepts every frame, by giving filter A a zero mask and disabling the rest.
     ///
     /// This is the one filter setting that matches standard and extended
-    /// identifiers at once.
+    /// identifiers at once. Like every filter change, it takes effect between
+    /// two frames; see [`CanFdRx::set_mask_filter`].
     pub fn accept_all(&mut self) {
-        // A zero mask passes any identifier word, so the format only decides
-        // how the zeros are shifted. Every step accepts at least what the
-        // filters accepted before, and the frame kinds change in one write.
-        self.driver.set_mask_filter(MaskFilter::A, false, 0, 0);
-        self.driver.reset_filter_kinds();
+        self.driver.accept_all();
     }
 
     /// Returns the current fault confinement state; see [`CanFd::error_state`].
