@@ -670,18 +670,16 @@ impl super::Timer for Alarm<'_> {
         } else {
             // Target mode
 
+            let v = self.unit.read_count();
+
             // The counters/comparators are 52-bits wide (except on ESP32-S2,
-            // which is 64-bits), so we must ensure that the provided value
+            // which is 64-bits), so we must ensure that the target value
             // is not too wide:
-            #[cfg(not(esp32s2))]
-            if (ticks & !SystemTimer::BIT_MASK) != 0 {
+            if ticks > SystemTimer::BIT_MASK - v {
                 return Err(Error::InvalidTimeout);
             }
 
-            let v = self.unit.read_count();
-            let t = v + ticks;
-
-            self.set_target(t);
+            self.set_target(v + ticks);
         }
 
         Ok(())

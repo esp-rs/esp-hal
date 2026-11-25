@@ -775,6 +775,7 @@ mod systimer {
         handler,
         time::Duration,
         timer::{
+            Error,
             OneShotTimer,
             PeriodicTimer,
             systimer::{Alarm, SystemTimer, Unit},
@@ -925,6 +926,16 @@ mod systimer {
             SystemTimer::set_unit_value(Unit::Unit1, 1 << 32);
             assert!(SystemTimer::unit_value(Unit::Unit1) >= 1 << 32);
         }
+    }
+
+    #[test]
+    fn schedule_rejects_target_above_counter_limit(ctx: Context) {
+        let mut alarm0 = OneShotTimer::new(ctx.alarm0);
+
+        let ticks_per_us = SystemTimer::ticks_per_second() / 1_000_000;
+        let longest_delay = Duration::from_micros(SystemTimer::BIT_MASK / ticks_per_us);
+
+        assert_eq!(alarm0.schedule(longest_delay), Err(Error::InvalidTimeout));
     }
 }
 
