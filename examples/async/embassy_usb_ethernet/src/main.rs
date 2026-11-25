@@ -7,12 +7,12 @@
 //! This example should be built in release mode.
 //!
 //! The following wiring is assumed:
-//! - DP => GPIO20 (GPIO27 on ESP32-P4)
-//! - DM => GPIO19 (GPIO26 on ESP32-P4)
+//! - DP => GPIO20 (GPIO22 on ESP32-H4, GPIO27 on ESP32-P4)
+//! - DM => GPIO19 (GPIO21 on ESP32-H4, GPIO26 on ESP32-P4)
 
-// TODO: impl_trait_in_assoc_type can't be used on stable rustc, so we need to exclude ESP32-P4 for
+// TODO: impl_trait_in_assoc_type can't be used on stable rustc, so we need to exclude riscv for
 // now.
-//% CHIP_FILTER: usb_otg_driver_supported && !esp32p4
+//% CHIP_FILTER: usb_otg_driver_supported && !riscv
 
 #![no_std]
 #![no_main]
@@ -60,13 +60,15 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
     let (dp, dm) = cfg_select! {
+        feature = "esp32h4" => (peripherals.GPIO22, peripherals.GPIO21),
         feature = "esp32p4" => (peripherals.GPIO27, peripherals.GPIO26),
         _ => (peripherals.GPIO20, peripherals.GPIO19),
     };

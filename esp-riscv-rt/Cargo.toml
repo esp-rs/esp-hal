@@ -2,7 +2,7 @@
 name          = "esp-riscv-rt"
 version       = "0.15.0"
 edition       = "2024"
-rust-version  = "1.95.0"
+rust-version  = "1.100.0"
 description   = "Minimal runtime / startup for RISC-V CPUs from Espressif"
 documentation = "https://docs.espressif.com/projects/rust/esp-riscv-rt/latest/"
 keywords      = ["esp32", "espressif", "riscv", "runtime", "startup"]
@@ -21,8 +21,12 @@ check-configs = [
     { features = ["rtc-ram"] },
     { features = ["no-mie-mip"] },
     { features = ["rtc-ram", "no-mie-mip"] },
+    { features = ["rtc-ram", "uncached-ram"] },
 ]
-clippy-configs = [{ features = ["rtc-ram"] }]
+clippy-configs = [
+    { features = ["rtc-ram"] },
+    { features = ["rtc-ram", "uncached-ram"] },
+]
 
 [lib]
 bench = false
@@ -40,8 +44,12 @@ riscv-rt          = {version = "0.16.0", features = ["pre-init", "no-exceptions"
 no-mie-mip = ["riscv-rt/no-xie-xip"]
 ## Indicate that the device has RTC RAM.
 rtc-ram = []
+## Indicate that the device can access internal SRAM through an L1-bypass address range.
+uncached-ram = []
 ## CLIC with 48 total interrupt lines
 clic-48 = []
+## Save and restore floating-point registers in interrupt routines
+float-save-restore = []
 
 ## Implement `defmt::Format`
 defmt = ["dep:defmt", "riscv-rt/defmt"]

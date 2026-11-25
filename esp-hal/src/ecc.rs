@@ -107,15 +107,16 @@ macro_rules! define_operations {
 
 # Errors
 
-[`KeyLengthMismatch`] when the bitlength of the parameters is different from the bitlength of the prime fields of the curve."]
+[`OperationError::ParameterLengthMismatch`] if an input does not match the curve's size."]
+                    #[cfg_attr(ecc_has_curve_sm2, doc = "\n[`OperationError::UnsupportedCurve`] if SM2 is disabled by eFuse.")]
                     #[inline]
                     pub fn $function<'op>(
                         &'op mut self,
                         curve: EllipticCurve,
                         $(#[cfg($is_modular)] modulus: EccModBase,)?
                         $($input: &[u8],)*
-                    ) -> Result<EccResultHandle<'op, $op>, KeyLengthMismatch> {
-                        curve.size_check([$($input),*])?;
+                    ) -> Result<EccResultHandle<'op, $op>, OperationError> {
+                        curve.check_parameters([$($input),*])?;
 
                         paste::paste! {
                             $(
@@ -150,12 +151,17 @@ macro_rules! define_operations {
                     #[doc = concat!("Configures a new ", $first_line, " operation with the given inputs, to be executed on [`EccBackend`].")]
                     ///
                     /// Outputs need to be assigned separately before executing the operation.
+                    ///
+                    /// # Errors
+                    ///
+                    /// [`OperationError::ParameterLengthMismatch`] if an input does not match the curve's size.
+                    #[cfg_attr(ecc_has_curve_sm2, doc = "\n[`OperationError::UnsupportedCurve`] if SM2 is disabled by eFuse.")]
                     pub fn $function<'op>(
                         self,
                         $(#[cfg($is_modular)] modulus: EccModBase,)?
                         $($input: &'op [u8],)*
-                    ) -> Result<EccBackendOperation<'op, $op>, KeyLengthMismatch> {
-                        self.size_check([&$($input,)*])?;
+                    ) -> Result<EccBackendOperation<'op, $op>, OperationError> {
+                        self.check_parameters([&$($input,)*])?;
 
                         #[cfg(ecc_has_modular_arithmetic)]
                         let mod_base = $crate::if_set! {
@@ -379,32 +385,58 @@ struct EccMemoryPowerGuard;
 
 impl EccMemoryPowerGuard {
     fn new() -> Self {
-        #[cfg(soc_has_pcr)]
-        crate::peripherals::PCR::regs()
-            .ecc_pd_ctrl()
-            .modify(|_, w| {
-                w.ecc_mem_force_pd().clear_bit();
-                w.ecc_mem_force_pu().set_bit();
-                w.ecc_mem_pd().clear_bit()
-            });
+        cfg_select! {
+            esp32h4 => {
+                crate::peripherals::PCR::regs()
+                    .ecc_mem_lp_ctrl()
+                    .modify(|_, w| {
+                        w.ecc_mem_lp_en().clear_bit();
+                        w.ecc_mem_force_ctrl().set_bit()
+                    });
+            }
+            soc_has_pcr => {
+                crate::peripherals::PCR::regs()
+                    .ecc_pd_ctrl()
+                    .modify(|_, w| {
+                        w.ecc_mem_force_pd().clear_bit();
+                        w.ecc_mem_force_pu().set_bit();
+                        w.ecc_mem_pd().clear_bit()
+                    });
+            }
+            _ => {}
+        }
         Self
     }
 }
 
 impl Drop for EccMemoryPowerGuard {
     fn drop(&mut self) {
-        #[cfg(soc_has_pcr)]
-        crate::peripherals::PCR::regs()
-            .ecc_pd_ctrl()
-            .modify(|_, w| {
-                w.ecc_mem_force_pd().clear_bit();
-                w.ecc_mem_force_pu().clear_bit();
-                w.ecc_mem_pd().set_bit()
-            });
+        cfg_select! {
+            esp32h4 => {
+                crate::peripherals::PCR::regs()
+                    .ecc_mem_lp_ctrl()
+                    .modify(|_, w| unsafe {
+                        w.ecc_mem_lp_mode().bits(0);
+                        w.ecc_mem_lp_en().set_bit()
+                    });
+            }
+            soc_has_pcr => {
+                crate::peripherals::PCR::regs()
+                    .ecc_pd_ctrl()
+                    .modify(|_, w| {
+                        w.ecc_mem_force_pd().clear_bit();
+                        w.ecc_mem_force_pu().clear_bit();
+                        w.ecc_mem_pd().set_bit()
+                    });
+            }
+            _ => {}
+        }
     }
 }
 
 /// ECC peripheral configuration.
+///
+/// The default turns enhanced security on, where the chip supports it.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
@@ -417,6 +449,17 @@ pub struct Config {
 
     /// Enables constant time operation and minimized power consumption variation for
     /// point-multiplication operations.
+    ///
+    /// Turning it off makes a point multiplication faster by an amount that depends on the
+    /// scalar's bit pattern. The time then exposes the scalar to timing-based side-channel
+    /// attacks. Turn it off only for a public scalar.
+    ///
+    /// `None` enables the mode where the chip revision supports it. Where it does not, `None`
+    /// logs a warning and `Some(true)` is refused with
+    /// [`ConfigError::EnhancedSecurityUnsupported`]. A caller that needs constant time passes
+    /// `true`.
+    ///
+    /// Default value: `None`.
     #[cfg_attr(
         esp32h2,
         doc = r"
@@ -424,12 +467,53 @@ pub struct Config {
 Only available on chip revision 1.2 and above."
     )]
     #[cfg(ecc_supports_enhanced_security)]
-    enhanced_security: bool,
+    enhanced_security: Option<bool>,
 }
 
-/// The length of the arguments do not match the length required by the curve.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct KeyLengthMismatch;
+/// ECC configuration error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// The configuration asks for enhanced security, and this chip revision does not support it.
+    ///
+    /// Only the ESP32-H2 below revision 1.2 lacks it. The default configuration is accepted there,
+    /// turns the mode off and logs a warning.
+    #[cfg(ecc_supports_enhanced_security)]
+    EnhancedSecurityUnsupported,
+}
+
+/// Returns whether this chip revision has the enhanced security mode.
+#[cfg(ecc_supports_enhanced_security)]
+fn enhanced_security_supported() -> bool {
+    !cfg!(esp32h2) || crate::soc::chip_revision_above(ChipRevision::from_combined(102))
+}
+
+/// Returns whether `config` turns enhanced security on, with `None` resolved for this chip
+/// revision.
+#[cfg(ecc_supports_enhanced_security)]
+fn enhanced_security(config: &Config) -> Result<bool, ConfigError> {
+    match config.enhanced_security {
+        None if !enhanced_security_supported() => {
+            warn!(
+                "No ECC enhanced security on this chip revision: point multiplication exposes a private scalar to a timing side channel"
+            );
+            Ok(false)
+        }
+        None => Ok(true),
+        Some(true) if !enhanced_security_supported() => {
+            Err(ConfigError::EnhancedSecurityUnsupported)
+        }
+        Some(on) => Ok(on),
+    }
+}
+
+fn check_config(_config: &Config) -> Result<(), ConfigError> {
+    #[cfg(ecc_supports_enhanced_security)]
+    enhanced_security(_config)?;
+
+    Ok(())
+}
 
 /// ECC operation error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -439,6 +523,9 @@ pub enum OperationError {
 
     /// Point verification failed.
     PointNotOnCurve,
+
+    /// The selected curve is not supported.
+    UnsupportedCurve,
 }
 
 /// Modulus base.
@@ -450,12 +537,6 @@ pub enum EccModBase {
 
     /// Prime modulus.
     PrimeModulus = 1,
-}
-
-impl From<KeyLengthMismatch> for OperationError {
-    fn from(_: KeyLengthMismatch) -> Self {
-        OperationError::ParameterLengthMismatch
-    }
 }
 
 for_each_ecc_curve! {
@@ -472,6 +553,17 @@ for_each_ecc_curve! {
             )*
         }
         impl EllipticCurve {
+            /// Returns whether the curve is available for hardware operations.
+            #[cfg_attr(ecc_has_curve_sm2, doc = "\nSM2 is disabled when the `DIS_SM_CRYPT` eFuse is set.")]
+            #[instability::unstable]
+            pub fn is_supported(self) -> bool {
+                match self {
+                    #[cfg(ecc_has_curve_sm2)]
+                    Self::Sm2 => !crate::efuse::read_bit(crate::efuse::DIS_SM_CRYPT),
+                    _ => true,
+                }
+            }
+
             /// Returns the size of the elliptic curve in bytes.
             pub const fn size(self) -> usize {
                 match self {
@@ -487,11 +579,19 @@ for_each_ecc_curve! {
 for_each_ecc_working_mode! {
     (all $(($wm_id:literal, $op:tt)),*) => {
         impl EllipticCurve {
-            fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
+            fn check_parameters<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), OperationError> {
+                if !self.is_supported() {
+                    return Err(OperationError::UnsupportedCurve);
+                }
+
+                self.size_check(params)
+            }
+
+            fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), OperationError> {
                 let bytes = self.size();
 
                 if params.iter().any(|p| p.len() != bytes) {
-                    return Err(KeyLengthMismatch);
+                    return Err(OperationError::ParameterLengthMismatch);
                 }
 
                 Ok(())
@@ -506,8 +606,8 @@ for_each_ecc_working_mode! {
 }
 
 impl<'d> Ecc<'d, Blocking> {
-    /// Creates a new instance in [Blocking] mode.
-    pub fn new(ecc: ECC<'d>, config: Config) -> Self {
+    /// Creates a new instance in [Blocking] mode, with the given configuration.
+    pub fn new(ecc: ECC<'d>, config: Config) -> Result<Self, ConfigError> {
         let clock_guard = CryptoClockGuard::new();
         let this = Self {
             _ecc: ecc,
@@ -517,9 +617,9 @@ impl<'d> Ecc<'d, Blocking> {
             _clock_guard: clock_guard,
         };
 
-        this.info().apply_config(&config);
+        this.info().apply_config(&config)?;
 
-        this
+        Ok(this)
     }
 }
 
@@ -541,7 +641,10 @@ impl Info {
         self.regs.mult_conf().reset()
     }
 
-    fn apply_config(&self, config: &Config) {
+    fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
+        #[cfg(ecc_supports_enhanced_security)]
+        let enhanced_security = enhanced_security(config)?;
+
         self.regs.mult_conf().modify(|_, w| {
             w.clk_en().bit(config.force_enable_reg_clock);
 
@@ -550,12 +653,14 @@ impl Info {
                 .bit(config.force_enable_mem_clock);
 
             #[cfg(ecc_supports_enhanced_security)]
-            if !cfg!(esp32h2) || crate::soc::chip_revision_above(ChipRevision::from_combined(102)) {
-                w.security_mode().bit(config.enhanced_security);
+            if enhanced_security_supported() {
+                w.security_mode().bit(enhanced_security);
             }
 
             w
         });
+
+        Ok(())
     }
 
     fn check_point_verification_result(&self) -> Result<(), OperationError> {
@@ -755,8 +860,8 @@ for_each_ecc_working_mode! {
             }
 
             /// Applies the given configuration to the ECC peripheral.
-            pub fn apply_config(&mut self, config: &Config) {
-                self.info().apply_config(config);
+            pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+                self.info().apply_config(config)
             }
 
             /// Resets the ECC peripheral.
@@ -1019,7 +1124,8 @@ const ECC_VTABLE: VTable<EccWorkItem> = VTable {
 
         // Ensure driver is initialized
         if let DriverState::Uninitialized(ecc) = &driver.driver {
-            let mut ecc = Ecc::new(unsafe { ecc.clone_unchecked() }, driver.config);
+            // `EccBackend::new` checked the configuration.
+            let mut ecc = unwrap!(Ecc::new(unsafe { ecc.clone_unchecked() }, driver.config));
             ecc.set_interrupt_handler(ecc_work_queue_handler);
             driver.driver = DriverState::Initialized(ecc);
         };
@@ -1054,14 +1160,16 @@ pub struct EccBackend<'d> {
 }
 
 impl<'d> EccBackend<'d> {
-    /// Creates a new ECC backend.
+    /// Creates a new ECC backend, with the given configuration.
     ///
     /// The backend must be started with [`Self::start`] before it can execute ECC operations.
-    pub fn new(ecc: ECC<'d>, config: Config) -> Self {
-        Self {
+    pub fn new(ecc: ECC<'d>, config: Config) -> Result<Self, ConfigError> {
+        check_config(&config)?;
+
+        Ok(Self {
             driver: DriverState::Uninitialized(ecc),
             config,
-        }
+        })
     }
 
     /// Registers the ECC driver to process ECC operations.
@@ -1231,8 +1339,8 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// # Errors
     ///
-    /// [`KeyLengthMismatch`] when `out` is not the correct size.
-    pub fn with_scalar_result(mut self, out: &'op mut [u8]) -> Result<Self, KeyLengthMismatch>
+    /// [`OperationError::ParameterLengthMismatch`] when `out` is not the correct size.
+    pub fn with_scalar_result(mut self, out: &'op mut [u8]) -> Result<Self, OperationError>
     where
         O: OperationReturnsScalar,
     {
@@ -1252,12 +1360,12 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// # Errors
     ///
-    /// [`KeyLengthMismatch`] when `x` or `y` are not the correct size.
+    /// [`OperationError::ParameterLengthMismatch`] when `x` or `y` are not the correct size.
     pub fn with_affine_point_result(
         mut self,
         px: &'op mut [u8],
         py: &'op mut [u8],
-    ) -> Result<Self, KeyLengthMismatch>
+    ) -> Result<Self, OperationError>
     where
         O: OperationReturnsAffinePoint,
     {
@@ -1275,13 +1383,13 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// # Errors
     ///
-    /// [`KeyLengthMismatch`] when `x`, `y`, or `z` are not the correct size.
+    /// [`OperationError::ParameterLengthMismatch`] when `x`, `y`, or `z` are not the correct size.
     pub fn with_jacobian_point_result(
         mut self,
         qx: &'op mut [u8],
         qy: &'op mut [u8],
         qz: &'op mut [u8],
-    ) -> Result<Self, KeyLengthMismatch>
+    ) -> Result<Self, OperationError>
     where
         O: OperationReturnsJacobianPoint,
     {

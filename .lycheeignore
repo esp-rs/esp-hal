@@ -24,3 +24,4 @@ https://stackoverflow\.com/
 
 # Unreleased documentation
 ^https://www\.espressif\.com/sites/default/files/documentation/esp32-h4_(datasheet|technical_reference_manual)_en\.pdf$
+^https://docs\.espressif\.com/projects/rust/esp-bootloader-direct-boot/

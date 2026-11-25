@@ -2,7 +2,6 @@ use core::ops::Not;
 
 use crate::{
     peripherals::{LP_AON, PMU},
-    private::DropGuard,
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
@@ -249,7 +248,7 @@ impl PowerSleepConfig {
         self.lp_sys_sleep
             .dig_power
             .set_peri_pd_en(pd_flags.pd_lp_periph());
-        self.lp_sys_sleep.dig_power.set_mem_dslp(true);
+        self.lp_sys_sleep.dig_power.set_mem_dslp(false);
 
         self.lp_sys_sleep
             .clk_power
@@ -416,10 +415,17 @@ impl ParamSleepConfig {
                 .bits(self.hp_sys.analog_wait_target_cycle)
         });
 
+        // From v1.2, the two low bits enable a power domain power-down that limits the inrush
+        // current.
+        let mut hp_digital_power_supply_wait_cycle = self.hp_sys.digital_power_supply_wait_cycle;
+        if crate::soc::chip_revision_above(crate::efuse::ChipRevision::from_combined(102)) {
+            hp_digital_power_supply_wait_cycle |= 0b11;
+        }
+
         PMU::regs().power_wait_timer0().modify(|_, w| unsafe {
             // pmu_ll_hp_set_digital_power_supply_wait_cycle
             w.dg_hp_pd_wait_timer()
-                .bits(self.hp_sys.digital_power_supply_wait_cycle);
+                .bits(hp_digital_power_supply_wait_cycle);
             // pmu_ll_hp_set_digital_power_up_wait_cycle
             w.dg_hp_powerup_timer()
                 .bits(self.hp_sys.digital_power_up_wait_cycle)
@@ -770,31 +776,22 @@ impl RtcSleepConfig {
             // which is the dominant saving.
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags
+                .set_pd_modem(crate::rtc_cntl::regdma::modem_power_down());
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
     }
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
-    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
-    /// sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
-        let restore_clock_config = ClockTree::with(|clocks| {
-            let old_root = clocks.hp_root_clk();
-
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        let hp_root_clk = ClockTree::with(|clocks| {
+            let old = clocks.hp_root_clk();
             clocks::configure_hp_root_clk(clocks, HpRootClkConfig::Xtal);
-
-            // Restore the old clock settings when we return
-            DropGuard::new((), move |_| {
-                ClockTree::with(|clocks| {
-                    crate::soc::clocks::reconfigure_pll(clocks);
-                    if let Some(old_root) = old_root {
-                        clocks::configure_hp_root_clk(clocks, old_root);
-                    }
-                });
-            })
+            old
         });
 
         // pmu_sleep_config_default + pmu_sleep_init.
@@ -829,7 +826,7 @@ impl RtcSleepConfig {
 
         // lp_aon_hal_inform_wakeup_type - tells ROM which wakeup stub to run
         LP_AON::regs()
-            .store9()
+            .store8()
             .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
 
         // pmu_ll_hp_set_wakeup_enable
@@ -861,24 +858,51 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
-        restore_clock_config
+        SavedState { hp_root_clk }
     }
 
     /// Requests the sleep.
     ///
     /// The caller waits for the result of the request.
     #[inline(always)]
-    pub(crate) fn enter_sleep(&self) -> bool {
+    pub(crate) fn enter_sleep(&self, _saved: &SavedState) -> bool {
         request_sleep()
     }
 
     /// Cleans up after sleep.
     #[inline(always)]
     pub(crate) fn finish_sleep(&self) {
-        // like esp-idf pmu_sleep_finish()
-        // In "pd_cpu lightsleep" and "deepsleep" modes we never get here
+        super::pmu_common::wait_for_efuse_idle();
 
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
     }
 }
+
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    hp_root_clk: Option<HpRootClkConfig>,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        ClockTree::with(|clocks| {
+            clocks::reconfigure_pll(clocks);
+            if let Some(hp_root_clk) = self.hp_root_clk {
+                clocks::configure_hp_root_clk(clocks, hp_root_clk);
+            }
+        });
+    }
+}
+
+/// Requests a light sleep with CPU retention. The ESP32-C5 needs no steps around the request.
+#[inline(always)]
+pub(crate) fn pmu_sleep_start(_saved: &SavedState) -> bool {
+    request_sleep()
+}
+
+/// Runs the wake steps after a CPU power-down. The ESP32-C5 has no wake steps.
+#[inline(always)]
+pub(crate) fn pmu_sleep_finish(_saved: &SavedState) {}

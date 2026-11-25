@@ -166,9 +166,9 @@ fn invalidate_cache(vaddr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
     }
-    unsafe {
+    crate::soc::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_Addr(map, vaddr, size);
-    }
+    });
 }
 
 #[cfg(esp32)]
@@ -264,6 +264,24 @@ fn find_free_entry() -> Option<u32> {
     (entries.start..entries.end.saturating_sub(1))
         .rev()
         .find(|&entry_id| !entry_is_valid(entry_id))
+}
+
+/// The entries that map the data (DROM) window, in address order.
+pub(super) fn drom_entries() -> Range<u32> {
+    cfg_select! {
+        // DROM0 is served by IBUS2. The data buses after it map other windows.
+        esp32s2 => s2::DATA_ENTRY_START..s2::IBUS_ENTRY_END,
+        _ => data_entries(),
+    }
+}
+
+/// The flash offset that a DROM entry maps, or `None` when the entry is
+/// outside the DROM window, invalid, or maps PSRAM.
+pub(super) fn drom_entry_offset(entry_id: u32) -> Option<u32> {
+    (drom_entries().contains(&entry_id)
+        && entry_is_valid(entry_id)
+        && entry_is_flash_mapping(entry_id))
+    .then(|| entry_flash_page(entry_id) * mmu_page_size())
 }
 
 /// Entries that can back a temporary mapping and be read through as data.
@@ -362,7 +380,7 @@ mod indexed {
     fn mmu_page_size_code() -> u32 {
         let ctrl = SPI0::regs().mmu_power_ctrl().read();
         cfg_select! {
-            any(esp32c5, esp32c61, esp32s31) => ctrl.mmu_page_size().bits() as u32,
+            any(esp32c5, esp32c61, esp32h4, esp32s31) => ctrl.mmu_page_size().bits() as u32,
             _ => ctrl.spi_mmu_page_size().bits() as u32,
         }
     }
@@ -504,10 +522,6 @@ mod table {
 /// and the core that waits for the fill then hangs. ESP-IDF turns the cache
 /// off around both operations, see `s_do_mapping()` in
 /// `components/esp_mm/esp_mmu_map.c`.
-///
-/// Everything that runs inside the cache-off window must be reachable without
-/// flash: the `#[ram]` entry points below only call `#[ram]` guard methods and
-/// helpers that are inlined into them.
 #[cfg(esp32)]
 mod esp32_cache {
     use procmacros::ram;
@@ -516,17 +530,17 @@ mod esp32_cache {
     use crate::{flash::cache::CacheGuard, pac::mmu_table::ENTRY};
 
     /// Map `page_paddr` into `entry` and make the new mapping visible.
-    #[ram]
+    #[ram(unstable(checked))]
     pub(super) fn map_entry(entry: &ENTRY, page_paddr: u32) {
-        let cache = CacheGuard::suspend();
+        let cache = CacheGuard::suspend_for_flush();
         table::write_entry(entry, page_paddr);
         cache.flush_while_off();
     }
 
     /// Drop the lines of a temporary mapping and invalidate its entry, if we own it.
-    #[ram]
+    #[ram(unstable(checked))]
     pub(super) fn unmap_entry(owned_entry: Option<&ENTRY>) {
-        let cache = CacheGuard::suspend();
+        let cache = CacheGuard::suspend_for_flush();
         if let Some(entry) = owned_entry {
             table::invalidate_entry(entry);
         }
@@ -534,9 +548,9 @@ mod esp32_cache {
     }
 
     /// Drop every cached line.
-    #[ram]
+    #[ram(unstable(checked))]
     pub(super) fn flush_caches() {
-        let cache = CacheGuard::suspend();
+        let cache = CacheGuard::suspend_for_flush();
         cache.flush_while_off();
     }
 }
@@ -568,7 +582,7 @@ mod s2 {
 
     pub(super) const DATA_ENTRY_START: u32 = 0x200 / 4;
     pub(super) const DATA_ENTRY_END: u32 = 0x500 / 4;
-    const IBUS_ENTRY_END: u32 = 0x300 / 4;
+    pub(super) const IBUS_ENTRY_END: u32 = 0x300 / 4;
 
     /// Virtual address for an S2 MMU entry.
     ///

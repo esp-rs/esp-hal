@@ -68,7 +68,8 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 //! ```toml
 //! [dependencies.esp-radio]
 //! # A supported chip needs to be specified, as well as specific use-case features
-#![doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now", "esp-alloc"]"#)]
+#![cfg_attr(wifi_driver_supported, doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now", "esp-alloc"]"#))]
+#![cfg_attr(not(wifi_driver_supported), doc = concat!(r#"features = [""#, chip!(), r#"", "ble", "esp-alloc"]"#))]
 //! [dependencies.esp-rtos]
 #![doc = concat!(r#"features = [""#, chip!(), r#"", "esp-radio", "esp-alloc"]"#)]
 //! [dependencies.esp-alloc]
@@ -180,7 +181,7 @@ use esp_hal as hal;
 #[instability::unstable]
 pub use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi", all(feature = "ble", supports_modem_power_down)))]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
 pub(crate) mod sys {
@@ -238,9 +239,18 @@ mod asynch;
 mod compat;
 #[cfg(any(esp32h4, esp32s31))]
 mod compiler_rt_abi;
-#[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "btdm2")))]
-mod drop_guard;
+#[cfg(any(
+    all(feature = "ble", any(bt_controller = "btdm", bt_controller = "btdm2")),
+    all(feature = "wifi", feature = "unstable", modem_retention = "backup_dma"),
+))]
+mod counting_lock;
 mod interrupt_dispatch;
+#[cfg(all(
+    supports_modem_power_down,
+    feature = "unstable",
+    any(feature = "ble", feature = "wifi", feature = "ieee802154"),
+))]
+mod modem_power;
 mod radio_clocks;
 mod refcount;
 mod time;
@@ -456,7 +466,7 @@ impl RadioRefGuard {
     /// If hardware init fails, it rolls back the refcount only once.
     ///
     /// The guard keeps the chip out of automatic light sleep while it exists.
-    #[cfg(any(feature = "ble", all(feature = "wifi", esp32)))]
+    #[cfg(feature = "ble")]
     pub(crate) fn new() -> Self {
         Self::create(true)
     }
@@ -464,7 +474,7 @@ impl RadioRefGuard {
     /// Like [`Self::new`], but the chip can sleep while the guard exists.
     ///
     /// The driver must refuse the sleeps that are not safe for it.
-    #[cfg(any(feature = "ble", all(feature = "wifi", not(esp32))))]
+    #[cfg(any(feature = "ble", feature = "wifi"))]
     pub(crate) fn without_wake_lock() -> Self {
         Self::create(false)
     }

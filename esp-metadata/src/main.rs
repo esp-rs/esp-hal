@@ -1,7 +1,7 @@
 //! Code generation tool for esp-metadata.
 //!
 //! Owns everything that is derived from `devices/*.toml`: the
-//! `esp-metadata-generated` crate, the tables in the esp-hal README, and the
+//! `esp-metadata-generated` crate, the tables in the READMEs, and the
 //! metadata cache consumed by the devtool.
 
 use std::{
@@ -17,12 +17,15 @@ use esp_metadata::{Chip, Config, TokenStream};
 /// Bump when the cache layout changes. Devtools that expect a different
 /// version refuse to use the cache instead of regenerating it, because
 /// regeneration cannot resolve a version mismatch.
-const CACHE_VERSION: u32 = 1;
+const CACHE_VERSION: u32 = 2;
+
+/// READMEs that contain the generated support tables, relative to the workspace.
+const READMES: [&str; 2] = ["README.md", "esp-hal/README.md"];
 
 const USAGE: &str = "\
 Usage: cargo update-metadata [--check]
 
-Re-generates `esp-metadata-generated`, the tables in the esp-hal README, and
+Re-generates `esp-metadata-generated`, the tables in the READMEs, and
 the metadata cache read by the devtool.
 
     --check    Exit with 1 if the generated code is not up to date.
@@ -73,6 +76,7 @@ fn generate(workspace: &Path, check: bool) -> Result<()> {
 
     log::info!("Updating esp-metadata-generated and README tables...");
 
+    warn_partial_support_without_issue();
     update_readme_tables(workspace)?;
 
     let out_path = workspace.join("esp-metadata-generated").join("src");
@@ -98,22 +102,42 @@ fn generate(workspace: &Path, check: bool) -> Result<()> {
     if check {
         // The README tables are generated from the same inputs, so a stale
         // README is as much a failure as stale generated code.
-        let paths = ["esp-metadata-generated", "esp-hal/README.md"];
+        let mut paths = vec!["esp-metadata-generated"];
+        paths.extend(READMES);
         let res = Command::new("git")
             .args(["diff", "HEAD", "--"])
-            .args(paths)
+            .args(&paths)
             .current_dir(workspace)
             .output()
             .context("Failed to run `git diff HEAD`")?;
         if !res.stdout.is_empty() {
             bail!(
                 "detected changes in {}. Run `cargo update-metadata`, and commit the changes.",
-                paths.join(" and ")
+                paths.join(", ")
             );
         }
     }
 
     Ok(())
+}
+
+/// Partially supported drivers should link to an issue that says what is missing, so
+/// that the support table shows it.
+fn warn_partial_support_without_issue() {
+    let unlinked = esp_metadata::partial_support_without_issue();
+    if unlinked.is_empty() {
+        return;
+    }
+
+    log::warn!(
+        "{} partially supported driver cells do not link to a tracking issue. Set \
+         `support_status = {{ status = \"partial\", issue = <number> }}` in their \
+         `[device.<driver>]` table. Run with `RUST_LOG=debug` to list them.",
+        unlinked.len()
+    );
+    for (chip, driver) in unlinked {
+        log::debug!("{}: {driver}", chip.pretty_name());
+    }
 }
 
 fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
@@ -173,18 +197,32 @@ fn format_generated_crate(workspace: &Path) -> Result<()> {
 }
 
 fn update_readme_tables(workspace: &Path) -> Result<()> {
+    let mut devices = String::new();
+    esp_metadata::generate_supported_devices_table(&mut devices)?;
+    let mut support = String::new();
+    esp_metadata::generate_chip_support_status(&mut support)?;
+
+    for readme in READMES {
+        update_readme(&workspace.join(readme), &devices, &support)?;
+    }
+
+    Ok(())
+}
+
+fn update_readme(readme_path: &Path, devices: &str, support: &str) -> Result<()> {
     const SUPPORTED_DEVICES_START: &str = "<!-- start supported devices table -->";
     const SUPPORTED_DEVICES_END: &str = "<!-- end supported devices table -->";
     const CHIP_SUPPORT_START: &str = "<!-- start chip support table -->";
     const CHIP_SUPPORT_END: &str = "<!-- end chip support table -->";
 
-    log::debug!("Updating generated tables in README.md...");
-    let readme_path = workspace.join("esp-hal").join("README.md");
-    let readme = std::fs::read_to_string(&readme_path)
+    log::debug!("Updating generated tables in {}...", readme_path.display());
+    let readme = std::fs::read_to_string(readme_path)
         .with_context(|| format!("Failed to read {}", readme_path.display()))?;
 
     let mut output = String::new();
     let mut end_marker = None;
+    let mut device_tables = 0;
+    let mut support_tables = 0;
     for line in readme.lines() {
         let trimmed = line.trim();
 
@@ -202,18 +240,30 @@ fn update_readme_tables(workspace: &Path) -> Result<()> {
 
         match trimmed {
             SUPPORTED_DEVICES_START => {
-                esp_metadata::generate_supported_devices_table(&mut output)?;
+                output.push_str(devices);
                 end_marker = Some(SUPPORTED_DEVICES_END);
+                device_tables += 1;
             }
             CHIP_SUPPORT_START => {
-                esp_metadata::generate_chip_support_status(&mut output)?;
+                output.push_str(support);
                 end_marker = Some(CHIP_SUPPORT_END);
+                support_tables += 1;
             }
             _ => {}
         }
     }
 
-    write_file(&readme_path, output)
+    if let Some(end) = end_marker {
+        bail!("{} has no `{end}` marker", readme_path.display());
+    }
+    if (device_tables, support_tables) != (1, 1) {
+        bail!(
+            "{} must contain `{SUPPORTED_DEVICES_START}` and `{CHIP_SUPPORT_START}` once each",
+            readme_path.display()
+        );
+    }
+
+    write_file(readme_path, output)
 }
 
 #[derive(serde::Serialize)]
@@ -224,6 +274,8 @@ struct Cache {
     symbols: Vec<String>,
     /// Every symbol with a value defined by any chip.
     kv_symbols: Vec<String>,
+    /// Pre-rendered HTML peripheral support matrix for the `esp-hal` documentation index.
+    peripheral_support_html: String,
     chips: BTreeMap<String, ChipCache>,
 }
 
@@ -306,11 +358,15 @@ fn dump_cache(workspace: &Path) -> Result<PathBuf> {
         .filter(|symbol| !kv_symbols.contains(symbol))
         .collect::<BTreeSet<_>>();
 
+    let mut peripheral_support_html = String::new();
+    esp_metadata::generate_chip_support_status_html(&mut peripheral_support_html)?;
+
     let cache = Cache {
         version: CACHE_VERSION,
         hash: esp_metadata::input_hash(workspace)?,
         symbols: symbols.into_iter().collect(),
         kv_symbols: kv_symbols.into_iter().collect(),
+        peripheral_support_html,
         chips,
     };
 

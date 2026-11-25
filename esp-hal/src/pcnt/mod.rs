@@ -108,6 +108,8 @@ pub use unit::Unit;
 pub struct Info {
     unit: usize,
     peripheral: Peripheral,
+    #[cfg(soc_has_clock_node_pcnt_function_clock)]
+    clock: crate::soc::clocks::PcntInstance,
     interrupt: Interrupt,
     dispatcher: InterruptHandler,
     register_block: *const RegisterBlock,
@@ -238,6 +240,8 @@ for_each_pcnt_unit! {
                 static INFO: crate::pcnt::Info = crate::pcnt::Info {
                     unit: $unit,
                     peripheral: crate::system::Peripheral::$sys,
+                    #[cfg(soc_has_clock_node_pcnt_function_clock)]
+                    clock: crate::soc::clocks::PcntInstance::$sys,
                     interrupt: crate::peripherals::Interrupt::$interrupt,
                     dispatcher: paste::paste! { [<pcnt_irq_ $interrupt>] },
                     register_block: crate::peripherals::$regs::ptr(),

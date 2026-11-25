@@ -15,8 +15,9 @@ fn clk_sel(sclk: I2sClkSclk) -> u8 {
 /// Each instance and direction has a `ctrl0` register with the source selector and the integer
 /// part of the divider, and a `div_ctrl0` register with the fraction.
 ///
-/// The divider applies twice, unless the coefficients are set in this sequence, with a small
-/// division before the target one.
+/// The divider applies twice, unless each coefficient has a separate register write in this
+/// sequence, with a small division before the target one.
+/// See <https://github.com/espressif/esp-idf/commit/eedf7b24ec792696de81ddb33a8451da1064292e>.
 macro_rules! configure_clk {
     (
         $config:ident, $fraction:ident,
@@ -32,23 +33,29 @@ macro_rules! configure_clk {
         let clkrst = HP_SYS_CLKRST::regs();
 
         clkrst.$ctrl_reg().modify(|_, w| unsafe { w.$n().bits(2) });
-        clkrst.$div_ctrl_reg().modify(|_, w| {
-            w.$yn1().clear_bit();
-            unsafe {
-                w.$y().bits(1);
-                w.$z().bits(0);
-                w.$x().bits(0)
-            }
-        });
+        clkrst.$div_ctrl_reg().modify(|_, w| w.$yn1().clear_bit());
+        clkrst
+            .$div_ctrl_reg()
+            .modify(|_, w| unsafe { w.$y().bits(1) });
+        clkrst
+            .$div_ctrl_reg()
+            .modify(|_, w| unsafe { w.$z().bits(0) });
+        clkrst
+            .$div_ctrl_reg()
+            .modify(|_, w| unsafe { w.$x().bits(0) });
 
-        clkrst.$div_ctrl_reg().modify(|_, w| {
-            w.$yn1().bit($fraction.yn1);
-            unsafe {
-                w.$z().bits($fraction.z);
-                w.$y().bits($fraction.y);
-                w.$x().bits($fraction.x)
-            }
-        });
+        clkrst
+            .$div_ctrl_reg()
+            .modify(|_, w| w.$yn1().bit($fraction.yn1));
+        clkrst
+            .$div_ctrl_reg()
+            .modify(|_, w| unsafe { w.$z().bits($fraction.z) });
+        clkrst
+            .$div_ctrl_reg()
+            .modify(|_, w| unsafe { w.$y().bits($fraction.y) });
+        clkrst
+            .$div_ctrl_reg()
+            .modify(|_, w| unsafe { w.$x().bits($fraction.x) });
 
         clkrst.$ctrl_reg().modify(|_, w| unsafe {
             w.$n().bits($config.div_num() as u8);
@@ -74,10 +81,21 @@ impl I2sInstance {
 
     pub(crate) fn configure_tx_clk_impl(
         self,
-        _clocks: &mut ClockTree,
+        clocks: &mut ClockTree,
         _old_config: Option<I2sClkConfig>,
         new_config: I2sClkConfig,
     ) {
+        // The divider can lose the fraction if the module clock is gated while the coefficients
+        // change.
+        let enabled = clocks.i2s_tx_clk_refcount[self as usize] > 0;
+        self.enable_tx_clk_impl(clocks, true);
+        self.set_tx_divider(new_config);
+        if !enabled {
+            self.enable_tx_clk_impl(clocks, false);
+        }
+    }
+
+    fn set_tx_divider(self, new_config: I2sClkConfig) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
 
         match self {
@@ -124,10 +142,21 @@ impl I2sInstance {
 
     pub(crate) fn configure_rx_clk_impl(
         self,
-        _clocks: &mut ClockTree,
+        clocks: &mut ClockTree,
         _old_config: Option<I2sClkConfig>,
         new_config: I2sClkConfig,
     ) {
+        // The divider can lose the fraction if the module clock is gated while the coefficients
+        // change.
+        let enabled = clocks.i2s_rx_clk_refcount[self as usize] > 0;
+        self.enable_rx_clk_impl(clocks, true);
+        self.set_rx_divider(new_config);
+        if !enabled {
+            self.enable_rx_clk_impl(clocks, false);
+        }
+    }
+
+    fn set_rx_divider(self, new_config: I2sClkConfig) {
         let fraction = MclkFraction::new(new_config.div_a(), new_config.div_b());
 
         match self {

@@ -2,7 +2,6 @@ use core::ops::Not;
 
 use crate::{
     peripherals::{LP_AON, PMU},
-    private::DropGuard,
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpBackupClk, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
@@ -247,7 +246,7 @@ impl PowerSleepConfig {
         self.lp_sys_sleep
             .dig_power
             .set_peri_pd_en(pd_flags.pd_lp_periph());
-        self.lp_sys_sleep.dig_power.set_mem_dslp(true);
+        self.lp_sys_sleep.dig_power.set_mem_dslp(false);
 
         self.lp_sys_sleep
             .clk_power
@@ -728,31 +727,22 @@ impl RtcSleepConfig {
             // which is the dominant saving.
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags
+                .set_pd_modem(crate::rtc_cntl::regdma::modem_power_down());
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
     }
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
-    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
-    /// sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
-        let restore_clock_config = ClockTree::with(|clocks| {
-            let old_root = clocks.soc_root_clk();
-
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        let soc_root_clk = ClockTree::with(|clocks| {
+            let old = clocks.soc_root_clk();
             clocks::configure_soc_root_clk(clocks, SocRootClkConfig::Xtal);
-
-            // Restore the old clock settings when we return
-            DropGuard::new((), move |_| {
-                ClockTree::with(|clocks| {
-                    crate::soc::clocks::reconfigure_pll(clocks);
-                    if let Some(old_root) = old_root {
-                        clocks::configure_soc_root_clk(clocks, old_root);
-                    }
-                });
-            })
+            old
         });
 
         // pmu_sleep_config_default + pmu_sleep_init.
@@ -830,24 +820,51 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
-        restore_clock_config
+        SavedState { soc_root_clk }
     }
 
     /// Requests the sleep.
     ///
     /// The caller waits for the result of the request.
     #[inline(always)]
-    pub(crate) fn enter_sleep(&self) -> bool {
+    pub(crate) fn enter_sleep(&self, _saved: &SavedState) -> bool {
         request_sleep()
     }
 
     /// Cleans up after sleep.
     #[inline(always)]
     pub(crate) fn finish_sleep(&self) {
-        // like esp-idf pmu_sleep_finish()
-        // In "pd_cpu lightsleep" and "deepsleep" modes we never get here
+        super::pmu_common::wait_for_efuse_idle();
 
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
     }
 }
+
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    soc_root_clk: Option<SocRootClkConfig>,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        ClockTree::with(|clocks| {
+            clocks::reconfigure_pll(clocks);
+            if let Some(soc_root_clk) = self.soc_root_clk {
+                clocks::configure_soc_root_clk(clocks, soc_root_clk);
+            }
+        });
+    }
+}
+
+/// Requests a light sleep with CPU retention. The ESP32-C6 needs no steps around the request.
+#[inline(always)]
+pub(crate) fn pmu_sleep_start(_saved: &SavedState) -> bool {
+    request_sleep()
+}
+
+/// Runs the wake steps after a CPU power-down. The ESP32-C6 has no wake steps.
+#[inline(always)]
+pub(crate) fn pmu_sleep_finish(_saved: &SavedState) {}

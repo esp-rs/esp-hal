@@ -39,6 +39,17 @@ options:
       - value: true
     active: "esp32"
 
+  - name: cache-livelock-workaround
+    description: "Enables a workaround for the cache live lock of ESP32 v3.0 and v3.1 (errata
+      WDT-3.15), which can stop both cores when they use PSRAM. The workaround runs while PSRAM
+      is mapped and the second core runs. It uses the TIMG1 watchdog and CPU interrupt 24, so the
+      application must not use the TIMG1 watchdog."
+    default:
+      - value: true
+        if: "esp32"
+      - value: false
+    active: "esp32"
+
   - name: stack-guard-offset
     description: The stack guard variable will be placed this many bytes from the stack's end. Needs to be a multiple of 4.
     default:
@@ -201,12 +212,10 @@ options:
     active: "esp32p4"
 
   - name: min-chip-revision
-    description: "The minimum chip revision required for the application to run, in format: major * 100 + minor."
+    description: "The minimum chip revision required for the application to run, in format: major * 100 + minor. The default value is the minimum revision supported by esp-hal."
     default:
       - value: 300
-        if: "esp32"
-      - value: 300
-        if: "esp32p4"
+        if: "esp32 || esp32p4"
       - value: 0
 
   - name: use_rwdata_ld_hook
@@ -237,11 +246,47 @@ options:
       - value: false
     active: "soc_has_clock_node_xtal32k_clk"
 
+  - name: keep-uart0-enabled
+    description: "Keeps UART0 enabled at startup, for output without a driver, such as esp-println."
+    default:
+      - value: true
+
+  - name: keep-usb-serial-jtag-enabled
+    description: "Keeps USB-Serial-JTAG connected at startup. Disable to save power if neither
+      the application nor a debugger uses it."
+    default:
+      - value: true
+    active: "soc_has_usb_device"
+
   - name: enable-pmp
     description: "Protects additional memory regions via Physical Memory Protection (PMP). (Only RISC-V other than ESP32-C2/C3)"
     default:
       - value: true
     active: "riscv && !esp32c2 && !esp32c3"
+
+  - name: idle-frequency-scaling
+    description: "EXPERIMENTAL: this option can cause peripherals and radio drivers to fail.
+      Switches the CPU clock to XTAL_CLK while `wait_for_interrupt` waits, to decrease the current
+      consumption of an idle CPU. The bus clocks that come from the CPU clock also decrease. The
+      PLL continues to run. The switch back to the PLL increases the interrupt latency. Hold a
+      `CpuFrequencyLock` to keep the CPU clock unchanged."
+    default:
+      - value: false
+    active: "sleep_idle_frequency_scaling"
+  - name: apb-frequency-reduction
+    description: "Divide AHB_CLK by this value to get APB_CLK while the APB bus is idle. The
+      value 1 disables the reduction. The reduction has an effect only if this divider is larger
+      than the APB_CLK divider. Drivers that need a constant APB_CLK frequency stop the reduction
+      while they operate."
+    default:
+      - value: 1
+    constraints:
+      - type:
+          validator: integer_in_range
+          value:
+            start: 1
+            end: 257
+    active: "soc_has_apb_frequency_reduction"
 
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"

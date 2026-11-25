@@ -131,7 +131,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, RegisterAccess},
     gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -184,8 +184,8 @@ where
         channel: impl LcdDmaTxChannel<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let tx_channel = ChannelTx::new(channel.into());
-        tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
+        let mut tx_channel = ChannelTx::new(channel.into());
+        tx_channel.connect(DmaPeripheral::LCD_CAM);
 
         let mut this = Self { lcd, tx_channel };
 
@@ -221,7 +221,9 @@ where
             .lcd_user()
             .modify(|_, w| w.lcd_reset().set_bit());
 
-        ll::set_lcd_conv_bypass(self.regs());
+        self.regs()
+            .lcd_rgb_yuv()
+            .write(|w| w.lcd_conv_enable().clear_bit());
 
         self.regs().lcd_user().modify(|_, w| {
             if config.format.enable_2byte_mode {
@@ -264,7 +266,7 @@ where
             timing.hsync_position as u8,
         );
         self.regs().lcd_misc().modify(|_, w| unsafe {
-            #[cfg(not(esp32s31))]
+            #[cfg(esp32s3)]
             w.lcd_afifo_threshold_num().bits((1 << 5) - 1);
 
             // Doesn't matter for RGB mode.
@@ -509,11 +511,8 @@ where
             w.lcd_next_frame_en().bit(next_frame_en)
         });
 
-        let result = unsafe {
-            self.tx_channel
-                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
-        }
-        .and_then(|_| self.tx_channel.start_transfer());
+        let result = unsafe { self.tx_channel.prepare_transfer(&mut buf) }
+            .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {
             return Err((err, self, buf));
         }
@@ -625,6 +624,14 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
 
         // Stop the DMA
         self.dpi.tx_channel.stop_transfer();
+
+        // A transfer stopped in the middle of a frame leaves pixels in the DMA channel and in the
+        // AFIFO. Without these resets, the next frame starts with them.
+        self.dpi.tx_channel.tx_impl.reset();
+        self.dpi
+            .regs()
+            .lcd_misc()
+            .modify(|_, w| w.lcd_afifo_reset().set_bit());
     }
 }
 

@@ -25,6 +25,18 @@ impl UartInstance {
         }
     }
 
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn uart0_function_clock_enabled() -> bool {
+        cfg_select! {
+            uart_has_sclk_divider => crate::peripherals::UART0::regs()
+                .clk_conf()
+                .read()
+                .sclk_en()
+                .bit(),
+            _ => true,
+        }
+    }
+
     pub(crate) fn configure_function_clock_impl(
         self,
         _clocks: &mut ClockTree,

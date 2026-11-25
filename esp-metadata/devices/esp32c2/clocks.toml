@@ -52,11 +52,12 @@ system_clocks = { clock_tree = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "RC_FAST",  outputs = "RC_FAST_DIV_CLK" },
     ] },
-    # BLE RTC timer (MODEM_CLKRST). The crystal input is divided by 5 in hardware.
-    { name = "BLE_LP_XTAL_CLK", type = "generic", output = "XTAL_CLK / 5" },
+    # BLE RTC timer (MODEM_CLKRST). The crystal and RC_SLOW inputs are divided by 5 in hardware.
+    { name = "BLE_LP_XTAL_CLK",    type = "generic", output = "XTAL_CLK / 5" },
+    { name = "BLE_LP_RC_SLOW_CLK", type = "generic", output = "RC_SLOW_CLK / 5" },
     { name = "BLE_LP_CLK", type = "generic", output = "sclk / (divisor + 1)", params = { sclk = [
         { name = "XTAL", outputs = "BLE_LP_XTAL_CLK", default = true },
-        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
+        { name = "RC_SLOW", outputs = "BLE_LP_RC_SLOW_CLK" },
     ], divisor = "0 ..= 255" } },
     { name = "RTC_FAST_CLK", type = "mux", variants = [ # RTC_CNTL_FAST_CLK_RTC_SEL
         { name = "XTAL", outputs = "XTAL_DIV_CLK" },
@@ -83,6 +84,12 @@ system_clocks = { clock_tree = [
         { name = "OSC32K_CLK",     outputs = "OSC_SLOW_CLK" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+        ] },
+    ] },
     { group = "TIMG", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
@@ -114,6 +121,9 @@ system_clocks = { clock_tree = [
             { name = "PLL_40M", outputs = "PLL_40M", default = true },
         ] },
     ] },
+    { group = "ADC", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "APB_CLK" },
+    ] },
 ] }
 
 peripheral_clocks = { templates = [
@@ -137,13 +147,13 @@ peripheral_clocks = { templates = [
     #{ name = "Adc2Arb" },
     { name = "Systimer", keep_enabled = true },
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
-    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
+    { name = "UartMem", keep_enabled = "keep_uart0_enabled" },
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true },
     { name = "Ledc" },
     { name = "I2cExt0" },
     { name = "Spi2" },
     { name = "Uart1" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = "keep_uart0_enabled" },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

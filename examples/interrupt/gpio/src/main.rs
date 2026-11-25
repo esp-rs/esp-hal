@@ -36,8 +36,9 @@ static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     // Set GPIO2 as an output, and set its state high initially.
     let mut io = Io::new(peripherals.IO_MUX);
@@ -45,15 +46,14 @@ fn main() -> ! {
 
     let mut led = Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default());
 
-    let button =
-        cfg_select! {
-            any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
-            feature = "esp32c5" => peripherals.GPIO28,
-            feature = "esp32p4" => peripherals.GPIO35,
-            feature = "esp32h4" => peripherals.GPIO34,
-            feature = "esp32s31" => peripherals.GPIO61,
-            _ => peripherals.GPIO9,
-        };
+    let button = cfg_select! {
+        any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
+        feature = "esp32c5" => peripherals.GPIO28,
+        feature = "esp32p4" => peripherals.GPIO35,
+        feature = "esp32h4" => peripherals.GPIO34,
+        feature = "esp32s31" => peripherals.GPIO61,
+        _ => peripherals.GPIO9,
+    };
 
     let config = InputConfig::default().with_pull(Pull::Up);
     let mut button = Input::new(button, config);
@@ -77,13 +77,13 @@ fn main() -> ! {
 fn handler() {
     cfg_select! {
         any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => {
-            esp_println::println!(
+            log::info!(
                 "GPIO Interrupt with priority {}",
                 esp_hal::xtensa_lx::interrupt::get_level()
             );
         }
         _ => {
-            esp_println::println!("GPIO Interrupt");
+            log::info!("GPIO Interrupt");
         }
     }
 
@@ -94,9 +94,9 @@ fn handler() {
             .unwrap()
             .is_interrupt_set()
     }) {
-        esp_println::println!("Button was the source of the interrupt");
+        log::info!("Button was the source of the interrupt");
     } else {
-        esp_println::println!("Button was not the source of the interrupt");
+        log::info!("Button was not the source of the interrupt");
     }
 
     critical_section::with(|cs| {

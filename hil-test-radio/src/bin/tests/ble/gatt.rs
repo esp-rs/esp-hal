@@ -1,7 +1,7 @@
 #[embedded_test::tests(default_timeout = 30, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
     use embassy_futures::select::select;
-    use embassy_time::{Duration, Timer, with_timeout};
+    use embassy_time::{Duration, Timer};
     use esp_hal::{
         clock::CpuClock,
         peripherals::{BT, Peripherals},
@@ -20,6 +20,7 @@ mod tests {
 
     #[test]
     async fn ble_central_connects_to_peripheral(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -33,6 +34,7 @@ mod tests {
     #[cfg(soc_has_ieee802154)]
     #[test]
     async fn ble_central_connects_while_ieee802154_is_up(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_radio::ieee802154::{Config, Ieee802154};
 
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -62,28 +64,8 @@ mod tests {
         let mut central = stack.central();
         let runner = stack.runner();
 
-        let _ = select(ble_task(runner), async {
-            let accept_list = [address];
-            let connect_config = ConnectConfig {
-                scan_config: ScanConfig {
-                    filter_accept_list: &accept_list,
-                    active: true,
-                    phys: PhySet::M1,
-                    interval: Duration::from_millis(100),
-                    window: Duration::from_millis(100),
-                    timeout: Duration::from_secs(10),
-                    ..Default::default()
-                },
-                connect_params: RequestedConnParams::default(),
-            };
-
-            let conn = with_timeout(Duration::from_secs(15), central.connect(&connect_config))
-                .await
-                .expect("BLE connect timed out")
-                .expect("BLE connect failed");
-
-            assert_eq!(conn.peer_address(), address);
-            assert!(conn.is_connected());
+        let _ = select(crate::ble_task(runner), async {
+            let conn = crate::connect(&mut central, address).await;
 
             let client = GattClient::<_, DefaultPacketPool, 4>::new(&stack, &conn)
                 .await
@@ -127,13 +109,5 @@ mod tests {
             Timer::after(Duration::from_millis(250)).await;
         })
         .await;
-    }
-
-    async fn ble_task<C: Controller, P: PacketPool>(mut runner: Runner<'_, C, P>) {
-        loop {
-            if runner.run().await.is_err() {
-                Timer::after(Duration::from_millis(100)).await;
-            }
-        }
     }
 }

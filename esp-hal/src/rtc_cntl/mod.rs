@@ -123,6 +123,22 @@ unstable_module! {
     // only include sleep where it's been implemented
     #[cfg(sleep_driver_supported)]
     pub mod sleep;
+    // Public for esp-radio, which builds the REGDMA nodes of the radios.
+    #[cfg(modem_retention = "regdma")]
+    #[doc(hidden)]
+    pub mod regdma;
+}
+
+cfg_select! {
+    any(supports_cpu_power_down, supports_modem_power_down) => {
+        mod retention_memory;
+        #[doc(hidden)]
+        #[instability::unstable]
+        pub use retention_memory::RetentionSlot;
+        #[instability::unstable]
+        pub use retention_memory::{RetentionMemory, RetentionMemoryError, RetentionStorage};
+    }
+    _ => {}
 }
 
 cfg_select! {
@@ -314,45 +330,6 @@ impl<'d> Rtc<'d> {
         Duration::from_micros(crate::clock::rtc_ticks_to_us(self.time_since_boot_raw()))
     }
 
-    /// Reads the current value of the boot time registers in microseconds.
-    #[cfg(lp_timer_driver_supported)]
-    fn boot_time_us(&self) -> u64 {
-        // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
-        let (low_reg, high_reg) =
-            cfg_select! {
-                esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
-                esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
-                _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
-            };
-
-        let l = low_reg.read().bits() as u64;
-        let h = high_reg.read().bits() as u64;
-
-        // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L115
-        l + (h << 32)
-    }
-
-    /// Sets the current value of the boot time registers in microseconds.
-    #[cfg(lp_timer_driver_supported)]
-    fn set_boot_time_us(&self, boot_time_us: u64) {
-        // Please see `boot_time_us` for documentation on registers and peripherals
-        // used for certain SOCs.
-
-        let (low_reg, high_reg) =
-            cfg_select! {
-                esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
-                esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
-                _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
-            };
-
-        // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
-
-        low_reg // Low bits
-            .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
-        high_reg // High bits
-            .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
-    }
-
     #[procmacros::doc_replace]
     /// Returns the current time in microseconds.
     ///
@@ -382,7 +359,7 @@ impl<'d> Rtc<'d> {
         // Current time is boot time + time since boot
 
         let rtc_time_us = self.time_since_power_up().as_micros();
-        let boot_time_us = self.boot_time_us();
+        let boot_time_us = boot_time_us();
         let wrapped_boot_time_us = u64::MAX - boot_time_us;
 
         // We can detect if we wrapped the boot time by checking if rtc time is greater
@@ -409,9 +386,9 @@ impl<'d> Rtc<'d> {
             // Subtracting time since boot and adding current new time is equivalent and
             // avoids overflow. We just checked that rtc_time_us is less than time_us
             // so this won't overflow.
-            self.set_boot_time_us(u64::MAX - rtc_time_us + current_time_us)
+            set_boot_time_us(u64::MAX - rtc_time_us + current_time_us)
         } else {
-            self.set_boot_time_us(current_time_us - rtc_time_us)
+            set_boot_time_us(current_time_us - rtc_time_us)
         }
     }
 
@@ -431,9 +408,7 @@ impl<'d> Rtc<'d> {
             _ => LP_AON::regs().store4(),
         };
         let disable_mask = cfg_select! {
-            any(esp32p4, esp32s31) => {
-                Self::RTC_DISABLE_ROM_LOG | (Self::RTC_DISABLE_ROM_LOG << 16)
-            }
+            any(esp32p4, esp32s31) => Self::RTC_DISABLE_ROM_LOG | (Self::RTC_DISABLE_ROM_LOG << 16),
             _ => Self::RTC_DISABLE_ROM_LOG,
         };
         reg.modify(|r, w| unsafe { w.bits(r.bits() | disable_mask) });
@@ -715,6 +690,39 @@ impl Swd {
     }
 }
 
+/// Reads the boot time registers, in microseconds.
+///
+/// The current time is the boot time plus the time since power-up. ESP-IDF keeps the boot time in
+/// the same registers, so the time survives a switch between the two.
+///
+/// See <https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L102-L115>.
+#[cfg(lp_timer_driver_supported)]
+pub(crate) fn boot_time_us() -> u64 {
+    let (low_reg, high_reg) = cfg_select! {
+        esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+        esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+        _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+    };
+
+    let l = low_reg.read().bits() as u64;
+    let h = high_reg.read().bits() as u64;
+
+    l + (h << 32)
+}
+
+/// Writes the boot time registers, in microseconds.
+#[cfg(lp_timer_driver_supported)]
+pub(crate) fn set_boot_time_us(boot_time_us: u64) {
+    let (low_reg, high_reg) = cfg_select! {
+        esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+        esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+        _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+    };
+
+    low_reg.write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
+    high_reg.write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+}
+
 /// Reads the LP timer counter, in its own tick units.
 ///
 /// `Rtc` owns `RTC_TIMER`, but the sleep alarm needs the same counter without the peripheral. This
@@ -841,6 +849,8 @@ cfg_select! {
 
 Note: This chip does not support automatic light sleep. On this chip, `WakeLock` does nothing."
 )]
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 #[non_exhaustive]
 pub struct WakeLock;

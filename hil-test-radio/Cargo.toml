@@ -45,7 +45,6 @@ path              = "src/bin/support/ieee802154_echo_support.rs"
 
 [dependencies]
 defmt              = "1.1"
-defmt-rtt          = { version = "1.0.0", optional = true }
 embassy-executor   = { version = "0.10.0", default-features = false }
 embassy-futures    = "0.1"
 embassy-sync       = "0.8"
@@ -57,6 +56,7 @@ esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
 esp-metadata-generated = { path = "../esp-metadata-generated" }
+esp-log       = { path = "../esp-log", default-features = false, features = ["defmt"], optional = true }
 esp-rtos           = { path = "../esp-rtos", optional = true }
 esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
@@ -88,16 +88,21 @@ trouble-host = { version = "0.8.0", default-features = false, features = [
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
-default = []
+default = ["log-serial"]
 unstable = ["esp-hal/unstable"]
 
-defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt"]
+# Logs on the serial port of the probe. Only tests that enable `unstable` log, because the
+# logger uses the unstable UART and USB-Serial-JTAG drivers.
+log-serial = ["dep:esp-log", "defmt"]
+# Enabled by `log-serial`.
+defmt = ["embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 esp-radio-unstable = ["esp-radio/unstable"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 rtos-radio-driver = ["dep:esp-rtos", "esp-rtos/esp-radio", "dep:esp-radio-rtos-driver"]
 
 esp32c6 = [
+    "esp-log?/esp32c6",
     "esp-hal/esp32c6",
     "esp-alloc?/esp32c6",
     "esp-radio?/esp32c6",
@@ -106,6 +111,7 @@ esp32c6 = [
     "esp-rtos?/esp32c6",
 ]
 esp32s3 = [
+    "esp-log?/esp32s3",
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s3",
     "esp-alloc?/esp32s3",

@@ -334,7 +334,7 @@ impl HeapRegion {
 /// Stats for a heap allocator
 ///
 /// Enable the "internal-heap-stats" feature if you want collect additional heap
-/// informations at the cost of extra cpu time during every alloc/dealloc.
+/// information at the cost of extra cpu time during every alloc/dealloc.
 #[derive(Debug)]
 pub struct HeapStats {
     /// Granular stats for all the configured memory regions.

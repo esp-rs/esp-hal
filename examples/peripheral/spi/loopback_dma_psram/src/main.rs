@@ -2,11 +2,11 @@
 //!
 //! The following wiring is assumed:
 //!
-//! Signal    | ESP32-S3 | ESP32-S2 | ESP32-C5/C61/P4 | ESP32-S31 |
-//! --------- | -------- | -------- | --------------- | --------- |
-//! SCLK      | GPIO42   | GPIO6    | GPIO6           | GPIO11    |
-//! MOSI/MISO | GPIO48   | GPIO7    | GPIO7           | GPIO12    |
-//! CS        | GPIO38   | GPIO10   | GPIO10          | GPIO13    |
+//! Signal    | ESP32-S3 | ESP32-S2 | ESP32-C5/C61/P4 | ESP32-S31 | ESP32-H4 |
+//! --------- | -------- | -------- | --------------- | --------- | -------- |
+//! SCLK      | GPIO42   | GPIO6    | GPIO6           | GPIO11    | GPIO0    |
+//! MOSI/MISO | GPIO48   | GPIO7    | GPIO7           | GPIO12    | GPIO2    |
+//! CS        | GPIO38   | GPIO10   | GPIO10          | GPIO13    | GPIO5    |
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -51,18 +51,21 @@ const DMA_ALIGNMENT: ExternalBurstConfig = cfg_select! {
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger(log::LevelFilter::Info);
-    info!("Starting SPI loopback test");
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
+
+    info!("Starting SPI loopback test");
+
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    let (sclk, mosi, cs) =
-        cfg_select! {
-            feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
-            feature = "esp32s31" => (peripherals.GPIO11, peripherals.GPIO12, peripherals.GPIO13),
-            _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
-        };
+    let (sclk, mosi, cs) = cfg_select! {
+        feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
+        feature = "esp32s31" => (peripherals.GPIO11, peripherals.GPIO12, peripherals.GPIO13),
+        feature = "esp32h4" => (peripherals.GPIO0, peripherals.GPIO2, peripherals.GPIO5),
+        _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
+    };
 
     let (miso, mosi) = unsafe { mosi.split() };
 

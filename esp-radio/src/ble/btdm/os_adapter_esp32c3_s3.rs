@@ -1,5 +1,6 @@
 use procmacros::BuilderLite;
 
+pub use super::mac_bb::{RetentionMemory, RetentionStorage, install_retention_memory};
 #[cfg(multi_core)]
 use crate::hal::system::Cpu;
 use crate::{
@@ -124,7 +125,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     cause_sw_intr_to_core: None,
     malloc: Some(crate::ble::malloc),
     malloc_internal: Some(super::malloc_internal),
-    free: Some(crate::ble::free),
+    free: Some(free_wrapper),
     read_efuse_mac: Some(super::read_efuse_mac),
     srand: Some(super::srand),
     rand: Some(super::rand),
@@ -149,7 +150,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     esp_hw_power_down: Some(esp_hw_power_down),
     esp_hw_power_up: Some(esp_hw_power_up),
     ets_backup_dma_copy: Some(ets_backup_dma_copy),
-    malloc_retention: Some(malloc_retention),
+    malloc_retention: Some(super::mac_bb::malloc_retention),
     ets_delay_us: Some(ets_delay_us_wrapper),
     btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
     coex_bt_wakeup_request: Some(super::coex_bt_wakeup_request),
@@ -158,10 +159,10 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     assert: Some(assert_wrapper),
 };
 
-pub(crate) unsafe extern "C" fn malloc_retention(size: u32) -> *mut crate::sys::c_types::c_void {
-    // IDF uses heap_caps_malloc(size, MALLOC_CAP_RETENTION). We have no retention
-    // heap, so fall back to the same internal allocator as malloc_internal.
-    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
+unsafe extern "C" fn free_wrapper(ptr: *mut c_void) {
+    if !super::mac_bb::try_free(ptr) {
+        unsafe { crate::ble::free(ptr) }
+    }
 }
 
 extern "C" fn get_time_us_wrapper() -> u64 {
@@ -345,6 +346,9 @@ pub struct Config {
     /// The low-power clock source comes from the clock tree (`BLE_LP_CLK`).
     /// While the controller sleeps, the chip can also enter automatic light
     /// sleep. Set this before the controller starts. The default is off.
+    ///
+    /// With [`install_retention_memory`], the controller also powers the MAC and
+    /// baseband down while it sleeps.
     modem_sleep: bool,
 
     /// The priority of the RTOS task.
@@ -656,21 +660,42 @@ pub(crate) unsafe extern "C" fn coex_wifi_sleep_set(sleep: i32) {
     );
 }
 
-pub(crate) unsafe extern "C" fn esp_hw_power_down() {
-    todo!();
+// The ESP32-S3 has no BT power domain, the modem domain powers its BT MAC.
+extern "C" fn esp_hw_power_down() {
+    #[cfg(esp32c3)]
+    {
+        regs!(RTC_CNTL)
+            .dig_iso()
+            .modify(|_, w| w.bt_force_iso().set_bit());
+        regs!(RTC_CNTL)
+            .dig_pwc()
+            .modify(|_, w| w.bt_force_pd().set_bit());
+    }
+
+    crate::modem_power::sleep(crate::modem_power::Radio::Ble);
 }
 
-pub(crate) unsafe extern "C" fn esp_hw_power_up() {
-    todo!();
+extern "C" fn esp_hw_power_up() {
+    #[cfg(esp32c3)]
+    {
+        regs!(RTC_CNTL)
+            .dig_pwc()
+            .modify(|_, w| w.bt_force_pd().clear_bit());
+        regs!(RTC_CNTL)
+            .dig_iso()
+            .modify(|_, w| w.bt_force_iso().clear_bit());
+    }
+
+    crate::modem_power::wake(crate::modem_power::Radio::Ble);
 }
 
-pub(crate) unsafe extern "C" fn ets_backup_dma_copy(
-    _reg: u32,
-    _mem_addr: u32,
-    _num: u32,
-    _to_rem: i32,
-) {
-    todo!();
+extern "C" fn ets_backup_dma_copy(reg: u32, mem_addr: u32, num: u32, to_mem: i32) {
+    unsafe extern "C" {
+        #[link_name = "ets_backup_dma_copy"]
+        fn rom_ets_backup_dma_copy(reg: u32, mem_addr: u32, num: u32, to_mem: bool);
+    }
+
+    unsafe { rom_ets_backup_dma_copy(reg, mem_addr, num, to_mem != 0) }
 }
 
 #[cfg(esp32c3)]

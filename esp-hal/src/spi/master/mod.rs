@@ -620,7 +620,8 @@ impl Config {
         // those values are not currently supported by the divider calculation.
         let max_divider = 16 * 64; // n * pre
 
-        if self.frequency < source_freq / max_divider || self.frequency > source_freq / min_divider
+        if self.frequency.as_hz() < source_freq.as_hz().div_ceil(max_divider)
+            || self.frequency > source_freq / min_divider
         {
             return Err(ConfigError::FrequencyOutOfRange);
         }

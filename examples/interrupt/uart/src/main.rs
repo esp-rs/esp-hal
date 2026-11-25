@@ -21,7 +21,7 @@
 //! Each device will:
 //! - Send a counter value every second
 //! - Send a break condition every 3 seconds
-//! - Print received data and break conditions via esp-println
+//! - Log received data and break conditions on USB-Serial-JTAG, where the chip has it
 
 //% CHIP_FILTER: uart_driver_supported
 
@@ -49,6 +49,11 @@ static SERIAL: Mutex<RefCell<Option<Uart<Blocking>>>> = Mutex::new(RefCell::new(
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
+    // This example drives the default UART0 pins, so it logs on USB-Serial-JTAG. The ESP32, C2 and
+    // S2 don't have one and print nothing.
+    #[cfg(not(any(feature = "esp32", feature = "esp32c2", feature = "esp32s2")))]
+    esp_log::init_usb!(peripherals);
+
     let (tx_pin, rx_pin) = cfg_select! {
         feature = "esp32" => (peripherals.GPIO1, peripherals.GPIO3),
         feature = "esp32c2" => (peripherals.GPIO20, peripherals.GPIO19),
@@ -60,9 +65,7 @@ fn main() -> ! {
         feature = "esp32h4" => (peripherals.GPIO24, peripherals.GPIO23),
         feature = "esp32p4" => (peripherals.GPIO6, peripherals.GPIO5),
         feature = "esp32s31" => (peripherals.GPIO3, peripherals.GPIO2),
-        any(feature = "esp32s2", feature = "esp32s3") => {
-            (peripherals.GPIO43, peripherals.GPIO44)
-        }
+        any(feature = "esp32s2", feature = "esp32s3") => (peripherals.GPIO43, peripherals.GPIO44),
     };
 
     let uart_config = UartConfig::default()
@@ -84,8 +87,8 @@ fn main() -> ! {
         SERIAL.borrow_ref_mut(cs).replace(uart);
     });
 
-    esp_println::println!("UART interrupt example with break conditions");
-    esp_println::println!("Sending data every second, break every 3 seconds");
+    log::info!("UART interrupt example with break conditions");
+    log::info!("Sending data every second, break every 3 seconds");
 
     let mut last_send = Instant::now();
     let mut last_break = Instant::now();
@@ -112,7 +115,7 @@ fn main() -> ! {
 
             critical_section::with(|cs| {
                 if let Some(uart) = SERIAL.borrow_ref_mut(cs).as_mut() {
-                    esp_println::println!("Sending break condition...");
+                    log::info!("Sending break condition...");
                     uart.send_break(14);
                 }
             });
@@ -128,12 +131,12 @@ fn handler() {
         let serial = serial.as_mut().unwrap();
 
         if serial.interrupts().contains(UartInterrupt::RxBreakDetected) {
-            esp_println::print!("\nBREAK");
+            log::info!("BREAK");
         }
         if serial.interrupts().contains(UartInterrupt::RxFifoFull) {
             let mut byte = [0u8; 1];
             serial.read(&mut byte).unwrap();
-            esp_println::print!(" {:02X}", byte[0]);
+            log::info!("{:02X}", byte[0]);
         }
 
         serial.clear_interrupts(UartInterrupt::RxBreakDetected | UartInterrupt::RxFifoFull);

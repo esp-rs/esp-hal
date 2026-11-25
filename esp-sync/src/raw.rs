@@ -69,7 +69,16 @@ impl RawLock for SingleCoreInterruptLock {
             xtensa => {
                 let token: u32;
                 unsafe {
-                    core::arch::asm!("rsil {0}, 5", out(reg) token);
+                    cfg_select! {
+                        esp32 => {
+                            // On ESP32, the cache live lock workaround of esp-hal needs priority 4
+                            // interrupts in critical sections.
+                            core::arch::asm!("rsil {0}, 3", out(reg) token);
+                        }
+                        _ => {
+                            core::arch::asm!("rsil {0}, 5", out(reg) token);
+                        }
+                    }
                 }
                 #[cfg(debug_assertions)]
                 let token = token & !RESERVED_MASK;
@@ -88,7 +97,7 @@ impl RawLock for SingleCoreInterruptLock {
 
     #[inline]
     unsafe fn exit(&self, token: RestoreState) {
-        // Ensure no preceeding memory accesses are reordered to after interrupts are
+        // Ensure no preceding memory accesses are reordered to after interrupts are
         // enabled.
         compiler_fence(Ordering::SeqCst);
 

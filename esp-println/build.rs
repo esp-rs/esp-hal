@@ -1,11 +1,22 @@
 use std::{env, path::Path};
 
-use esp_metadata_generated::assert_unique_used_features;
+use esp_metadata_generated::assert_unique_features;
 use log_04::LevelFilter;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Ensure that only a single communication method is specified
-    assert_unique_used_features!("jtag-serial", "uart", "auto", "no-op");
+    // `auto` yields to an explicit communication method, so a package that defaults to `auto`
+    // can select the interface of one binary.
+    assert_unique_features!("jtag-serial", "uart", "no-op");
+    let explicit =
+        cfg!(feature = "jtag-serial") || cfg!(feature = "uart") || cfg!(feature = "no-op");
+    assert!(
+        explicit || cfg!(feature = "auto"),
+        "One of the `auto`, `jtag-serial`, `uart` and `no-op` features must be enabled."
+    );
+    if !explicit {
+        println!("cargo:rustc-cfg=auto_select");
+    }
+    println!("cargo:rustc-check-cfg=cfg(auto_select)");
 
     let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
     // Ensure that, if the `jtag-serial` communication method feature is enabled,

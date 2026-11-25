@@ -8,6 +8,8 @@ use crate::{
 
 mod oct_hex;
 
+pub(crate) use oct_hex::low_speed;
+
 /// PSRAM configuration.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -16,7 +18,7 @@ pub struct PsramConfig {
     /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density.
     pub size: PsramSize,
 
-    /// PSRAM timing parameters. Default: 250 MHz.
+    /// PSRAM timing parameters. Default: 200 MHz. 250 MHz needs the MPLL at 500 MHz.
     pub timing: PsramTimingParams,
     // TODO: ECC enable.
     // The MSPI0 controller has a ECC engine.
@@ -58,7 +60,7 @@ pub struct PsramTimingParams {
 
 impl Default for PsramTimingParams {
     fn default() -> Self {
-        Self::MHZ_250
+        Self::MHZ_200
     }
 }
 

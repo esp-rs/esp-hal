@@ -19,7 +19,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, main, ram, rtc_cntl::Rtc, time::Duration};
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -32,9 +31,18 @@ static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
 #[ram(unstable(rtc_fast, zeroed))]
 static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 
+#[cfg(esp32p4)]
+#[ram(unstable(uncached))]
+static mut UNCACHE_DATA: [u8; 4] = [0x11, 0x22, 0x33, 0x44];
+
+#[cfg(esp32p4)]
+#[ram(unstable(uncached, zeroed))]
+static mut UNCACHE_BSS: [u8; 8] = [0; 8];
+
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
     let delay = Delay::new();
 
@@ -43,7 +51,7 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.RTC_TIMER);
     rtc.rwdt.enable();
 
-    println!(
+    log::info!(
         "IRAM function located at {:p}",
         function_in_ram as *const ()
     );
@@ -57,22 +65,32 @@ fn main() -> ! {
         assert_eq!(&[0xff, 0xbb], &SOME_INITED_DATA);
         assert_eq!(&[0xff, 0, 0, 0, 0, 0, 0, 0], &SOME_ZEROED_DATA);
 
+        #[cfg(esp32p4)]
+        {
+            let data_addr = &raw const UNCACHE_DATA as usize;
+            let bss_addr = &raw const UNCACHE_BSS as usize;
+            assert!((0x8FF0_0000..0x9000_0000).contains(&data_addr));
+            assert!((0x8FF0_0000..0x9000_0000).contains(&bss_addr));
+            assert_eq!(&[0x11, 0x22, 0x33, 0x44], &UNCACHE_DATA);
+            assert_eq!(&[0; 8], &UNCACHE_BSS);
+        }
+
         if SOME_PERSISTENT_DATA[1] == 0xff {
             SOME_PERSISTENT_DATA[1] = 0;
         }
 
-        println!("Counter {}", SOME_PERSISTENT_DATA[1]);
+        log::info!("Counter {}", SOME_PERSISTENT_DATA[1]);
         SOME_PERSISTENT_DATA[1] += 1;
     }
 
-    println!(
+    log::info!(
         "RTC_FAST function located at {:p}",
         function_in_rtc_ram as *const ()
     );
 
     assert_eq!(42, function_in_rtc_ram());
 
-    println!("Restarting in ~ 10 seconds.");
+    log::info!("Restarting in ~ 10 seconds.");
     let mut i = 10;
     loop {
         assert_eq!(42, function_in_rtc_ram());
@@ -84,7 +102,7 @@ fn main() -> ! {
 
 #[ram]
 fn function_in_ram(count: u32) {
-    println!("{}", count);
+    log::info!("{}", count);
 }
 
 #[ram(unstable(rtc_fast))]

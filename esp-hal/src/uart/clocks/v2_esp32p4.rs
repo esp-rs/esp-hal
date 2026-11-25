@@ -40,6 +40,15 @@ impl UartInstance {
         }
     }
 
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn uart0_function_clock_enabled() -> bool {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl110()
+            .read()
+            .uart0_clk_en()
+            .bit()
+    }
+
     pub(crate) fn configure_function_clock_impl(
         self,
         _clocks: &mut ClockTree,

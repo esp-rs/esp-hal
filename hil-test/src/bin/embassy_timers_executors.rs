@@ -91,12 +91,14 @@ mod timers_executors {
     }
 
     fn set_up_embassy_with_timg0(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
     }
 
     #[cfg(not(feature = "esp32"))]
     fn set_up_embassy_with_systimer(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
         esp_rtos::start(systimer.alarm0);
     }
@@ -123,6 +125,7 @@ mod timers_executors {
 
     #[test]
     fn test_periodic_timg(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
 
         run_test_periodic_timer(timg0.timer0);
@@ -131,6 +134,7 @@ mod timers_executors {
     #[test]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_systimer(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
 
         run_test_periodic_timer(systimer.alarm0);
@@ -138,6 +142,7 @@ mod timers_executors {
 
     #[test]
     fn test_periodic_oneshot_timg(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let mut timg0 = TimerGroup::new(peripherals.TIMG0);
         run_test_periodic_timer(timg0.timer0.reborrow());
         run_test_oneshot_timer(timg0.timer0.reborrow());
@@ -146,6 +151,7 @@ mod timers_executors {
     #[test]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_oneshot_systimer(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
         run_test_periodic_timer(systimer.alarm0.reborrow());
         run_test_oneshot_timer(systimer.alarm0.reborrow());
@@ -169,6 +175,7 @@ mod timers_executors {
     /// Test that the ticker works in tasks ran by the interrupt executors.
     #[test]
     async fn test_interrupt_executor(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -304,10 +311,10 @@ mod interrupt_executor {
             response.wait().await;
         }
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        CpuControl::new(unsafe { CPU_CTRL::steal() })
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
         embedded_test::export::check_outcome(());
     }
 
@@ -320,6 +327,7 @@ mod interrupt_executor {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
@@ -492,18 +500,18 @@ mod interrupt_spi_dma {
     #[test]
     async fn dma_does_not_lock_up_when_used_in_different_executors() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
 
-        let (dma_channel1, dma_channel2) =
-            cfg_select! {
-                spi_master_dma_engine = "SPI_DMA" => (peripherals.DMA_SPI2, peripherals.DMA_SPI3),
-                spi_master_dma_engine = "AXI_GDMA" => {
-                    (peripherals.DMA_AXI_CH0, peripherals.DMA_AXI_CH1)
-                }
-                _ => (peripherals.DMA_CH0, peripherals.DMA_CH1),
-            };
+        let (dma_channel1, dma_channel2) = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => (peripherals.DMA_SPI2, peripherals.DMA_SPI3),
+            spi_master_dma_engine = "AXI_GDMA" => {
+                (peripherals.DMA_AXI_CH0, peripherals.DMA_AXI_CH1)
+            }
+            _ => (peripherals.DMA_CH0, peripherals.DMA_CH1),
+        };
 
         let dma_rx_buf = dma_rx_buffer!(1024).unwrap();
         let dma_tx_buf = dma_tx_buffer!(1024).unwrap();
@@ -639,6 +647,7 @@ mod interrupt_spi_dma {
         }
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
@@ -680,9 +689,9 @@ mod interrupt_spi_dma {
         STOP_INTERRUPT_TASK.store(true, portable_atomic::Ordering::Relaxed);
         while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Relaxed) {}
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        CpuControl::new(unsafe { CPU_CTRL::steal() })
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
     }
 }

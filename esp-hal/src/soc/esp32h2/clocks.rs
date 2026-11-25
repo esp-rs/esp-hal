@@ -16,7 +16,7 @@
 
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, TIMG0},
-    soc::{regi2c, xtal32k},
+    soc::{regi2c, update_bus_clocks, with_single_bus_clock_update, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -78,22 +78,8 @@ impl ClockConfig {
             self.xtal_clk = Some(XtalClkConfig::_32);
         }
 
-        self.apply(clocks);
+        with_single_bus_clock_update(|| self.apply(clocks));
     }
-}
-
-fn clk_ll_bus_update() {
-    PCR::regs()
-        .bus_clk_update()
-        .modify(|_, w| w.bus_clock_update().bit(true));
-
-    // reg_get_bit
-    while PCR::regs()
-        .bus_clk_update()
-        .read()
-        .bus_clock_update()
-        .bit_is_set()
-    {}
 }
 
 // XTAL_CLK
@@ -107,6 +93,16 @@ fn configure_xtal_clk_impl(
 }
 
 // PLL_F96M_CLK
+
+/// Configures and calibrates the BBPLL again.
+///
+/// The BBPLL loses its analog configuration while the PMU powers it down, for example in a light
+/// sleep. ESP-IDF configures it again before it uses the PLL after a wake.
+pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
+    if clocks.pll_f96m_clk_refcount > 0 {
+        enable_pll_f96m_clk_impl(clocks, true);
+    }
+}
 
 fn enable_pll_f96m_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
@@ -254,7 +250,39 @@ fn configure_hp_root_clk_impl(
 
     // "When selecting the clock source of HP_ROOT_CLK, or configuring the clock divisor for CPU_CLK
     // and AHB_CLK ..."
-    clk_ll_bus_update();
+    update_bus_clocks();
+}
+
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+
+/// Switches HP_ROOT_CLK to XTAL_CLK if it is the PLL, with configured dividers that
+/// [`restore_cpu_clock`] can restore. Returns whether the clock changed.
+///
+/// CPU_CLK and AHB_CLK change to XTAL_CLK. APB_CLK changes to XTAL_CLK divided by the APB divider.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if !matches!(
+        clocks.hp_root_clk(),
+        Some(HpRootClkConfig::Pll96 | HpRootClkConfig::Pll64)
+    ) || clocks.cpu_clk().is_none()
+        || clocks.ahb_clk().is_none()
+    {
+        return false;
+    }
+    // CPU_CLK must stay an integer multiple of AHB_CLK after each step.
+    configure_hp_root_clk_impl(clocks, None, HpRootClkConfig::Xtal);
+    configure_cpu_clk_impl(clocks, None, CpuClkConfig::new(0));
+    configure_ahb_clk_impl(clocks, None, AhbClkConfig::new(0));
+    true
+}
+
+/// Restores HP_ROOT_CLK and the CPU and AHB dividers that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    configure_ahb_clk_impl(clocks, None, unwrap!(clocks.ahb_clk()));
+    configure_cpu_clk_impl(clocks, None, unwrap!(clocks.cpu_clk()));
+    configure_hp_root_clk_impl(clocks, None, unwrap!(clocks.hp_root_clk()));
 }
 
 // CPU_CLK
@@ -274,7 +302,7 @@ fn configure_cpu_clk_impl(
 
     // "When selecting the clock source of HP_ROOT_CLK, or configuring the clock divisor for CPU_CLK
     // and AHB_CLK ..."
-    clk_ll_bus_update();
+    update_bus_clocks();
 }
 
 // AHB_CLK
@@ -294,23 +322,28 @@ fn configure_ahb_clk_impl(
 
     // "When selecting the clock source of HP_ROOT_CLK, or configuring the clock divisor for CPU_CLK
     // and AHB_CLK ..."
-    clk_ll_bus_update();
+    update_bus_clocks();
 }
 
 // APB_CLK
 
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    crate::soc::enable_apb_frequency_reduction(!en);
 }
 
 fn configure_apb_clk_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<ApbClkConfig>,
+    old_config: Option<ApbClkConfig>,
     new_config: ApbClkConfig,
 ) {
     PCR::regs()
         .apb_freq_conf()
         .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
+
+    // No driver uses APB_CLK before the first configuration.
+    if old_config.is_none() {
+        crate::soc::enable_apb_frequency_reduction(true);
+    }
 }
 
 fn configure_iomux_function_clock_impl(
@@ -491,6 +524,39 @@ impl ParlIoInstance {
     }
 }
 
+impl AdcInstance {
+    // ADC_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .saradc_clkm_conf()
+            .modify(|_, w| w.saradc_clkm_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<AdcFunctionClockConfig>,
+        new_config: AdcFunctionClockConfig,
+    ) {
+        PCR::regs().saradc_clkm_conf().modify(|_, w| unsafe {
+            w.saradc_clkm_sel().bits(match new_config {
+                AdcFunctionClockConfig::Xtal => 0,
+                AdcFunctionClockConfig::PllF96m => 1,
+                AdcFunctionClockConfig::RcFast => 2,
+            })
+        });
+    }
+}
+
+impl PcntInstance {
+    // PCNT_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+}
+
 impl SdmInstance {
     // SDM_FUNCTION_CLOCK
 
@@ -609,6 +675,13 @@ fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
+// BLE_LP_RC_SLOW_CLK
+
+fn enable_ble_lp_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do, divisor and mux are configured in BLE_LP_CLK
+    // (see modem_clock_select_lp_clock_source() in modem_clock.c).
+}
+
 // BLE_LP_CLK
 
 fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -622,7 +695,10 @@ fn configure_ble_lp_clk_impl(
 ) {
     let divisor = match new_config {
         BleLpClkConfig::Xtal => xtal_clk_frequency() / ble_lp_xtal_clk_frequency() - 1,
-        _ => 0,
+        // Divided by 5 (div_num = 4), see esp_bt_rtc_slow_clk_select() in bt.c.
+        BleLpClkConfig::RcSlow => rc_slow_clk_frequency() / ble_lp_rc_slow_clk_frequency() - 1,
+        #[cfg(use_xtal32k)]
+        BleLpClkConfig::Xtal32k => 0,
     };
     let sel_xtal32k = cfg_select! {
         use_xtal32k => new_config == BleLpClkConfig::Xtal32k,

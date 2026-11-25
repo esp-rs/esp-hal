@@ -6,8 +6,23 @@ use crate::{
 impl SpiInstance {
     // SPI_FUNCTION_CLOCK
 
-    pub(crate) fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // SPI clock gates are managed by the peripheral clock infrastructure in system.rs.
+    pub(crate) fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        match self {
+            Self::Spi2 => {
+                HP_SYS_CLKRST::regs().peri_clk_ctrl116().modify(|_, w| {
+                    w.gpspi2_hs_clk_en().bit(en);
+                    w.gpspi2_mst_clk_en().bit(en)
+                });
+            }
+            Self::Spi3 => {
+                HP_SYS_CLKRST::regs()
+                    .peri_clk_ctrl116()
+                    .modify(|_, w| w.gpspi3_hs_clk_en().bit(en));
+                HP_SYS_CLKRST::regs()
+                    .peri_clk_ctrl117()
+                    .modify(|_, w| w.gpspi3_mst_clk_en().bit(en));
+            }
+        }
     }
 
     pub(crate) fn configure_function_clock_impl(

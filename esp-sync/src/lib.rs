@@ -1,4 +1,4 @@
-//! Syncronization primitives for ESP32 devices
+//! Synchronization primitives for ESP32 devices
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
@@ -16,6 +16,11 @@
 mod fmt;
 
 use core::{cell::UnsafeCell, marker::PhantomData};
+
+// The macros exist and can use log-04, but they aren't used currently. To keep
+// fmt.rs copy-paste friendly, we just ignore the unused dependency.
+#[cfg(feature = "log-04")]
+use log_04 as _;
 
 pub mod raw;
 
@@ -46,6 +51,7 @@ impl RestoreState {
     /// # Safety
     ///
     /// The `inner` value must be appropriate for the [RawMutex] implementation that creates it.
+    #[inline]
     pub const unsafe fn new(inner: u32) -> Self {
         Self(inner, PhantomData)
     }
@@ -54,6 +60,7 @@ impl RestoreState {
     ///
     /// Note that due to the safety contract of [`RawLock::enter`]/[`RawLock::exit`], you must not
     /// pass a `RestoreState` obtained from this method to [`RawLock::exit`].
+    #[inline]
     pub const fn invalid() -> Self {
         Self(0, PhantomData)
     }
@@ -85,6 +92,7 @@ mod single_core {
     }
 
     impl LockedState {
+        #[inline]
         pub const fn new() -> Self {
             Self {
                 locked: Cell::new(false),
@@ -92,10 +100,13 @@ mod single_core {
         }
 
         #[inline]
-        pub fn lock(&self, lock: &impl crate::RawLock) -> crate::RestoreState {
+        pub fn lock(&self, lock: &impl crate::RawLock, reentrant: bool) -> crate::RestoreState {
             let mut tkn = unsafe { lock.enter() };
             let was_locked = self.locked.replace(true);
             if was_locked {
+                if !reentrant {
+                    crate::panic_lock_not_reentrant();
+                }
                 tkn.mark_reentry();
             }
             tkn
@@ -116,17 +127,17 @@ mod single_core {
 mod multi_core {
     use core::sync::atomic::{AtomicUsize, Ordering};
 
-    // Safety: Ensure that when adding new chips `raw_core` doesn't return this
-    // value.
-    const UNUSED_THREAD_ID_VALUE: usize = 0x100;
+    // Zero, so that a static mutex is placed in `.bss`.
+    const UNUSED_THREAD_ID_VALUE: usize = 0;
 
     #[inline]
     fn thread_id() -> usize {
         // This method must never return UNUSED_THREAD_ID_VALUE
         cfg_select! {
-            all(multi_core, riscv) => riscv::register::mhartid::read(),
-            all(multi_core, xtensa) => (xtensa_lx::get_processor_id() & 0x2000) as usize,
-            _ => 0,
+            // `mhartid` is 0 on the first core.
+            all(multi_core, riscv) => riscv::register::mhartid::read() + 1,
+            // `PRID` is 0xCDCD on the PRO CPU and 0xABAB on the APP CPU.
+            all(multi_core, xtensa) => xtensa_lx::get_processor_id() as usize,
         }
     }
 
@@ -144,7 +155,7 @@ mod multi_core {
         }
 
         #[inline]
-        pub fn lock(&self, lock: &impl crate::RawLock) -> crate::RestoreState {
+        pub fn lock(&self, lock: &impl crate::RawLock, reentrant: bool) -> crate::RestoreState {
             // We acquire the lock inside an interrupt-free context to prevent a subtle
             // race condition:
             // In case an interrupt handler tries to lock the same resource, it could win if
@@ -153,37 +164,53 @@ mod multi_core {
             // If we allow reentrancy, the interrupt handler would technically be a different
             // context with the same `current_thread_id`, so it would be allowed to lock the
             // resource in a theoretically incorrect way.
-            let try_lock = || {
-                let mut tkn = unsafe { lock.enter() };
+            let tkn = unsafe { lock.enter() };
+            let current_thread_id = thread_id();
 
-                let current_thread_id = thread_id();
+            match self.owner.compare_exchange(
+                UNUSED_THREAD_ID_VALUE,
+                current_thread_id,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => tkn,
+                Err(owner) => self.lock_contended(lock, tkn, owner, current_thread_id, reentrant),
+            }
+        }
 
-                let try_lock_result = self
-                    .owner
-                    .compare_exchange(
-                        UNUSED_THREAD_ID_VALUE,
-                        current_thread_id,
-                        Ordering::Acquire,
-                        Ordering::Relaxed,
-                    )
-                    .map(|_| ());
-
-                match try_lock_result {
-                    Ok(()) => Some(tkn),
-                    Err(owner) if owner == current_thread_id => {
-                        tkn.mark_reentry();
-                        Some(tkn)
-                    }
-                    Err(_) => {
-                        unsafe { lock.exit(tkn) };
-                        None
-                    }
-                }
-            };
-
+        // Code in RAM takes locks, so this function must be in RAM, too.
+        #[cold]
+        #[procmacros::ram]
+        fn lock_contended(
+            &self,
+            lock: &impl crate::RawLock,
+            mut tkn: crate::RestoreState,
+            mut owner: usize,
+            mut current_thread_id: usize,
+            reentrant: bool,
+        ) -> crate::RestoreState {
             loop {
-                if let Some(token) = try_lock() {
-                    return token;
+                if owner == current_thread_id {
+                    if !reentrant {
+                        crate::panic_lock_not_reentrant();
+                    }
+                    tkn.mark_reentry();
+                    return tkn;
+                }
+
+                unsafe { lock.exit(tkn) };
+                tkn = unsafe { lock.enter() };
+                // The thread may have been resumed on the other core while interrupts were enabled.
+                current_thread_id = thread_id();
+
+                match self.owner.compare_exchange(
+                    UNUSED_THREAD_ID_VALUE,
+                    current_thread_id,
+                    Ordering::Acquire,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => return tkn,
+                    Err(o) => owner = o,
                 }
             }
         }
@@ -210,10 +237,14 @@ mod multi_core {
     }
 }
 
-#[cfg(multi_core)]
-use multi_core::LockedState;
-#[cfg(single_core)]
-use single_core::LockedState;
+cfg_select! {
+    multi_core => {
+        use multi_core::LockedState;
+    }
+    _ => {
+        use single_core::LockedState;
+    }
+}
 
 /// A generic lock that wraps a [`RawLock`] implementation and tracks
 /// whether the caller has locked recursively.
@@ -242,8 +273,8 @@ impl<L: RawLock> GenericRawMutex<L> {
     /// - The returned token must be passed to the corresponding `release` call.
     /// - The caller must ensure to release the locks in the reverse order they were acquired.
     #[inline]
-    unsafe fn acquire(&self) -> RestoreState {
-        self.inner.lock(&self.lock)
+    unsafe fn acquire(&self, reentrant: bool) -> RestoreState {
+        self.inner.lock(&self.lock, reentrant)
     }
 
     /// Releases the lock.
@@ -288,7 +319,7 @@ impl<L: RawLock> GenericRawMutex<L> {
 #[cfg_attr(
     multi_core,
     doc = r#"It needs a bit of memory, but it does not take a global critical
-    section, making it preferrable for use in multi-core systems."#
+    section, making it preferable for use in multi-core systems."#
 )]
 pub struct RawMutex {
     inner: GenericRawMutex<SingleCoreInterruptLock>,
@@ -319,7 +350,7 @@ impl RawMutex {
     /// - The caller must ensure to release the locks in the reverse order they were acquired.
     #[inline]
     pub unsafe fn acquire(&self) -> RestoreState {
-        unsafe { self.inner.acquire() }
+        unsafe { self.inner.acquire(true) }
     }
 
     /// Releases the lock.
@@ -348,24 +379,6 @@ impl RawMutex {
     /// Runs the callback with this lock locked.
     #[inline]
     pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        self.inner.lock(f)
-    }
-}
-
-unsafe impl embassy_sync_06::blocking_mutex::raw::RawMutex for RawMutex {
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: Self = Self::new();
-
-    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        self.inner.lock(f)
-    }
-}
-
-unsafe impl embassy_sync_07::blocking_mutex::raw::RawMutex for RawMutex {
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: Self = Self::new();
-
-    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
         self.inner.lock(f)
     }
 }
@@ -402,7 +415,7 @@ impl<T> NonReentrantMutex<T> {
     /// Calling this reentrantly will panic.
     pub fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
         self.lock_state
-            .lock_non_reentrant(|| f(unsafe { &mut *self.data.get() }))
+            .lock_non_reentrant(|| f(unsafe { self.data.as_mut_unchecked() }))
     }
 }
 
@@ -417,20 +430,21 @@ struct LockGuard<'a, L: RawLock> {
 impl<'a, L: RawLock> LockGuard<'a, L> {
     #[inline]
     fn new_non_reentrant(lock: &'a GenericRawMutex<L>) -> Self {
-        let this = Self::new_reentrant(lock);
-        if this.token.is_reentry() {
-            panic_lock_not_reentrant();
-        }
-        this
+        Self::new(lock, false)
     }
 
     #[inline]
     fn new_reentrant(lock: &'a GenericRawMutex<L>) -> Self {
+        Self::new(lock, true)
+    }
+
+    #[inline]
+    fn new(lock: &'a GenericRawMutex<L>, reentrant: bool) -> Self {
         let token = unsafe {
             // SAFETY: the same lock will be released when dropping the guard.
             // This ensures that the lock is released on the same thread, in the reverse
             // order it was acquired.
-            lock.acquire()
+            lock.acquire(reentrant)
         };
 
         Self { lock, token }

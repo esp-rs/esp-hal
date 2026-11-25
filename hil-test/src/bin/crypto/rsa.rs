@@ -65,15 +65,9 @@ mod tests {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(peripherals);
 
-        #[allow(unused_mut)]
-        let mut rsa = Rsa::new(peripherals.RSA);
-
-        #[cfg(not(esp32))]
-        {
-            rsa.disable_constant_time(true);
-            rsa.search_acceleration(true);
-        }
+        let rsa = Rsa::new(peripherals.RSA, esp_hal::rsa::Config::default()).unwrap();
 
         Context { rsa }
     }
@@ -182,6 +176,10 @@ mod tests {
             d.wrapping_rem_vartime(&modulus.resize()).resize()
         }
 
+        // Computing these at runtime needs more stack than the ESP32-S2 has left.
+        static R: MAX = compute_r(&MODULUS);
+        const MPRIME: u32 = compute_mprime(&MODULUS);
+
         // 10^3 mod bignum = 1000
 
         let mut outbuf = [u32::MAX; MAX::LIMBS];
@@ -189,10 +187,9 @@ mod tests {
             &mut ctx.rsa,
             THREE.as_words(),
             MODULUS.as_words(),
-            compute_mprime(&MODULUS),
+            MPRIME,
         );
-        let r = compute_r(&MODULUS);
-        mod_exp.start_exponentiation(TEN.as_words(), r.as_words());
+        mod_exp.start_exponentiation(TEN.as_words(), R.as_words());
         mod_exp.read_results(&mut outbuf);
 
         let words = RESULT.as_words();
@@ -223,6 +220,46 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(rsa_version = "1"))]
+    fn test_constant_time_off_speeds_up_exponentiation(mut ctx: Context<'static>) {
+        // 65537 has only two 1 bits, so with constant time off the block skips almost every
+        // multiply, and the two times differ the most. Both configurations keep the search off, the
+        // default, so only the constant time setting changes the time.
+        let constant_time = esp_hal::rsa::Config::default();
+        let accelerated = constant_time.with_constant_time(false);
+        let exponent = U512::from_u32(65537);
+        let r = compute_r(&BIGNUM_3);
+        let mprime = compute_mprime(&BIGNUM_3);
+        let exponentiation_us = |rsa: &mut Rsa<'static, Blocking>| {
+            let mut outbuf = [0_u32; U512::LIMBS];
+            let start = esp_hal::time::Instant::now();
+            let mut mod_exp = RsaModularExponentiation::<Op512, _>::new(
+                rsa,
+                exponent.as_words(),
+                BIGNUM_3.as_words(),
+                mprime,
+            );
+            mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
+            mod_exp.read_results(&mut outbuf);
+            start.elapsed().as_micros()
+        };
+
+        // An untimed run first, so that neither timed run pays for cache misses.
+        exponentiation_us(&mut ctx.rsa);
+        ctx.rsa.apply_config(&constant_time).unwrap();
+        let constant_time_us = exponentiation_us(&mut ctx.rsa);
+        ctx.rsa.apply_config(&accelerated).unwrap();
+        let accelerated_us = exponentiation_us(&mut ctx.rsa);
+
+        hil_test::assert!(
+            accelerated_us * 8 < constant_time_us,
+            "constant time {} us, accelerated {} us",
+            constant_time_us,
+            accelerated_us
+        );
+    }
+
+    #[test]
     async fn modular_async_exponentiation(ctx: Context<'static>) {
         let mut rsa = ctx.rsa.into_async();
 
@@ -238,6 +275,43 @@ mod tests {
             .exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf)
             .await;
         hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+    }
+
+    #[test]
+    fn test_blocking_operations_on_async_driver(ctx: Context<'static>) {
+        let mut rsa = ctx.rsa.into_async();
+        let r = compute_r(&BIGNUM_3);
+        let mprime = compute_mprime(&BIGNUM_3);
+        let mut outbuf = [0_u32; U512::LIMBS];
+
+        let mut mod_exp = RsaModularExponentiation::<Op512, _>::new(
+            &mut rsa,
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            mprime,
+        );
+        mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
+        // Let the interrupt handler acknowledge completion before reading.
+        esp_hal::delay::Delay::new().delay_millis(20);
+        mod_exp.read_results(&mut outbuf);
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+
+        let mut mod_multi = RsaModularMultiplication::<Op512, _>::new(
+            &mut rsa,
+            BIGNUM_1.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            mprime,
+        );
+        mod_multi.start_modular_multiplication(BIGNUM_2.as_words());
+        mod_multi.read_results(&mut outbuf);
+        hil_test::assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
+
+        let mut outbuf = [0_u32; U1024::LIMBS];
+        let mut multi = RsaMultiplication::<Op512, _>::new(&mut rsa, BIGNUM_1.as_words());
+        multi.start_multiplication(BIGNUM_2.as_words());
+        multi.read_results(&mut outbuf);
+        hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, outbuf);
     }
 
     #[test]
@@ -318,6 +392,7 @@ mod work_queue_tests {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         #[allow(unused_mut)]
         let mut rsa = RsaBackend::new(peripherals.RSA);
@@ -331,7 +406,7 @@ mod work_queue_tests {
 
         let mut rsa = RsaContext::new();
 
-        #[cfg(not(esp32))]
+        #[cfg(not(rsa_version = "1"))]
         {
             rsa.enable_acceleration();
             rsa.enable_search_acceleration();
@@ -386,12 +461,40 @@ mod work_queue_tests {
     }
 
     #[test]
+    async fn test_rsa_work_queue_multiple_requests(mut ctx: Context<'static>) {
+        let _rsa = ctx.rsa.start();
+        let mut rsa1 = RsaContext::new();
+        let mut rsa2 = RsaContext::new();
+        let mut outbuf = [0_u32; U512::LIMBS];
+        let mut multi_outbuf = [0_u32; U1024::LIMBS];
+        let r = compute_r(&BIGNUM_3);
+
+        let mut handle1 = rsa1.modular_exponentiate::<Op512>(
+            BIGNUM_1.as_words(),
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            compute_mprime(&BIGNUM_3),
+            &mut outbuf,
+        );
+        let mut handle2 =
+            rsa2.multiply::<Op512>(BIGNUM_1.as_words(), BIGNUM_2.as_words(), &mut multi_outbuf);
+
+        handle1.wait().await;
+        handle2.wait().await;
+        core::mem::drop((handle1, handle2));
+
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+        hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, multi_outbuf);
+    }
+
+    #[test]
     fn test_rsa_work_queue_blocking(mut ctx: Context<'static>) {
         let _rsa = ctx.rsa.start();
 
         let mut rsa = RsaContext::new();
 
-        #[cfg(not(esp32))]
+        #[cfg(not(rsa_version = "1"))]
         {
             rsa.enable_acceleration();
             rsa.enable_search_acceleration();
@@ -439,5 +542,44 @@ mod work_queue_tests {
         .wait_blocking();
 
         hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+    }
+
+    #[test]
+    #[cfg(not(rsa_version = "1"))]
+    fn test_rsa_work_queue_is_constant_time_by_default(mut ctx: Context<'static>) {
+        let _rsa = ctx.rsa.start();
+
+        // Sparse, for the reason in `test_constant_time_off_speeds_up_exponentiation`.
+        let exponent = U512::from_u32(65537);
+        let r = compute_r(&BIGNUM_3);
+        let mprime = compute_mprime(&BIGNUM_3);
+        let exponentiation_us = |rsa: &mut RsaContext| {
+            let mut outbuf = [0_u32; U512::LIMBS];
+            let start = esp_hal::time::Instant::now();
+            rsa.modular_exponentiate::<Op512>(
+                BIGNUM_1.as_words(),
+                exponent.as_words(),
+                BIGNUM_3.as_words(),
+                r.as_words(),
+                mprime,
+                &mut outbuf,
+            )
+            .wait_blocking();
+            start.elapsed().as_micros()
+        };
+
+        // An untimed run first, so that neither timed run pays for cache misses.
+        exponentiation_us(&mut RsaContext::new());
+        let constant_time_us = exponentiation_us(&mut RsaContext::new());
+        let mut accelerated = RsaContext::new();
+        accelerated.enable_acceleration();
+        let accelerated_us = exponentiation_us(&mut accelerated);
+
+        hil_test::assert!(
+            accelerated_us * 8 < constant_time_us,
+            "constant time {} us, accelerated {} us",
+            constant_time_us,
+            accelerated_us
+        );
     }
 }

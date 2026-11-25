@@ -20,6 +20,9 @@
 //!
 //! RGMII uses PHY-driven `RX_CLK`. The MAC drives `TX_CLK` from the MPLL
 //! (125 MHz at 1000 Mbps, 25 MHz at 100 Mbps, 2.5 MHz at 10 Mbps).
+//!
+//! The `TX_CLK` divider is an integer, so 1000 Mbps needs the MPLL at 500 MHz.
+//! At 400 MHz, the rate that 200 MHz PSRAM needs, RGMII runs at up to 100 Mbps.
 
 use esp_rom_sys::rom::ets_delay_us;
 
@@ -172,8 +175,24 @@ fn configure_rgmii() {
         w.sys_emac_tx_180_clk_en().set_bit()
     });
 
-    set_rgmii_tx_divider(RGMII_TX_CLK_1000M_HZ);
+    let max_speed = rgmii_max_speed();
+    if max_speed != Speed::_1000M {
+        warn!(
+            "MPLL at {} MHz cannot make the 125 MHz RGMII clock, limiting Ethernet to 100 Mbps",
+            mpll_clk_frequency() / 1_000_000
+        );
+    }
+    apply_rgmii_tx_speed(max_speed);
     enable_common();
+}
+
+/// Fastest RGMII speed the MPLL's rate can drive.
+pub(super) fn rgmii_max_speed() -> Speed {
+    if mpll_clk_frequency().is_multiple_of(RGMII_TX_CLK_1000M_HZ) {
+        Speed::_1000M
+    } else {
+        Speed::_100M
+    }
 }
 
 /// Updates the RGMII TX clock divider for the negotiated link speed.

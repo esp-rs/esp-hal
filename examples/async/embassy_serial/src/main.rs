@@ -54,21 +54,25 @@ async fn reader(mut rx: UartRx<'static, Async>, signal: &'static Signal<NoopRawM
         match r {
             Ok(len) => {
                 offset += len;
-                esp_println::println!("Read: {len}, data: {:?}", &rbuf[..offset]);
+                log::info!("Read: {len}, data: {:?}", &rbuf[..offset]);
                 offset = 0;
                 signal.signal(len);
             }
-            Err(e) => esp_println::println!("RX Error: {:?}", e),
+            Err(e) => log::info!("RX Error: {:?}", e),
         }
     }
 }
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
-    esp_println::println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // This example drives UART0, so it logs on USB-Serial-JTAG. The ESP32, C2 and S2 don't have one
+    // and print nothing.
+    #[cfg(not(any(feature = "esp32", feature = "esp32c2", feature = "esp32s2")))]
+    esp_log::init_usb!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
@@ -85,9 +89,7 @@ async fn main(spawner: Spawner) {
         feature = "esp32h4" => (peripherals.GPIO24, peripherals.GPIO23),
         feature = "esp32p4" => (peripherals.GPIO6, peripherals.GPIO5),
         feature = "esp32s31" => (peripherals.GPIO3, peripherals.GPIO2),
-        any(feature = "esp32s2", feature = "esp32s3") => {
-            (peripherals.GPIO43, peripherals.GPIO44)
-        }
+        any(feature = "esp32s2", feature = "esp32s3") => (peripherals.GPIO43, peripherals.GPIO44),
     };
 
     let config = Config::default()

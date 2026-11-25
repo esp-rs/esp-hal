@@ -25,12 +25,13 @@ system_clocks = { clock_tree = [
         { name = "PLL_F160M", outputs = "PLL_F160M" },
     ] },
 
-    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
     # AHB_CLK divider: divider = (AHB_DIV_NUM + 1), <= 40MHz
-    { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
-    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)" },
+    # The hardware lowers APB_CLK while the APB bus is idle. Consumers stop the reduction.
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)", always_on = true, refcounted = true },
 
     { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
     { name = "LP_FAST_CLK", type = "mux", variants = [
@@ -44,10 +45,11 @@ system_clocks = { clock_tree = [
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
     # BLE RTC timer (MODEM_LPCON). Independent of LP_SLOW_CLK.
-    { name = "BLE_LP_XTAL_CLK", type = "derived", from = "XTAL_CLK", output = "100_000" },
+    { name = "BLE_LP_XTAL_CLK",    type = "derived", from = "XTAL_CLK", output = "100_000" },
+    { name = "BLE_LP_RC_SLOW_CLK", type = "generic", output = "RC_SLOW_CLK / 5" },
     { name = "BLE_LP_CLK", type = "mux", variants = [
         { name = "XTAL",    outputs = "BLE_LP_XTAL_CLK" },
-        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
+        { name = "RC_SLOW", outputs = "BLE_LP_RC_SLOW_CLK" },
         { name = "XTAL32K", outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 
@@ -68,6 +70,12 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+        ] },
+    ] },
     { group = "UART", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
@@ -99,6 +107,13 @@ system_clocks = { clock_tree = [
             { name = "XTAL",      outputs = "XTAL_CLK" },
             { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
             { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
+        ] },
+    ] },
+    { group = "ADC", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "PLL_F80M", outputs = "PLL_F80M", default = true },
         ] },
     ] },
     { group = "I2S",
@@ -139,7 +154,7 @@ peripheral_clocks = { templates = [
     { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
     { name = "rst_field", value = "{{peripheral}}_rst_en" },
 ], peripheral_clocks = [
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = "keep_uart0_enabled" },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Uart2", template_params = { conf_register = "uart(2).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
@@ -148,10 +163,11 @@ peripheral_clocks = { templates = [
     { name = "AhbGdma", template_params = { peripheral = "gdma" } },
     { name = "I2s0", template_params = { peripheral = "i2s" } },
     { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" } }, # used by some wifi calibration steps.
+    { name = "Tsens", template_params = { conf_register = "tsens_clk_conf" } },
     { name = "Spi2" },
 
     { name = "Sha" },
     { name = "Ecc" },
     { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true },
-    { name = "UsbDevice", keep_enabled = true },
+    { name = "UsbDevice", keep_enabled = "keep_usb_serial_jtag_enabled" },
 ] }

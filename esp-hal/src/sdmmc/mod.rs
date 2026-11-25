@@ -32,12 +32,12 @@ use core::{
     cell::UnsafeCell,
     future::poll_fn,
     marker::PhantomData,
+    mem::DropGuard,
     pin::Pin,
     sync::atomic::Ordering,
     task::{Context, Poll},
 };
 
-use embassy_futures::yield_now;
 use embassy_sync::{mutex::MutexGuard, waitqueue::WakerRegistration};
 use esp_sync::{NonReentrantMutex, RawMutex};
 use portable_atomic::AtomicBool;
@@ -50,7 +50,8 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
-    asynch::AtomicWaker,
+    asynch::{AtomicWaker, wait_until},
+    clock::CpuFrequencyLock,
     dma::{
         DmaBufError,
         aligned::{DmaAlignedMut, DmaAlignedRef, InternalMemory},
@@ -61,7 +62,6 @@ use crate::{
         interconnect::{self, PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, SDHOST},
-    private::DropGuard,
     system::{Peripheral, PeripheralGuard},
     time::{Duration, Instant},
 };
@@ -82,7 +82,7 @@ pub enum ClockSource {
     /// 160 MHz PLL.
     #[cfg(not(esp32s31))]
     Pll160m,
-    /// 500 MHz PLL.
+    /// Configured MPLL clock.
     #[cfg(esp32s31)]
     Mpll,
     /// Crystal oscillator.
@@ -357,6 +357,14 @@ impl From<DmaBufError> for MmcError {
 /// Spin-poll bound for self-clearing hardware bits.
 const POLL_LIMIT: u32 = 1_000_000;
 
+/// Upper bound for the card to release DAT0 after an R1b command in async mode.
+///
+/// Generous because `CMD38` (erase) is R1b and may keep the card busy for seconds.
+const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Interval between DAT0 busy checks in async mode.
+const BUSY_POLL_INTERVAL: Duration = Duration::from_micros(100);
+
 // `rintsts` event bits (see `sdmmc_ll.h` `SDMMC_LL_EVENT_*`).
 const EVT_RESP_ERR: u32 = 1 << 1;
 const EVT_CMD_DONE: u32 = 1 << 2;
@@ -460,7 +468,7 @@ unsafe impl Sync for DescRing {}
 static DESC_RING: DescRing = DescRing(UnsafeCell::new(InternalMemory::new([Desc::ZERO; RING_LEN])));
 
 fn ring() -> DmaAlignedMut<'static, [Desc; RING_LEN]> {
-    unsafe { &mut *DESC_RING.0.get() }.get_mut()
+    unsafe { DESC_RING.0.as_mut_unchecked() }.get_mut()
 }
 
 /// Exclusive engine session: bounce scratch and last HW-programmed slot.
@@ -739,7 +747,7 @@ impl EngineSession {
         if flags.busy {
             wait_busy_poll().await?;
         }
-        guard.defuse();
+        DropGuard::dismiss(guard);
         Ok(resp)
     }
 
@@ -754,6 +762,7 @@ impl EngineSession {
         block_size: u16,
         auto_stop: bool,
     ) -> Result<[u32; 4], Error> {
+        let _cpu_frequency_lock = CpuFrequencyLock::new();
         let guard = DropGuard::new((), |()| abort_transfer());
         let r = SDHOST::regs();
 
@@ -781,7 +790,7 @@ impl EngineSession {
         }
         disable_idmac();
         let resp = read_response(ResponseLen::Short);
-        guard.defuse();
+        DropGuard::dismiss(guard);
         Ok(resp)
     }
 
@@ -1050,7 +1059,7 @@ fn slot_state(id: SlotId) -> &'static SlotState {
 /// Exclusive access to a slot's pin guards (builder-time only).
 #[cfg(sdmmc_has_gpio_matrix)]
 fn slot_pins(id: SlotId) -> &'static mut SlotPins {
-    unsafe { &mut *slot_state(id).pins.get() }
+    unsafe { slot_state(id).pins.as_mut_unchecked() }
 }
 
 /// Immutable per-slot routing: SDIO card-interrupt bit plus the input/output
@@ -1915,9 +1924,10 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
     }
 
     async fn init_idle(&mut self, hz: u32) -> Result<(), MmcError> {
-        let mut session = lock_engine(slot_id(S)).await?;
+        let mut session = ENGINE.lock().await;
         self.validate_pins().map_err(|_| MmcError::Other)?;
         self.set_bus_low_level(BusWidth::Bit1, hz)?;
+        session.select_and_apply(slot_id(S))?;
         session.send_init_sequence(slot_id(S))?;
         Ok(())
     }
@@ -2107,13 +2117,15 @@ async fn wait_busy_async() -> Result<(), Error> {
 /// does not generate a Busy Clear Interrupt for those, so polling is the
 /// only option, mirroring ESP-IDF's `wait_for_busy_cleared`.
 async fn wait_busy_poll() -> Result<(), Error> {
-    for _ in 0..POLL_LIMIT {
-        if !SDHOST::regs().status().read().data_busy().bit_is_set() {
-            return Ok(());
+    let deadline = Instant::now() + BUSY_TIMEOUT;
+    while SDHOST::regs().status().read().data_busy().bit_is_set() {
+        let now = Instant::now();
+        if now > deadline {
+            return Err(Error::Timeout);
         }
-        yield_now().await;
+        wait_until(now + BUSY_POLL_INTERVAL).await;
     }
-    Err(Error::Timeout)
+    Ok(())
 }
 
 /// Reads response registers into spec word order (`words[3]` is the MSW).
@@ -2355,7 +2367,7 @@ fn disable_idmac() {
 fn module_hz(source: ClockSource, div: u8) -> u32 {
     let base = match source {
         #[cfg(esp32s31)]
-        ClockSource::Mpll => 500_000_000,
+        ClockSource::Mpll => crate::clock::ll::mpll_clk_frequency(),
         #[cfg(not(esp32s31))]
         ClockSource::Pll160m => 160_000_000,
         //#[cfg(esp32p4)]

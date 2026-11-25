@@ -17,7 +17,6 @@ use esp_hal::{
     DriverMode,
     canfd::{
         CanFd,
-        CanFdInterrupt,
         ClockSource,
         Config,
         ConfigError,
@@ -36,7 +35,6 @@ use esp_hal::{
         TxBufferState,
     },
     rtc_cntl::WakeLock,
-    timer::timg::TimerGroup,
 };
 use hil_test as _;
 
@@ -69,11 +67,16 @@ fn config() -> Config {
 
 /// Waits for a queued frame to leave the in-progress states.
 fn wait_tx<D: DriverMode>(canfd: &CanFd<'static, D>, index: u8) -> TxBufferState {
+    wait_tx_state(index, || canfd.tx_buffer_state(index))
+}
+
+/// Polls `state` until TX buffer `index` leaves the in-progress states.
+fn wait_tx_state(index: u8, state: impl Fn() -> TxBufferState) -> TxBufferState {
     // The slowest bit rate these tests configure needs over a hundred
     // milliseconds for one frame.
     let deadline = esp_hal::time::Instant::now() + esp_hal::time::Duration::from_millis(500);
     loop {
-        let state = canfd.tx_buffer_state(index);
+        let state = state();
         if !matches!(
             state,
             TxBufferState::Ready | TxBufferState::InProgress | TxBufferState::AbortInProgress
@@ -132,19 +135,30 @@ mod blocking_tests {
         );
     }
 
-    #[init]
-    fn init() -> Context<Blocking> {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let (rx, tx) = hil_test::common_test_pins!(peripherals);
-
-        let mut canfd = CanFd::new(peripherals.TWAI0, config())
-            .unwrap()
-            .with_rx(rx)
-            .with_tx(tx);
+    fn started_controller(
+        twai: esp_hal::peripherals::TWAI0<'static>,
+        rx: impl esp_hal::gpio::interconnect::PeripheralInput<'static>,
+        tx: impl esp_hal::gpio::interconnect::PeripheralOutput<'static>,
+    ) -> Context<Blocking> {
+        let mut canfd = CanFd::new(twai, config()).unwrap().with_rx(rx).with_tx(tx);
         canfd.start().unwrap();
 
         Context { canfd }
+    }
+
+    #[init]
+    fn init() -> Context<Blocking> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        started_controller(peripherals.TWAI0, rx, tx)
+    }
+
+    // The USB-Serial-JTAG driver of the logger holds a `WakeLock`, which this test must not see.
+    fn init_without_logger() -> Context<Blocking> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        started_controller(peripherals.TWAI0, rx, tx)
     }
 
     #[test]
@@ -476,7 +490,7 @@ mod blocking_tests {
         );
     }
 
-    #[test]
+    #[test(init = init_without_logger)]
     fn the_chip_stays_awake_exactly_while_the_controller_is_on_the_bus(mut ctx: Context<Blocking>) {
         assert!(ctx.canfd.is_started());
         assert!(WakeLock::is_active(), "started in init, yet asleep");
@@ -689,8 +703,11 @@ mod blocking_tests {
 }
 
 /// Two controllers on one wire, so a peer acknowledges frames and arbitrates.
+#[cfg(soc_has_twai1)]
 #[embedded_test::tests(default_timeout = 5)]
 mod two_node_tests {
+    use esp_hal::canfd::CanFdInterrupt;
+
     use super::*;
 
     struct Nodes {
@@ -701,6 +718,7 @@ mod two_node_tests {
     #[init]
     fn init() -> Nodes {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         // Each controller needs both signals on its own end of the wire.
         let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
@@ -748,19 +766,6 @@ mod two_node_tests {
         let got = cross(&mut ctx.node1, &mut ctx.node0, &sent);
         assert_eq!(got.id(), std(0x401).into());
         assert_eq!(got.payload(), sent.payload());
-    }
-
-    #[test]
-    fn fd_frames_cross_at_the_data_bit_rate(mut ctx: Nodes) {
-        let sent = Frame::new_fd(ext(0x1AB_CDEF), &[0x3C; 64])
-            .unwrap()
-            .with_bit_rate_switch(true);
-        let got = cross(&mut ctx.node0, &mut ctx.node1, &sent);
-
-        assert_eq!(got.id(), ext(0x1AB_CDEF).into());
-        assert!(got.is_fd());
-        assert!(got.is_bit_rate_switched());
-        assert_eq!(got.payload(), &[0x3C; 64]);
     }
 
     #[test]
@@ -813,6 +818,7 @@ mod two_node_tests {
     }
 }
 
+/// One controller in loopback, with the driver in async mode.
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod async_tests {
     use core::{
@@ -821,6 +827,7 @@ mod async_tests {
     };
 
     use embassy_time::{Duration, Instant, Timer};
+    use esp_hal::timer::timg::TimerGroup;
 
     use super::*;
 
@@ -842,44 +849,28 @@ mod async_tests {
         unsafe { Waker::from_raw(RawWaker::new(core::ptr::null(), &VTABLE)) }
     }
 
-    /// The async driver plus a peer that delivers a frame on demand.
-    struct AsyncContext {
-        canfd: CanFd<'static, Async>,
-        peer: CanFd<'static, Blocking>,
-    }
-
     #[init]
-    async fn init() -> AsyncContext {
+    async fn init() -> Context<Async> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
-        let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
-        let (rx0, tx0) = unsafe { pin0.split() };
-        let (rx1, tx1) = unsafe { pin1.split() };
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
 
-        let mut canfd = CanFd::new(peripherals.TWAI0, config().with_no_transceiver(true))
+        let mut canfd = CanFd::new(peripherals.TWAI0, config())
             .unwrap()
-            .with_rx(rx0)
-            .with_tx(tx0)
+            .with_rx(rx)
+            .with_tx(tx)
             .into_async();
         canfd.start().unwrap();
 
-        let peer_config = Config::default()
-            .with_mode(Mode::SelfTest)
-            .with_no_transceiver(true);
-        let mut peer = CanFd::new(peripherals.TWAI1, peer_config)
-            .unwrap()
-            .with_rx(rx1)
-            .with_tx(tx1);
-        peer.start().unwrap();
-
-        AsyncContext { canfd, peer }
+        Context { canfd }
     }
 
     #[test]
-    async fn frames_round_trip(mut ctx: AsyncContext) {
+    async fn frames_round_trip(mut ctx: Context<Async>) {
         for frame in [
             Frame::new(std(0x201), &[1, 2, 3, 4, 5, 6, 7, 8]).unwrap(),
             Frame::new_fd(std(0x202), &[0x77; 64])
@@ -897,7 +888,7 @@ mod async_tests {
     }
 
     #[test]
-    async fn receive_async_waits_instead_of_spinning(mut ctx: AsyncContext) {
+    async fn receive_async_waits_instead_of_spinning(mut ctx: Context<Async>) {
         ctx.canfd.flush_rx();
 
         let waker = counting_waker();
@@ -926,13 +917,14 @@ mod async_tests {
     }
 
     #[test]
-    async fn receive_async_wakes_on_the_rx_interrupt(mut ctx: AsyncContext) {
+    async fn receive_async_wakes_on_the_rx_interrupt(mut ctx: Context<Async>) {
         ctx.canfd.flush_rx();
+        let (mut rx, mut tx) = ctx.canfd.split();
 
         let waker = counting_waker();
         let mut cx = core::task::Context::from_waker(&waker);
 
-        let mut receive = core::pin::pin!(ctx.canfd.receive_async());
+        let mut receive = core::pin::pin!(rx.receive_async());
 
         assert!(
             receive.as_mut().poll(&mut cx).is_pending(),
@@ -944,8 +936,7 @@ mod async_tests {
             "nothing should have woken the future yet"
         );
 
-        ctx.peer
-            .transmit(&Frame::new(std(0x203), &[0xEE; 2]).unwrap())
+        tx.transmit(&Frame::new(std(0x203), &[0xEE; 2]).unwrap())
             .unwrap();
 
         // This waker belongs to no executor, so the wake can only come from
@@ -963,10 +954,124 @@ mod async_tests {
             Poll::Pending => panic!("the frame arrived but the future did not complete"),
         }
     }
+
+    #[test]
+    async fn rx_and_tx_halves_work_at_the_same_time(mut ctx: Context<Async>) {
+        ctx.canfd.flush_rx();
+        let (mut rx, mut tx) = ctx.canfd.split();
+
+        let outgoing = Frame::new_fd(std(0x150), &[0x5A; 64])
+            .unwrap()
+            .with_bit_rate_switch(true);
+        let mut receive = core::pin::pin!(rx.receive_async());
+        let mut transmit = core::pin::pin!(tx.transmit_async(&outgoing));
+
+        let waker = counting_waker();
+        let mut cx = core::task::Context::from_waker(&waker);
+
+        assert!(receive.as_mut().poll(&mut cx).is_pending());
+        assert!(transmit.as_mut().poll(&mut cx).is_pending());
+
+        let deadline = Instant::now() + Duration::from_millis(500);
+        let mut sent = false;
+        let mut received = false;
+        while !(sent && received) {
+            if !sent && let Poll::Ready(result) = transmit.as_mut().poll(&mut cx) {
+                result.unwrap();
+                sent = true;
+            }
+            if !received && let Poll::Ready(frame) = receive.as_mut().poll(&mut cx) {
+                assert_eq!(frame.id(), std(0x150).into());
+                assert_eq!(frame.payload(), &[0x5A; 64]);
+                received = true;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "split halves did not both complete"
+            );
+        }
+    }
+
+    #[test]
+    async fn a_full_rx_buffer_drains_in_order_and_rearms(mut ctx: Context<Async>) {
+        ctx.canfd.flush_rx();
+        let waker = counting_waker();
+        let mut cx = core::task::Context::from_waker(&waker);
+
+        {
+            let (mut rx, mut tx) = ctx.canfd.split();
+            let mut receive = core::pin::pin!(rx.receive_async());
+            assert!(receive.as_mut().poll(&mut cx).is_pending());
+
+            // More frames than the 128-word buffer can hold, never read.
+            for seq in 0..40u8 {
+                let frame = Frame::new_fd(std(0x123), &[seq; 64])
+                    .unwrap()
+                    .with_bit_rate_switch(true);
+                let index = tx.transmit(&frame).unwrap();
+                assert_eq!(
+                    wait_tx_state(index, || tx.tx_buffer_state(index)),
+                    TxBufferState::Ok
+                );
+            }
+            assert!(WAKES.load(Ordering::SeqCst) > 0, "no frame ever woke RX");
+        }
+
+        assert!(ctx.canfd.rx_overrun(), "overrun was not reported");
+        let queued = ctx.canfd.rx_frame_count();
+        assert!(queued > 0 && queued < 40, "queued {} frames", queued);
+
+        // An overrun drops what does not fit, not what is already held.
+        for seq in 0..queued {
+            let mut receive = core::pin::pin!(ctx.canfd.receive_async());
+            match receive.as_mut().poll(&mut cx) {
+                Poll::Ready(frame) => assert_eq!(frame.payload(), &[seq as u8; 64]),
+                Poll::Pending => panic!("a queued frame was lost"),
+            }
+        }
+        assert_eq!(ctx.canfd.rx_frame_count(), 0);
+
+        ctx.canfd.clear_rx_overrun();
+        assert!(!ctx.canfd.rx_overrun());
+
+        let (mut rx, mut tx) = ctx.canfd.split();
+        WAKES.store(0, Ordering::SeqCst);
+        let mut receive = core::pin::pin!(rx.receive_async());
+        assert!(receive.as_mut().poll(&mut cx).is_pending());
+
+        // One spurious wake left over from the drained buffer is allowed.
+        Timer::after_millis(10).await;
+        WAKES.store(0, Ordering::SeqCst);
+        assert!(receive.as_mut().poll(&mut cx).is_pending());
+        Timer::after_millis(10).await;
+        assert_eq!(
+            WAKES.load(Ordering::SeqCst),
+            0,
+            "the future kept waking itself on an idle bus"
+        );
+
+        let index = tx
+            .transmit(&Frame::new(std(0x456), &[42]).unwrap())
+            .unwrap();
+        assert_eq!(
+            wait_tx_state(index, || tx.tx_buffer_state(index)),
+            TxBufferState::Ok
+        );
+
+        let deadline = Instant::now() + Duration::from_millis(100);
+        while WAKES.load(Ordering::SeqCst) == 0 {
+            assert!(Instant::now() < deadline, "RX never rearmed");
+        }
+        match receive.as_mut().poll(&mut cx) {
+            Poll::Ready(frame) => assert_eq!(frame.id(), std(0x456).into()),
+            Poll::Pending => panic!("the fresh frame did not complete the future"),
+        }
+    }
 }
 
 /// Two nodes exchanging real traffic, with the driver under test in async
 /// mode.
+#[cfg(soc_has_twai1)]
 #[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod contention_tests {
     use core::{
@@ -975,7 +1080,10 @@ mod contention_tests {
     };
 
     use embassy_time::Timer;
-    use esp_hal::time::{Duration, Instant};
+    use esp_hal::{
+        time::{Duration, Instant},
+        timer::timg::TimerGroup,
+    };
 
     use super::*;
 
@@ -1003,6 +1111,7 @@ mod contention_tests {
     #[init]
     async fn init() -> Nodes {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
         let (rx0, tx0) = unsafe { pin0.split() };
@@ -1056,46 +1165,6 @@ mod contention_tests {
     }
 
     #[test]
-    async fn rx_and_tx_halves_work_at_the_same_time(mut ctx: Nodes) {
-        let (mut rx, mut tx) = ctx.node.split();
-
-        let outgoing = Frame::new_fd(std(0x150), &[0x5A; 64])
-            .unwrap()
-            .with_bit_rate_switch(true);
-        let mut receive = core::pin::pin!(rx.receive_async());
-        let mut transmit = core::pin::pin!(tx.transmit_async(&outgoing));
-
-        let waker = counting_waker();
-        let mut cx = core::task::Context::from_waker(&waker);
-
-        assert!(receive.as_mut().poll(&mut cx).is_pending());
-        assert!(transmit.as_mut().poll(&mut cx).is_pending());
-
-        let deadline = Instant::now() + Duration::from_millis(500);
-        let mut sent = false;
-        loop {
-            if !sent && transmit.as_mut().poll(&mut cx).is_ready() {
-                sent = true;
-                assert_eq!(ctx.peer.receive().unwrap().id(), std(0x150).into());
-                let index = ctx
-                    .peer
-                    .transmit(&Frame::new(std(0x151), &[0xC3; 8]).unwrap())
-                    .unwrap();
-                assert_eq!(wait_tx(&ctx.peer, index), TxBufferState::Ok);
-            }
-            if sent && let Poll::Ready(frame) = receive.as_mut().poll(&mut cx) {
-                assert_eq!(frame.id(), std(0x151).into());
-                assert_eq!(frame.payload(), &[0xC3; 8]);
-                break;
-            }
-            assert!(
-                Instant::now() < deadline,
-                "split halves did not both complete"
-            );
-        }
-    }
-
-    #[test]
     async fn tx_buffer_priority_controls_the_local_queue(mut ctx: Nodes) {
         // Buffer zero goes first because it was armed on an idle bus; the rest
         // follow in descending priority. Buffer one is ranked above the
@@ -1126,74 +1195,6 @@ mod contention_tests {
                 &[index],
                 "buffers left in the wrong order"
             );
-        }
-    }
-
-    #[test]
-    async fn a_full_rx_buffer_drains_in_order_and_rearms(mut ctx: Nodes) {
-        let waker = counting_waker();
-        let mut cx = core::task::Context::from_waker(&waker);
-
-        {
-            let mut receive = core::pin::pin!(ctx.node.receive_async());
-            assert!(receive.as_mut().poll(&mut cx).is_pending());
-
-            // More frames than the 128-word buffer can hold, never read.
-            for seq in 0..40u8 {
-                let frame = Frame::new_fd(std(0x123), &[seq; 64])
-                    .unwrap()
-                    .with_bit_rate_switch(true);
-                let index = ctx.peer.transmit(&frame).unwrap();
-                assert_eq!(wait_tx(&ctx.peer, index), TxBufferState::Ok);
-            }
-            assert!(WAKES.load(Ordering::SeqCst) > 0, "no frame ever woke RX");
-        }
-
-        assert!(ctx.node.rx_overrun(), "overrun was not reported");
-        let queued = ctx.node.rx_frame_count();
-        assert!(queued > 0 && queued < 40, "queued {} frames", queued);
-
-        // An overrun drops what does not fit, not what is already held.
-        for seq in 0..queued {
-            let mut receive = core::pin::pin!(ctx.node.receive_async());
-            match receive.as_mut().poll(&mut cx) {
-                Poll::Ready(frame) => assert_eq!(frame.payload(), &[seq as u8; 64]),
-                Poll::Pending => panic!("a queued frame was lost"),
-            }
-        }
-        assert_eq!(ctx.node.rx_frame_count(), 0);
-
-        ctx.node.clear_rx_overrun();
-        assert!(!ctx.node.rx_overrun());
-
-        WAKES.store(0, Ordering::SeqCst);
-        let mut receive = core::pin::pin!(ctx.node.receive_async());
-        assert!(receive.as_mut().poll(&mut cx).is_pending());
-
-        // One spurious wake left over from the drained buffer is allowed.
-        Timer::after_millis(10).await;
-        WAKES.store(0, Ordering::SeqCst);
-        assert!(receive.as_mut().poll(&mut cx).is_pending());
-        Timer::after_millis(10).await;
-        assert_eq!(
-            WAKES.load(Ordering::SeqCst),
-            0,
-            "the future kept waking itself on an idle bus"
-        );
-
-        let index = ctx
-            .peer
-            .transmit(&Frame::new(std(0x456), &[42]).unwrap())
-            .unwrap();
-        assert_eq!(wait_tx(&ctx.peer, index), TxBufferState::Ok);
-
-        let deadline = Instant::now() + Duration::from_millis(100);
-        while WAKES.load(Ordering::SeqCst) == 0 {
-            assert!(Instant::now() < deadline, "RX never rearmed");
-        }
-        match receive.as_mut().poll(&mut cx) {
-            Poll::Ready(frame) => assert_eq!(frame.id(), std(0x456).into()),
-            Poll::Pending => panic!("the fresh frame did not complete the future"),
         }
     }
 
@@ -1459,6 +1460,7 @@ mod fault_tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (pin0, pin1) = hil_test::common_test_pins!(peripherals);
         let injector = Output::new(

@@ -1,7 +1,11 @@
 //! UART Test
+//!
+//! The tests drive UART0, which the serial logger uses on chips without USB-Serial-JTAG, so they
+//! log over RTT.
 
 //% CHIP_FILTER: uart_driver_supported
-//% FEATURES: unstable embassy
+//% FEATURES: unstable embassy log-rtt
+//% DEFAULT-FEATURES: false
 
 #![no_std]
 #![no_main]
@@ -29,11 +33,10 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let config =
-            cfg_select! {
-                esp32s31 => esp_hal::Config::default(),
-                _ => esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
-            };
+        let config = cfg_select! {
+            esp32s31 => esp_hal::Config::default(),
+            _ => esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        };
         let peripherals = esp_hal::init(config);
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
@@ -161,13 +164,12 @@ mod tests {
         // working as expected. We will also using different clock sources
         // while we're at it.
 
-        let fastest_clock_source =
-            cfg_select! {
-                esp32c2 => ClockSource::PllF40m,
-                any(esp32c5, esp32c6, esp32c61, esp32p4, esp32s31) => ClockSource::PllF80m,
-                any(esp32h2, esp32h4) => ClockSource::PllF48m,
-                _ => ClockSource::Apb,
-            };
+        let fastest_clock_source = cfg_select! {
+            esp32c2 => ClockSource::PllF40m,
+            any(esp32c5, esp32c6, esp32c61, esp32p4, esp32s31) => ClockSource::PllF80m,
+            any(esp32h2, esp32h4) => ClockSource::PllF48m,
+            _ => ClockSource::Apb,
+        };
 
         let configs = [
             #[cfg(not(soc_has_clock_node_ref_tick))]
@@ -521,7 +523,7 @@ mod async_tx_rx {
         timer::timg::TimerGroup,
         uart::{self, RxConfig, RxError, RxErrorKind, UartRx, UartTx},
     };
-    use hil_test::{assert, assert_eq, assert_ne};
+    use hil_test::{assert, assert_eq, assert_matches, assert_ne};
 
     struct Context {
         rx: UartRx<'static, Async>,
@@ -664,7 +666,7 @@ mod async_tx_rx {
         // The read is supposed to return an error because the FIFO is just 128 bytes
         // long.
         let res = ctx.rx.read_async(&mut read).await;
-        assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
+        assert_matches!(res, Err(RxError::FifoOverflowed), "{:?}", res);
     }
 
     #[test]
@@ -677,7 +679,7 @@ mod async_tx_rx {
         // The read is supposed to return an error because the FIFO is just 128 bytes
         // long.
         let res = ctx.rx.read_async(&mut read).await;
-        assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
+        assert_matches!(res, Err(RxError::FifoOverflowed), "{:?}", res);
 
         // Now we should be able to write and read back the same data.
         for _ in 0..5 {
@@ -743,7 +745,7 @@ mod async_tx_rx {
         )
         .await;
 
-        assert!(matches!(should_timeout, Either::Second(_)));
+        assert_matches!(should_timeout, Either::Second(_));
     }
 
     #[test]
@@ -770,7 +772,7 @@ mod async_tx_rx {
         )
         .await;
 
-        assert!(matches!(should_timeout, Either::Second(_)));
+        assert_matches!(should_timeout, Either::Second(_));
     }
 
     #[test]
@@ -804,7 +806,7 @@ mod async_tx_rx {
 
         // Default RX FIFO threshold should be more than 3 bytes, so we don't expect
         // read to become ready.
-        assert!(matches!(should_be_tx, Either::Second(_)));
+        assert_matches!(should_be_tx, Either::Second(_));
 
         let read = ctx.rx.read_async(&mut data).await;
 

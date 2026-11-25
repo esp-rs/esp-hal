@@ -192,9 +192,10 @@ pub trait Phy {
     ///
     /// In async mode the context must be used to schedule the next poll:
     /// register a waker for a PHY interrupt or a timer, or wake immediately.
-    /// An implementation that does neither will never be polled again, so
-    /// drivers without an interrupt source wake immediately, which busy-polls.
-    /// Wrap them to rate-limit the polling if a timer is available.
+    /// An implementation that does neither will never be polled again.
+    /// [`generic::GenericPhy`] has no interrupt source: it schedules a timer
+    /// wake-up with the `embassy-time-05` feature, and otherwise wakes
+    /// immediately, which busy-polls.
     fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, _cx: Option<&mut Context<'_>>) -> LinkState;
 
     /// Returns the Clause 22 PHY address on the MDIO bus.

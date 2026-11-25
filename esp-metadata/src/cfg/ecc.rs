@@ -18,7 +18,26 @@ struct WorkingModeEntry {
 #[serde(deny_unknown_fields)]
 struct CurveEntry {
     id: u32,
-    curve: u32,
+    curve: Curve,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Curve {
+    P192,
+    P256,
+    P384,
+    Sm2,
+}
+
+impl Curve {
+    fn bits(self) -> u32 {
+        match self {
+            Self::P192 => 192,
+            Self::P256 | Self::Sm2 => 256,
+            Self::P384 => 384,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -61,7 +80,7 @@ impl super::GenericProperty for EccDriverProperties {
         }
 
         for curve in self.curves.iter() {
-            cfgs.push(format!("ecc_has_curve_p{}", curve.curve));
+            cfgs.push(format!("ecc_has_curve_{:?}", curve.curve).to_lowercase());
         }
 
         Some(cfgs)
@@ -71,7 +90,7 @@ impl super::GenericProperty for EccDriverProperties {
         let mem_block_size = self
             .curves
             .iter()
-            .map(|entry| entry.curve / 8)
+            .map(|entry| entry.curve.bits() / 8)
             .max()
             .unwrap();
 
@@ -102,9 +121,9 @@ impl super::GenericProperty for EccDriverProperties {
             .curves
             .iter()
             .map(|entry| {
-                let name = quote::format_ident!("P{}", entry.curve);
+                let name = quote::format_ident!("{}", format!("{:?}", entry.curve));
                 let id = crate::number(entry.id);
-                let curve = crate::number(entry.curve);
+                let curve = crate::number(entry.curve.bits());
                 quote::quote! {
                     #id, #name, #curve
                 }

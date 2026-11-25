@@ -110,7 +110,8 @@ mod tests {
     #[init]
     fn init() {
         // Ensures that watchdogs are disabled
-        let _ = esp_hal::init(Default::default());
+        let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
     }
 
     #[test]
@@ -341,6 +342,24 @@ mod tests {
             core::assert_eq!(popped, CHUNK_SIZE + SECOND_LEN);
             core::assert_eq!(&out[..CHUNK_SIZE], &first);
             core::assert_eq!(&out[CHUNK_SIZE..], &second);
+        });
+    }
+
+    #[test]
+    fn test_dma_rx_stream_buf_view_consume_partial_last_descriptor() {
+        const LAST_LEN: usize = 100;
+        let chunks: [[u8; CHUNK_SIZE]; 4] =
+            core::array::from_fn(|c| core::array::from_fn(|i| ((c * CHUNK_SIZE + i) % 251) as u8));
+        let fills = [
+            (chunks[0].as_slice(), false),
+            (chunks[1].as_slice(), false),
+            (chunks[2].as_slice(), false),
+            (&chunks[3][..LAST_LEN], false),
+        ];
+        with_rx_view_multi(&fills, |mut view| {
+            core::assert_eq!(view.consume(3 * CHUNK_SIZE + 4), 3 * CHUNK_SIZE + 4);
+            core::assert_eq!(view.available_bytes(), LAST_LEN - 4);
+            core::assert_eq!(view.peek(), &chunks[3][4..LAST_LEN]);
         });
     }
 

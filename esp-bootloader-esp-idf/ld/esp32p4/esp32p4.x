@@ -1,0 +1,57 @@
+PROVIDE(_max_hart_id = 1);
+
+/* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6,
+   ESP32-H2, and ESP32-P4 have IDs 0-31, so we must define the handler for the
+   one additional interrupt ID: */
+PROVIDE(interrupt0 = DefaultHandler);
+
+/* # Multi-processing hook function
+   fn _mp_hook() -> bool;
+   This function is called from all the harts and must return true only for one hart,
+   which will perform memory initialization. For other harts it must return false
+   and implement wake-up in platform-dependent way (e.g. after waiting for a user interrupt).
+*/
+PROVIDE(_mp_hook = default_mp_hook);
+
+/* Include this before `.uncached.hole`. The hole uses the size of these sections. */
+INCLUDE "uncached.x"
+
+SECTIONS {
+  /* Reserve the RAM that `.uncached.bss` uses. Round the uncached sections up
+     to the 64-byte L1 cache line. */
+  .uncached.hole (NOLOAD) : {
+    . = . + ALIGN(_uncached_end - _uncached_data_start, 64) - SIZEOF(.uncached.data);
+  } > RAM
+
+  /* Shared sections - ordering matters */
+  INCLUDE "rwtext.x"
+  INCLUDE "rwdata.x"
+  /* End of Shared sections */
+}
+
+SECTIONS {
+  /**
+   * Bootloader really wants to have separate segments for ROTEXT and RODATA
+   * Thus, we need to force a gap here.
+   */
+  .text_gap (NOLOAD): {
+    . = . + 8;
+    . = ALIGN(4) + 0x20;
+  } > ROM
+}
+INSERT BEFORE .text;
+
+INCLUDE "rodata.x"
+INCLUDE "text.x"
+INCLUDE "rtc_fast.x"
+INCLUDE "stack.x"
+INCLUDE "dram2.x"
+INCLUDE "metadata.x"
+INCLUDE "eh_frame.x"
+/* End of Shared sections */
+
+/* Do not add section sizes. Alignment of `.trap` can add padding after the hole. */
+_dram_data_start = ABSOLUTE(ADDR(.rwtext) + SIZEOF(.rwtext));
+
+ASSERT(SIZEOF(.uncached.hole) == 0 || ADDR(.uncached.hole) == ORIGIN(RAM) + SIZEOF(.uncached.data), "
+ERROR(esp-hal): .uncached.hole must follow the load address of .uncached.data");

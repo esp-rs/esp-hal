@@ -1,0 +1,12 @@
+INCLUDE "esp_hal_config.x"
+INCLUDE "memory.x"
+
+REGION_ALIAS("ROTEXT", ROM);
+REGION_ALIAS("RODATA", ROM);
+
+REGION_ALIAS("RWTEXT", RAM);
+REGION_ALIAS("RWDATA", RAM);
+
+INCLUDE "esp32c61.x"
+INCLUDE "hal-defaults.x"
+INCLUDE "esp_idf_boot.x"

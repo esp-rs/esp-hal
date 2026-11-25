@@ -7,7 +7,10 @@
 //! receive and transmit to work. It counts beacon timeouts and disconnects. A disconnect with
 //! reason 200 is a beacon timeout.
 //!
-//! Use the UART port. USB Serial/JTAG stops when the chip sleeps.
+//! On chips other than the ESP32, ESP32-C2 and ESP32-S2, the example installs Wi-Fi retention
+//! memory, so light sleep also powers the Wi-Fi MAC and baseband down.
+//!
+//! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
 //% CHIP_FILTER: wifi_driver_supported && sleep_light_sleep
@@ -21,7 +24,6 @@ use embassy_time::{Duration, Instant, Timer, with_timeout};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{ram, rng::Rng, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::wifi::{
     AuthenticationMethodConfig,
     Config,
@@ -50,12 +52,34 @@ const PASSWORD: &str = env!("PASSWORD");
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 
+cfg_select! {
+    supports_modem_power_down => {
+        // The retention memory takes part of the reclaimed RAM.
+        const RECLAIMED_HEAP_SIZE: usize =
+            DRAM2_UNINIT_SIZE - core::mem::size_of::<esp_radio::wifi::RetentionStorage>();
+
+        fn install_wifi_retention_memory() {
+            use esp_radio::wifi::{RetentionStorage, install_retention_memory};
+
+            #[ram(reclaimed, unstable(zeroed))]
+            static WIFI_RETENTION_MEMORY: RetentionStorage = RetentionStorage::new();
+
+            install_retention_memory(WIFI_RETENTION_MEMORY.take()).unwrap();
+        }
+    }
+    _ => {
+        const RECLAIMED_HEAP_SIZE: usize = DRAM2_UNINIT_SIZE;
+
+        fn install_wifi_retention_memory() {}
+    }
+}
+
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: RECLAIMED_HEAP_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
@@ -69,6 +93,8 @@ async fn main(spawner: Spawner) -> ! {
                 PASSWORD.try_into().unwrap(),
             )),
     );
+
+    install_wifi_retention_memory();
 
     let wifi_interface = Interface::station();
     let mut controller = WifiController::new(
@@ -94,7 +120,7 @@ async fn main(spawner: Spawner) -> ! {
     stack.wait_config_up().await;
     let config = stack.config_v4().unwrap();
     let gateway = config.gateway.unwrap();
-    println!("Got IP {}, gateway {}", config.address, gateway);
+    log::info!("Got IP {}, gateway {}", config.address, gateway);
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
@@ -120,7 +146,7 @@ async fn main(spawner: Spawner) -> ! {
         if !ok {
             failures += 1;
         }
-        println!(
+        log::info!(
             "[{} s] probe {}: {} in {} ms, {} failed so far",
             Instant::now().as_secs(),
             probes,
@@ -139,7 +165,7 @@ async fn connection(mut controller: WifiController<'static>) {
     loop {
         match controller.connect_async().await {
             Ok(info) => {
-                println!("Connected to {:?}", info);
+                log::info!("Connected to {:?}", info);
 
                 // Subscribe only while connected. A subscriber that nobody reads fills the event
                 // channel, and `connect_async` then misses its events.
@@ -148,18 +174,18 @@ async fn connection(mut controller: WifiController<'static>) {
                     match events.next_event_pure().await {
                         EventInfo::StationBeaconTimeout => {
                             beacon_timeouts += 1;
-                            println!("Beacon timeout, {beacon_timeouts} in total");
+                            log::info!("Beacon timeout, {beacon_timeouts} in total");
                         }
                         EventInfo::StationDisconnected { reason, .. } => {
                             disconnects += 1;
-                            println!("Disconnected, reason {reason}, {disconnects} in total");
+                            log::info!("Disconnected, reason {reason}, {disconnects} in total");
                             break;
                         }
                         _ => {}
                     }
                 }
             }
-            Err(e) => println!("Failed to connect: {e:?}"),
+            Err(e) => log::info!("Failed to connect: {e:?}"),
         }
 
         Timer::after(Duration::from_secs(5)).await;

@@ -19,20 +19,17 @@ pub enum PsramCacheSpeed {
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PsramVaddrMode {
-    /// App and pro CPU use their own flash cache for external RAM access.
+    /// Each CPU uses its own cache for PSRAM.
     ///
-    /// In this mode both cores access the same physical PSRAM.
-    #[default]
+    /// The caches are not coherent. A CPU can read old data after the other CPU writes PSRAM.
+    /// Use this mode only if one CPU accesses PSRAM.
     Normal = 0,
-    /// App and pro CPU share external RAM caches: pro CPU has low * 2M, app
-    /// CPU has high 2M.
-    ///
-    /// In this mode the two cores will access different parts of PSRAM.
+    /// The PRO CPU cache holds the low 2 MiB of PSRAM, and the APP CPU cache holds the high
+    /// 2 MiB. Both CPUs use both caches.
+    #[default]
     LowHigh,
-    /// App and pro CPU share external RAM caches: pro CPU does even 32 byte
-    /// ranges, app does odd ones.
-    ///
-    /// In this mode the two cores will access different parts of PSRAM.
+    /// The PRO CPU cache holds the even 32-byte lines of PSRAM, and the APP CPU cache holds the
+    /// odd lines. Both CPUs use both caches.
     Evenodd,
 }
 
@@ -91,6 +88,56 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     }
 
     true
+}
+
+/// Writes the dirty PSRAM lines of the CPU caches back to PSRAM.
+///
+/// The caches must be enabled. In [`PsramVaddrMode::Normal`] this only writes back the cache of
+/// the calling CPU.
+#[procmacros::ram(unstable(checked))]
+pub(crate) fn writeback_cache() {
+    const CACHE_SPAN: usize = 64 * 1024;
+    const HIGH_HALF: usize = 2 * 1024 * 1024;
+
+    let range = super::psram_range();
+    if range.len() < CACHE_SPAN {
+        return;
+    }
+    let low_high =
+        active_vaddr_mode() == PsramVaddrMode::LowHigh && range.len() >= HIGH_HALF + CACHE_SPAN;
+
+    let psram = range.start as *const u8;
+    for offset in (0..CACHE_SPAN).step_by(32) {
+        unsafe {
+            psram.wrapping_add(offset).read_volatile();
+            if low_high {
+                psram.wrapping_add(HIGH_HALF + offset).read_volatile();
+            }
+        }
+    }
+}
+
+/// Writes the dirty PSRAM lines of the cache of the calling CPU back to PSRAM, if the other CPU
+/// cannot write them back.
+///
+/// The caches must be enabled.
+#[procmacros::ram(unstable(checked))]
+pub(crate) fn writeback_private_cache() {
+    if active_vaddr_mode() == PsramVaddrMode::Normal {
+        writeback_cache();
+    }
+}
+
+#[procmacros::ram(unstable(checked))]
+fn active_vaddr_mode() -> PsramVaddrMode {
+    let ctrl = crate::peripherals::DPORT::regs().pro_cache_ctrl().read();
+    if ctrl.pro_dram_hl().bit_is_set() {
+        PsramVaddrMode::LowHigh
+    } else if ctrl.pro_dram_split().bit_is_set() {
+        PsramVaddrMode::Evenodd
+    } else {
+        PsramVaddrMode::Normal
+    }
 }
 
 #[procmacros::ram]
@@ -682,7 +729,7 @@ pub(crate) mod utils {
         addr_bit_len: u16,  // Address byte length
         tx_data: &'a [u32], // Point to send data buffer
         tx_data_bit_len: u16,
-        rx_data: &'a mut [u32], // Point to recevie data buffer
+        rx_data: &'a mut [u32], // Point to receive data buffer
         rx_data_bit_len: u16,
         dummy_bit_len: u32,
     }
@@ -788,8 +835,7 @@ pub(crate) mod utils {
     #[derive(Debug, Clone, Copy, PartialEq)]
     enum PsramCmdMode {
         PsramCmdQpi,
-        #[expect(unused)]
-        PsramCmdSpi,
+        // PsramCmdSpi,
     }
 
     // start sending cmd/addr and optionally, receiving data
@@ -806,10 +852,10 @@ pub(crate) mod utils {
             & (SPI_FREAD_DIO_M | SPI_FREAD_DUAL_M | SPI_FREAD_QUAD_M | SPI_FREAD_QIO_M);
 
         match cmd_mode {
-            PsramCmdMode::PsramCmdSpi => {
-                psram_set_basic_write_mode_spi1();
-                psram_set_basic_read_mode_spi1();
-            }
+            // PsramCmdMode::PsramCmdSpi => {
+            //    psram_set_basic_write_mode_spi1();
+            //    psram_set_basic_read_mode_spi1();
+            //}
             PsramCmdMode::PsramCmdQpi => {
                 psram_set_qio_write_mode_spi1();
                 psram_set_qio_read_mode_spi1();
@@ -872,14 +918,14 @@ pub(crate) mod utils {
     }
 
     // set basic SPI write mode
-    fn psram_set_basic_write_mode_spi1() {
-        SPI1::regs().user().modify(|_, w| {
-            w.fwrite_qio().clear_bit();
-            w.fwrite_dio().clear_bit();
-            w.fwrite_quad().clear_bit();
-            w.fwrite_dual().clear_bit()
-        });
-    }
+    // fn psram_set_basic_write_mode_spi1() {
+    //     SPI1::regs().user().modify(|_, w| {
+    //         w.fwrite_qio().clear_bit();
+    //         w.fwrite_dio().clear_bit();
+    //         w.fwrite_quad().clear_bit();
+    //         w.fwrite_dual().clear_bit()
+    //     });
+    // }
 
     // set QPI write mode
     fn psram_set_qio_write_mode_spi1() {
@@ -902,14 +948,14 @@ pub(crate) mod utils {
     }
 
     // set SPI read mode
-    fn psram_set_basic_read_mode_spi1() {
-        SPI1::regs().ctrl().modify(|_, w| {
-            w.fread_qio().clear_bit();
-            w.fread_quad().clear_bit();
-            w.fread_dual().clear_bit();
-            w.fread_dio().clear_bit()
-        });
-    }
+    // fn psram_set_basic_read_mode_spi1() {
+    //     SPI1::regs().ctrl().modify(|_, w| {
+    //         w.fread_qio().clear_bit();
+    //         w.fread_quad().clear_bit();
+    //         w.fread_dual().clear_bit();
+    //         w.fread_dio().clear_bit()
+    //     });
+    // }
 
     // psram gpio init , different working frequency we have different solutions
     fn psram_gpio_config(psram_io: &PsramIo, mode: PsramCacheSpeed) -> u32 {

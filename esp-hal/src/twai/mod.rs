@@ -794,8 +794,8 @@ impl BaudRate {
             Self::Custom(timing_config) => timing_config,
         };
 
-        // clock source on ESP32-C6 is xtal (40MHz)
-        #[cfg(esp32c6)]
+        // clock source on ESP32-C6 and ESP32-P4 is xtal (40MHz)
+        #[cfg(any(esp32c6, esp32p4))]
         let timing = TimingConfig {
             baud_rate_prescaler: timing.baud_rate_prescaler / 2,
             ..timing
@@ -917,7 +917,7 @@ where
     pub fn set_baud_rate(&mut self, baud_rate: BaudRate) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
-        #[cfg(not(any(esp32h2, esp32c6)))]
+        #[cfg(not(any(esp32h2, esp32c6, esp32p4)))]
         {
             assert!(crate::soc::clocks::apb_clk_frequency() == 80_000_000);
         }
@@ -1401,11 +1401,11 @@ where
         }
 
         // Check if the packet in the receive buffer is valid or overrun.
-        if status.miss_st().bit_is_set() {
+        if head_entry_is_overrun(self.regs()) {
             // The FIFO entry is what is left of an overrun, not a frame:
             // release it, or every later call would report it again. The
             // async interrupt handler does the same.
-            release_receive_fifo(self.regs());
+            release_overrun_entry(self.regs());
             return nb::Result::Err(nb::Error::Other(EspTwaiError::EmbeddedHAL(
                 ErrorKind::Overrun,
             )));
@@ -1614,6 +1614,33 @@ fn release_receive_fifo(register_block: &RegisterBlock) {
     register_block.cmd().write(|w| w.release_buf().set_bit());
 }
 
+/// Returns whether the entry at the head of the receive FIFO is what is left of an
+/// overrun, not a frame.
+fn head_entry_is_overrun(register_block: &RegisterBlock) -> bool {
+    let status = register_block.status().read();
+    cfg_select! {
+        // The ESP32 has no per-entry miss status. The data overrun status is set from
+        // the first entry that the overrun overwrote, until it is cleared.
+        esp32 => status.overrun_st().bit_is_set(),
+        _ => status.miss_st().bit_is_set(),
+    }
+}
+
+/// Releases an overrun entry from the receive FIFO.
+fn release_overrun_entry(register_block: &RegisterBlock) {
+    release_receive_fifo(register_block);
+    #[cfg(esp32)]
+    if register_block
+        .rx_message_cnt()
+        .read()
+        .rx_message_counter()
+        .bits()
+        == 0
+    {
+        register_block.cmd().write(|w| w.clr_overrun().set_bit());
+    }
+}
+
 /// Returns whether the peripheral is in the error-passive state, i.e. one of the
 /// error counters has reached 128.
 fn is_error_passive(register_block: &RegisterBlock) -> bool {
@@ -1720,6 +1747,45 @@ impl PrivateInstance for crate::peripherals::TWAI1<'_> {
     }
 }
 
+#[cfg(soc_has_twai2)]
+impl PrivateInstance for crate::peripherals::TWAI2<'_> {
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Twai2
+    }
+
+    fn input_signal(&self) -> InputSignal {
+        InputSignal::TWAI2_RX
+    }
+
+    fn output_signal(&self) -> OutputSignal {
+        OutputSignal::TWAI2_TX
+    }
+
+    fn interrupt(&self) -> crate::peripherals::Interrupt {
+        crate::peripherals::Interrupt::TWAI2
+    }
+
+    fn async_handler(&self) -> InterruptHandler {
+        #[handler]
+        fn twai2() {
+            let twai = unsafe { crate::peripherals::TWAI2::steal() };
+            asynch::handle_interrupt(twai.register_block(), twai.async_state());
+        }
+
+        twai2
+    }
+
+    #[inline(always)]
+    fn register_block(&self) -> &RegisterBlock {
+        crate::peripherals::TWAI2::regs()
+    }
+
+    fn async_state(&self) -> &asynch::TwaiAsyncState {
+        static STATE: asynch::TwaiAsyncState = asynch::TwaiAsyncState::new();
+        &STATE
+    }
+}
+
 crate::any_peripheral! {
     /// Any TWAI peripheral.
     pub peripheral AnyTwai<'d> {
@@ -1727,6 +1793,8 @@ crate::any_peripheral! {
         Twai0(crate::peripherals::TWAI0<'d>),
         #[cfg(soc_has_twai1)]
         Twai1(crate::peripherals::TWAI1<'d>),
+        #[cfg(soc_has_twai2)]
+        Twai2(crate::peripherals::TWAI2<'d>),
     }
 }
 
@@ -1737,6 +1805,8 @@ impl PrivateInstance for AnyTwai<'_> {
             any::Inner::Twai0(twai) => twai,
             #[cfg(soc_has_twai1)]
             any::Inner::Twai1(twai) => twai,
+            #[cfg(soc_has_twai2)]
+            any::Inner::Twai2(twai) => twai,
         } {
             fn peripheral(&self) -> crate::system::Peripheral;
             fn input_signal(&self) -> InputSignal;
@@ -1756,6 +1826,8 @@ pub trait Instance: PrivateInstance + any::Degrade {}
 impl Instance for crate::peripherals::TWAI0<'_> {}
 #[cfg(soc_has_twai1)]
 impl Instance for crate::peripherals::TWAI1<'_> {}
+#[cfg(soc_has_twai2)]
+impl Instance for crate::peripherals::TWAI2<'_> {}
 impl Instance for AnyTwai<'_> {}
 
 mod asynch {
@@ -1873,8 +1945,8 @@ mod asynch {
         /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
         ///
         /// The transmission is aborted if the future is dropped. The technical
-        /// reference manual does not specifiy if aborting the transmission also
-        /// stops it, in case it is activly transmitting. Therefor it could be
+        /// reference manual does not specify if aborting the transmission also
+        /// stops it, in case it is actively transmitting. Therefore it could be
         /// the case that even though the future is dropped, the frame was sent
         /// anyways.
         ///
@@ -1971,8 +2043,8 @@ mod asynch {
         /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
         ///
         /// The transmission is aborted if the future is dropped. The technical
-        /// reference manual does not specifiy if aborting the transmission also
-        /// stops it, in case it is actively transmitting. Therefor it could be
+        /// reference manual does not specify if aborting the transmission also
+        /// stops it, in case it is actively transmitting. Therefore it could be
         /// the case that even though the future is dropped, the frame was sent
         /// anyways.
         ///
@@ -2059,7 +2131,6 @@ mod asynch {
         }
 
         if int_raw.rx_int_st().bit_is_set() {
-            let status_reg = register_block.status();
             let rx_queue = &async_state.rx_queue;
 
             // Consumme all pending frames in the Rx FIFO
@@ -2070,9 +2141,9 @@ mod asynch {
                 .bits()
                 > 0
             {
-                let msg = if status_reg.read().miss_st().bit_is_set() {
+                let msg = if head_entry_is_overrun(register_block) {
                     // Current frame is incomplete (Rx FIFO has overrun)
-                    release_receive_fifo(register_block);
+                    release_overrun_entry(register_block);
                     Counts::count(&async_state.counts.overrun);
                     Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun))
                 } else {

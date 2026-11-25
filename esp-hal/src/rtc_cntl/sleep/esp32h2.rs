@@ -2,7 +2,6 @@ use core::ops::Not;
 
 use crate::{
     peripherals::{LP_AON, PMU},
-    private::DropGuard,
     rtc_cntl::{
         Rtc,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
@@ -73,6 +72,7 @@ impl DigitalSleepConfig {
                 let mut cfg = HpSysCntlReg::default();
 
                 cfg.set_dig_pad_slp_sel(pd_flags.pd_top().not());
+                cfg.set_dig_pause_wdt(true);
 
                 cfg
             },
@@ -86,7 +86,13 @@ impl DigitalSleepConfig {
     fn defaults_deep_sleep() -> Self {
         Self {
             // PMU_SLEEP_DIGITAL_DSLP_CONFIG_DEFAULT
-            syscntl: HpSysCntlReg::default(),
+            syscntl: {
+                let mut cfg = HpSysCntlReg::default();
+
+                cfg.set_dig_pause_wdt(true);
+
+                cfg
+            },
             icg_func: 0,
             deep_sleep: true,
         }
@@ -100,12 +106,15 @@ impl DigitalSleepConfig {
         PMU::regs().hp_sleep_icg_hp_func().modify(|_, w| unsafe {
             w.hp_sleep_dig_icg_func_en().bits(self.icg_func) // pmu_ll_hp_set_icg_func
         });
-        if !self.deep_sleep {
-            PMU::regs().hp_sleep_hp_sys_cntl().modify(|_, w| {
+        PMU::regs().hp_sleep_hp_sys_cntl().modify(|_, w| {
+            w.hp_sleep_dig_pause_wdt().bit(self.syscntl.dig_pause_wdt());
+            w.hp_sleep_dig_cpu_stall().set_bit();
+            if !self.deep_sleep {
                 w.hp_sleep_dig_pad_slp_sel()
-                    .bit(self.syscntl.dig_pad_slp_sel()) // pmu_ll_hp_set_dig_pad_slp_sel
-            });
-        }
+                    .bit(self.syscntl.dig_pad_slp_sel()); // pmu_ll_hp_set_dig_pad_slp_sel
+            }
+            w
+        });
     }
 }
 
@@ -142,6 +151,8 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_cpu_pd_en(pd_flags.pd_cpu());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
 
+        self.hp_sys.clk.set_i2c_iso_en(true);
+        self.hp_sys.clk.set_i2c_retention(true);
         self.hp_sys.clk.set_xpd_bbpll(false);
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
@@ -534,35 +545,23 @@ impl RtcSleepConfig {
             // the oscillator current but not regulator power.
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags
+                .set_pd_modem(crate::rtc_cntl::regdma::modem_power_down());
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
     }
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
-    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
-    /// sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
-        let restore_clock_config = ClockTree::with(|clocks| {
-            let old_hp_root_clk = clocks.hp_root_clk();
-            let old_cpu_divider = clocks.cpu_clk();
-
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        let (hp_root_clk, cpu_clk) = ClockTree::with(|clocks| {
+            let old = (clocks.hp_root_clk(), clocks.cpu_clk());
             clocks::configure_hp_root_clk(clocks, HpRootClkConfig::Xtal);
             clocks::configure_cpu_clk(clocks, CpuClkConfig::new(0));
-
-            // Restore the old clock settings when we return
-            DropGuard::new((), move |_| {
-                ClockTree::with(|clocks| {
-                    if let Some(old_hp_root_clk) = old_hp_root_clk {
-                        clocks::configure_hp_root_clk(clocks, old_hp_root_clk);
-                    }
-                    if let Some(old_cpu_divider) = old_cpu_divider {
-                        clocks::configure_cpu_clk(clocks, old_cpu_divider);
-                    }
-                });
-            })
+            old
         });
 
         // misc_modules_sleep_prepare
@@ -623,21 +622,59 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
-        restore_clock_config
+        SavedState {
+            hp_root_clk,
+            cpu_clk,
+        }
     }
 
     /// Requests the sleep.
     ///
     /// The caller waits for the result of the request.
     #[inline(always)]
-    pub(crate) fn enter_sleep(&self) -> bool {
+    pub(crate) fn enter_sleep(&self, _saved: &SavedState) -> bool {
         request_sleep()
     }
 
     /// Cleans up after sleep.
     #[inline(always)]
     pub(crate) fn finish_sleep(&self) {
+        // Sleep loses this setting, which `rtc::init` also writes.
+        crate::soc::regi2c::I2C_BIAS_DREG_0P8.write_field(8);
+
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
     }
 }
+
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    hp_root_clk: Option<HpRootClkConfig>,
+    cpu_clk: Option<CpuClkConfig>,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        ClockTree::with(|clocks| {
+            clocks::reconfigure_pll(clocks);
+            if let Some(hp_root_clk) = self.hp_root_clk {
+                clocks::configure_hp_root_clk(clocks, hp_root_clk);
+            }
+            if let Some(cpu_clk) = self.cpu_clk {
+                clocks::configure_cpu_clk(clocks, cpu_clk);
+            }
+        });
+    }
+}
+
+/// Requests a light sleep with CPU retention. The ESP32-H2 needs no steps around the request.
+#[inline(always)]
+pub(crate) fn pmu_sleep_start(_saved: &SavedState) -> bool {
+    request_sleep()
+}
+
+/// Runs the wake steps after a CPU power-down. The ESP32-H2 has no wake steps.
+#[inline(always)]
+pub(crate) fn pmu_sleep_finish(_saved: &SavedState) {}

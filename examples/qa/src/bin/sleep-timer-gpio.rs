@@ -14,7 +14,7 @@
 //! Each pin idles at the level that does not wake the chip. Pull the low-level pin to ground, or
 //! the high-level pin to 3V3, to end the sleep.
 
-//% CHIP_FILTER: sleep_driver_supported
+//% CHIP_FILTER: sleep_driver_supported && sleep_deep_sleep
 
 #![no_std]
 #![no_main]
@@ -33,13 +33,13 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
     let delay = Delay::new();
     let mut lpwr = LowPower::new(peripherals.LPWR);
@@ -60,19 +60,19 @@ fn main() -> ! {
         }
     }
 
-    println!("up and running!");
+    log::info!("up and running!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
-    println!("reset reason: {:?}", reason);
+    log::info!("reset reason: {:?}", reason);
     let wake_reason = wakeup_cause();
-    println!("wake reason: {:?}", wake_reason);
+    log::info!("wake reason: {:?}", wake_reason);
 
     // The pull holds the pin at the level that does not wake the chip. The hardware then does not
     // reject the sleep.
     let mut pin_low = Input::new(pin_low, InputConfig::default().with_pull(Pull::Up));
     let mut pin_high = Input::new(pin_high, InputConfig::default().with_pull(Pull::Down));
 
-    println!("low-level pin ended the sleep: {}", pin_low.caused_wakeup());
-    println!(
+    log::info!("low-level pin ended the sleep: {}", pin_low.caused_wakeup());
+    log::info!(
         "high-level pin ended the sleep: {}",
         pin_high.caused_wakeup()
     );
@@ -88,7 +88,7 @@ fn main() -> ! {
     // The deadline is absolute, so the delay below does not shorten the sleep.
     lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(30));
 
-    println!("sleeping!");
+    log::info!("sleeping!");
     delay.delay_millis(100);
     lpwr.sleep_deep(RtcSleepConfig::deep());
 }

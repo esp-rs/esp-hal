@@ -26,10 +26,10 @@ use crate::{
 /// Immutable per-channel metadata.
 #[doc(hidden)]
 pub struct ChannelInfo {
-    #[expect(dead_code)]
+    #[cfg_attr(feature = "unstable", expect(dead_code))]
     pub(crate) peripheral_interrupt: Interrupt,
 
-    #[expect(dead_code)]
+    #[cfg_attr(feature = "unstable", expect(dead_code))]
     pub(crate) async_handler: InterruptHandler,
 
     /// Peripheral IDs this channel can serve. An empty slice means no runtime check is needed.

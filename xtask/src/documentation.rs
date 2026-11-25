@@ -529,6 +529,7 @@ fn cargo_doc_without_pre_processing(
         [
             "--cfg docsrs",
             "--cfg not_really_docsrs",
+            "-D warnings",
             "-Z unstable-options",
             // fix-up broken documentation links for `rand_core`
             "--extern-html-root-takes-precedence",
@@ -809,12 +810,7 @@ pub fn build_documentation_index(
             let meta = generate_documentation_meta_for_package(*package, &chips, &version_label)?;
 
             // Render the template to HTML and write it out to the desired path:
-            let html = render_template(&resources_path, "package_index.html.somni", {
-                let mut env = Env::new();
-                env.value("package", package.to_string().replace('-', "_"))
-                    .value("metadata", Iter(meta));
-                env
-            })?;
+            let html = render_package_index(&resources_path, *package, meta)?;
             let path = version_path.join("index.html");
             fs::write(&path, html).context("Failed to write index.html")?;
             log::info!("Created {}", path.display());
@@ -852,6 +848,26 @@ pub fn build_documentation_index(
     log::info!("Created {}", path.display());
 
     Ok(())
+}
+
+fn render_package_index(
+    resources_path: &Path,
+    package: Package,
+    meta: Vec<Meta>,
+) -> Result<String> {
+    let peripheral_support = if package == Package::EspHal {
+        crate::metadata::peripheral_support_html()
+    } else {
+        ""
+    };
+
+    render_template(resources_path, "package_index.html.somni", {
+        let mut env = Env::new();
+        env.value("package", package.to_string().replace('-', "_"))
+            .value("metadata", Iter(meta))
+            .value("peripheral_support", peripheral_support);
+        env
+    })
 }
 
 fn generate_documentation_meta_for_package(
@@ -1311,13 +1327,8 @@ mod tests {
         )
         .unwrap();
 
-        let html = render_template(&ws.join("resources"), "package_index.html.somni", {
-            let mut env = Env::new();
-            env.value("package", "esp_hal")
-                .value("metadata", Iter(meta));
-            env
-        })
-        .unwrap();
+        let html = super::render_package_index(&ws.join("resources"), crate::Package::EspHal, meta)
+            .unwrap();
 
         assert!(
             html.contains("<title>esp_hal Documentation</title>"),
@@ -1335,6 +1346,10 @@ mod tests {
             html.contains("<span class=\"crate-version\">1.0.0</span>"),
             "{html}"
         );
+        assert!(
+            html.contains(r#"<details class="peri-matrix" id="peripheral-support">"#),
+            "{html}"
+        );
     }
 
     #[test]
@@ -1346,15 +1361,10 @@ mod tests {
         )
         .unwrap();
 
-        let html = render_template(
+        let html = super::render_package_index(
             &workspace().join("resources"),
-            "package_index.html.somni",
-            {
-                let mut env = Env::new();
-                env.value("package", "esp_hal")
-                    .value("metadata", Iter(meta));
-                env
-            },
+            crate::Package::EspHal,
+            meta,
         )
         .unwrap();
 
@@ -1362,6 +1372,25 @@ mod tests {
             html.contains("<span class=\"crate-version\">main</span>"),
             "{html}"
         );
+    }
+
+    #[test]
+    fn package_index_omits_peripheral_matrix_for_other_packages() {
+        let meta = generate_documentation_meta_for_package(
+            crate::Package::EspRadio,
+            &[crate::Chip::Esp32c6],
+            "main",
+        )
+        .unwrap();
+
+        let html = super::render_package_index(
+            &workspace().join("resources"),
+            crate::Package::EspRadio,
+            meta,
+        )
+        .unwrap();
+
+        assert!(!html.contains(r#"id="peripheral-support""#), "{html}");
     }
 
     #[test]
@@ -1404,6 +1433,10 @@ mod tests {
             "{html}"
         );
         assert!(html.contains("<code>esp-hal</code>"), "{html}");
+        assert!(
+            html.contains(r#"<a href="esp-hal/main/index.html#peripheral-support">Peripheral Support Matrix</a>"#),
+            "{html}"
+        );
     }
 
     #[test]

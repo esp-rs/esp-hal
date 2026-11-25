@@ -691,7 +691,7 @@ pub struct PwmUpdateMethod(u8);
 
 impl PwmUpdateMethod {
     /// New timestamp will be applied immediately.
-    pub const SYNC_IMMEDIATLY: Self = Self::empty();
+    pub const SYNC_IMMEDIATELY: Self = Self::empty();
     /// New timestamp will be applied when timer is equal to zero.
     pub const SYNC_ON_ZERO: Self = Self::empty().sync_on_timer_equals_zero();
     /// New timestamp will be applied when timer is equal to period.

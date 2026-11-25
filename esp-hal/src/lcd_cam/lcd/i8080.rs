@@ -184,8 +184,8 @@ where
         channel: impl LcdDmaTxChannel<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let tx_channel = ChannelTx::new(channel.into());
-        tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
+        let mut tx_channel = ChannelTx::new(channel.into());
+        tx_channel.connect(DmaPeripheral::LCD_CAM);
 
         let mut this = Self { lcd, tx_channel };
 
@@ -218,7 +218,9 @@ where
             .map_err(ConfigError::Clock)?;
 
         ll::set_rgb_mode_en(self.regs(), false);
-        ll::set_lcd_conv_bypass(self.regs());
+        self.regs()
+            .lcd_rgb_yuv()
+            .write(|w| w.lcd_conv_enable().clear_bit());
 
         self.regs().lcd_user().modify(|_, w| {
             w.lcd_bit_order().bit(false);
@@ -227,7 +229,7 @@ where
         ll::set_8bits_order(self.regs(), false);
         ll::set_2byte_mode(self.regs(), false);
         self.regs().lcd_misc().write(|w| unsafe {
-            #[cfg(not(esp32s31))]
+            #[cfg(esp32s3)]
             w.lcd_afifo_threshold_num().bits(0);
             // Configure the setup cycles in LCD non-RGB mode. Setup cycles
             // expected = this value + 1. (6 bit)
@@ -482,7 +484,7 @@ where
         });
         ll::set_2byte_mode(self.regs(), is_2byte_mode);
 
-        // Use continous mode for DMA. FROM the S3 TRM:
+        // Use continuous mode for DMA. FROM the S3 TRM:
         // > In a continuous output, LCD module keeps sending data till:
         // > i. LCD_CAM_LCD_START is cleared;
         // > ii. or LCD_CAM_LCD_RESET is set;
@@ -491,11 +493,8 @@ where
             .lcd_user()
             .modify(|_, w| w.lcd_always_out_en().set_bit().lcd_dout().set_bit());
 
-        let result = unsafe {
-            self.tx_channel
-                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut data)
-        }
-        .and_then(|_| self.tx_channel.start_transfer());
+        let result = unsafe { self.tx_channel.prepare_transfer(&mut data) }
+            .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {
             return Err((err, self, data));
         }
@@ -694,6 +693,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
             .regs()
             .lc_dma_int_clr()
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
+        self.i8080.tx_channel.end_transfer();
 
         // SAFETY: Since forget is called on self, we know that self.i8080 and
         // self.buf_view won't be touched again.

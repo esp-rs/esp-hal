@@ -1,5 +1,5 @@
 use crate::{
-    clock::{RtcClock, calibrate_rtc_fast_clock, calibrate_rtc_slow_clock, rtc_slow_cal_period},
+    clock::{RtcClock, calibrate_rtc_fast_clock, rtc_slow_cal_period},
     peripherals::PMU,
     rtc_cntl::sleep::PowerDownFlags,
     soc::clocks,
@@ -21,18 +21,10 @@ impl SleepTimeConfig {
         clocks::rc_fast_clk_frequency()
     }
 
-    fn rtc_clk_cal_slow(deep: bool) -> u32 {
-        if deep {
-            calibrate_rtc_slow_clock();
-        }
-
-        rtc_slow_cal_period()
-    }
-
     pub fn new(deep: bool) -> Self {
         Self {
             sleep_time_adjustment: 0,
-            slowclk_period: Self::rtc_clk_cal_slow(deep),
+            slowclk_period: rtc_slow_cal_period(),
             fastclk_frequency: Self::rtc_clk_cal_fast(deep),
         }
     }
@@ -48,6 +40,7 @@ impl SleepTimeConfig {
         this
     }
 
+    #[cfg(sleep_deep_sleep)]
     pub fn deep_sleep() -> Self {
         let mut this = Self::new(true);
 
@@ -75,7 +68,7 @@ impl SleepTimeConfig {
 /// dirty line. The retention frames are among them, because the save writes them through the cache.
 /// esp-idf writes the cache back in `pmu_sleep_start` (`esp32p4/pmu_sleep.c:410`), and it uses the
 /// registers and not the ROM helper, because the return of a call dirties the cache again.
-#[crate::ram]
+#[procmacros::ram(unstable(checked))]
 #[cfg(soc_internal_memory_cached)]
 fn writeback_data_cache() {
     // `CACHE_MAP_L1_DCACHE` of `esp32p4/rom/cache.h`.
@@ -93,9 +86,9 @@ fn writeback_data_cache() {
 
 /// Requests the sleep and returns whether the hardware rejected the request.
 ///
-/// The software retention path calls this through a function pointer after the critical frame is
-/// saved.
-#[inline(always)]
+/// The software retention path calls this after the critical frame is saved.
+#[cfg_attr(cpu_retention = "software", procmacros::ram(unstable(checked)))]
+#[cfg_attr(not(cpu_retention = "software"), inline(always))]
 pub(crate) fn request_sleep() -> bool {
     #[cfg(soc_internal_memory_cached)]
     writeback_data_cache();
@@ -105,4 +98,22 @@ pub(crate) fn request_sleep() -> bool {
         .write(|w| w.sleep_req().bit(true));
 
     super::wait_for_sleep_result()
+}
+
+/// Waits until the eFuse controller has reloaded the eFuse memory after the sleep request.
+///
+/// An eFuse read before this point can return stale data.
+#[cfg(not(esp32h2))]
+#[inline(always)]
+pub(crate) fn wait_for_efuse_idle() {
+    // `EFUSE_CONTROLLER_STATE_IDLE`
+    const IDLE: u8 = 1;
+
+    while crate::peripherals::EFUSE::regs()
+        .status()
+        .read()
+        .state()
+        .bits()
+        != IDLE
+    {}
 }

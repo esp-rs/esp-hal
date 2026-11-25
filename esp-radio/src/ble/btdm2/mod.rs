@@ -9,9 +9,9 @@
 //! millisecond.
 
 use core::{
-    mem::{size_of, transmute},
+    mem::{DropGuard, size_of, transmute},
     ptr::NonNull,
-    sync::atomic::{AtomicU8, AtomicU16, AtomicU32, Ordering},
+    sync::atomic::{AtomicU16, AtomicU32, Ordering},
 };
 
 use esp_phy::PhyInitGuard;
@@ -20,7 +20,7 @@ use super::{Config, ReceivedPacket, in_isr};
 use crate::{
     compat::{
         self,
-        common::str_from_c,
+        common::{str_from_c, task_core},
         mutex,
         queue::{
             queue_create,
@@ -36,8 +36,8 @@ use crate::{
         },
         semaphore,
     },
-    drop_guard::DropGuard,
-    hal::{ram, system::Cpu},
+    counting_lock::CountingLock,
+    hal::ram,
     sys::{
         c_types::{c_char, c_void},
         include::*,
@@ -460,8 +460,8 @@ fn esp_bt_controller_enable(_mode: esp_bt_mode_t) -> esp_err_t {
         return ESP_FAIL as _;
     }
 
-    hci_fc.defuse();
-    ble_stack.defuse();
+    DropGuard::dismiss(hci_fc);
+    DropGuard::dismiss(ble_stack);
 
     set_controller_status(esp_bt_controller_status_t_ESP_BT_CONTROLLER_STATUS_ENABLED);
     0
@@ -678,7 +678,11 @@ fn queue_rx_packet(header: &[u8], payload: &[u8]) {
     let mut data = alloc::vec::Vec::with_capacity(header.len() + payload.len());
     data.extend_from_slice(header);
     data.extend_from_slice(payload);
+    queue_rx_data(data);
+}
 
+/// Hands an already assembled HCI packet, indicator byte first, to the host reader.
+fn queue_rx_data(data: alloc::vec::Vec<u8>) {
     super::dump_packet_info(&data);
     super::BT_STATE.with(|state| {
         state.rx_queue.push_back(ReceivedPacket {
@@ -710,9 +714,25 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, _arg: *const c_void) -> i
 }
 
 unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, _arg: *const c_void) -> i32 {
-    queue_rx_packet(&[0x02], unsafe {
-        core::slice::from_raw_parts((*om).om_data, (*om).om_len as usize)
-    });
+    // The controller may split one ACL packet over a chain of mbufs.
+    let chain = || {
+        core::iter::successors(unsafe { om.as_ref() }, |mbuf| unsafe { mbuf.next.as_ref() })
+            .map(|mbuf| unsafe { core::slice::from_raw_parts(mbuf.om_data, mbuf.om_len as usize) })
+    };
+
+    let len = 1 + chain().map(<[u8]>::len).sum::<usize>();
+    let mut data = alloc::vec::Vec::new();
+    if data.try_reserve_exact(len).is_err() {
+        warn!(
+            "Out of memory, dropping a received ACL packet of {} bytes",
+            len
+        );
+        unsafe { r_os_mbuf_free_chain(om.cast_mut()) };
+        return ESP_ERR_NO_MEM as i32;
+    }
+    data.push(0x02);
+    chain().for_each(|payload| data.extend_from_slice(payload));
+    queue_rx_data(data);
     unsafe { r_os_mbuf_free_chain(om.cast_mut()) };
     0
 }
@@ -869,6 +889,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     let res = esp_bt_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
     assert!(res == 0, "esp_bt_controller_enable returned {}", res);
 
+    #[cfg(modem_retention = "regdma")]
+    super::mac_bb::init(config.modem_sleep() && super::lp_clk::light_sleep_supported());
+
     if config.modem_sleep() {
         super::lp_clk::claim_wake_source();
     }
@@ -883,6 +906,8 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
 pub(crate) fn ble_deinit() {
     super::lp_clk::release_wake_source();
+    #[cfg(modem_retention = "regdma")]
+    super::mac_bb::deinit();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 
@@ -918,8 +943,7 @@ const BTDM_OSAL_INVALID_PARM: i32 = 3;
 const BTDM_OSAL_TIMEOUT: i32 = 6;
 
 static EVENTQ_DEPTH: AtomicU16 = AtomicU16::new(16);
-static CRITICAL_NEST: AtomicU8 = AtomicU8::new(0);
-static CRITICAL_TOKEN: AtomicU32 = AtomicU32::new(0);
+static CRITICAL: CountingLock = CountingLock::new();
 
 #[repr(C)]
 #[derive(Default, Clone, Copy)]
@@ -1473,30 +1497,20 @@ extern "C" fn wr_btdm_osal_get_time_forever() -> u32 {
 extern "C" fn wr_btdm_osal_hw_enter_critical() -> u32 {
     // We count calls because in at least one place, the blob doesn't pass the returned number back
     // to `exit_critical`.
-    let last = CRITICAL_NEST.fetch_add(1, Ordering::Release);
-    if last == 0 {
-        let token = unsafe { crate::ble::ESP_RADIO_LOCK.acquire().inner() };
-        CRITICAL_TOKEN.store(token, Ordering::Relaxed);
-    }
+    unsafe { CRITICAL.acquire() };
     0
 }
 
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_hw_exit_critical(_ctx: u32) {
-    if CRITICAL_NEST.fetch_sub(1, Ordering::Release) == 1 {
-        let last = CRITICAL_TOKEN.load(Ordering::Relaxed);
-
-        unsafe {
-            crate::ble::ESP_RADIO_LOCK.release(esp_sync::RestoreState::new(last));
-        }
-    }
+    unsafe { CRITICAL.release() };
 }
 
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_hw_is_in_critical() -> u8 {
-    CRITICAL_NEST.load(Ordering::Acquire)
+    CRITICAL.nesting() as u8
 }
 
 #[unsafe(no_mangle)]
@@ -1519,11 +1533,7 @@ extern "C" fn wr_btdm_osal_task_create(
             task_func,
             arg,
             priority.min(crate::preempt::max_task_priority()),
-            if core_id < Cpu::COUNT as u32 {
-                Some(core_id)
-            } else {
-                None
-            },
+            Some(task_core(core_id)),
             stack_size as usize,
         );
         if !task_handle.is_null() {

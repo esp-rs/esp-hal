@@ -1,18 +1,21 @@
 //! BLE low-power clock, read from the clock tree.
 //!
-//! The tree reports the divided output frequency. An RC source has no calibrated rate, so selecting
-//! one panics here.
+//! The tree reports the divided output frequency.
 
-use esp_hal::clock::ll::{self, BleLpClkConfig};
+#[cfg(bt_controller = "btdm")]
+use esp_hal::clock::ll::BleLpClkConfig;
+use esp_hal::clock::ll::{self, ClockSource};
 #[cfg(sleep_driver_supported)]
 use {
     enumset::EnumSet,
-    esp_hal::{
-        clock::ll::ClockSource,
-        rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig},
-    },
+    esp_hal::rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig},
     portable_atomic::{AtomicU32, Ordering},
 };
+
+/// Sleep clock accuracy (in ppm) reported to the BLE controller when `BLE_LP_CLK` runs from an RC
+/// oscillator (see `ble_rtc_clk_init()` in `bt.c`).
+#[cfg(bt_controller = "npl")]
+pub(crate) const RC_SCA_PPM: u16 = 3000;
 
 /// BTDM blob parameters for the selected low-power clock.
 #[cfg(bt_controller = "btdm")]
@@ -25,6 +28,7 @@ pub(crate) struct BtdmLpClk {
     pub lpcycle_us: u32,
 }
 
+#[cfg(bt_controller = "btdm")]
 fn selected() -> BleLpClkConfig {
     ll::ClockTree::with(|clocks| clocks.ble_lp_clk()).expect("BLE_LP_CLK is not configured")
 }
@@ -70,7 +74,13 @@ pub(crate) fn claim_wake_source() {
             root.map_or(0, |source| EnumSet::only(source).as_u32()),
             Ordering::Relaxed,
         );
-        WakeupSource::Bt.enable_with_hooks(Some(sleep_entry), None);
+        WakeupSource::Bt.enable_with_hooks(
+            Some(sleep_entry),
+            cfg_select! {
+                any(modem_retention = "backup_dma", regdma_bt_needs_pll) => Some(sleep_exit),
+                _ => None,
+            },
+        );
     }
 }
 
@@ -107,12 +117,20 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
                 config.reject_sleep();
                 return;
             }
+            // After the refusals, because a refused sleep must leave the MAC and baseband powered.
+            #[cfg(modem_retention = "backup_dma")]
+            let remaining = super::porting::power_down_mac_bb(remaining);
             config.limit_sleep(remaining);
         }
         // The BLE timer wakes the chip through the `Bt` source. The controller refuses the sleep
         // when its next event is too close.
         not(esp32c2) => {
             if super::porting::controller_skips_light_sleep() {
+                config.reject_sleep();
+                return;
+            }
+            #[cfg(regdma_bt_needs_pll)]
+            if super::mac_bb::power_down().is_err() {
                 config.reject_sleep();
                 return;
             }
@@ -126,42 +144,51 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     }
 }
 
-fn reject_rc(config: BleLpClkConfig) {
-    let rc = cfg_select! {
-        bt_controller = "btdm" => match config {
-            BleLpClkConfig::Xtal => false,
-            BleLpClkConfig::RtcSlow => matches!(
-                ll::ClockTree::with(|clocks| clocks.rtc_slow_clk()),
-                Some(ll::RtcSlowClkConfig::RcSlow) | Some(ll::RtcSlowClkConfig::RcFast)
-            ),
-        },
-        esp32c2 => config.sclk() == ll::BleLpClkSclk::RcSlow,
-        _ => config == BleLpClkConfig::RcSlow,
-    };
-    if rc {
-        panic!("RC clocks cannot be selected as the BLE low-power clock");
+#[cfg(all(
+    sleep_driver_supported,
+    any(modem_retention = "backup_dma", regdma_bt_needs_pll)
+))]
+fn sleep_exit() {
+    cfg_select! {
+        modem_retention = "backup_dma" => super::porting::power_up_mac_bb(),
+        _ => super::mac_bb::power_up(),
     }
 }
 
+/// Returns whether the clock node's root source is an internal RC oscillator.
+#[cfg(not(bt_controller = "btdm2"))]
+pub(crate) fn source_is_rc(f: fn(&mut ll::ClockTree) -> Option<ClockSource>) -> bool {
+    matches!(
+        ll::ClockTree::with(f),
+        Some(ClockSource::RcSlowClk | ClockSource::RcFastClk)
+    )
+}
+
 /// Returns the BLE low-power clock frequency, in hertz.
-///
-/// # Panics
-///
-/// Panics when `BLE_LP_CLK` is not configured, or when its source is an RC oscillator.
 #[cfg(not(bt_controller = "btdm"))]
 pub(crate) fn frequency_hz() -> u32 {
-    reject_rc(selected());
     ll::ble_lp_clk_frequency()
+}
+
+/// Returns the microseconds per low-power cycle.
+#[cfg(bt_controller = "btdm")]
+pub(crate) fn btdm_lpcycle_us() -> u32 {
+    let hz = ll::ble_lp_clk_frequency().max(1);
+    ((1_000_000u64 << 19) / u64::from(hz)) as u32
 }
 
 /// Returns the BTDM blob clock-select parameters for the configured source.
 #[cfg(bt_controller = "btdm")]
 pub(crate) fn btdm() -> BtdmLpClk {
-    let config = selected();
-    reject_rc(config);
+    // ESP32 only supports the main crystal or an external 32 kHz crystal/oscillator as the BLE
+    // sleep clock (see `btdm_low_power_mode_init()` in `esp32/bt.c`).
+    #[cfg(esp32)]
+    if source_is_rc(ll::ble_lp_clk_root_source) {
+        panic!("RC clocks cannot be selected as the BLE low-power clock");
+    }
 
-    let hz = ll::ble_lp_clk_frequency().max(1);
-    let lpcycle_us = ((1_000_000u64 << 19) / u64::from(hz)) as u32;
+    let config = selected();
+    let lpcycle_us = btdm_lpcycle_us();
 
     let (select, divider) = match config {
         BleLpClkConfig::Xtal => {

@@ -52,6 +52,7 @@ cfg_select! {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32s31",
         feature = "esp32p4"
     ) => {
@@ -66,7 +67,7 @@ cfg_select! {
 #[embassy_executor::task]
 async fn periodic() {
     loop {
-        esp_println::println!(
+        log::info!(
             "tick @ {} (wakeup cause: {:?})",
             Instant::now().duration_since_epoch().as_millis(),
             wakeup_cause(),
@@ -81,6 +82,9 @@ cfg_select! {
     }
     feature = "esp32c5" => {
         use peripherals::GPIO28 as BOOT_GPIO;
+    }
+    feature = "esp32h4" => {
+        use peripherals::GPIO34 as BOOT_GPIO;
     }
     feature = "esp32p4" => {
         use peripherals::GPIO35 as BOOT_GPIO;
@@ -99,10 +103,10 @@ async fn gpio(boot_btn: BOOT_GPIO<'static>) {
         // A pin that waits for an event also ends a light sleep, so it needs no wakeup
         // configuration.
         input.wait_for(Event::LowLevel).await;
-        esp_println::println!("button low (wakeup cause: {:?})", wakeup_cause());
+        log::info!("button low (wakeup cause: {:?})", wakeup_cause());
 
         input.wait_for(Event::HighLevel).await;
-        esp_println::println!("button high");
+        log::info!("button high");
     }
 }
 
@@ -110,7 +114,7 @@ async fn gpio(boot_btn: BOOT_GPIO<'static>) {
 #[embassy_executor::task]
 async fn periodic_core2() {
     loop {
-        esp_println::println!(
+        log::info!(
             "tick on core 2 @ {}",
             Instant::now().duration_since_epoch().as_millis()
         );
@@ -124,18 +128,20 @@ async fn wake_lock_demo() {
         Timer::after(Duration::from_secs(5)).await;
 
         let guard = WakeLock::new();
-        esp_println::println!("wake lock held: auto light-sleep disabled for 3s");
+        log::info!("wake lock held: auto light-sleep disabled for 3s");
         Timer::after(Duration::from_secs(3)).await;
         core::mem::drop(guard);
 
-        esp_println::println!("wake lock released: auto light-sleep re-enabled");
+        log::info!("wake lock released: auto light-sleep re-enabled");
     }
 }
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let p = esp_hal::init(esp_hal::Config::default());
+
+    // Log on UART0's default TX pin: USB-Serial-JTAG disconnects while the chip sleeps.
+    esp_log::init_uart!(p);
 
     let timg0 = TimerGroup::new(p.TIMG0);
 
@@ -150,6 +156,7 @@ async fn main(spawner: Spawner) {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32s31",
         feature = "esp32p4"
     ))]
@@ -165,6 +172,7 @@ async fn main(spawner: Spawner) {
     let boot_btn = cfg_select! {
         any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => p.GPIO0,
         feature = "esp32c5" => p.GPIO28,
+        feature = "esp32h4" => p.GPIO34,
         feature = "esp32p4" => p.GPIO35,
         // esp32c2, esp32c3, esp32c6, esp32c61, esp32h2
         _ => p.GPIO9,

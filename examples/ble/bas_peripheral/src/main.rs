@@ -15,6 +15,9 @@
 //! - `CPU_POWERDOWN` lets light sleep power the CPU down, and retains its state in RAM. This saves
 //!   more current, but it makes the sleep and the wake slower. Only the ESP32-C3, -C5, -C6, -C61,
 //!   -H2, -S3 and -S31 support this. On other chips the constant has no effect.
+//! - `MAC_BB_POWERDOWN` lets light sleep power the BLE MAC and baseband down, and retains their
+//!   state in RAM. Only the ESP32-C3, -C5, -C6, -C61, -H2, -H4, -S3 and -S31 support this. On other
+//!   chips the constant has no effect.
 //!
 //! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
 //! the output.
@@ -48,6 +51,10 @@ const LIGHT_SLEEP: bool = true;
 /// Whether light sleep powers the CPU down. Requires [`LIGHT_SLEEP`] to be enabled.
 #[cfg(feature = "light_sleep")]
 const CPU_POWERDOWN: bool = true;
+/// Whether light sleep powers the BLE MAC and baseband down. Requires [`LIGHT_SLEEP`] to be
+/// enabled.
+#[cfg(feature = "light_sleep")]
+const MAC_BB_POWERDOWN: bool = true;
 
 // An example reads no chip capability, so this condition lists the chips that support CPU
 // power-down.
@@ -90,10 +97,34 @@ cfg_select! {
     }
 }
 
+#[cfg(feature = "light_sleep")]
+cfg_select! {
+    any(
+        feature = "esp32c3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32h2",
+        feature = "esp32h4",
+        feature = "esp32s3",
+        feature = "esp32s31",
+    ) => {
+        fn enable_mac_bb_powerdown() {
+            use esp_radio::ble::{RetentionStorage, install_retention_memory};
+
+            #[esp_hal::ram(reclaimed, unstable(zeroed))]
+            static BLE_RETENTION_MEMORY: RetentionStorage = RetentionStorage::new();
+
+            install_retention_memory(BLE_RETENTION_MEMORY.take()).unwrap();
+        }
+    }
+    _ => {
+        fn enable_mac_bb_powerdown() {}
+    }
+}
+
 #[esp_hal::main]
 async fn main(_s: Spawner) {
-    esp_println::logger::init_logger_from_env();
-
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock({
         #[cfg_attr(feature = "esp32c2", allow(unused_mut))]
         let mut config = ClockConfig::from(CpuClock::max());
@@ -102,14 +133,15 @@ async fn main(_s: Spawner) {
         {
             use esp_hal::clock::ll::BleLpClkConfig;
 
-            // For now, only Xtal can be selected if modem-sleep is enabled.
-            // This is our default anyway, a safe choice even in light sleep,
-            // although it can raise the sleep current a bit.
+            // `Xtal` is the default, and a safe choice even in light sleep, although keeping the
+            // main crystal running raises the sleep current compared to an RC oscillator.
             config.ble_lp_clk = Some(BleLpClkConfig::Xtal);
         }
 
         config
     }));
+
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
@@ -119,6 +151,9 @@ async fn main(_s: Spawner) {
         let mut sleep = esp_rtos::sleep::configure(peripherals.LPWR);
         if CPU_POWERDOWN {
             enable_cpu_powerdown(&mut sleep);
+        }
+        if MAC_BB_POWERDOWN {
+            enable_mac_bb_powerdown();
         }
         esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
     } else {

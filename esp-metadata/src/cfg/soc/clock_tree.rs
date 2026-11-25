@@ -130,6 +130,8 @@ pub(crate) enum RootSource {
 pub(crate) enum SourceFrequencySignature {
     Skip,
     Parameterless(TokenStream),
+    /// Same signature and result as the node's `config_frequency` function.
+    SameAsConfig,
     Selector {
         param_type: TokenStream,
         param_name: Ident,
@@ -523,6 +525,10 @@ pub(crate) trait ClockTreeNodeType: Any {
     }
 
     fn always_on(&self) -> bool {
+        false
+    }
+    /// Returns `true` if an `always_on` node counts its consumers.
+    fn refcounted(&self) -> bool {
         false
     }
     fn wake_locking(&self) -> bool {

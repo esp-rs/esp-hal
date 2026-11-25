@@ -24,15 +24,15 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
-    println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -62,7 +62,7 @@ async fn main(_spawner: Spawner) {
         .with_din(peripherals.GPIO5)
         .build();
 
-    println!("Start");
+    log::info!("Start");
 
     let mut data = [0u8; 9000];
     let mut transaction = i2s_rx.read(buffer).ok().unwrap();
@@ -70,17 +70,17 @@ async fn main(_spawner: Spawner) {
         transaction.wait_for_available_async().await.unwrap();
 
         let avail = transaction.available_bytes();
-        println!("available {}", avail);
+        log::info!("available {}", avail);
 
         if avail > 0 {
             let count = transaction.pop(&mut data[..avail]);
 
             cfg_select! {
                 feature = "esp32s2" => {
-                    println!("got {} bytes", count,);
+                    log::info!("got {} bytes", count,);
                 }
                 _ => {
-                    println!(
+                    log::info!(
                         "got {} bytes, {:x?}..{:x?}",
                         count,
                         &data[..10],

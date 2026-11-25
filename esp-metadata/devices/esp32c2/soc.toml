@@ -1,9 +1,6 @@
 # ESP32-C2 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32c2"
@@ -18,7 +15,7 @@ page_size = 0x10000
 entry_num = 64
 
 [device.flash]
-support_status = "partial"
+support_status = { status = "partial", issue = 6757 }
 
 [device.rom]
 has_crc_le      = true
@@ -39,7 +36,7 @@ memory_map = { ranges = [
 
 peripherals = [
     { name = "APB_CTRL" },
-    { name = "APB_SARADC" },
+    { name = "APB_SARADC", clock_group = "ADC" },
     { name = "BB" },
     { name = "ASSIST_DEBUG" },
     { name = "DMA" },
@@ -73,6 +70,7 @@ peripherals = [
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
     { name = "FROM_CPU_INTR0", virtual = true, hidden = true },
     { name = "FROM_CPU_INTR1", virtual = true },
@@ -95,7 +93,7 @@ instances = [
 ]
 
 [device.assist_debug]
-support_status = "partial"
+support_status = { status = "partial", issue = 6749 }
 has_sp_monitor = true
 
 [device.dma]
@@ -129,22 +127,22 @@ working_modes = [
     { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" }
 ]
 curves = [
-    { id = 0, curve = 192 },
-    { id = 1, curve = 256 }
+    { id = 0, curve = "p192" },
+    { id = 1, curve = "p256" }
 ]
 zero_extend_writes = true
 
 [device.gpio]
-support_status = "supported"
+support_status = { status = "supported", issue = 6758 }
 # {include gpio.toml}
 
 [device.dedicated_gpio]
 version = "riscv_v1"
-support_status = "partial"
+support_status = { status = "partial", issue = 6753 }
 channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
 
 [device.i2c_master]
-support_status = "supported"
+support_status = { status = "supported", issue = 6760 }
 version = 3
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
@@ -170,13 +168,13 @@ controller = { Riscv = { flavour = "basic", interrupts = 32, priority_levels = 1
 context_switch_source = "from_cpu"
 
 [device.sha]
-support_status = "partial"
+support_status = { status = "partial", issue = 6775 }
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 version = 3
 fifo_size = 64
-support_status = "supported"
+support_status = { status = "supported", issue = 6776 }
 has_app_interrupts = true
 has_dma_segmented_transfer = true
 instances = [
@@ -190,7 +188,7 @@ instances = [
 ]
 
 [device.spi_slave]
-support_status = "partial"
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",
@@ -203,13 +201,13 @@ instances = [
 ]
 
 [device.timergroup]
-support_status = "partial"
+support_status = { status = "partial", issue = 6779 }
 instances = [{ name = "timg0" }]
 timg_has_divcnt_rst = true
 wdt_has_conf_update = true
 
 [device.uart]
-support_status = "supported"
+support_status = { status = "supported", issue = 6782 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
@@ -225,22 +223,19 @@ trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
 [device.sleep]
-support_status = "partial"
+support_status = { status = "partial", issue = 6743 }
 light_sleep = true
 deep_sleep = true
 pin_wakeup_version = 2
 deep_sleep_needs_gpio_isolation = true
 wakeup_sources = {
     # A UART wake cannot reject a sleep.
-    rejectable = ["Gpio", "Timer", "Sdio", "Wifi", "Touch", "Ulp", "Bt"],
+    rejectable = ["Gpio", "Timer", "Wifi", "Bt"],
     Gpio = 2,
     Timer = 3,
-    Sdio = 4,
     Wifi = 5,
     Uart0 = 6,
     Uart1 = 7,
-    Touch = 8,
-    Ulp = 9,
     Bt = 10,
 }
 
@@ -251,23 +246,27 @@ wakeup_sources = {
 
 ## Interfaces
 [device.ledc]
+support_status = { status = "partial", issue = 6765 }
 version = 2
 channel_count = 6
 
 ## Miscellaneous
 [device.io_mux]
+support_status = { status = "partial", issue = 6758 }
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6778 }
+register_block = "apb_saradc"
 [device.systimer]
 [device.lp_timer]
 
 ## Radio
 [device.wifi]
+support_status = { status = "partial", issue = 6788 }
 mac_version = 1
 has_ftm = true
 
 [device.bt]
-support_status = "partial"
+support_status = { status = "partial", issue = 6750 }
 controller = "npl"
 
 [device.phy]

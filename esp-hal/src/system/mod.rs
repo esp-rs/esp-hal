@@ -1,0 +1,482 @@
+//! # System Control
+
+#![allow(dead_code)]
+
+use esp_sync::NonReentrantMutex;
+
+#[cfg(soc_multi_core_enabled)]
+pub(crate) mod multi_core;
+#[cfg(all(soc_multi_core_enabled, feature = "unstable"))]
+pub use multi_core::*;
+
+// Implements the Peripheral enum based on esp-metadata/device.soc/peripheral_clocks
+implement_peripheral_clocks!();
+
+impl Peripheral {
+    pub const fn try_from(value: u8) -> Option<Peripheral> {
+        if value >= Peripheral::COUNT as u8 {
+            return None;
+        }
+
+        Some(unsafe { core::mem::transmute::<u8, Peripheral>(value) })
+    }
+}
+
+struct RefCounts {
+    counts: [usize; Peripheral::COUNT],
+}
+
+impl RefCounts {
+    pub const fn new() -> Self {
+        Self {
+            counts: [0; Peripheral::COUNT],
+        }
+    }
+}
+
+static PERIPHERAL_REF_COUNT: NonReentrantMutex<RefCounts> =
+    NonReentrantMutex::new(RefCounts::new());
+
+/// Disables all peripherals.
+///
+/// Peripherals listed in [KEEP_ENABLED] are NOT disabled.
+#[cfg_attr(not(feature = "rt"), expect(dead_code))]
+pub(crate) fn disable_peripherals() {
+    // Gating the clock alone leaves the D+ pull-up on, and the host keeps talking to a device that
+    // no longer answers.
+    #[cfg(all(soc_has_usb_device, not(keep_usb_serial_jtag_enabled)))]
+    crate::soc::usb_phy::disconnect_usj();
+
+    // Take the critical section up front to avoid taking it multiple times.
+    PERIPHERAL_REF_COUNT.with(|refcounts| {
+        for p in Peripheral::KEEP_ENABLED {
+            refcounts.counts[*p as usize] += 1;
+        }
+        for p in Peripheral::ALL {
+            let ref_count = refcounts.counts[*p as usize];
+            if ref_count == 0 {
+                PeripheralClockControl::enable_forced_with_counts(*p, false, true, refcounts);
+            }
+        }
+    })
+}
+
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct PeripheralGuard {
+    peripheral: Peripheral,
+}
+
+impl PeripheralGuard {
+    pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
+        PeripheralClockControl::request_peripheral(p, init);
+
+        Self { peripheral: p }
+    }
+
+    pub(crate) fn new(p: Peripheral) -> Self {
+        Self::new_with(p, || {})
+    }
+}
+
+impl Clone for PeripheralGuard {
+    fn clone(&self) -> Self {
+        Self::new(self.peripheral)
+    }
+
+    fn clone_from(&mut self, _source: &Self) {
+        // This is a no-op since the ref count for P remains the same.
+    }
+}
+
+impl Drop for PeripheralGuard {
+    fn drop(&mut self) {
+        PeripheralClockControl::disable(self.peripheral);
+    }
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct GenericPeripheralGuard<const P: u8> {}
+
+impl<const P: u8> GenericPeripheralGuard<P> {
+    pub(crate) fn new_with(init: fn()) -> Self {
+        let p = const { Peripheral::try_from(P).unwrap() };
+        PeripheralClockControl::request_peripheral(p, init);
+
+        Self {}
+    }
+
+    #[cfg_attr(esp32p4, allow(unused))]
+    #[cfg_attr(not(feature = "unstable"), allow(unused))]
+    pub(crate) fn new() -> Self {
+        Self::new_with(|| {})
+    }
+}
+
+impl<const P: u8> Clone for GenericPeripheralGuard<P> {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+
+    fn clone_from(&mut self, _source: &Self) {
+        // This is a no-op since the ref count for P remains the same.
+    }
+}
+
+impl<const P: u8> Drop for GenericPeripheralGuard<P> {
+    fn drop(&mut self) {
+        let peripheral = const { Peripheral::try_from(P).unwrap() };
+        PeripheralClockControl::disable(peripheral);
+    }
+}
+
+/// Controls the enablement of peripheral clocks.
+pub(crate) struct PeripheralClockControl;
+
+impl PeripheralClockControl {
+    fn request_peripheral(p: Peripheral, init: fn()) {
+        PERIPHERAL_REF_COUNT.with(|ref_counts| {
+            if Self::enable_with_counts(p, ref_counts) {
+                unsafe { Self::reset_racey(p) };
+                init();
+            }
+        });
+    }
+
+    /// Enables the given peripheral.
+    ///
+    /// This keeps track of enabling a peripheral - i.e. a peripheral
+    /// is only enabled with the first call attempt to enable it.
+    ///
+    /// Returns whether it actually enabled the peripheral.
+    pub(crate) fn enable(peripheral: Peripheral) -> bool {
+        PERIPHERAL_REF_COUNT.with(|ref_counts| Self::enable_with_counts(peripheral, ref_counts))
+    }
+
+    /// Sets a caller-managed clock gate without changing its reference count.
+    pub(crate) fn set_enabled_untracked(peripheral: Peripheral, enabled: bool) {
+        PERIPHERAL_REF_COUNT.with(|_| unsafe { enable_internal_racey(peripheral, enabled) });
+    }
+
+    /// Enables the given peripheral.
+    ///
+    /// This keeps track of enabling a peripheral - i.e. a peripheral
+    /// is only enabled with the first call attempt to enable it.
+    ///
+    /// Returns whether it actually enabled the peripheral.
+    fn enable_with_counts(peripheral: Peripheral, ref_counts: &mut RefCounts) -> bool {
+        Self::enable_forced_with_counts(peripheral, true, false, ref_counts)
+    }
+
+    /// Disables the given peripheral.
+    ///
+    /// This keeps track of disabling a peripheral - i.e. it only
+    /// gets disabled when the number of enable/disable attempts is balanced.
+    ///
+    /// Returns whether it actually disabled the peripheral.
+    pub(crate) fn disable(peripheral: Peripheral) -> bool {
+        PERIPHERAL_REF_COUNT.with(|ref_counts| {
+            Self::enable_forced_with_counts(peripheral, false, false, ref_counts)
+        })
+    }
+
+    fn enable_forced_with_counts(
+        peripheral: Peripheral,
+        enable: bool,
+        force: bool,
+        ref_counts: &mut RefCounts,
+    ) -> bool {
+        let ref_count = &mut ref_counts.counts[peripheral as usize];
+        if !force {
+            let prev = *ref_count;
+            if enable {
+                *ref_count += 1;
+                trace!("Enable {:?} {} -> {}", peripheral, prev, *ref_count);
+                if prev > 0 {
+                    return false;
+                }
+            } else {
+                assert!(prev != 0);
+                *ref_count -= 1;
+                trace!("Disable {:?} {} -> {}", peripheral, prev, *ref_count);
+                if prev > 1 {
+                    return false;
+                }
+            };
+        } else if !enable {
+            assert!(*ref_count == 0);
+        }
+
+        debug!("Enable {:?} {}", peripheral, enable);
+        unsafe { enable_internal_racey(peripheral, enable) };
+
+        true
+    }
+
+    /// Resets the given peripheral.
+    pub(crate) unsafe fn reset_racey(peripheral: Peripheral) {
+        debug!("Reset {:?}", peripheral);
+
+        unsafe {
+            assert_peri_reset_racey(peripheral, true);
+            assert_peri_reset_racey(peripheral, false);
+        }
+    }
+
+    /// Resets the given peripheral.
+    pub(crate) fn reset(peripheral: Peripheral) {
+        PERIPHERAL_REF_COUNT.with(|_| unsafe { Self::reset_racey(peripheral) })
+    }
+
+    pub(crate) fn set_reset(peripheral: Peripheral, reset: bool) {
+        PERIPHERAL_REF_COUNT.with(|_| unsafe { assert_peri_reset_racey(peripheral, reset) });
+    }
+}
+
+/// Available CPU cores
+///
+/// The actual number of available cores depends on the target.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::FromRepr)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(C)]
+pub enum Cpu {
+    /// The first core.
+    ProCpu = 0,
+    /// The second core.
+    #[cfg(multi_core)]
+    AppCpu = 1,
+}
+
+impl Cpu {
+    /// The number of available cores.
+    pub const COUNT: usize = 1 + cfg!(multi_core) as usize;
+
+    #[procmacros::doc_replace]
+    /// Returns the core the application is currently executing on.
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// #
+    /// use esp_hal::system::Cpu;
+    /// let current_cpu = Cpu::current();
+    /// #
+    /// # {after_snippet}
+    /// ```
+    #[inline(always)]
+    pub fn current() -> Self {
+        // `raw_core` returns 0 on the first core, and 1 (RISC-V) or 0x2000 (Xtensa) on the
+        // second core. Code that runs with the caches suspended calls this function, so it
+        // must not panic.
+        cfg_select! {
+            multi_core => {
+                if raw_core() == 0 {
+                    Cpu::ProCpu
+                } else {
+                    Cpu::AppCpu
+                }
+            }
+            _ => Cpu::ProCpu,
+        }
+    }
+
+    /// Returns an iterator over the "other" cores.
+    #[inline(always)]
+    #[instability::unstable]
+    pub fn other() -> impl Iterator<Item = Self> {
+        cfg_select! {
+            multi_core => match Self::current() {
+                Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
+                Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
+            },
+            _ => [].into_iter(),
+        }
+    }
+
+    /// Returns an iterator over all cores.
+    #[inline(always)]
+    pub fn all() -> impl Iterator<Item = Self> {
+        cfg_select! {
+            multi_core => [Cpu::ProCpu, Cpu::AppCpu].into_iter(),
+            _ => [Cpu::ProCpu].into_iter(),
+        }
+    }
+}
+
+/// Returns the raw value of the mhartid register.
+///
+/// On RISC-V, this is the hardware thread ID.
+///
+/// On Xtensa, this returns the result of reading the PRID register logically
+/// ANDed with 0x2000, the 13th bit in the register. Espressif Xtensa chips use
+/// this bit to determine the core id.
+#[inline(always)]
+pub(crate) fn raw_core() -> usize {
+    cfg_select! {
+        all(multi_core, riscv) => riscv::register::mhartid::read(),
+        all(multi_core, xtensa) => (xtensa_lx::get_processor_id() & 0x2000) as usize,
+        _ => 0,
+    }
+}
+
+use crate::rtc_cntl::SocResetReason;
+
+#[procmacros::doc_replace]
+/// Performs a software reset on the chip.
+///
+/// # Examples
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::system::software_reset;
+/// software_reset();
+/// # {after_snippet}
+/// ```
+#[inline]
+pub fn software_reset() -> ! {
+    let _uart0_sclk_guard = ensure_uart0_sclk_enabled();
+    #[cfg(any(esp32h4, esp32p4, esp32s31))]
+    crate::soc::cpu_control::pre_system_reset();
+    crate::rom::software_reset()
+}
+
+/// Resets the given CPU, leaving peripherals unchanged.
+#[instability::unstable]
+#[inline]
+pub fn software_reset_cpu(cpu: Cpu) {
+    let _uart0_sclk_guard = ensure_uart0_sclk_enabled();
+    crate::rom::software_reset_cpu(cpu as u32)
+}
+
+/// Guard for a temporary UART0 source-clock request.
+///
+/// Drops its request when dropped. If no request was needed, this is a no-op.
+#[must_use = "dropping the guard releases the UART0 source clock"]
+pub(crate) struct Uart0SclkGuard {
+    release: bool,
+}
+
+impl Drop for Uart0SclkGuard {
+    fn drop(&mut self) {
+        if self.release {
+            release_uart0_sclk();
+        }
+    }
+}
+
+/// Ensures UART0's source clock stays enabled for boot ROM compatibility.
+///
+/// On some chips, resetting or waking up while UART0's source clock is disabled
+/// can prevent the boot ROM from starting correctly. This only requests the
+/// clock when UART0 already has a function-clock configuration; otherwise the
+/// returned guard is a no-op.
+#[inline(always)]
+pub(crate) fn ensure_uart0_sclk_enabled() -> Uart0SclkGuard {
+    Uart0SclkGuard {
+        release: request_uart0_sclk(),
+    }
+}
+
+#[cfg(soc_has_clock_node_uart_function_clock)]
+fn request_uart0_sclk() -> bool {
+    crate::soc::clocks::ClockTree::with(|clocks| {
+        let uart = crate::soc::clocks::UartInstance::Uart0;
+        if uart.function_clock_config(clocks).is_some() {
+            uart.request_function_clock(clocks);
+            true
+        } else {
+            false
+        }
+    })
+}
+
+#[cfg(not(soc_has_clock_node_uart_function_clock))]
+fn request_uart0_sclk() -> bool {
+    false
+}
+
+#[cfg(soc_has_clock_node_uart_function_clock)]
+fn release_uart0_sclk() {
+    crate::soc::clocks::ClockTree::with(|clocks| {
+        crate::soc::clocks::UartInstance::Uart0.release_function_clock(clocks);
+    });
+}
+
+#[cfg(not(soc_has_clock_node_uart_function_clock))]
+fn release_uart0_sclk() {}
+
+/// Guard for the clock shared by the crypto accelerators.
+#[cfg(feature = "unstable")]
+#[must_use = "dropping the guard releases the crypto clock"]
+pub(crate) struct CryptoClockGuard;
+
+#[cfg(feature = "unstable")]
+impl CryptoClockGuard {
+    /// Request the clock that drives the crypto accelerators.
+    ///
+    /// The clock is called `CRYPTO_CLK` on most chips, and `CRYPTO_PWM_CLK` on the ESP32-S3, where
+    /// the MCPWM peripherals share it.
+    #[inline(always)]
+    pub(crate) fn new() -> Self {
+        Self::request();
+        Self
+    }
+
+    fn request() {
+        cfg_select! {
+            soc_has_clock_node_crypto_clk => {
+                crate::soc::clocks::ClockTree::with(|clocks| {
+                    crate::soc::clocks::request_crypto_clk(clocks);
+                });
+            }
+            soc_has_clock_node_crypto_pwm_clk => {
+                crate::soc::clocks::ClockTree::with(|clocks| {
+                    crate::soc::clocks::request_crypto_pwm_clk(clocks);
+                });
+            }
+            _ => {}
+        }
+    }
+
+    fn release() {
+        cfg_select! {
+            soc_has_clock_node_crypto_clk => {
+                crate::soc::clocks::ClockTree::with(|clocks| {
+                    crate::soc::clocks::release_crypto_clk(clocks);
+                });
+            }
+            soc_has_clock_node_crypto_pwm_clk => {
+                crate::soc::clocks::ClockTree::with(|clocks| {
+                    crate::soc::clocks::release_crypto_pwm_clk(clocks);
+                });
+            }
+            _ => {}
+        }
+    }
+}
+
+#[cfg(feature = "unstable")]
+impl Drop for CryptoClockGuard {
+    fn drop(&mut self) {
+        Self::release();
+    }
+}
+
+/// Retrieves the reason for the last reset as a SocResetReason enum value.
+/// Returns `None` if the reset reason cannot be determined.
+#[instability::unstable]
+#[inline]
+pub fn reset_reason() -> Option<SocResetReason> {
+    crate::rtc_cntl::reset_reason(Cpu::current())
+}
+
+/// Retrieves the cause(s) of the last wakeup event.
+///
+/// Returns the [`WakeupReason`][crate::rtc_cntl::WakeupReason] describing the source(s) that ended
+/// the most recent sleep. The result is empty if the chip was not woken from sleep.
+#[cfg(sleep_driver_supported)]
+#[instability::unstable]
+#[inline]
+pub fn wakeup_cause() -> crate::rtc_cntl::WakeupReason {
+    crate::rtc_cntl::wakeup_cause()
+}

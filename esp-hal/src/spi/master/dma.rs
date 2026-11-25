@@ -1,7 +1,7 @@
 use core::{
     cell::{Cell, UnsafeCell},
     cmp::min,
-    mem::{ManuallyDrop, MaybeUninit},
+    mem::{DropGuard, ManuallyDrop, MaybeUninit},
     pin::Pin,
     ptr::NonNull,
     sync::atomic::{Ordering, fence},
@@ -36,7 +36,6 @@ use crate::{
         prepare_for_tx,
     },
     pac::spi2::RegisterBlock,
-    private::DropGuard,
     soc::is_slice_in_dram,
     spi::{DmaError, master::low_level::SpiClockGuard},
 };
@@ -253,8 +252,8 @@ impl<'d> SpiDma<'d, Blocking> {
     }
 
     fn new_inner(spi: SpiWrapper<'d>, channel: SpiMasterErased<'d>) -> Self {
-        let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(spi.spi.dma_peripheral());
+        let mut channel = Channel::new(channel);
+        channel.connect(spi.spi.dma_peripheral());
 
         let state = spi.spi.dma_state();
 
@@ -264,7 +263,7 @@ impl<'d> SpiDma<'d, Blocking> {
         // Safety: The descriptors occupy their own shared cache line and are updated in a
         // synchronised fashion.
         let (tx_descriptors, rx_descriptors) = unsafe {
-            let descriptors = (&mut *state.descriptors.get()).get_mut().into_inner();
+            let descriptors = state.descriptors.as_mut_unchecked().get_mut().into_inner();
             descriptors.fill(DmaDescriptor::EMPTY);
             let (tx_descriptors, rx_descriptors) = descriptors.split_at_mut(1);
             (
@@ -409,6 +408,8 @@ impl<'d> SpiDma<'d, Async> {
             }
             self.dma_driver().state.tx_transfer_in_progress.set(false);
         }
+        self.channel.rx.end_transfer();
+        self.channel.tx.end_transfer();
     }
 
     /// Fills the given buffer with data from the bus.
@@ -771,7 +772,7 @@ impl<'d> SpiDma<'d, Async> {
             spi.start_dma_transfer(read_bytes, write_bytes, &mut rx_buffer, &mut tx_buffer)?;
         }
         spi.wait_for_idle_async().await;
-        spi.defuse();
+        DropGuard::dismiss(spi);
         Ok(())
     }
 
@@ -798,7 +799,7 @@ impl<'d> SpiDma<'d, Async> {
             )?;
         }
         spi.wait_for_idle_async().await;
-        spi.defuse();
+        DropGuard::dismiss(spi);
         Ok(())
     }
 
@@ -825,7 +826,7 @@ impl<'d> SpiDma<'d, Async> {
             )?;
         }
         spi.wait_for_idle_async().await;
-        spi.defuse();
+        DropGuard::dismiss(spi);
         Ok(())
     }
 }
@@ -909,10 +910,8 @@ impl<'a> MaybeCopyRxBuf<'a> {
                 align_buffer,
                 ..
             } => {
-                #[cfg(soc_internal_memory_cached)]
-                unsafe {
-                    crate::soc::cache_invalidate_addr(chunk.as_ptr() as u32, chunk.len() as u32);
-                }
+                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                crate::dma::invalidate_received(NonNull::from(&*chunk));
 
                 #[cfg(dma_can_access_psram)]
                 for buffer in align_buffer.iter_mut() {
@@ -952,9 +951,12 @@ impl DmaOperationKind {
             if is_slice_in_psram(buffer) {
                 #[cfg(spi_master_version = "2")]
                 if _direction == TransferDirection::In {
-                    // For some reason, having tail bytes in internal RAM causes issues, so we
-                    // force copying if the end of the PSRAM buffer is not aligned.
-                    let tail_bytes = (buffer.as_ptr() as usize + buffer.len()).wrapping_neg() & 15;
+                    // The S2's DMA does not write an internal descriptor that follows a PSRAM
+                    // descriptor. A PSRAM buffer that does not end on a cache line would need an
+                    // internal tail bounce buffer, so the DMA receives into the driver's internal
+                    // buffer instead, and the CPU copies the data to the PSRAM buffer.
+                    let tail_bytes = (buffer.as_ptr() as usize + buffer.len()).wrapping_neg()
+                        & (crate::dma::aligned::PSRAM_CACHE_LINE - 1);
                     if tail_bytes > 0 {
                         return false;
                     }
@@ -1012,6 +1014,7 @@ where
         DmaDriver {
             driver: self.driver(),
             state: self.spi().dma_state(),
+            #[cfg(spi_master_version = "1")]
             dma_peripheral: self.spi.spi.dma_peripheral(),
         }
     }
@@ -1041,6 +1044,8 @@ where
         }
         self.dma_driver().state.rx_transfer_in_progress.set(false);
         self.dma_driver().state.tx_transfer_in_progress.set(false);
+        self.channel.rx.end_transfer();
+        self.channel.tx.end_transfer();
         fence(Ordering::Acquire);
     }
 
@@ -1812,6 +1817,7 @@ where
 
 pub(super) struct DmaDriver {
     driver: Driver,
+    #[cfg(spi_master_version = "1")]
     dma_peripheral: crate::dma::DmaPeripheral,
     state: &'static DmaState,
 }
@@ -1852,6 +1858,8 @@ impl DmaDriver {
             self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
             self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
         }
+        #[cfg(spi_master_version = "1")]
+        crate::dma::connect_spi_dma(self.dma_peripheral, false);
     }
 
     fn regs(&self) -> &RegisterBlock {
@@ -1888,7 +1896,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .rx
-                    .prepare_transfer(self.dma_peripheral, rx_buffer)
+                    .prepare_transfer(rx_buffer)
                     .and_then(|_| channel.rx.start_transfer())?;
             }
         } else {
@@ -1910,7 +1918,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .tx
-                    .prepare_transfer(self.dma_peripheral, tx_buffer)
+                    .prepare_transfer(tx_buffer)
                     .and_then(|_| channel.tx.start_transfer())?;
             }
         }
@@ -1926,6 +1934,8 @@ impl DmaDriver {
     fn enable_dma(&self) {
         cfg_select! {
             any(spi_master_version = "1", spi_master_version = "2") => {
+                #[cfg(spi_master_version = "1")]
+                crate::dma::connect_spi_dma(self.dma_peripheral, true);
                 self.reset_dma();
             }
             _ => {
@@ -2007,7 +2017,7 @@ impl DmaState {
         reason = "Safety requirements ensure this is okay"
     )]
     unsafe fn rx_buffer(&self) -> &mut ScopedDmaRxBuf<'static> {
-        unsafe { (&mut *self.rx_buffer.get()).assume_init_mut() }
+        unsafe { self.rx_buffer.as_mut_unchecked().assume_init_mut() }
     }
 
     // Syntactic helper to get a mutable reference to the "empty" TX DMA buffer.
@@ -2020,7 +2030,7 @@ impl DmaState {
         reason = "Safety requirements ensure this is okay"
     )]
     unsafe fn tx_buffer(&self) -> &mut ScopedDmaTxBuf<'static> {
-        unsafe { (&mut *self.tx_buffer.get()).assume_init_mut() }
+        unsafe { self.tx_buffer.as_mut_unchecked().assume_init_mut() }
     }
 }
 

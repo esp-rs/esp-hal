@@ -49,7 +49,7 @@ mod quad_xtensa;
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
-#[cfg_attr(any(esp32c5, esp32c61), path = "esp32c5_c61.rs")]
+#[cfg_attr(any(esp32c5, esp32c61, esp32h4), path = "esp32c5_c61.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4.rs")]
 #[cfg_attr(esp32s31, path = "esp32s31.rs")]
 pub(crate) mod implem;
@@ -91,6 +91,7 @@ const EXTMEM_ORIGIN: usize = property!("psram.extmem_origin");
 static MAPPED_PSRAM_START: AtomicUsize = AtomicUsize::new(0);
 static MAPPED_PSRAM_END: AtomicUsize = AtomicUsize::new(0);
 
+#[inline(always)]
 pub(crate) fn psram_range() -> Range<usize> {
     let end = MAPPED_PSRAM_END.load(Ordering::Acquire);
     let start = MAPPED_PSRAM_START.load(Ordering::Relaxed);
@@ -118,6 +119,9 @@ impl Psram {
             let range = map_psram(config);
 
             unsafe { set_psram_range(range) };
+
+            #[cfg(all(cache_livelock_workaround, feature = "rt"))]
+            crate::soc::cache_livelock::psram_mapped();
         }
         Self { _peri: peri }
     }

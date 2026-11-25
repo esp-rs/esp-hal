@@ -10,7 +10,7 @@ inputs:
   current-xtensa-version:
     description: Xtensa Rust release for the "current" channel.
     required: false
-    default: "1.97.0.0"
+    default: "1.100.0.0"
   xtensa:
     description: When "true", install the Xtensa toolchain.
     required: false
@@ -124,3 +124,10 @@ runs:
         toolchain: ${{ steps.pins.outputs.riscv-toolchain }}
         targets: ${{ steps.chips.outputs.targets }}
         components: ${{ inputs.riscv-components }}
+
+    # Host tools (xtask, esp-metadata) build with the default toolchain, which the runner image may
+    # ship older than the MSRV.
+    - if: inputs.riscv != 'true' && inputs.xtensa-default != 'true'
+      uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: ${{ steps.pins.outputs.riscv-toolchain }}

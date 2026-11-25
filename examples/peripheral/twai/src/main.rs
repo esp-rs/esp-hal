@@ -34,15 +34,15 @@ use esp_hal::{
     main,
     twai::{self, EspTwaiFrame, StandardId, TwaiMode, filter::SingleStandardFilter},
 };
-use esp_println::println;
 use nb::block;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     // Without an external transceiver, we only need a single line between the two
     // MCUs.
@@ -88,7 +88,7 @@ fn main() -> ! {
         // Use `new_self_reception` if you want to use self-testing.
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         block!(twai.transmit(&frame)).unwrap();
-        println!("Sent a frame");
+        log::info!("Sent a frame");
     }
 
     let delay = Delay::new();
@@ -96,12 +96,12 @@ fn main() -> ! {
         // Wait for a frame to be received.
         let frame = block!(twai.receive()).unwrap();
 
-        println!("Received a frame: {frame:?}");
+        log::info!("Received a frame: {frame:?}");
         delay.delay_millis(250);
 
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         // Transmit a new frame back to the other ESP
         block!(twai.transmit(&frame)).unwrap();
-        println!("Sent a frame");
+        log::info!("Sent a frame");
     }
 }

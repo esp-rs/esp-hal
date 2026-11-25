@@ -33,8 +33,10 @@ impl FlashStorage<'_> {
             // Read only needed data words
             let sector_data = &mut sector_data.as_bytes_mut()[..aligned_end];
             self.internal_read(aligned_offset, sector_data)?;
+            // SAFETY: internal_read initialized this prefix. The remaining buffer stays
+            // uninitialized.
             let sector_data = unsafe {
-                core::slice::from_raw_parts_mut(sector_data.as_ptr() as *mut u8, sector_data.len())
+                core::slice::from_raw_parts(sector_data.as_ptr().cast::<u8>(), sector_data.len())
             };
             bytes[..len].copy_from_slice(&sector_data[data_offset as usize..][..len]);
 

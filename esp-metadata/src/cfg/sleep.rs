@@ -16,6 +16,25 @@ pub(crate) struct SleepRetentionProperties {
     cpu_retention: Option<String>,
     /// Register context frame shape for software CPU retention.
     cpu_retention_frame: Option<String>,
+    /// How the chip retains the modem MAC and baseband across light sleep with the modem domain
+    /// powered down.
+    ///
+    /// `backup_dma` chips copy the registers with the ROM backup DMA, into memory between
+    /// `cpu_retention_mem_start` and `cpu_retention_mem_end`. `regdma` chips use REGDMA link
+    /// lists. Either method also drives the `supports_modem_power_down` cfg.
+    modem_retention: Option<String>,
+    /// The number of REGDMA entries, each a separate link list. A branch node has one `next`
+    /// pointer for each entry.
+    regdma_list_count: Option<u32>,
+    /// The REGDMA has one link address for all entries, which points to a branch node.
+    ///
+    /// Without this, the PAU has one link address register for each entry.
+    #[serde(default)]
+    regdma_link_configurable: bool,
+    /// The REGDMA cannot reach the Bluetooth MAC and baseband on the XTAL clock of the sleep
+    /// transition, so software saves and restores them in the extra entry, while the PLL runs.
+    #[serde(default)]
+    regdma_bt_needs_pll: bool,
     #[serde(default)]
     supports_top_power_down: bool,
     #[serde(default)]
@@ -28,6 +47,8 @@ pub(crate) struct SleepRetentionProperties {
     cpu_retention_mem_size: Option<u32>,
     cpu_retention_mem_align: Option<u32>,
     /// First address the retention DMA can reach.
+    ///
+    /// The range also bounds the modem retention memory of `backup_dma` chips.
     cpu_retention_mem_start: Option<u32>,
     /// First address past the range the retention DMA can reach.
     cpu_retention_mem_end: Option<u32>,
@@ -42,6 +63,16 @@ impl GenericProperty for SleepRetentionProperties {
         }
         if let Some(frame) = &self.cpu_retention_frame {
             cfgs.push(format!("cpu_retention_frame=\"{frame}\""));
+        }
+        if let Some(mode) = &self.modem_retention {
+            cfgs.push(format!("modem_retention=\"{mode}\""));
+            cfgs.push("supports_modem_power_down".to_string());
+        }
+        if self.regdma_link_configurable {
+            cfgs.push("regdma_link_configurable".to_string());
+        }
+        if self.regdma_bt_needs_pll {
+            cfgs.push("regdma_bt_needs_pll".to_string());
         }
         if self.cpu_retention.is_some() {
             cfgs.push("supports_cpu_power_down".to_string());
@@ -88,6 +119,14 @@ impl GenericProperty for SleepRetentionProperties {
             branches.extend(quote! {
                 ("sleep.cpu_retention_mem_end") => {
                     #end
+                };
+            });
+        }
+        if let Some(count) = self.regdma_list_count {
+            let count = number(count);
+            branches.extend(quote! {
+                ("sleep.regdma_list_count") => {
+                    #count
                 };
             });
         }

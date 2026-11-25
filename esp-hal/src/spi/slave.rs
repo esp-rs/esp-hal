@@ -64,7 +64,7 @@ transfer.wait();
 //! then the `SpiDmaTransfer` object can be `wait()`ed on or polled for
 //! `is_done()`.
 //!
-//! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
+//! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/1437) for more information.
 
 use core::marker::PhantomData;
 
@@ -212,8 +212,8 @@ pub mod dma {
 
     impl<'d> SpiDma<'d, Blocking> {
         pub(super) fn new(spi: AnySpi<'d>, channel: SpiSlaveErased<'d>) -> Self {
-            let channel = Channel::new(channel);
-            channel.runtime_ensure_compatible(spi.dma_peripheral());
+            let mut channel = Channel::new(channel);
+            channel.connect(spi.dma_peripheral());
             let guard = PeripheralGuard::new(spi.info().peripheral);
 
             Self {
@@ -231,7 +231,6 @@ pub mod dma {
         fn driver(&self) -> DmaDriver {
             DmaDriver {
                 info: self.spi.info(),
-                dma_peripheral: self.spi.dma_peripheral(),
             }
         }
 
@@ -423,6 +422,8 @@ pub mod dma {
                     self.spi_dma.channel.tx.stop_transfer();
                 }
             }
+            self.spi_dma.channel.rx.end_transfer();
+            self.spi_dma.channel.tx.end_transfer();
 
             let retval = unsafe {
                 (
@@ -452,7 +453,6 @@ pub mod dma {
 
     struct DmaDriver {
         info: &'static Info,
-        dma_peripheral: crate::dma::DmaPeripheral,
     }
 
     impl DmaDriver {
@@ -474,17 +474,13 @@ pub mod dma {
 
             if read_buffer_len > 0 {
                 unsafe {
-                    channel
-                        .rx
-                        .prepare_transfer(self.dma_peripheral, rx_buffer)?;
+                    channel.rx.prepare_transfer(rx_buffer)?;
                 }
             }
 
             if write_buffer_len > 0 {
                 unsafe {
-                    channel
-                        .tx
-                        .prepare_transfer(self.dma_peripheral, tx_buffer)?;
+                    channel.tx.prepare_transfer(tx_buffer)?;
                 }
             }
 
@@ -692,9 +688,19 @@ impl Info {
     /// Initializes for full-duplex 1 bit mode.
     fn init(&self) {
         #[cfg(soc_has_pcr)]
-        crate::peripherals::PCR::regs()
-            .spi2_clkm_conf()
-            .modify(|_, w| w.spi2_clkm_en().set_bit());
+        match self.peripheral {
+            #[cfg(soc_has_spi3)]
+            crate::system::Peripheral::Spi3 => {
+                crate::peripherals::PCR::regs()
+                    .spi3_clkm_conf()
+                    .modify(|_, w| w.spi3_clkm_en().set_bit());
+            }
+            _ => {
+                crate::peripherals::PCR::regs()
+                    .spi2_clkm_conf()
+                    .modify(|_, w| w.spi2_clkm_en().set_bit());
+            }
+        }
 
         self.regs().clock().write(|w| unsafe { w.bits(0) });
         self.regs().user().write(|w| unsafe { w.bits(0) });
@@ -757,8 +763,9 @@ impl Info {
             });
 
             if dma {
-                assert!(
-                    matches!(data_mode, Mode::_1 | Mode::_3),
+                assert_matches!(
+                    data_mode,
+                    Mode::_1 | Mode::_3,
                     "Mode {:?} is not supported with DMA",
                     data_mode
                 );

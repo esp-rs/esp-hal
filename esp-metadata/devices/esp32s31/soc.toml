@@ -1,9 +1,6 @@
 # ESP32-S31 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32s31"
@@ -12,14 +9,13 @@ target = "riscv32imafc-unknown-none-elf"
 cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_datasheet_en.pdf"
 trm       = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf"
-support_note = "In early stages of development."
 
 [device.mmu]
 page_size = 0x10000
 entry_num = 1024
 
 [device.flash]
-support_status = "partial"
+support_status = { status = "partial", issue = 6757 }
 
 [device.rom]
 has_crc_le  = true
@@ -28,21 +24,24 @@ has_md5_bsd = true
 
 [device.soc]
 multi_core_enabled = true
+cpu_pma_needs_core1_setup = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_has_zcmp_workaround = true
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x3f
 cpu_pmp_granularity = 128
+cpu_powers_down_cache = true
 
 has_swd_watchdog = true
+has_bus_clock_update = true
 
-# SRAM_START = 0x2F000000, SRAM_SEG_END = 0x2F07AFC0 (from esp-idf ld.hp_mem_defs)
-# dram2_uninit: SRAM_SEG_END..SOC_ROM_STACK_START (PRO CPU stack, reclaimable)
+# SOC_DRAM_LOW = 0x2F000000, SOC_DRAM_HIGH = 0x2F080000 (from soc.h)
 # SOC_ROM_STACK_START = 0x2F07CFB0 (from soc.h)
 memory_map = { ranges = [
-    { name = "dram", start = 0x2F00_0000, end = 0x2F07_AFC0 },
-    { name = "dram2_uninit", start = 0x2F07_AFC0, end = 0x2F07_CFB0 },
+    { name = "dram", start = 0x2F00_0000, end = 0x2F08_0000 },
+    # start address from the 2nd stage bootloader's linker script: https://github.com/espressif/esp-idf/blob/383dda6c182/components/bootloader/subproject/main/ld/esp32s31/bootloader.memory.ld.in#L52
+    { name = "dram2_uninit", start = 0x2F06_CFB0, end = 0x2F07_CFB0 },
     { name = "irom", start = 0x4000_0000, end = 0x5000_0000 },
     { name = "drom", start = 0x4000_0000, end = 0x5000_0000 },
 ] }
@@ -57,9 +56,12 @@ peripherals = [
     { name = "CLINT_OTHER_CORE" },
     { name = "CNNT_SYS", hidden = true },
     { name = "CNNT_IO_MUX", hidden = true },
+    { name = "CORDIC", interrupts = { peri = "CORDIC" }, clock_group = "CORDIC" },
+    { name = "DMA2D" },
     { name = "ETH", virtual = true, interrupts = { peri = "SBD" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
     { name = "EMAC_MAC", pac = "GMAC", hidden = true },
+    { name = "DAC", hidden = true },
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
@@ -77,6 +79,7 @@ peripherals = [
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
+    { name = "JPEG", interrupts = { peri = "JPEG" } },
     { name = "LCD_CAM", interrupts = { peri = "LCD_CAM" }, clock_group = "LCD_CAM" },
     { name = "IOMUX_MSPI_PIN", hidden = true },
     { name = "LP_AON_CLK_RST", pac = "LP_AON_CLKRST" },
@@ -91,10 +94,12 @@ peripherals = [
     { name = "MEM_MONITOR", pac = "MEM_MONITOR0" },
     { name = "MODEM_LPCON" },
     { name = "MODEM_SYSCON" },
+    { name = "PARL_IO", interrupts = { tx = "HP_PARLIO_TX", rx = "HP_PARLIO_RX" }, clock_group = "PARL_IO" },
     { name = "PAU" },
-    { name = "PCNT",  interrupts = { peri = "PCNT0" } },
-    { name = "PCNT1", interrupts = { peri = "PCNT1" } },
+    { name = "PCNT",  interrupts = { peri = "PCNT0" }, clock_group = "PCNT" },
+    { name = "PCNT1", interrupts = { peri = "PCNT1" }, clock_group = "PCNT" },
     { name = "PMU" },
+    { name = "PPA" },
     { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "RNG", pac = "TRNG" },
     { name = "RMT", interrupts = { peri = "RMT" }, clock_group = "RMT" },
@@ -114,6 +119,9 @@ peripherals = [
     { name = "TEE" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
+    { name = "TSENS", pac = "LP_TSENS", clock_group = "TSENS" },
+    { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" }, clock_group = "TWAI" },
+    { name = "TWAI1", interrupts = { peri = "TWAI1", timer = "TWAI1_TIMER" }, clock_group = "TWAI" },
     { name = "UART0", interrupts = { peri = "UART0" }, clock_group = "UART", stable = true },
     { name = "UART1", interrupts = { peri = "UART1" }, clock_group = "UART", stable = true },
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART", stable = true },
@@ -149,7 +157,7 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 context_switch_source = "ipc"
 
 [device.timergroup]
-support_status = "partial"
+support_status = { status = "partial", issue = 6779 }
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_timer1 = true
 timg_has_divcnt_rst = true
@@ -157,21 +165,22 @@ rc_fast_calibration = { divider = 50, min_rev = 0 }
 wdt_has_conf_update = true
 
 [device.gpio]
-support_status = "supported"
+support_status = { status = "supported", issue = 6758 }
 # {include gpio.toml}
 
 [device.dedicated_gpio]
 version = "riscv_v2"
-support_status = "partial"
+support_status = { status = "partial", issue = 6753 }
 channels = [
     ["CPU_GPIO_0", "CPU_GPIO_1",  "CPU_GPIO_2",  "CPU_GPIO_3",  "CPU_GPIO_4",  "CPU_GPIO_5",  "CPU_GPIO_6",  "CPU_GPIO_7" ],
     ["CPU_GPIO_8", "CPU_GPIO_9",  "CPU_GPIO_10", "CPU_GPIO_11", "CPU_GPIO_12", "CPU_GPIO_13", "CPU_GPIO_14", "CPU_GPIO_15"],
 ]
 
 [device.io_mux]
+support_status = { status = "partial", issue = 6758 }
 
 [device.uart]
-support_status = "supported"
+support_status = { status = "supported", issue = 6782 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
@@ -184,7 +193,7 @@ peripheral_controls_mem_clk = true
 has_sclk_enable = true
 
 [device.i2c_master]
-support_status = "supported"
+support_status = { status = "supported", issue = 6760 }
 version = 4
 instances = [
     { name = "i2c0", sys_instance = "I2c0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
@@ -210,23 +219,25 @@ version = "lp_i2c"
 fifo_size = 16
 
 [device.systimer]
+support_status = { status = "partial", issue = 6777 }
 
 [device.lp_timer]
 
 [device.assist_debug]
-support_status = "not_supported"
-has_sp_monitor = false
+support_status = { status = "partial", issue = 6749 }
+has_sp_monitor = true
 has_region_monitor = true
 
 [device.rng]
-support_status = { status = "partial", issue = 5977 }
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = false
 
 [device.sleep]
-support_status = "partial"
+support_status = { status = "partial", issue = 6743 }
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 ext1_version = 3
 pin_wakeup_version = 3
@@ -245,16 +256,20 @@ wakeup_sources = {
 
 [device.sleep.retention]
 cpu_retention = "software"
+modem_retention = "regdma"
+regdma_list_count = 5
+regdma_link_configurable = true
 cpu_retention_frame = "s31"
 supports_top_power_down = true
 
 [device.usb_otg_hs]
+support_status = { status = "partial", issue = 6786 }
 fifo_depth_words = 896
 
 [device.spi_master]
 version = 3
 fifo_size = 64
-support_status = "supported"
+support_status = { status = "supported", issue = 6776 }
 has_octal = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
@@ -276,7 +291,7 @@ instances = [
 ]
 
 [device.spi_slave]
-support_status = "partial"
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",
@@ -297,15 +312,16 @@ instances = [
 ]
 
 [device.dma]
-support_status = "partial"
+support_status = { status = "partial", issue = 6754 }
 gdma_version = 3
 separate_in_out_interrupts = true
+psram_max_burst = 128
 # TODO: add LP_GDMA engine
 engines = [
     {
         name = "AHB_GDMA",
         max_priority = 15,
-        burst_sizes = [0, 4, 16, 32, 64],
+        burst_sizes = [4, 16, 32, 64],
         drivers = ["uhci", "i2s"],
         peripheral_instances = [
             { name = "UHCI0", dma_id = 0 },
@@ -324,12 +340,12 @@ engines = [
         name = "AXI_GDMA",
         max_priority = 15,
         burst_sizes = [8, 16, 32, 64, 128],
-        drivers = ["spi_master", "spi_slave", "aes", "lcd_cam"],
+        drivers = ["spi_master", "spi_slave", "aes", "lcd_cam", "parl_io"],
         peripheral_instances = [
             { name = "LCD_CAM", dma_id = 0 },
             { name = "SPI2", dma_id = 1 },
             { name = "SPI3", dma_id = 2 },
-            # PARL_IO
+            { name = "PARL_IO", dma_id = 3 },
             { name = "AES",  dma_id = 4 },
             { name = "SHA",  dma_id = 5 },
         ],
@@ -342,7 +358,7 @@ engines = [
 ]
 
 [device.ecc]
-support_status = { status = "partial", issue = 5972 }
+support_status = "partial"
 working_modes = [
     { id = 0, mode = "affine_point_multiplication" },
     { id = 2, mode = "affine_point_verification" },
@@ -357,17 +373,17 @@ working_modes = [
     { id = 11, mode = "modular_division" }
 ]
 curves = [
-    { id = 0, curve = 192 },
-    { id = 1, curve = 256 },
-    { id = 2, curve = 384 },
-    # TODO: SM2 = 3
+    { id = 0, curve = "p192" },
+    { id = 1, curve = "p256" },
+    { id = 2, curve = "p384" },
+    { id = 3, curve = "sm2" },
 ]
 separate_jacobian_point_memory = true
 has_memory_clock_gate = true
 supports_enhanced_security = true
 
 [device.aes]
-support_status = "partial"
+support_status = { status = "partial", issue = 6748 }
 has_split_text_registers = true
 endianness_configurable = false
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128", "GCM"]
@@ -383,7 +399,7 @@ size_increment = 32
 memory_size_bytes = 512
 
 [device.sha]
-support_status = { status = "partial", issue = 5973 }
+support_status = { status = "partial", issue = 6775 }
 algo = {
     sha1 = 0,
     sha224 = 1,
@@ -404,17 +420,18 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.adc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6747 }
 instances = [
     { name = "adc1" },
     { name = "adc2" },
 ]
 
 [device.usb_serial_jtag]
-support_status = "partial"
+support_status = { status = "partial", issue = 6787 }
+phy_pads = ["USJ"]
 
 [device.camera]
-support_status = "partial"
+support_status = { status = "partial", issue = 6751 }
 
 # Peripherals the chip has, that no driver reaches yet.
 [device.avc]
@@ -422,20 +439,28 @@ support_status = "not_supported"
 [device.bit_scrambler]
 support_status = "not_supported"
 [device.dac]
-support_status = "not_supported"
-[device.ethernet]
 support_status = "partial"
+version = 2
+channel_count = 2
+resolution = 12
+[device.ethernet]
+support_status = { status = "partial", issue = 6755 }
 mii_via_gpio_matrix = true
 dma_burst_len = 16
+dma_alignment = 8
 has_rgmii = true
 rx_checksum_offload = true
 tx_checksum_offload = false # TX FIFO is too small for store-and-forward insertion
 [device.etm]
 support_status = "not_supported"
 [device.i2c_slave]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6761 }
+instances = [
+    { name = "i2c0" },
+    { name = "i2c1" },
+]
 [device.i2s]
-support_status = "partial"
+support_status = { status = "partial", issue = 6762 }
 version = 3
 clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 8
@@ -472,11 +497,13 @@ instances = [
     },
 ]
 [device.ieee802154]
+support_status = { status = "partial", issue = 6763 }
 [device.key_manager]
 support_status = "not_supported"
 [device.mcpwm]
 support_status = "not_supported"
 [device.pcnt]
+support_status = { status = "partial", issue = 6771 }
 instances = {
     PCNT = {
         sys_instance = "Pcnt",
@@ -500,21 +527,27 @@ instances = {
     },
 }
 [device.rgb_display]
-support_status = "partial"
+support_status = { status = "partial", issue = 6744 }
 output_lines = 24
+has_rgb_timing_registers = true
 
 [device.sdm]
 support_status = "partial"
 channel_count = 8
 
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6778 }
+register_block = "lp_tsens"
 [device.touch]
 support_status = "not_supported"
 [device.canfd]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6746 }
+instances = [
+    { name = "twai0", sys_instance = "Twai0", rx = "TWAI0_RX", tx = "TWAI0_TX" },
+    { name = "twai1", sys_instance = "Twai1", rx = "TWAI1_RX", tx = "TWAI1_TX" },
+]
 [device.uhci]
-support_status = "partial"
+support_status = { status = "partial", issue = 6783 }
 combined_uart_selector_field = true
 [device.ulp_riscv]
 support_status = "not_supported"
@@ -533,11 +566,13 @@ has_rx_wrap = true
 has_rx_demodulation = true
 
 [device.parl_io]
-support_status = "not_supported"
-version = 1 # FIXME placeholder
+support_status = { status = "partial", issue = 6770 }
+version = 2
+max_data_width = 16
+has_tx_cs = true
 
 [device.sdmmc]
-support_status = "partial"
+support_status = { status = "partial", issue = 6774 }
 delay_phase_num = 8 # FIXME: placeholder
 has_iomux = true
 has_gpio_matrix = false
@@ -564,7 +599,7 @@ slot_config = [
 
 ## Radio
 [device.wifi]
-support_status = "partial"
+support_status = { status = "partial", issue = 6788 }
 mac_version = 3
 has_wifi6 = true
 csi_supported = true
@@ -572,9 +607,10 @@ has_nan = true
 has_ftm = true
 
 [device.bt]
-support_status = "partial"
+support_status = { status = "partial", issue = 6750 }
 # IDF `porting_btdm` (nested config + `esp_*` VHCI), not the ESP32/C3/S3 OSI table
 controller = "btdm2"
+requires_fast_cpu = true
 
 [device.phy]
 support_status = "partial"
@@ -590,18 +626,25 @@ support_status = "not_supported"
 ram_size = 20 # FIXME: placeholder
 
 [device.psram]
-support_status = "partial"
+support_status = { status = "partial", issue = 6773 }
 extmem_origin = 0x5000_0000
+idle_low_speed_switch = true
 octal_spi = true
+has_timing_tuning = true
+
+[device.dma2d]
+support_status = "partial"
+tx_channel_count = 4
+rx_channel_count = 3
 
 [device.pixel_accelerator]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6772 }
 
 [device.asrc]
 support_status = "not_supported"
 
 [device.cordic]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.jpeg]
-support_status = "not_supported"
+support_status = "partial"

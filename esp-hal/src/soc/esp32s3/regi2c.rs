@@ -1,4 +1,7 @@
-use crate::rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c};
+use crate::{
+    peripherals::LPWR,
+    rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c},
+};
 
 define_regi2c! {
     master: REGI2C_BBPLL(0x66, 1) {
@@ -121,7 +124,17 @@ define_regi2c! {
     }
 }
 
+fn regi2c_enable_block(block: u8) {
+    if block == REGI2C_SAR_I2C.master {
+        LPWR::regs()
+            .ana_conf()
+            .modify(|_, w| w.sar_i2c_pu().set_bit());
+    }
+}
+
 pub(crate) fn regi2c_read(block: u8, host_id: u8, reg_add: u8) -> u8 {
+    regi2c_enable_block(block);
+
     unsafe extern "C" {
         pub(crate) fn esp_rom_regi2c_read(block: u8, block_hostid: u8, reg_add: u8) -> u8;
     }
@@ -129,6 +142,8 @@ pub(crate) fn regi2c_read(block: u8, host_id: u8, reg_add: u8) -> u8 {
 }
 
 pub(crate) fn regi2c_write(block: u8, host_id: u8, reg_add: u8, data: u8) {
+    regi2c_enable_block(block);
+
     unsafe extern "C" {
         pub(crate) fn rom_i2c_writeReg(block: u8, block_hostid: u8, reg_add: u8, indata: u8);
     }

@@ -15,6 +15,7 @@ mod tests {
 
     #[test]
     fn different_priority_levels_can_interrupt_each_other(p: Peripherals) {
+        hil_test::init_logger!(p);
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         #[handler(priority = Priority::min())]
@@ -50,5 +51,37 @@ mod tests {
 
         interrupt_low.raise();
         hil_test::assert_eq!(COUNTER.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    #[should_panic]
+    #[cfg(riscv)]
+    fn stack_guard_is_monitored_after_nested_interrupts(p: Peripherals) {
+        hil_test::init_logger!(p);
+        unsafe extern "C" {
+            static mut __stack_chk_guard: u32;
+        }
+
+        #[handler(priority = Priority::min())]
+        fn handler_low_prio() {
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR2::steal() }).reset();
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR3::steal() }).raise();
+        }
+
+        #[handler(priority = Priority::max())]
+        fn handler_high_prio() {
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR3::steal() }).reset();
+        }
+
+        let mut interrupt_low = SoftwareInterrupt::new(p.FROM_CPU_INTR2);
+        let mut interrupt_high = SoftwareInterrupt::new(p.FROM_CPU_INTR3);
+
+        interrupt_low.set_interrupt_handler(handler_low_prio);
+        interrupt_high.set_interrupt_handler(handler_high_prio);
+
+        // The high priority interrupt nests in the low priority one
+        interrupt_low.raise();
+
+        unsafe { (&raw mut __stack_chk_guard).write_volatile(0) };
     }
 }

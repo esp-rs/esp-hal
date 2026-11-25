@@ -1,18 +1,14 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "freq" => {
-        cfg(esp32h2) => "32",
-        _ => "80"
-    },
-    "channel" => {
-        cfg(any(esp32, esp32s2)) => "channel0",
-        cfg(any(esp32s3, esp32s31, esp32p4)) => "channel7",
-        _ => "channel2"
+    "rx_channel" => {
+        cfg(any(esp32, esp32s2)) => "RMT_CH1",
+        cfg(any(esp32s3, esp32s31, esp32p4)) => "RMT_CH4",
+        _ => "RMT_CH2"
     },
     "channels_desc" => {
         cfg(esp32) => "8 channels, each of them can be either receiver or transmitter",
         cfg(esp32s2) => "4 channels, each of them can be either receiver or transmitter",
-        cfg(any(esp32s3, esp32s31, esp32p4)) => "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals",
-        cfg(any(esp32c3, esp32c5, esp32c6, esp32h2)) => "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals",
+        cfg(any(esp32s3, esp32s31, esp32p4)) => "8 channels, `RMT_CH0`-`RMT_CH3` for transmitting signals and `RMT_CH4`-`RMT_CH7` for receiving signals",
+        cfg(any(esp32c3, esp32c5, esp32c6, esp32h2)) => "4 channels, `RMT_CH0` and `RMT_CH1` for transmitting signals and `RMT_CH2` and `RMT_CH3` for receiving signals",
     }
 ))]
 //! # Remote Control Peripheral (RMT)
@@ -34,70 +30,42 @@
 //!
 //! ### Channels
 //!
-//! There are __channels_desc__.
+//! There are __channels_desc__. Each channel is a peripheral singleton (`RMT_CH0`, …).
+//!
+//! A channel can use the RAM of the channels that follow it: pass a tuple of adjacent channel
+//! singletons, such as `(RMT_CH0, RMT_CH1)`. See [`TxInstance`] and [`RxInstance`] for the
+//! combinations of the chip.
 //!
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/peripherals/rmt.html)")]
 //! ## Configuration
-//! Each TX/RX channel has the same functionality controlled by a dedicated set
-//! of registers and is able to independently transmit or receive data. TX
-//! channels are indicated by n which is used as a placeholder for the channel
-//! number, and by m for RX channels.
+//!
+//! [`Rmt`] holds the settings that all channels share: the clock source and the group clock
+//! ([`RmtConfig`]). The channels come from [`Rmt::tx_channel`] and [`Rmt::rx_channel`], and
+//! each channel selects its own tick rate ([`TxConfig`], [`RxConfig`]).
 //!
 //! ## Examples
-//!
-//! ### Initialization
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! # use esp_hal::gpio::Level;
-//! # use esp_hal::peripherals::Peripherals;
-//! # use esp_hal::rmt::TxChannelConfig;
-//! # use esp_hal::rmt::Rmt;
-//! # use crate::esp_hal::rmt::TxChannelCreator;
-//! let rmt = Rmt::new(peripherals.RMT, Rate::from_mhz(__freq__))?;
-//! let mut channel = rmt
-//!     .channel0
-//!     .configure_tx(
-//!         &TxChannelConfig::default()
-//!             .with_clk_divider(1)
-//!             .with_idle_output_level(Level::Low)
-//!             .with_idle_output(false)
-//!             .with_carrier_modulation(false)
-//!             .with_carrier_high(1)
-//!             .with_carrier_low(1)
-//!             .with_carrier_level(Level::Low),
-//!     )?
-//!     .with_pin(peripherals.GPIO1);
-//! # {after_snippet}
-//! ```
 //!
 //! ### TX operation
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Level;
-//! # use esp_hal::rmt::{PulseCode, Rmt, TxChannelConfig, TxChannelCreator};
-//! #
-//! // Configure frequency based on chip type
-//! let rmt = Rmt::new(peripherals.RMT, Rate::from_mhz(__freq__))?;
+//! # use esp_hal::rmt::{PulseCode, Rmt, RmtConfig, TxConfig};
+//! let rmt = Rmt::new(peripherals.RMT, RmtConfig::default())?;
 //!
-//! let tx_config = TxChannelConfig::default().with_clk_divider(255);
-//!
+//! let tx_config = TxConfig::default().with_tick_rate(Rate::from_mhz(1));
 //! let mut channel = rmt
-//!     .channel0
-//!     .configure_tx(&tx_config)?
+//!     .tx_channel(peripherals.RMT_CH0, tx_config)?
 //!     .with_pin(peripherals.GPIO4);
 //!
 //! let delay = Delay::new();
 //!
 //! let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
-//! data[data.len() - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
-//! data[data.len() - 1] = PulseCode::end_marker();
+//! data[data.len() - 1] = PulseCode::new(Level::High, 3000, Level::Low, 500);
 //!
 //! loop {
-//!     let transaction = channel.transmit(&data)?;
-//!     channel = transaction.wait()?;
+//!     channel.transmit(&data)?;
 //!     delay.delay_millis(500);
 //! }
 //! # }
@@ -106,102 +74,25 @@
 //! ### RX operation
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator};
-//! # use esp_hal::delay::Delay;
-//! # use esp_hal::gpio::{Level, Output, OutputConfig};
-//! #
-//! const WIDTH: usize = 80;
+//! # use esp_hal::rmt::{PulseCode, Rmt, RmtConfig, RxConfig};
+//! let rmt = Rmt::new(peripherals.RMT, RmtConfig::default())?;
 //!
-//! let mut out = Output::new(peripherals.GPIO5, Level::Low, OutputConfig::default());
-//!
-//! // Configure frequency based on chip type
-//! let rmt = Rmt::new(peripherals.RMT, Rate::from_mhz(__freq__))?;
-//!
-//! let rx_config = RxChannelConfig::default()
-//!     .with_clk_divider(1)
-//!     .with_idle_threshold(10000);
+//! let rx_config = RxConfig::default()
+//!     .with_tick_rate(Rate::from_mhz(1))
+//!     .with_idle_ns(10_000_000);
 //! let mut channel = rmt
-//!     .__channel__
-//!     .configure_rx(&rx_config)?
+//!     .rx_channel(peripherals.__rx_channel__, rx_config)?
 //!     .with_pin(peripherals.GPIO4);
-//! let delay = Delay::new();
-//! let mut data: [PulseCode; 48] = [PulseCode::default(); 48];
 //!
-//! loop {
-//!     for x in data.iter_mut() {
-//!         x.reset()
-//!     }
-//!
-//!     let transaction = channel.receive(&mut data)?;
-//!
-//!     // Simulate input
-//!     for i in 0u32..5u32 {
-//!         out.set_high();
-//!         delay.delay_micros(i * 10 + 20);
-//!         out.set_low();
-//!         delay.delay_micros(i * 20 + 20);
-//!     }
-//!
-//!     match transaction.wait() {
-//!         Ok((symbol_count, channel_res)) => {
-//!             channel = channel_res;
-//!             let mut total = 0usize;
-//!             for entry in &data[..symbol_count] {
-//!                 if entry.length1() == 0 {
-//!                     break;
-//!                 }
-//!                 total += entry.length1() as usize;
-//!
-//!                 if entry.length2() == 0 {
-//!                     break;
-//!                 }
-//!                 total += entry.length2() as usize;
-//!             }
-//!
-//!             for entry in &data[..symbol_count] {
-//!                 if entry.length1() == 0 {
-//!                     break;
-//!                 }
-//!
-//!                 let count = WIDTH / (total / entry.length1() as usize);
-//!                 let c = match entry.level1() {
-//!                     Level::High => '-',
-//!                     Level::Low => '_',
-//!                 };
-//!                 for _ in 0..count + 1 {
-//!                     print!("{}", c);
-//!                 }
-//!
-//!                 if entry.length2() == 0 {
-//!                     break;
-//!                 }
-//!
-//!                 let count = WIDTH / (total / entry.length2() as usize);
-//!                 let c = match entry.level2() {
-//!                     Level::High => '-',
-//!                     Level::Low => '_',
-//!                 };
-//!                 for _ in 0..count + 1 {
-//!                     print!("{}", c);
-//!                 }
-//!             }
-//!
-//!             println!();
-//!         }
-//!         Err((_err, channel_res)) => {
-//!             channel = channel_res;
-//!         }
-//!     }
-//!
-//!     delay.delay_millis(1500);
+//! let mut data = [PulseCode::default(); 48];
+//! let count = channel.receive(&mut data)?;
+//! for code in &data[..count] {
+//!     println!("{:?}", code);
 //! }
-//! # }
+//! # {after_snippet}
 //! ```
-//!
-//! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{
-    default::Default,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
@@ -209,14 +100,15 @@ use core::{
 
 use enumset::{EnumSet, EnumSetType};
 use esp_sync::RawMutex;
-use portable_atomic::Ordering;
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
 
 use crate::{
     Async,
     Blocking,
+    DriverMode,
     asynch::AtomicWaker,
+    clock::CpuFrequencyLock,
     gpio::{
         self,
         InputConfig,
@@ -236,19 +128,19 @@ use reader::{ReaderState, RmtReader};
 mod writer;
 use writer::{RmtWriter, WriterState};
 
-/// A configuration error.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Errors of [`Rmt`] and of the channel constructors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
-    /// The desired frequency is impossible to reach.
-    UnreachableTargetFrequency,
-    /// The idle threshold exceeds [`MAX_RX_IDLE_THRESHOLD`].
-    IdleThresholdOutOfRange,
-    /// The memsize is 0 or larger than what the channel can support.
-    MemsizeOutOfRange,
-    /// (Part of) the requested channel memory is in use by another channel.
-    MemoryBlockNotAvailable,
+    /// The tick rate is above the group clock, or below the group clock divided by 256.
+    UnreachableTickRate,
+
+    /// The carrier frequency or duty cycle cannot be reached.
+    UnreachableCarrier,
+
+    /// A receive limit is out of range at the actual clock rates.
+    RxLimitOutOfRange,
 }
 
 impl core::error::Error for ConfigError {}
@@ -256,49 +148,86 @@ impl core::error::Error for ConfigError {}
 impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::UnreachableTargetFrequency => {
-                write!(f, "The desired frequency is impossible to reach")
-            }
-            Self::IdleThresholdOutOfRange => write!(f, "The idle threshold is out of range"),
-            Self::MemsizeOutOfRange => write!(f, "The memsize is out of range"),
-            Self::MemoryBlockNotAvailable => {
-                write!(f, "Memory block is not available for channel")
-            }
+            Self::UnreachableTickRate => write!(f, "The tick rate cannot be reached"),
+            Self::UnreachableCarrier => write!(f, "The carrier cannot be reached"),
+            Self::RxLimitOutOfRange => write!(f, "A receive limit is out of range"),
         }
     }
 }
 
-/// Errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Errors of a transmission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 #[non_exhaustive]
-pub enum Error {
-    /// The amount of pulses exceeds the size of the FIFO.
-    Overflow,
-    /// An argument is invalid.
-    InvalidArgument,
-    /// An error occurred during transmission.
-    TransmissionError,
-    /// No transmission end marker found.
-    EndMarkerMissing,
-    /// The data length is invalid.
-    InvalidDataLength,
-    /// Receiver error most likely RMT memory overflow.
-    ReceiverError,
+pub enum TxError {
+    /// The transmission ended before the driver wrote all data to channel RAM.
+    Underrun,
+
+    /// The data and the end marker do not fit in the channel RAM (loop mode).
+    DataTooLong,
+
+    /// The loop count is above [`MAX_TX_LOOPCOUNT`].
+    #[cfg(rmt_has_tx_loop_count)]
+    LoopCountOutOfRange,
 }
 
-impl core::error::Error for Error {}
+impl core::error::Error for TxError {}
 
-impl core::fmt::Display for Error {
+impl core::fmt::Display for TxError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Overflow => write!(f, "The amount of pulses exceeds the size of the FIFO"),
-            Self::InvalidArgument => write!(f, "An argument is invalid"),
-            Self::TransmissionError => write!(f, "An error occurred during transmission"),
-            Self::EndMarkerMissing => write!(f, "No transmission end marker found"),
-            Self::InvalidDataLength => write!(f, "The data length is invalid"),
-            Self::ReceiverError => write!(f, "Receiver error most likely RMT memory overflow"),
+            Self::Underrun => write!(f, "The transmission ended before all data was written"),
+            Self::DataTooLong => write!(f, "The data does not fit in the channel RAM"),
+            #[cfg(rmt_has_tx_loop_count)]
+            Self::LoopCountOutOfRange => write!(f, "The loop count is out of range"),
+        }
+    }
+}
+
+/// Errors of a reception.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum RxError {
+    /// The frame has more codes than the buffer holds.
+    BufferTooSmall,
+
+    /// The driver did not read the channel RAM in time, or the frame does not fit in the
+    /// channel RAM on a chip without RX wrap.
+    Overrun,
+}
+
+impl core::error::Error for RxError {}
+
+impl core::fmt::Display for RxError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::BufferTooSmall => write!(f, "The frame does not fit in the buffer"),
+            Self::Overrun => write!(f, "The channel RAM overflowed"),
+        }
+    }
+}
+
+/// Error of [`PulseCode::try_new`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum PulseCodeError {
+    /// `length1` does not convert to `u16`, or is above [`PulseCode::MAX_LEN`].
+    Length1OutOfRange,
+
+    /// `length2` does not convert to `u16`, or is above [`PulseCode::MAX_LEN`]. Reported only if
+    /// `length1` is in range.
+    Length2OutOfRange,
+}
+
+impl core::error::Error for PulseCodeError {}
+
+impl core::fmt::Display for PulseCodeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Length1OutOfRange => write!(f, "length1 is out of range"),
+            Self::Length2OutOfRange => write!(f, "length2 is out of range"),
         }
     }
 }
@@ -318,7 +247,7 @@ impl core::fmt::Display for Error {
 /// stop with the corresponding signal.
 #[derive(Clone, Copy, Default, Eq, PartialEq)]
 #[repr(transparent)]
-pub struct PulseCode(pub u32);
+pub struct PulseCode(u32);
 
 // Pre-compute some constants to make it obvious that the code below doesn't mix up both halves of
 // a PulseCode.
@@ -381,25 +310,31 @@ impl PulseCode {
     /// This is slightly more convenient when passing in longer integers (e.g. `u32`) resulting from
     /// a preceding calculation.
     ///
-    /// If `length1` or `length2` fail to convert to `u16` or exceed the maximum representable
-    /// range, this will return `None`.
+    /// # Errors
+    ///
+    /// [`PulseCodeError::Length1OutOfRange`] or [`PulseCodeError::Length2OutOfRange`] if a length
+    /// does not convert to `u16` or is above [`PulseCode::MAX_LEN`].
     #[inline]
     pub fn try_new(
         level1: Level,
         length1: impl TryInto<u16>,
         level2: Level,
         length2: impl TryInto<u16>,
-    ) -> Option<Self> {
-        let (Ok(length1), Ok(length2)) = (length1.try_into(), length2.try_into()) else {
-            return None;
-        };
-        if length1 > Self::MAX_LEN || length2 > Self::MAX_LEN {
-            return None;
-        }
+    ) -> Result<Self, PulseCodeError> {
+        let length1 = length1
+            .try_into()
+            .ok()
+            .filter(|&l| l <= Self::MAX_LEN)
+            .ok_or(PulseCodeError::Length1OutOfRange)?;
+        let length2 = length2
+            .try_into()
+            .ok()
+            .filter(|&l| l <= Self::MAX_LEN)
+            .ok_or(PulseCodeError::Length2OutOfRange)?;
 
         // SAFETY:
         // - We just checked that length1 and length2 are in range
-        Some(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
+        Ok(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
     }
 
     /// Creates a new instance without checking that code lengths are in range.
@@ -602,27 +537,23 @@ impl MemSize {
     }
 }
 
-/// Marker for a channel capable of or configured for transmit operations.
+/// Marker for a channel configured for transmit operations.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Tx;
+struct Tx;
 
-/// Marker for a channel capable of or configured for receive operations.
+/// Marker for a channel configured for receive operations.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Rx;
+struct Rx;
 
-/// A trait implemented by the `Rx` and `Tx` marker structs.
-///
-/// For internal use by the driver.
-pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed + Unpin {
-    #[doc(hidden)]
+trait Direction: Copy + Clone + core::fmt::Debug + Unpin {
+    #[cfg_attr(
+        any(esp32, esp32s2),
+        expect(dead_code, reason = "these chips use the same registers for TX and RX")
+    )]
     const IS_TX: bool;
 }
-
-impl crate::private::Sealed for Tx {}
-
-impl crate::private::Sealed for Rx {}
 
 impl Direction for Tx {
     const IS_TX: bool = true;
@@ -649,145 +580,217 @@ impl<Dir: Direction> DynChannelAccess<Dir> {
     }
 }
 
-/// Channel configuration for TX channels
-#[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
+/// RMT clock source.
+pub use crate::soc::clocks::RmtSclkConfig as ClockSource;
+
+/// Configuration of [`Rmt`]: the settings that all channels share.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct TxChannelConfig {
-    /// Channel's clock divider
-    clk_divider: u8,
-    /// Whether the idle output level is low/high.
-    idle_output_level: Level,
-    /// Whether idle output is enabled.
-    idle_output: bool,
-    /// Whether carrier modulation is enabled.
-    carrier_modulation: bool,
-    /// Carrier high phase in ticks
-    carrier_high: u16,
-    /// Carrier low phase in ticks
-    carrier_low: u16,
-    /// Level of the carrier
-    carrier_level: Level,
-    /// The amount of memory blocks allocated to this channel.
-    memsize: u8,
+#[non_exhaustive]
+pub struct RmtConfig {
+    /// Source of the group clock.
+    clock_source: ClockSource,
+
+    /// Frequency of the group clock. `None` means the source frequency.
+    ///
+    /// A value selects the integer divider (1 to 256) that gives the nearest clock period.
+    /// [`Rmt::frequency`] returns the actual frequency.
+    #[cfg(not(rmt_has_per_channel_clock))]
+    frequency: Option<Rate>,
 }
 
-impl Default for TxChannelConfig {
+/// Carrier of a transmit channel, or the carrier that a receive channel removes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct CarrierConfig {
+    /// Carrier frequency.
+    frequency: Rate,
+
+    /// High time in percent of the carrier period.
+    duty_percent: u8,
+
+    /// The output level that the carrier modulates.
+    level: Level,
+}
+
+impl Default for CarrierConfig {
     fn default() -> Self {
         Self {
-            clk_divider: Default::default(),
-            idle_output_level: Level::Low,
-            idle_output: Default::default(),
-            carrier_modulation: Default::default(),
-            carrier_high: Default::default(),
-            carrier_low: Default::default(),
-            carrier_level: Level::Low,
-            memsize: 1,
+            frequency: Rate::from_khz(38),
+            duty_percent: 50,
+            level: Level::High,
         }
     }
 }
 
-/// Channel configuration for RX channels
-#[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
+/// Configuration of a transmit channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct RxChannelConfig {
-    /// Channel's clock divider
-    clk_divider: u8,
-    /// Whether carrier demodulation is enabled.
-    carrier_modulation: bool,
-    /// Carrier high phase in ticks
-    carrier_high: u16,
-    /// Carrier low phase in ticks
-    carrier_low: u16,
-    /// Level of the carrier
-    carrier_level: Level,
-    /// Filter threshold in ticks
-    filter_threshold: u8,
-    /// Idle threshold in ticks, must not exceed [`MAX_RX_IDLE_THRESHOLD`].
-    idle_threshold: u16,
-    /// The amount of memory blocks allocated to this channel.
-    memsize: u8,
+#[non_exhaustive]
+pub struct TxConfig {
+    /// Tick rate of the channel. `None` means the group clock.
+    ///
+    /// The driver uses the nearest tick period that it can reach. The actual period differs
+    /// from the requested one by at most `r / (2 * g)` of it, with `r` the requested rate and
+    /// `g` the group clock. It is exact when `g / r` is an integer.
+    /// [`TxChannel::tick_rate`] returns the actual rate.
+    tick_rate: Option<Rate>,
+
+    /// Output level when the channel does not transmit.
+    idle_level: Level,
+
+    /// Carrier that modulates the output. `None` means no carrier.
+    carrier: Option<CarrierConfig>,
 }
 
-impl Default for RxChannelConfig {
+impl Default for TxConfig {
     fn default() -> Self {
         Self {
-            clk_divider: Default::default(),
-            carrier_modulation: Default::default(),
-            carrier_high: Default::default(),
-            carrier_low: Default::default(),
-            carrier_level: Level::Low,
-            filter_threshold: Default::default(),
-            idle_threshold: Default::default(),
-            memsize: 1,
+            tick_rate: None,
+            idle_level: Level::Low,
+            carrier: None,
         }
     }
+}
+
+/// Configuration of a receive channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct RxConfig {
+    /// Tick rate of the channel. `None` means the group clock. See [`TxConfig::tick_rate`].
+    tick_rate: Option<Rate>,
+
+    /// Pulses shorter than this are noise, in nanoseconds. `None` turns the filter off.
+    ///
+    /// The filter counts group clock cycles and is at most 255 of them.
+    min_pulse_ns: Option<u32>,
+
+    /// A level that lasts longer than this ends the reception, in nanoseconds.
+    ///
+    /// At most [`MAX_RX_IDLE_THRESHOLD`] ticks.
+    idle_ns: u32,
+
+    /// Carrier to remove from the input. `None` means no demodulation.
+    #[cfg(rmt_has_rx_demodulation)]
+    carrier: Option<CarrierConfig>,
+}
+
+impl Default for RxConfig {
+    fn default() -> Self {
+        Self {
+            tick_rate: None,
+            min_pulse_ns: None,
+            idle_ns: 100_000,
+            #[cfg(rmt_has_rx_demodulation)]
+            carrier: None,
+        }
+    }
+}
+
+// Returns the channel divider that gives the nearest tick period.
+fn channel_divider(group: Rate, tick_rate: Option<Rate>) -> Result<u16, ConfigError> {
+    let Some(tick_rate) = tick_rate else {
+        return Ok(1);
+    };
+    let (group, rate) = (group.as_hz() as u64, tick_rate.as_hz() as u64);
+    if rate == 0 || rate > group || rate * 256 < group {
+        return Err(ConfigError::UnreachableTickRate);
+    }
+    Ok(((group + rate / 2) / rate).clamp(1, 256) as u16)
+}
+
+// Returns the high and low times of a carrier in group clock cycles.
+fn carrier_cycles(group: Rate, carrier: &CarrierConfig) -> Result<(u16, u16), ConfigError> {
+    let frequency = carrier.frequency.as_hz();
+    if frequency == 0 || carrier.duty_percent > 100 {
+        return Err(ConfigError::UnreachableCarrier);
+    }
+    let total = group.as_hz() / frequency;
+    let high = total * carrier.duty_percent as u32 / 100;
+    let low = total - high;
+    match (u16::try_from(high), u16::try_from(low)) {
+        (Ok(high @ 1..), Ok(low @ 1..)) => Ok((high, low)),
+        _ => Err(ConfigError::UnreachableCarrier),
+    }
+}
+
+// Converts a duration to cycles of `rate`, rounded to nearest.
+fn ns_to_cycles(ns: u32, rate: Rate) -> u64 {
+    (ns as u64 * rate.as_hz() as u64 + 500_000_000) / 1_000_000_000
+}
+
+// Returns the channel divider.
+#[inline(never)]
+fn apply_tx_config(
+    raw: DynChannelAccess<Tx>,
+    group: Rate,
+    config: &TxConfig,
+) -> Result<u16, ConfigError> {
+    let divider = channel_divider(group, config.tick_rate)?;
+    let carrier = config
+        .carrier
+        .map(|carrier| carrier_cycles(group, &carrier).map(|cycles| (carrier.level, cycles)))
+        .transpose()?;
+
+    raw.set_divider(divider as u8);
+    match carrier {
+        Some((level, (high, low))) => raw.set_tx_carrier(true, high, low, level),
+        None => raw.set_tx_carrier(false, 0, 0, Level::Low),
+    }
+    raw.set_tx_idle_output(true, config.idle_level);
+
+    Ok(divider)
+}
+
+// Returns the channel divider.
+#[inline(never)]
+fn apply_rx_config(
+    raw: DynChannelAccess<Rx>,
+    group: Rate,
+    config: &RxConfig,
+) -> Result<u16, ConfigError> {
+    let divider = channel_divider(group, config.tick_rate)?;
+
+    let filter = match config.min_pulse_ns {
+        None => 0,
+        Some(ns) => match ns_to_cycles(ns, group) {
+            cycles @ 1..=255 => cycles as u8,
+            _ => return Err(ConfigError::RxLimitOutOfRange),
+        },
+    };
+
+    let tick_rate = Rate::from_hz(group.as_hz() / divider as u32);
+    let idle = match ns_to_cycles(config.idle_ns, tick_rate) {
+        ticks @ 1.. if ticks <= MAX_RX_IDLE_THRESHOLD as u64 => ticks as u16,
+        _ => return Err(ConfigError::RxLimitOutOfRange),
+    };
+
+    #[cfg(rmt_has_rx_demodulation)]
+    let carrier = config
+        .carrier
+        .map(|carrier| carrier_cycles(group, &carrier).map(|cycles| (carrier.level, cycles)))
+        .transpose()?;
+
+    raw.set_divider(divider as u8);
+    #[cfg(rmt_has_rx_demodulation)]
+    match carrier {
+        Some((level, (high, low))) => raw.set_rx_carrier(true, high, low, level),
+        None => raw.set_rx_carrier(false, 0, 0, Level::Low),
+    }
+    raw.set_rx_filter_threshold(filter);
+    raw.set_rx_idle_threshold(idle);
+
+    Ok(divider)
 }
 
 // Channel specification
 
-// Looping all channels: Build up the Rmt struct and compute NUM_CHANNELS
 for_each_rmt_channel!(
     (all $(($num:literal)),+) => {
-        paste::paste! {
-            /// RMT Instance
-            pub struct Rmt<'rmt, Dm>
-            where
-                Dm: crate::DriverMode,
-            {
-                peripheral: RMT<'rmt>,
-                frequency: Rate,
-                $(
-                    #[doc = concat!("RMT Channel ", $num)]
-                    pub [<channel $num>]: ChannelCreator<'rmt, Dm, $num>,
-                )+
-                _mode: PhantomData<Dm>,
-            }
-
-            impl<'rmt, Dm> Rmt<'rmt, Dm>
-            where
-                Dm: crate::DriverMode,
-            {
-                fn create(peripheral: RMT<'rmt>, frequency: Rate) -> Self {
-                    Self {
-                        peripheral,
-                        frequency,
-                        $(
-                            [<channel $num>]: ChannelCreator::conjure(),
-                        )+
-                        _mode: PhantomData,
-                    }
-                }
-
-                /// Returns the configured RMT counter clock frequency.
-                ///
-                /// This is the actual frequency after the global RMT clock divider has been
-                /// configured. Pulse code lengths are expressed in cycles of
-                /// this clock divided by the channel divider configured with
-                /// [`TxChannelConfig::with_clk_divider`] or [`RxChannelConfig::with_clk_divider`].
-                pub fn frequency(&self) -> Rate {
-                    self.frequency
-                }
-            }
-
-            impl<'rmt> Rmt<'rmt, Blocking> {
-                /// Reconfigures the driver for asynchronous operation.
-                pub fn into_async(mut self) -> Rmt<'rmt, Async> {
-                    self.set_interrupt_handler(chip_specific::async_interrupt_handler);
-
-                    Rmt {
-                        peripheral: self.peripheral,
-                        frequency: self.frequency,
-                        $(
-                            [<channel $num>]: unsafe { self.[<channel $num>].into_async() },
-                        )+
-                        _mode: PhantomData,
-                    }
-                }
-            }
-
-            #[allow(clippy::no_effect)]
-            const NUM_CHANNELS: usize = const { 0 $( + {$num; 1} )+ };
-        }
+        #[allow(clippy::no_effect)]
+        const NUM_CHANNELS: usize = const { 0 $( + {$num; 1} )+ };
     };
 
     // Looping channel indices: Declare input/output signals and ChannelIndex
@@ -824,30 +827,6 @@ for_each_rmt_channel!(
                     gpio::OutputSignal::[<RMT_SIG_ $idx>],
                 )+
             ];
-
-            $(
-                impl<'ch, Dm> TxChannelCreator<'ch, Dm> for ChannelCreator<'ch, Dm, $num>
-                where
-                    Dm: crate::DriverMode,
-                {
-                    fn configure_tx(
-                        self,
-                        config: &TxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Tx>, ConfigError> {
-                        let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
-
-                        apply_tx_config(raw, config, false)?;
-
-                        Ok(Channel {
-                            raw,
-                            _rmt: core::marker::PhantomData,
-                            _pin_guard: PinGuard::new_unconnected(),
-                            _mem_guard: MemoryGuard::new(raw),
-                            _guard: self._guard,
-                        })
-                    }
-                }
-            )+
         }
     };
 
@@ -858,30 +837,6 @@ for_each_rmt_channel!(
                     gpio::InputSignal::[<RMT_SIG_ $idx>],
                 )+
             ];
-
-            $(
-                impl<'ch, Dm> RxChannelCreator<'ch, Dm> for ChannelCreator<'ch, Dm, $num>
-                where
-                    Dm: crate::DriverMode,
-                {
-                    fn configure_rx(
-                        self,
-                        config: &RxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Rx>, ConfigError> {
-                        let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
-
-                        apply_rx_config(raw, config, false)?;
-
-                        Ok(Channel {
-                            raw,
-                            _rmt: core::marker::PhantomData,
-                            _pin_guard: PinGuard::new_unconnected(),
-                            _mem_guard: MemoryGuard::new(raw),
-                            _guard: self._guard,
-                        })
-                    }
-                }
-            )+
         }
     };
 );
@@ -913,215 +868,185 @@ impl ChannelIndex {
     }
 }
 
-impl<'rmt> Rmt<'rmt, Blocking> {
-    /// Creates a new RMT instance.
-    ///
-    /// The `frequency` parameter configures the global RMT counter clock. Use
-    /// [`Rmt::frequency`] to retrieve the actual configured frequency when
-    /// converting real-time pulse durations to [`PulseCode`] lengths; this is
-    /// not necessarily the APB clock frequency.
-    ///
-    /// # Errors
-    ///
-    /// [`ConfigError::UnreachableTargetFrequency`] when the target frequency cannot be reached.
-    pub fn new(peripheral: RMT<'rmt>, frequency: Rate) -> Result<Self, ConfigError> {
-        let clk_src = ClockSource::default();
-        let (div, counter_frequency) = self::chip_specific::validate_clock(clk_src, frequency)?;
-
-        // Only create the peripheral guards after validate_clock() to avoid that this function
-        // contains lots of code to drop them again on error.
-        let this = Rmt::create(peripheral, counter_frequency);
-
-        self::chip_specific::configure_clock(clk_src, div, counter_frequency);
-        Ok(this)
-    }
-
-    /// Registers an interrupt handler for the RMT peripheral.
-    ///
-    /// Replaces any previously registered interrupt handlers.
-    #[instability::unstable]
-    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::RMT);
-        }
-        crate::interrupt::bind_handler(Interrupt::RMT, handler);
-    }
+/// Immutable data of a channel in one direction.
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct Info {
+    ch_idx: ChannelIndex,
 }
 
-impl crate::private::Sealed for Rmt<'_, Blocking> {}
-
-#[instability::unstable]
-impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        self.set_interrupt_handler(handler);
-    }
+mod sealed {
+    pub trait Tx {}
+    pub trait Rx {}
 }
 
-// Mark the channel as used and reserve the channel RAM.
-//
-// If this is not possible (because a preceding channel is using the RAM, or
-// because subsequent channels are in use so that we can't reserve the RAM),
-// restore all state and return with an error.
-#[inline(never)]
-fn reserve_channel_memory(
-    channel: u8,
-    state: RmtState,
-    memsize: MemSize,
-) -> Result<(), ConfigError> {
-    if memsize.blocks() == 0 || memsize.blocks() > NUM_CHANNELS as u8 - channel {
-        return Err(ConfigError::MemsizeOutOfRange);
-    }
+/// A transmit channel, alone or with the RAM blocks of the channels that follow it.
+///
+/// A tuple of adjacent channel singletons, such as `(RMT_CH0, RMT_CH1)`, gives the first channel
+/// the RAM blocks of the others. Each block holds [`CHANNEL_RAM_SIZE`] pulse codes. The
+/// channels that lend their RAM cannot be used while the tuple is in use, also if they are
+/// receive channels.
+///
+/// The implementations list the singletons and tuples that this chip supports.
+pub trait TxInstance: sealed::Tx {
+    /// Number of RAM blocks that the channel uses.
+    // Hidden, so that the RAM size is not part of the type in the public API.
+    #[doc(hidden)]
+    const BLOCKS: u8;
 
-    let mut next_state = state;
-    for cur_channel in channel..channel + memsize.blocks() {
-        if RmtState::compare_exchange(
-            cur_channel,
-            RmtState::Unconfigured,
-            next_state,
-            Ordering::Acquire,
-            Ordering::Relaxed,
-        )
-        .is_err()
-        {
-            RmtState::store_range_rev(
-                RmtState::Unconfigured,
-                channel..cur_channel,
-                Ordering::Relaxed,
-            );
-
-            return Err(ConfigError::MemoryBlockNotAvailable);
-        }
-
-        // Set the first channel to `state` (`Rx`|`Tx`), the remaining (if any) to
-        // `Reserved`
-        next_state = RmtState::Reserved;
-    }
-
-    Ok(())
+    // Public, because the generic channel constructor reads it.
+    #[doc(hidden)]
+    fn info(&self) -> &'static Info;
 }
 
-#[inline(never)]
-fn release_channel_memory<Dir: Direction>(raw: DynChannelAccess<Dir>) {
-    let channel = raw.channel();
-    let memsize = raw.memsize().blocks();
+/// A receive channel, alone or with the RAM blocks of the channels that follow it.
+///
+/// A tuple of adjacent channel singletons, such as `(RMT_CH2, RMT_CH3)`, gives the first channel
+/// the RAM blocks of the others. Each block holds [`CHANNEL_RAM_SIZE`] pulse codes.
+///
+/// The implementations list the singletons and tuples that this chip supports.
+pub trait RxInstance: sealed::Rx {
+    /// Number of RAM blocks that the channel uses.
+    // Hidden, so that the RAM size is not part of the type in the public API.
+    #[doc(hidden)]
+    const BLOCKS: u8;
 
-    raw.set_memsize(MemSize::from_blocks(0));
-
-    RmtState::store_range_rev(
-        RmtState::Unconfigured,
-        channel..channel + memsize,
-        Ordering::Release,
-    );
+    // Public, because the generic channel constructor reads it.
+    #[doc(hidden)]
+    fn info(&self) -> &'static Info;
 }
 
-// We store values of type `RmtState` in the global `STATE`. However, we also need atomic access,
-// thus the enum needs to be represented as AtomicU8. Thus, we end up with unsafe conversions
-// between `RmtState` and `u8` to avoid constant range checks.
-// This submodule wraps all accesses in a safe API which ensures that only valid enum values can
-// be stored to `STATE` such that other code in this driver does not need to be concerned with
-// these details.
-mod state {
-    use core::ops::Range;
+for_each_rmt_channel!(
+    (tx $(($num:literal, $idx:literal)),+) => {
+        paste::paste! {
+            $(
+                impl sealed::Tx for crate::peripherals::[<RMT_CH $num>]<'_> {}
 
-    use portable_atomic::{AtomicU8, Ordering};
+                #[doc = concat!("`RMT_CH", $num, "` with 1 RAM block.")]
+                impl TxInstance for crate::peripherals::[<RMT_CH $num>]<'_> {
+                    const BLOCKS: u8 = 1;
 
-    use super::{Direction, DynChannelAccess, NUM_CHANNELS};
+                    fn info(&self) -> &'static Info {
+                        static INFO: Info = Info {
+                            ch_idx: ChannelIndex::[<Ch $idx>],
+                        };
+                        &INFO
+                    }
+                }
+            )+
 
-    static STATE: [AtomicU8; NUM_CHANNELS] =
-        [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
-
-    #[derive(Copy, Clone, PartialEq, Eq)]
-    #[repr(u8)]
-    pub(super) enum RmtState {
-        // The channel is not configured for either rx or tx, and its memory is available
-        Unconfigured,
-
-        // The channels is not in use, but one of the preceding channels is using its memory
-        Reserved,
-
-        // The channel is configured for rx
-        Rx,
-
-        // The channel is configured for tx
-        Tx,
-    }
-
-    impl RmtState {
-        /// Returns whether this state corresponds to a rx, tx, or other configuration.
-        #[allow(unused)]
-        #[inline]
-        pub(super) fn is_tx(&self) -> Option<bool> {
-            match self {
-                Self::Rx => Some(false),
-                Self::Tx => Some(true),
-                _ => None,
+            crate::any_peripheral! {
+                /// Any RMT channel that can transmit.
+                pub peripheral AnyRmtTxChannel<'d> {
+                    $(
+                        [<RmtCh $num>](crate::peripherals::[<RMT_CH $num>]<'d>),
+                    )+
+                }
             }
         }
+    };
 
-        /// Converts a `u8` to `Self` without checking that it has a valid value for the enum.
-        ///
-        /// # Safety
-        ///
-        /// - Must only be called with valid values of the RmtState discriminant
-        #[allow(unused)]
-        #[inline]
-        unsafe fn from_u8_unchecked(value: u8) -> Self {
-            unsafe { core::mem::transmute::<_, Self>(value) }
-        }
+    (rx $(($num:literal, $idx:literal)),+) => {
+        paste::paste! {
+            $(
+                impl sealed::Rx for crate::peripherals::[<RMT_CH $num>]<'_> {}
 
-        /// Loads channel state from the global `STATE` by channel index.
-        ///
-        /// # Safety
-        ///
-        /// - the `channel` number must be in 0..NUM_CHANNELS
-        #[allow(unused)]
-        #[inline]
-        pub(super) unsafe fn load_by_channel_number(channel: u8, ordering: Ordering) -> Self {
-            unsafe { Self::from_u8_unchecked(STATE[channel as usize].load(ordering)) }
-        }
+                #[doc = concat!("`RMT_CH", $num, "` with 1 RAM block.")]
+                impl RxInstance for crate::peripherals::[<RMT_CH $num>]<'_> {
+                    const BLOCKS: u8 = 1;
 
-        /// Stores the given state to all channel states for an index range in reverse order.
-        #[inline]
-        pub(super) fn store_range_rev(self, range: Range<u8>, ordering: Ordering) {
-            for ch_num in range.rev() {
-                STATE[ch_num as usize].store(self as u8, ordering);
+                    fn info(&self) -> &'static Info {
+                        static INFO: Info = Info {
+                            ch_idx: ChannelIndex::[<Ch $idx>],
+                        };
+                        &INFO
+                    }
+                }
+            )+
+
+            mod rx_any {
+                use super::{Info, RxInstance, sealed};
+
+                crate::any_peripheral! {
+                    /// Any RMT channel that can receive.
+                    pub peripheral AnyRmtRxChannel<'d> {
+                        $(
+                            [<RmtCh $num>](crate::peripherals::[<RMT_CH $num>]<'d>),
+                        )+
+                    }
+                }
+
+                impl sealed::Rx for AnyRmtRxChannel<'_> {}
+
+                /// A type-erased channel uses one RAM block: its type cannot show that the
+                /// channels of a tuple are adjacent.
+                impl RxInstance for AnyRmtRxChannel<'_> {
+                    const BLOCKS: u8 = 1;
+
+                    fn info(&self) -> &'static Info {
+                        any::delegate!(self, channel => { RxInstance::info(channel) })
+                    }
+                }
             }
-        }
 
-        /// Stores channel state to the global `STATE` given a `DynChannelAccess`.
-        #[allow(unused)]
-        #[inline]
-        pub(super) fn store<Dir: Direction>(self, raw: DynChannelAccess<Dir>, ordering: Ordering) {
-            STATE[raw.channel() as usize].store(self as u8, ordering);
+            pub use rx_any::AnyRmtRxChannel;
         }
+    };
 
-        /// Loads channel state from the global `STATE` given a `DynChannelAccess`.
-        #[allow(unused)]
-        #[inline]
-        pub(super) fn load<Dir: Direction>(raw: DynChannelAccess<Dir>, ordering: Ordering) -> Self {
-            // SAFETY: The only implementations of RawChannelAccess are in this module and can only
-            // be (safely) constructed using valid channel numbers.
-            unsafe { Self::load_by_channel_number(raw.channel(), ordering) }
-        }
+    (tx_tuples $(($blocks:literal, ($first:ident $(, $peri:ident)+))),*) => {
+        $(
+            impl sealed::Tx for (
+                crate::peripherals::$first<'_>,
+                $(crate::peripherals::$peri<'_>,)+
+            ) {}
 
-        /// Performs a compare_exchange on the global `STATE` by channel index.
-        #[inline]
-        pub(super) fn compare_exchange(
-            ch_num: u8,
-            current: Self,
-            new: Self,
-            success: Ordering,
-            failure: Ordering,
-        ) -> Result<Self, Self> {
-            STATE[ch_num as usize]
-                .compare_exchange(current as u8, new as u8, success, failure)
-                .map(|prev| unsafe { Self::from_u8_unchecked(prev) })
-                .map_err(|prev| unsafe { Self::from_u8_unchecked(prev) })
-        }
+            #[doc = concat!("`", stringify!($first), "` with ", $blocks, " RAM blocks.")]
+            impl TxInstance for (
+                crate::peripherals::$first<'_>,
+                $(crate::peripherals::$peri<'_>,)+
+            ) {
+                const BLOCKS: u8 = $blocks;
+
+                fn info(&self) -> &'static Info {
+                    TxInstance::info(&self.0)
+                }
+            }
+        )*
+    };
+
+    (rx_tuples $(($blocks:literal, ($first:ident $(, $peri:ident)+))),*) => {
+        $(
+            impl sealed::Rx for (
+                crate::peripherals::$first<'_>,
+                $(crate::peripherals::$peri<'_>,)+
+            ) {}
+
+            #[doc = concat!("`", stringify!($first), "` with ", $blocks, " RAM blocks.")]
+            impl RxInstance for (
+                crate::peripherals::$first<'_>,
+                $(crate::peripherals::$peri<'_>,)+
+            ) {
+                const BLOCKS: u8 = $blocks;
+
+                fn info(&self) -> &'static Info {
+                    RxInstance::info(&self.0)
+                }
+            }
+        )*
+    };
+);
+
+impl sealed::Tx for AnyRmtTxChannel<'_> {}
+
+/// A type-erased channel uses one RAM block: its type cannot show that the channels of a tuple
+/// are adjacent.
+impl TxInstance for AnyRmtTxChannel<'_> {
+    const BLOCKS: u8 = 1;
+
+    fn info(&self) -> &'static Info {
+        any::delegate!(self, channel => { TxInstance::info(channel) })
     }
 }
-
-use state::RmtState;
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1138,6 +1063,10 @@ impl RmtClockGuard {
             clocks::RmtInstance::Rmt.request_sclk(clocks);
         });
 
+        // The RMT stops if APB_CLK is less than about 1/10 of the RMT clock.
+        #[cfg(soc_has_apb_frequency_reduction)]
+        clocks::ClockTree::with(clocks::request_apb_clk);
+
         Self
     }
 }
@@ -1146,54 +1075,10 @@ impl Drop for RmtClockGuard {
     fn drop(&mut self) {
         #[cfg(soc_has_clock_node_rmt_sclk)]
         clocks::ClockTree::with(|clocks| clocks::RmtInstance::Rmt.release_sclk(clocks));
+        #[cfg(soc_has_apb_frequency_reduction)]
+        clocks::ClockTree::with(clocks::release_apb_clk);
     }
 }
-
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-struct ChannelGuards {
-    _peripheral: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
-    _clock: RmtClockGuard,
-}
-
-impl ChannelGuards {
-    fn new() -> Self {
-        Self {
-            _peripheral: GenericPeripheralGuard::new(),
-            _clock: RmtClockGuard::new(),
-        }
-    }
-}
-
-/// RMT Channel.
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct Channel<'ch, Dm, Dir>
-where
-    Dm: crate::DriverMode,
-    Dir: Direction,
-{
-    raw: DynChannelAccess<Dir>,
-
-    // Holds the lifetime for which have unique access to both the channel and the pin its
-    // configured for. Conceptually, for 'ch, we keep the Rmt peripheral alive.
-    _rmt: PhantomData<Rmt<'ch, Dm>>,
-
-    _pin_guard: PinGuard,
-
-    _mem_guard: MemoryGuard<Dir>,
-
-    // Only the "outermost" Channel/ChannelCreator holds these guards, which avoids constant
-    // inc/dec of the reference counts on reborrow and drop.
-    _guard: Option<ChannelGuards>,
-}
-
-// The reborrowing API treats Channel similar to a smart pointer: Ensure that it's size is actually
-// in line with that notion.
-const _: () = if core::mem::size_of::<Channel<'static, Blocking, Tx>>() > 4 {
-    core::panic!("Channel growing too large!");
-};
 
 /// Per-channel size of the RMT hardware buffer (number of `PulseCode`s).
 pub const CHANNEL_RAM_SIZE: usize = property!("rmt.channel_ram_size");
@@ -1201,119 +1086,238 @@ pub const CHANNEL_RAM_SIZE: usize = property!("rmt.channel_ram_size");
 /// Whether the channel supports wrapping rx (wrapping tx is supported on all devices)
 pub const HAS_RX_WRAP: bool = property!("rmt.has_rx_wrap");
 
-#[inline(never)]
-fn apply_tx_config(
-    raw: DynChannelAccess<Tx>,
-    config: &TxChannelConfig,
-    reconfigure: bool,
-) -> Result<(), ConfigError> {
-    let memsize = MemSize::from_blocks(config.memsize);
-    if reconfigure {
-        release_channel_memory(raw);
-    }
-    reserve_channel_memory(raw.channel(), RmtState::Tx, memsize)?;
-
-    raw.set_divider(config.clk_divider);
-    raw.set_tx_carrier(
-        config.carrier_modulation,
-        config.carrier_high,
-        config.carrier_low,
-        config.carrier_level,
-    );
-    raw.set_tx_idle_output(config.idle_output, config.idle_output_level);
-    raw.set_memsize(memsize);
-
-    Ok(())
-}
-
-#[inline(never)]
-fn apply_rx_config(
-    raw: DynChannelAccess<Rx>,
-    config: &RxChannelConfig,
-    reconfigure: bool,
-) -> Result<(), ConfigError> {
-    #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
-    if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
-        return Err(ConfigError::IdleThresholdOutOfRange);
-    }
-
-    let memsize = MemSize::from_blocks(config.memsize);
-    if reconfigure {
-        release_channel_memory(raw);
-    }
-    reserve_channel_memory(raw.channel(), RmtState::Rx, memsize)?;
-
-    raw.set_divider(config.clk_divider);
-    raw.set_rx_carrier(
-        config.carrier_modulation,
-        config.carrier_high,
-        config.carrier_low,
-        config.carrier_level,
-    );
-    raw.set_rx_filter_threshold(config.filter_threshold);
-    raw.set_rx_idle_threshold(config.idle_threshold);
-    raw.set_memsize(memsize);
-
-    Ok(())
-}
-
+/// Shared RMT setup: clock source and group clock.
+///
+/// Channels come from [`Rmt::tx_channel`] and [`Rmt::rx_channel`] and borrow the `Rmt`. The
+/// driver mode decides who owns the RMT interrupt: the user in blocking mode
+/// ([`Rmt::set_interrupt_handler`]), the driver in async mode.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-struct MemoryGuard<Dir: Direction> {
-    raw: Option<DynChannelAccess<Dir>>,
-    _dir: PhantomData<Dir>,
+pub struct Rmt<'d, Dm: DriverMode = Blocking> {
+    _peripheral: RMT<'d>,
+    frequency: Rate,
+    _peripheral_guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
+    _clock_guard: RmtClockGuard,
+    _mode: PhantomData<Dm>,
 }
 
-impl<Dir: Direction> MemoryGuard<Dir> {
-    fn new(raw: DynChannelAccess<Dir>) -> Self {
-        Self {
-            raw: Some(raw),
-            _dir: PhantomData,
+impl<'d> Rmt<'d, Blocking> {
+    /// Creates the RMT driver and configures the group clock.
+    ///
+    /// # Errors
+    ///
+    /// None at the moment: an unreachable group frequency selects the nearest one.
+    pub fn new(peripheral: RMT<'d>, config: RmtConfig) -> Result<Self, ConfigError> {
+        let (divider, frequency) = chip_specific::group_clock(&config);
+
+        let this = Self {
+            _peripheral: peripheral,
+            frequency,
+            _peripheral_guard: GenericPeripheralGuard::new(),
+            _clock_guard: RmtClockGuard::new(),
+            _mode: PhantomData,
+        };
+
+        chip_specific::configure_clock(config.clock_source, divider, frequency);
+        Ok(this)
+    }
+
+    /// Binds the driver's interrupt handler, which serves the async channels.
+    pub fn into_async(mut self) -> Rmt<'d, Async> {
+        self.set_interrupt_handler(chip_specific::async_interrupt_handler);
+        Rmt {
+            _peripheral: self._peripheral,
+            frequency: self.frequency,
+            _peripheral_guard: self._peripheral_guard,
+            _clock_guard: self._clock_guard,
+            _mode: PhantomData,
         }
     }
 
-    fn new_empty() -> Self {
-        Self {
-            raw: None,
-            _dir: PhantomData,
+    /// Registers an interrupt handler for the RMT peripheral.
+    ///
+    /// Replaces any previously registered interrupt handlers. Needs `&mut self`, so it is only
+    /// possible while no channel borrows this `Rmt`.
+    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        for core in crate::system::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::RMT);
         }
+        crate::interrupt::bind_handler(Interrupt::RMT, handler);
     }
 }
 
-impl<Dir: Direction> Drop for MemoryGuard<Dir> {
-    fn drop(&mut self) {
-        if let Some(raw) = self.raw {
-            release_channel_memory(raw);
-        }
+impl crate::private::Sealed for Rmt<'_, Blocking> {}
+
+impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }
 
-impl<Dm, Dir> Channel<'_, Dm, Dir>
-where
-    Dm: crate::DriverMode,
-    Dir: Direction,
-{
-    /// Reborrows this channel for a shorter lifetime `'a`.
-    pub fn reborrow<'a>(&'a mut self) -> Channel<'a, Dm, Dir> {
-        Channel {
-            raw: self.raw,
-            _rmt: self._rmt,
-            // Resources must only be released once the parent is dropped.
+impl<'d> Rmt<'d, Async> {
+    /// Unbinds the driver's interrupt handler.
+    pub fn into_blocking(self) -> Rmt<'d, Blocking> {
+        for core in crate::system::Cpu::all() {
+            crate::interrupt::disable(core, Interrupt::RMT);
+        }
+        Rmt {
+            _peripheral: self._peripheral,
+            frequency: self.frequency,
+            _peripheral_guard: self._peripheral_guard,
+            _clock_guard: self._clock_guard,
+            _mode: PhantomData,
+        }
+    }
+
+    /// Creates an async transmit channel. It also has the blocking methods.
+    ///
+    /// # Errors
+    ///
+    /// See [`Rmt::tx_channel`].
+    pub fn async_tx_channel<'a>(
+        &'a self,
+        channel: impl TxInstance + 'a,
+        config: TxConfig,
+    ) -> Result<TxChannel<'a, Async>, ConfigError> {
+        TxChannel::new(
+            channel.info(),
+            channel_blocks(&channel),
+            self.frequency,
+            &config,
+        )
+    }
+
+    /// Creates an async receive channel. It also has the blocking methods.
+    ///
+    /// # Errors
+    ///
+    /// See [`Rmt::rx_channel`].
+    pub fn async_rx_channel<'a>(
+        &'a self,
+        channel: impl RxInstance + 'a,
+        config: RxConfig,
+    ) -> Result<RxChannel<'a, Async>, ConfigError> {
+        RxChannel::new(
+            channel.info(),
+            rx_channel_blocks(&channel),
+            self.frequency,
+            &config,
+        )
+    }
+}
+
+fn channel_blocks<T: TxInstance>(_: &T) -> u8 {
+    T::BLOCKS
+}
+
+fn rx_channel_blocks<T: RxInstance>(_: &T) -> u8 {
+    T::BLOCKS
+}
+
+impl<'d, Dm: DriverMode> Rmt<'d, Dm> {
+    /// Changes the shared settings.
+    ///
+    /// Needs `&mut self`, so it is only possible while no channel borrows this `Rmt`.
+    ///
+    /// # Errors
+    ///
+    /// None at the moment, see [`Rmt::new`].
+    pub fn apply_config(&mut self, config: &RmtConfig) -> Result<(), ConfigError> {
+        let (divider, frequency) = chip_specific::group_clock(config);
+        chip_specific::configure_clock(config.clock_source, divider, frequency);
+        self.frequency = frequency;
+        Ok(())
+    }
+
+    /// Returns the actual group clock frequency.
+    ///
+    /// The channel tick rates are this frequency divided by the channel dividers.
+    pub fn frequency(&self) -> Rate {
+        self.frequency
+    }
+
+    /// Creates a blocking transmit channel that uses the group clock of this `Rmt`.
+    ///
+    /// `channel` is a channel singleton, or a tuple of adjacent singletons for more RAM (see
+    /// [`TxInstance`]).
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::UnreachableTickRate`] or [`ConfigError::UnreachableCarrier`].
+    pub fn tx_channel<'a>(
+        &'a self,
+        channel: impl TxInstance + 'a,
+        config: TxConfig,
+    ) -> Result<TxChannel<'a, Blocking>, ConfigError> {
+        TxChannel::new(
+            channel.info(),
+            channel_blocks(&channel),
+            self.frequency,
+            &config,
+        )
+    }
+
+    /// Creates a blocking receive channel that uses the group clock of this `Rmt`.
+    ///
+    /// `channel` is a channel singleton, or a tuple of adjacent singletons for more RAM (see
+    /// [`RxInstance`]).
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::UnreachableTickRate`], [`ConfigError::UnreachableCarrier`] or
+    /// [`ConfigError::RxLimitOutOfRange`].
+    pub fn rx_channel<'a>(
+        &'a self,
+        channel: impl RxInstance + 'a,
+        config: RxConfig,
+    ) -> Result<RxChannel<'a, Blocking>, ConfigError> {
+        RxChannel::new(
+            channel.info(),
+            rx_channel_blocks(&channel),
+            self.frequency,
+            &config,
+        )
+    }
+}
+
+/// A transmit channel.
+///
+/// Created by [`Rmt::tx_channel`] or [`Rmt::async_tx_channel`]. Dropping the channel
+/// disconnects the pin and frees the channel singletons.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct TxChannel<'a, Dm: DriverMode> {
+    raw: DynChannelAccess<Tx>,
+    group_frequency: Rate,
+    divider: u16,
+    _pin_guard: PinGuard,
+    _phantom: PhantomData<(&'a (), Dm)>,
+}
+
+impl<'a, Dm: DriverMode> TxChannel<'a, Dm> {
+    fn new(
+        info: &'static Info,
+        blocks: u8,
+        group_frequency: Rate,
+        config: &TxConfig,
+    ) -> Result<Self, ConfigError> {
+        let raw = unsafe { DynChannelAccess::conjure(info.ch_idx) };
+        let divider = apply_tx_config(raw, group_frequency, config)?;
+        raw.set_memsize(MemSize::from_blocks(blocks));
+
+        Ok(Self {
+            raw,
+            group_frequency,
+            divider,
             _pin_guard: PinGuard::new_unconnected(),
-            _mem_guard: MemoryGuard::new_empty(),
-            _guard: None,
-        }
+            _phantom: PhantomData,
+        })
     }
-}
 
-impl<'ch, Dm> Channel<'ch, Dm, Tx>
-where
-    Dm: crate::DriverMode,
-{
     /// Connects a pin to the channel's output signal.
     ///
     /// This will replace previous pin assignments for this signal.
-    pub fn with_pin(mut self, pin: impl PeripheralOutput<'ch>) -> Self {
+    pub fn with_pin(mut self, pin: impl PeripheralOutput<'a>) -> Self {
         let pin = pin.into();
 
         // Make sure to not cause a pulse between enabling the output and connecting it.
@@ -1331,373 +1335,198 @@ where
     ///
     /// # Errors
     ///
-    /// [`ConfigError::MemoryBlockNotAvailable`] or [`ConfigError::MemsizeOutOfRange`].
-    pub fn apply_config(&mut self, config: &TxChannelConfig) -> Result<(), ConfigError> {
-        apply_tx_config(self.raw, config, true)
+    /// [`ConfigError::UnreachableTickRate`] or [`ConfigError::UnreachableCarrier`].
+    pub fn apply_config(&mut self, config: &TxConfig) -> Result<(), ConfigError> {
+        self.divider = apply_tx_config(self.raw, self.group_frequency, config)?;
+        Ok(())
     }
-}
 
-impl<'ch, Dm> Channel<'ch, Dm, Rx>
-where
-    Dm: crate::DriverMode,
-{
-    /// Connects a pin to the channel's input signal.
+    /// Returns the actual tick rate.
+    pub fn tick_rate(&self) -> Rate {
+        Rate::from_hz(self.group_frequency.as_hz() / self.divider as u32)
+    }
+
+    /// Sends `data` and blocks until the last code is out.
     ///
-    /// This will replace previous pin assignments for this signal.
-    pub fn with_pin(self, pin: impl PeripheralInput<'ch>) -> Self {
-        let pin = pin.into();
-        pin.apply_input_config(&InputConfig::default());
-        pin.set_input_enable(true);
-
-        self.raw.input_signal().connect_to(&pin);
-
-        self
-    }
-
-    /// Changes the configuration.
+    /// The driver adds the end marker. A code with a zero length ends the transmission early:
+    /// the codes after it are not sent. Empty data returns at once.
     ///
     /// # Errors
     ///
-    /// [`ConfigError::MemoryBlockNotAvailable`], [`ConfigError::MemsizeOutOfRange`], or
-    /// [`ConfigError::IdleThresholdOutOfRange`].
-    pub fn apply_config(&mut self, config: &RxChannelConfig) -> Result<(), ConfigError> {
-        apply_rx_config(self.raw, config, true)
-    }
-}
-
-/// TX channel creator for the RMT peripheral.
-pub trait TxChannelCreator<'ch, Dm>
-where
-    Dm: crate::DriverMode,
-{
-    /// Configures the TX channel.
-    ///
-    /// # Errors
-    ///
-    /// [`ConfigError::MemoryBlockNotAvailable`] or [`ConfigError::MemsizeOutOfRange`] under the
-    /// same conditions as [`Channel<Tx>::apply_config`].
-    fn configure_tx(self, config: &TxChannelConfig) -> Result<Channel<'ch, Dm, Tx>, ConfigError>
-    where
-        Self: Sized;
-}
-
-/// RX channel creator for the RMT peripheral.
-pub trait RxChannelCreator<'ch, Dm>
-where
-    Dm: crate::DriverMode,
-{
-    /// Configures the RX channel.
-    ///
-    /// # Errors
-    ///
-    /// [`ConfigError::MemoryBlockNotAvailable`], [`ConfigError::MemsizeOutOfRange`], or
-    /// [`ConfigError::IdleThresholdOutOfRange`] under the same conditions as
-    /// [`Channel<Rx>::apply_config`].
-    fn configure_rx(self, config: &RxChannelConfig) -> Result<Channel<'ch, Dm, Rx>, ConfigError>
-    where
-        Self: Sized;
-}
-
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-struct TxGuard {
-    raw: Option<DynChannelAccess<Tx>>,
-}
-
-impl TxGuard {
-    fn new(raw: DynChannelAccess<Tx>) -> Self {
-        Self { raw: Some(raw) }
-    }
-
-    fn new_empty() -> Self {
-        Self { raw: None }
-    }
-
-    /// Indicates that the transaction has completed (or was never started) and does not require
-    /// explicit stopping on drop.
-    fn set_completed(&mut self) {
-        self.raw = None;
-    }
-
-    fn is_active(&self) -> bool {
-        self.raw.is_some()
-    }
-}
-
-impl Drop for TxGuard {
-    fn drop(&mut self) {
-        if let Some(raw) = self.raw {
-            if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
-                raw.stop_tx();
-                raw.update();
-
-                // Block until the channel is safe to use again.
-                #[cfg(not(rmt_has_tx_immediate_stop))]
-                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
-            }
-
-            raw.unlisten_tx_interrupt(EnumSet::all());
-        }
-    }
-}
-
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-struct RxGuard {
-    raw: Option<DynChannelAccess<Rx>>,
-}
-
-impl RxGuard {
-    fn new(raw: DynChannelAccess<Rx>) -> Self {
-        Self { raw: Some(raw) }
-    }
-
-    fn new_empty() -> Self {
-        Self { raw: None }
-    }
-
-    /// Indicates that the transaction has completed (or was never started) and does not require
-    /// explicit stopping on drop.
-    fn set_completed(&mut self) {
-        self.raw = None;
-    }
-}
-
-impl Drop for RxGuard {
-    fn drop(&mut self) {
-        if let Some(raw) = self.raw {
-            raw.stop_rx(true);
-            raw.update();
-
-            raw.unlisten_rx_interrupt(EnumSet::all());
-        }
-    }
-}
-
-/// An in-progress transaction for a single shot TX transaction.
-///
-/// If the data size exceeds the size of the internal buffer, `.poll()` or
-/// `.wait()` needs to be called before the entire buffer has been sent to avoid
-/// underruns.
-#[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct TxTransaction<'ch, 'data> {
-    // This must go first such that it is dropped before the channel (which might disable the
-    // peripheral on drop)!
-    _guard: TxGuard,
-
-    channel: Channel<'ch, Blocking, Tx>,
-
-    writer: RmtWriter,
-
-    // Remaining data that has not yet been written to channel RAM. May be empty.
-    remaining_data: &'data [PulseCode],
-}
-
-impl<'ch> TxTransaction<'ch, '_> {
+    /// [`TxError::Underrun`] if the transmission ended before the driver wrote all data to the
+    /// channel RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn poll_internal(&mut self) -> Option<Event> {
-        let raw = self.channel.raw;
+    pub fn transmit(&mut self, data: &[PulseCode]) -> Result<(), TxError> {
+        let Some(mut transmission) = Transmission::start(self.raw, data, false) else {
+            return Ok(());
+        };
+        loop {
+            if let Some(result) = transmission.poll() {
+                return result;
+            }
+        }
+    }
 
-        let status = raw.get_tx_status();
-        if status == Some(Event::Threshold) {
-            raw.clear_tx_interrupts(Event::Threshold);
+    /// Sends `data` repeatedly until the returned [`TxLoop`] stops.
+    ///
+    /// The driver adds the end marker that ends each repetition. All codes and the end marker
+    /// must fit in the channel RAM. The `mode` argument decides whether the transmission
+    /// repeats until it is stopped or for a number of repetitions, see [`LoopMode`].
+    ///
+    /// # Errors
+    ///
+    /// [`TxError::DataTooLong`], or `TxError::LoopCountOutOfRange` for a loop count above
+    /// `MAX_TX_LOOPCOUNT`.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    pub fn transmit_loop(
+        &mut self,
+        mut data: &[PulseCode],
+        mode: LoopMode,
+    ) -> Result<TxLoop<'_>, TxError> {
+        let raw = self.raw;
 
-            // `RmtWriter::write()` is safe to call even if `poll_internal` is called repeatedly
-            // after the data is exhausted since it returns immediately if already done.
-            self.writer.write(&mut self.remaining_data, raw, false);
+        #[cfg(rmt_has_tx_loop_count)]
+        if mode.get_count() > MAX_TX_LOOPCOUNT {
+            return Err(TxError::LoopCountOutOfRange);
         }
 
-        status
-    }
+        let mut guard = TxGuard::new(raw);
+        #[cfg(rmt_has_tx_loop_auto_stop)]
+        let zero_loops = mode == LoopMode::Finite(0);
+        #[cfg(not(rmt_has_tx_loop_auto_stop))]
+        let zero_loops = false;
 
-    /// Checks transmission status and writes new data to the hardware if
-    /// necessary.
-    ///
-    /// Returns whether transmission has ended (whether successfully or with an
-    /// error). In that case, a subsequent call to `wait()` returns immediately.
-    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn poll(&mut self) -> bool {
-        matches!(self.poll_internal(), Some(Event::Error | Event::End))
-    }
-
-    /// Waits for the transaction to complete.
-    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn wait(
-        mut self,
-    ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
-        // Not sure that all the error cases below can happen. However, it's best to
-        // handle them to be sure that we don't lock up here in case they can happen.
-        let result = loop {
-            match self.poll_internal() {
-                Some(Event::Error) => break Err(Error::TransmissionError),
-                Some(Event::End) => break self.writer.state().to_result(),
-                _ => continue,
+        if data.is_empty() || zero_loops {
+            guard.set_completed();
+        } else {
+            let mut writer = RmtWriter::new();
+            writer.write(&mut data, raw, true);
+            if writer.state() == WriterState::Active {
+                return Err(TxError::DataTooLong);
             }
+
+            raw.clear_tx_interrupts(EnumSet::all());
+            raw.start_send(Some(mode), raw.memsize());
+        }
+
+        Ok(TxLoop {
+            raw,
+            _guard: guard,
+            _channel: PhantomData,
+        })
+    }
+}
+
+impl<'a> TxChannel<'a, Async> {
+    /// Sends `data` and returns when the last code is out.
+    ///
+    /// Dropping the future stops the transmission. See [`TxChannel::transmit`].
+    ///
+    /// # Errors
+    ///
+    /// [`TxError::Underrun`] if the task did not refill the channel RAM in time.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    pub async fn transmit_async(&mut self, data: &[PulseCode]) -> Result<(), TxError> {
+        let Some(transmission) = Transmission::start(self.raw, data, true) else {
+            return Ok(());
+        };
+        TxFuture { transmission }.await
+    }
+}
+
+impl<Dm: DriverMode> Drop for TxChannel<'_, Dm> {
+    fn drop(&mut self) {
+        self.raw.set_memsize(MemSize::from_blocks(0));
+    }
+}
+
+// A transmission in progress: refills the channel RAM and checks the result.
+struct Transmission<'d> {
+    raw: DynChannelAccess<Tx>,
+    writer: RmtWriter,
+    // Data that has not yet been written to channel RAM. May be empty.
+    data: &'d [PulseCode],
+    guard: TxGuard,
+}
+
+impl<'d> Transmission<'d> {
+    // Returns `None` for empty data: there is nothing to send.
+    #[inline(always)]
+    fn start(raw: DynChannelAccess<Tx>, mut data: &'d [PulseCode], listen: bool) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
+
+        let mut writer = RmtWriter::new();
+        writer.write(&mut data, raw, true);
+
+        raw.clear_tx_interrupts(EnumSet::all());
+        if listen {
+            let mut events = Event::End | Event::Error;
+            if writer.state() == WriterState::Active {
+                events |= Event::Threshold;
+            }
+            raw.listen_tx_interrupt(events);
+        }
+        raw.start_send(None, raw.memsize());
+
+        Some(Self {
+            raw,
+            writer,
+            data,
+            guard: TxGuard::new(raw),
+        })
+    }
+
+    // Refills the channel RAM if needed. Returns the result once the transmission has ended.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn poll(&mut self) -> Option<Result<(), TxError>> {
+        let raw = self.raw;
+        let result = match raw.get_tx_status() {
+            Some(Event::Error) => Err(TxError::Underrun),
+            Some(Event::End) => self.writer.finish(raw),
+            Some(Event::Threshold) => {
+                raw.clear_tx_interrupts(Event::Threshold);
+                self.writer.write(&mut self.data, raw, false);
+                return None;
+            }
+            _ => return None,
         };
 
-        self._guard.set_completed();
-
-        match result {
-            Ok(()) => Ok(self.channel),
-            Err(err) => Err((err, self.channel)),
-        }
+        self.guard.set_completed();
+        Some(result)
     }
 }
 
-/// An in-progress continuous TX transaction.
-#[must_use = "transactions will be aborted when dropped"]
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ContinuousTxTransaction<'ch> {
-    // This must go first such that it is dropped before the channel (which might disable the
-    // peripheral on drop)!
-    _guard: TxGuard,
-
-    channel: Channel<'ch, Blocking, Tx>,
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+struct TxFuture<'d> {
+    transmission: Transmission<'d>,
 }
 
-impl<'ch> ContinuousTxTransaction<'ch> {
-    // FIXME: This interface isn't great, since one cannot use the waiting time until tx is stopped
-    // for other things! Implement a poll-like interface similar to TxTransaction!
-    /// Stops transaction when the current iteration ends.
-    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn stop_next(
-        self,
-    ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
-        self.stop_impl(false)
-    }
-
-    /// Stops transaction as soon as possible.
-    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn stop(self) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
-        self.stop_impl(true)
-    }
+impl core::future::Future for TxFuture<'_> {
+    type Output = Result<(), TxError>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn stop_impl(
-        mut self,
-        immediate: bool,
-    ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
-        let raw = self.channel.raw;
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let transmission = &mut self.get_mut().transmission;
+        let raw = transmission.raw;
 
-        let mut result = Ok(());
-        if self._guard.is_active() {
-            // If rmt_has_tx_loop_auto_stop and the engine is stopped already, this is not
-            // necessary. However, explicitly stopping unconditionally makes the logic
-            // here much simpler and shouldn't create much overhead.
-            raw.set_tx_continuous(false);
-            if immediate {
-                raw.stop_tx()
-            }
-            raw.update();
+        WAKER[raw.channel() as usize].register(ctx.waker());
 
-            if !immediate || !cfg!(rmt_has_tx_immediate_stop) {
-                loop {
-                    match raw.get_tx_status() {
-                        Some(Event::Error) => {
-                            result = Err(Error::TransmissionError);
-                            break;
-                        }
-                        Some(Event::End) => break,
-                        Some(Event::LoopCount) if cfg!(rmt_has_tx_loop_auto_stop) => break,
-                        _ => continue,
-                    }
+        match transmission.poll() {
+            Some(result) => Poll::Ready(result),
+            None => {
+                // The interrupt handler disables the threshold interrupt when it fires.
+                if transmission.writer.state() == WriterState::Active {
+                    raw.listen_tx_interrupt(Event::Threshold);
                 }
+                Poll::Pending
             }
         }
-
-        self._guard.set_completed();
-
-        match result {
-            Ok(()) => Ok(self.channel),
-            Err(err) => Err((err, self.channel)),
-        }
-    }
-
-    /// Returns whether the `loopcount` interrupt bit is set.
-    ///
-    /// Whether this implies that the transmission has stopped depends on the [`LoopMode`] value
-    /// provided when starting it.
-    #[cfg(rmt_has_tx_loop_count)]
-    pub fn is_loopcount_interrupt_set(&self) -> bool {
-        !self._guard.is_active() || self.channel.raw.is_tx_loopcount_interrupt_set()
     }
 }
 
-/// RMT Channel Creator.
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ChannelCreator<'ch, Dm, const CHANNEL: u8>
-where
-    Dm: crate::DriverMode,
-{
-    // Conceptually, this retains a reference to the main driver struct, even when the
-    // `ChannelCreator` is taken out of it and the `Rmt` dropped. This prevents re-inititalizing
-    // the `Rmt` and obtaining a duplicate `ChannelCreator`.
-    _rmt: PhantomData<Rmt<'ch, Dm>>,
-
-    // We need to keep the peripheral and source clocks alive since the following sequence of
-    // events is possible:
-    //
-    // ```
-    // let cc = {
-    //     let rmt = Rmt::new(peripheral, freq);  // 1
-    //     rmt.channel0  // 2
-    // };  // 3 (drop other ChannelCreators and Rmt.peripheral)
-    // let ch0 = cc.configure_tx(pin, config).unwrap();  // 4 (create Channel._guard)
-    // ch0.transmit(...);  // 5
-    // ```
-    //
-    // If there was no _guard in ChannelCreator, the peripheral would be disabled in step 3, and
-    // re-enabled in step 4, losing the clock configuration that was set in step 1.
-    _guard: Option<ChannelGuards>,
-}
-
-impl<'ch, Dm, const CHANNEL: u8> ChannelCreator<'ch, Dm, CHANNEL>
-where
-    Dm: crate::DriverMode,
-{
-    fn conjure() -> Self {
-        Self {
-            _rmt: PhantomData,
-            _guard: Some(ChannelGuards::new()),
-        }
-    }
-
-    unsafe fn into_async(self) -> ChannelCreator<'ch, Async, CHANNEL> {
-        ChannelCreator {
-            _rmt: PhantomData,
-            _guard: self._guard,
-        }
-    }
-
-    /// Reborrows this channel creator for a shorter lifetime `'a`.
-    pub fn reborrow<'a>(&'a mut self) -> ChannelCreator<'a, Dm, CHANNEL> {
-        Self {
-            _rmt: PhantomData,
-            // Resources must only be released once the parent is dropped.
-            _guard: None,
-        }
-    }
-
-    /// Unsafely steal a channel creator instance.
-    ///
-    /// # Safety
-    ///
-    /// Circumvents HAL ownership and safety guarantees and allows creating
-    /// multiple handles to the same peripheral structure.
-    #[inline]
-    pub unsafe fn steal() -> Self {
-        Self {
-            _rmt: PhantomData,
-            _guard: Some(ChannelGuards::new()),
-        }
-    }
-}
-
-/// Loop mode for continuous transmission.
+/// Loop mode of [`TxChannel::transmit_loop`].
 ///
 /// Depending on hardware support, the `loopcount` interrupt and automatic stopping of the
 /// transmission upon reaching a specified loop count may not be available.
@@ -1707,8 +1536,6 @@ pub enum LoopMode {
     /// Repeats until explicitly stopped.
     Infinite,
 
-    // FIXME: Does continuous tx trigger the End interrupt on each repetition such that it could
-    // be used to emulate the LoopCount interrupt on devices that lack it?
     /// Repeats until explicitly stopped, and asserts the loop count interrupt upon completing the
     /// given number of iterations.
     ///
@@ -1740,213 +1567,353 @@ impl LoopMode {
     }
 }
 
-/// Channel in TX mode.
-impl<'ch> Channel<'ch, Blocking, Tx> {
-    /// Starts transmitting the given pulse code sequence.
-    /// Returns a [`TxTransaction`] that can be used to wait for the transaction to
-    /// complete and get back the channel for further use.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit<'data>(
-        self,
-        mut data: &'data [PulseCode],
-    ) -> Result<TxTransaction<'ch, 'data>, (Error, Self)> {
-        let raw = self.raw;
-        let memsize = raw.memsize();
-
-        let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, true);
-
-        if let WriterState::Error(e) = writer.state() {
-            return Err((e, self));
-        }
-
-        raw.clear_tx_interrupts(EnumSet::all());
-        raw.start_send(None, memsize);
-
-        Ok(TxTransaction {
-            channel: self,
-            writer,
-            remaining_data: data,
-            _guard: TxGuard::new(raw),
-        })
-    }
-
-    /// Starts transmitting the given pulse code continuously.
-    ///
-    /// Returns a [`ContinuousTxTransaction`] that can be used to stop the ongoing
-    /// transmission and get back the channel for further use.
-    ///
-    /// The `mode` argument determines whether transmission will continue until explicitly stopped
-    /// or for a fixed number of iterations; see [`LoopMode`] for more details.
-    #[cfg_attr(
-        rmt_has_tx_loop_count,
-        doc = "When using a loop `mode` other than [`LoopMode::Infinite`], [`ContinuousTxTransaction::is_loopcount_interrupt_set`] can be used to check if the loop count is reached."
-    )]
-    /// The length of `data` cannot exceed the size of the allocated RMT RAM.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_continuously(
-        self,
-        mut data: &[PulseCode],
-        mode: LoopMode,
-    ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)> {
-        let raw = self.raw;
-        let memsize = raw.memsize();
-
-        #[cfg(rmt_has_tx_loop_count)]
-        if mode.get_count() > MAX_TX_LOOPCOUNT {
-            return Err((Error::InvalidArgument, self));
-        }
-
-        let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, true);
-
-        match writer.state() {
-            WriterState::Error(e) => return Err((e, self)),
-            WriterState::Active => return Err((Error::Overflow, self)),
-            WriterState::Done => (),
-        }
-
-        let mut _guard = TxGuard::new(raw);
-        #[cfg(rmt_has_tx_loop_auto_stop)]
-        if mode == LoopMode::Finite(0) {
-            _guard.set_completed();
-        }
-
-        if _guard.is_active() {
-            raw.clear_tx_interrupts(EnumSet::all());
-            raw.start_send(Some(mode), memsize);
-        }
-
-        Ok(ContinuousTxTransaction {
-            channel: self,
-            _guard,
-        })
-    }
-}
-
-/// RX transaction instance.
-#[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
+/// A loop transmission in progress, see [`TxChannel::transmit_loop`].
+///
+/// Dropping it stops the transmission.
+#[must_use = "dropping the loop stops the transmission"]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct RxTransaction<'ch, 'data> {
-    // This must go first such that it is dropped before the channel (which might disable the
-    // peripheral on drop)!
-    _guard: RxGuard,
-
-    channel: Channel<'ch, Blocking, Rx>,
-
-    reader: RmtReader,
-
-    data: &'data mut [PulseCode],
+pub struct TxLoop<'c> {
+    raw: DynChannelAccess<Tx>,
+    _guard: TxGuard,
+    _channel: PhantomData<&'c mut ()>,
 }
 
-impl<'ch> RxTransaction<'ch, '_> {
+impl TxLoop<'_> {
+    /// Stops the transmission when the current repetition ends, and waits for that.
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn stop_next(self) -> Result<(), TxError> {
+        self.stop_impl(false)
+    }
+
+    /// Stops the transmission as soon as possible.
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn stop(self) -> Result<(), TxError> {
+        self.stop_impl(true)
+    }
+
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn poll_internal(&mut self) -> Option<Event> {
-        let raw = self.channel.raw;
+    fn stop_impl(mut self, immediate: bool) -> Result<(), TxError> {
+        let raw = self.raw;
 
-        let status = raw.get_rx_status();
+        let mut result = Ok(());
+        if self._guard.is_active() {
+            // If rmt_has_tx_loop_auto_stop and the engine is stopped already, this is not
+            // necessary. However, explicitly stopping unconditionally makes the logic
+            // here much simpler and shouldn't create much overhead.
+            raw.set_tx_continuous(false);
+            if immediate {
+                raw.stop_tx()
+            }
+            raw.update();
 
-        match status {
+            if !immediate || !cfg!(rmt_has_tx_immediate_stop) {
+                loop {
+                    match raw.get_tx_status() {
+                        Some(Event::Error) => {
+                            result = Err(TxError::Underrun);
+                            break;
+                        }
+                        Some(Event::End) => break,
+                        Some(Event::LoopCount) if cfg!(rmt_has_tx_loop_auto_stop) => break,
+                        _ => continue,
+                    }
+                }
+            }
+        }
+
+        self._guard.set_completed();
+        result
+    }
+
+    /// Returns whether the `loopcount` interrupt bit is set.
+    ///
+    /// Whether this implies that the transmission has stopped depends on the [`LoopMode`] value
+    /// provided when starting it.
+    #[cfg(rmt_has_tx_loop_count)]
+    pub fn is_loopcount_interrupt_set(&self) -> bool {
+        !self._guard.is_active() || self.raw.is_tx_loopcount_interrupt_set()
+    }
+}
+
+/// A receive channel.
+///
+/// Created by [`Rmt::rx_channel`] or [`Rmt::async_rx_channel`].
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct RxChannel<'a, Dm: DriverMode> {
+    raw: DynChannelAccess<Rx>,
+    group_frequency: Rate,
+    divider: u16,
+    _phantom: PhantomData<(&'a (), Dm)>,
+}
+
+impl<'a, Dm: DriverMode> RxChannel<'a, Dm> {
+    fn new(
+        info: &'static Info,
+        blocks: u8,
+        group_frequency: Rate,
+        config: &RxConfig,
+    ) -> Result<Self, ConfigError> {
+        let raw = unsafe { DynChannelAccess::conjure(info.ch_idx) };
+        let divider = apply_rx_config(raw, group_frequency, config)?;
+        raw.set_memsize(MemSize::from_blocks(blocks));
+
+        Ok(Self {
+            raw,
+            group_frequency,
+            divider,
+            _phantom: PhantomData,
+        })
+    }
+
+    /// Connects a pin to the channel's input signal.
+    ///
+    /// This will replace previous pin assignments for this signal.
+    pub fn with_pin(self, pin: impl PeripheralInput<'a>) -> Self {
+        let pin = pin.into();
+        pin.apply_input_config(&InputConfig::default());
+        pin.set_input_enable(true);
+
+        self.raw.input_signal().connect_to(&pin);
+
+        self
+    }
+
+    /// Changes the configuration.
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::UnreachableTickRate`], [`ConfigError::UnreachableCarrier`] or
+    /// [`ConfigError::RxLimitOutOfRange`].
+    pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
+        self.divider = apply_rx_config(self.raw, self.group_frequency, config)?;
+        Ok(())
+    }
+
+    /// Returns the actual tick rate.
+    pub fn tick_rate(&self) -> Rate {
+        Rate::from_hz(self.group_frequency.as_hz() / self.divider as u32)
+    }
+
+    #[procmacros::doc_replace(
+        "rx_size_limit" => {
+            cfg(any(esp32, esp32s2)) => "A frame cannot be longer than the channel RAM on this chip.",
+            _ => ""
+        }
+    )]
+    /// Receives one frame into `buf` and returns the number of codes.
+    ///
+    /// Blocks until the input stays at one level for longer than the idle threshold.
+    ///
+    /// # {rx_size_limit}
+    ///
+    /// # Errors
+    ///
+    /// [`RxError::BufferTooSmall`] or [`RxError::Overrun`].
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    pub fn receive(&mut self, buf: &mut [PulseCode]) -> Result<usize, RxError> {
+        let mut reception = Reception::start(self.raw, buf, false);
+        loop {
+            if let Some(result) = reception.poll() {
+                return result;
+            }
+        }
+    }
+}
+
+impl<'a> RxChannel<'a, Async> {
+    /// Receives one frame into `buf` and returns the number of codes.
+    ///
+    /// Dropping the future stops the reception. See [`RxChannel::receive`].
+    ///
+    /// # Errors
+    ///
+    /// [`RxError::BufferTooSmall`] or [`RxError::Overrun`].
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    pub async fn receive_async(&mut self, buf: &mut [PulseCode]) -> Result<usize, RxError> {
+        RxFuture {
+            reception: Reception::start(self.raw, buf, true),
+        }
+        .await
+    }
+}
+
+impl<Dm: DriverMode> Drop for RxChannel<'_, Dm> {
+    fn drop(&mut self) {
+        self.raw.set_memsize(MemSize::from_blocks(0));
+    }
+}
+
+// A reception in progress: reads the channel RAM and checks the result.
+struct Reception<'d> {
+    raw: DynChannelAccess<Rx>,
+    reader: RmtReader,
+    data: &'d mut [PulseCode],
+    guard: RxGuard,
+}
+
+impl<'d> Reception<'d> {
+    #[inline(always)]
+    fn start(raw: DynChannelAccess<Rx>, data: &'d mut [PulseCode], listen: bool) -> Self {
+        raw.clear_rx_interrupts(EnumSet::all());
+        if listen {
+            raw.listen_rx_interrupt(Event::End | Event::Error | Event::Threshold);
+        }
+        raw.start_receive(true, raw.memsize());
+
+        Self {
+            raw,
+            reader: RmtReader::new(),
+            data,
+            guard: RxGuard::new(raw),
+        }
+    }
+
+    // Reads the channel RAM if needed. Returns the result once the reception has ended.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn poll(&mut self) -> Option<Result<usize, RxError>> {
+        let raw = self.raw;
+        let result = match raw.get_rx_status() {
             // Read all available data also on error
-            Some(Event::End | Event::Error) => {
-                // Do not clear the interrupt flags here: Subsequent calls of wait() must
-                // be able to observe them if this is currently called via poll()
+            Some(event @ (Event::End | Event::Error)) => {
                 // Rx is stopped already, but we do need to clear the rx enable flag and
                 // apply that right away! Otherwise the next `raw.update` call would do so
                 // while starting the next transaction, which breaks it when SCLK is slow.
                 raw.stop_rx(false);
                 raw.update();
 
-                // `RmtReader::read()` is safe to call even if `poll_internal` is called repeatedly
-                // after the receiver finished since it returns immediately if already done.
-                if !self.reader.read(&mut self.data, raw, true) {
-                    return Some(Event::Error);
+                // `RmtReader::read()` returns immediately if the reader is already done.
+                if !self.reader.read(&mut self.data, raw, true) || event == Event::Error {
+                    Err(RxError::Overrun)
+                } else if let ReaderState::Error(err) = self.reader.state {
+                    Err(err)
+                } else {
+                    Ok(self.reader.total)
                 }
             }
             #[cfg(rmt_has_rx_wrap)]
             Some(Event::Threshold) => {
                 raw.clear_rx_interrupts(Event::Threshold);
-
-                if self.reader.state == ReaderState::Active {
-                    self.reader.read(&mut self.data, raw, false);
-                }
+                self.reader.read(&mut self.data, raw, false);
+                return None;
             }
-            _ => (),
-        }
-
-        status
-    }
-
-    /// Checks receive status.
-    ///
-    /// Returns whether reception has ended (whether successfully or with an
-    /// error). In that case, a subsequent call to `wait()` returns immediately.
-    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn poll(&mut self) -> bool {
-        matches!(self.poll_internal(), Some(Event::Error | Event::End))
-    }
-
-    /// Waits for the transaction to complete.
-    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    // The return type isn't nice, but the blocking API needs a broader redesign anyway.
-    #[allow(clippy::type_complexity)]
-    pub fn wait(
-        mut self,
-    ) -> Result<(usize, Channel<'ch, Blocking, Rx>), (Error, Channel<'ch, Blocking, Rx>)> {
-        let result = loop {
-            match self.poll_internal() {
-                Some(Event::Error) => break Err(Error::ReceiverError),
-                Some(Event::End) => break Ok(self.reader.total),
-                _ => continue,
-            }
+            _ => return None,
         };
 
-        self._guard.set_completed();
+        self.guard.set_completed();
+        Some(result)
+    }
+}
 
-        match result {
-            Ok(total) => Ok((total, self.channel)),
-            Err(err) => Err((err, self.channel)),
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+struct RxFuture<'d> {
+    reception: Reception<'d>,
+}
+
+impl core::future::Future for RxFuture<'_> {
+    type Output = Result<usize, RxError>;
+
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let reception = &mut self.get_mut().reception;
+        let raw = reception.raw;
+
+        WAKER[raw.channel() as usize].register(ctx.waker());
+
+        match reception.poll() {
+            Some(result) => Poll::Ready(result),
+            None => {
+                // The interrupt handler disables the threshold interrupt when it fires.
+                if reception.reader.state == ReaderState::Active {
+                    raw.listen_rx_interrupt(Event::Threshold);
+                }
+                Poll::Pending
+            }
         }
     }
 }
 
-/// Channel is RX mode.
-impl<'ch> Channel<'ch, Blocking, Rx> {
-    #[procmacros::doc_replace(
-        "rx_size_limit" => {
-            cfg(any(esp32, esp32s2)) => "The length of the received data cannot exceed the allocated RMT RAM.",
-            _ => ""
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct TxGuard {
+    raw: Option<DynChannelAccess<Tx>>,
+    // The CPU refills the channel RAM. At a low CPU frequency, the refill can be too late.
+    _cpu_frequency_lock: Option<CpuFrequencyLock>,
+}
+
+impl TxGuard {
+    fn new(raw: DynChannelAccess<Tx>) -> Self {
+        Self {
+            raw: Some(raw),
+            _cpu_frequency_lock: Some(CpuFrequencyLock::new()),
         }
-    )]
-    /// Starts receiving pulse codes into the given buffer.
-    /// Returns a [`RxTransaction`] that can be used to wait for receive to complete
-    /// and get back the channel for further use.
-    ///
-    /// # {rx_size_limit}
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<'data>(
-        self,
-        data: &'data mut [PulseCode],
-    ) -> Result<RxTransaction<'ch, 'data>, (Error, Self)> {
-        let raw = self.raw;
-        let memsize = raw.memsize();
+    }
 
-        if !property!("rmt.has_rx_wrap") && data.len() > memsize.codes() {
-            return Err((Error::InvalidDataLength, self));
+    /// Indicates that the transaction has completed (or was never started) and does not require
+    /// explicit stopping on drop.
+    fn set_completed(&mut self) {
+        self.raw = None;
+        self._cpu_frequency_lock = None;
+    }
+
+    fn is_active(&self) -> bool {
+        self.raw.is_some()
+    }
+}
+
+impl Drop for TxGuard {
+    fn drop(&mut self) {
+        // The guard is still active if the transmission was aborted or loops. A loop raises
+        // `End` at every repetition on some chips, so the status does not tell whether the
+        // channel still runs.
+        if let Some(raw) = self.raw {
+            // In continuous mode, an end marker restarts the loop instead of ending it.
+            raw.set_tx_continuous(false);
+            raw.stop_tx();
+            raw.update();
+
+            // Block until the channel is safe to use again.
+            #[cfg(not(rmt_has_tx_immediate_stop))]
+            while !raw.is_tx_idle() {}
+
+            raw.unlisten_tx_interrupt(EnumSet::all());
         }
+    }
+}
 
-        let reader = RmtReader::new();
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct RxGuard {
+    raw: Option<DynChannelAccess<Rx>>,
+    // The CPU empties the channel RAM. At a low CPU frequency, the read can be too late.
+    _cpu_frequency_lock: Option<CpuFrequencyLock>,
+}
 
-        raw.clear_rx_interrupts(EnumSet::all());
-        raw.start_receive(true, memsize);
+impl RxGuard {
+    fn new(raw: DynChannelAccess<Rx>) -> Self {
+        Self {
+            raw: Some(raw),
+            _cpu_frequency_lock: Some(CpuFrequencyLock::new()),
+        }
+    }
 
-        Ok(RxTransaction {
-            channel: self,
-            reader,
-            data,
-            _guard: RxGuard::new(raw),
-        })
+    /// Indicates that the transaction has completed and does not require explicit stopping on
+    /// drop.
+    fn set_completed(&mut self) {
+        self.raw = None;
+        self._cpu_frequency_lock = None;
+    }
+}
+
+impl Drop for RxGuard {
+    fn drop(&mut self) {
+        if let Some(raw) = self.raw {
+            raw.stop_rx(true);
+            raw.update();
+
+            raw.unlisten_rx_interrupt(EnumSet::all());
+        }
     }
 }
 
@@ -1955,198 +1922,18 @@ static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_C
 // Lock to synchronize access to registers that are shared between channels.
 static RMT_LOCK: RawMutex = RawMutex::new();
 
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-struct TxFuture<'a> {
-    raw: DynChannelAccess<Tx>,
-    _phantom: PhantomData<Channel<'a, Async, Tx>>,
-    writer: RmtWriter,
+// Blocking channels move to other cores and tasks, and all channels borrow `Rmt`. Async drivers
+// are not `Send`, see `crate::Async`. Keep these bounds until the stable API decides which ones
+// it promises.
+const _: () = {
+    const fn assert_send<T: Send>() {}
+    const fn assert_sync<T: Sync>() {}
 
-    // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: &'a [PulseCode],
-
-    _guard: TxGuard,
-}
-
-impl core::future::Future for TxFuture<'_> {
-    type Output = Result<(), Error>;
-
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-        let raw = this.raw;
-
-        if let WriterState::Error(err) = this.writer.state() {
-            return Poll::Ready(Err(err));
-        }
-
-        WAKER[raw.channel() as usize].register(ctx.waker());
-
-        let result = match raw.get_tx_status() {
-            Some(Event::Error) => Err(Error::TransmissionError),
-            Some(Event::End) => this.writer.state().to_result(),
-            Some(Event::Threshold) => {
-                raw.clear_tx_interrupts(Event::Threshold);
-
-                this.writer.write(&mut this.data, raw, false);
-
-                if this.writer.state() == WriterState::Active {
-                    raw.listen_tx_interrupt(Event::Threshold);
-                }
-
-                return Poll::Pending;
-            }
-            _ => return Poll::Pending,
-        };
-
-        this._guard.set_completed();
-
-        Poll::Ready(result)
-    }
-}
-
-/// TX channel in async mode.
-impl Channel<'_, Async, Tx> {
-    /// Starts transmitting the given pulse code sequence.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit(&mut self, mut data: &[PulseCode]) -> impl Future<Output = Result<(), Error>> {
-        let raw = self.raw;
-        let memsize = raw.memsize();
-
-        let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, true);
-
-        let _guard = if writer.state().is_ok() {
-            let wrap = match writer.state() {
-                WriterState::Error(_) => false,
-                WriterState::Active => true,
-                WriterState::Done => false,
-            };
-
-            raw.clear_tx_interrupts(EnumSet::all());
-            let mut events = Event::End | Event::Error;
-            if wrap {
-                events |= Event::Threshold;
-            }
-            raw.listen_tx_interrupt(events);
-            raw.start_send(None, memsize);
-
-            TxGuard::new(raw)
-        } else {
-            TxGuard::new_empty()
-        };
-
-        TxFuture {
-            raw,
-            _phantom: PhantomData,
-            writer,
-            data,
-            _guard,
-        }
-    }
-}
-
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RxFuture<'a> {
-    raw: DynChannelAccess<Rx>,
-    _phantom: PhantomData<Channel<'a, Async, Rx>>,
-    reader: RmtReader,
-    data: &'a mut [PulseCode],
-    _guard: RxGuard,
-}
-
-impl core::future::Future for RxFuture<'_> {
-    type Output = Result<usize, Error>;
-
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-        let raw = this.raw;
-
-        if let ReaderState::Error(err) = this.reader.state {
-            return Poll::Ready(Err(err));
-        }
-
-        WAKER[raw.channel() as usize].register(ctx.waker());
-
-        let result = match raw.get_rx_status() {
-            // Read all available data also on error
-            Some(ev @ (Event::End | Event::Error)) => {
-                // Rx is stopped already, but we do need to clear the rx enable flag and
-                // apply that right away! Otherwise the next `raw.update` call would do so
-                // while starting the next transaction, which breaks it when SCLK is slow.
-                raw.stop_rx(false);
-                raw.update();
-
-                if !this.reader.read(&mut this.data, raw, true) {
-                    Err(Error::ReceiverError)
-                } else {
-                    match ev {
-                        Event::Error => Err(Error::ReceiverError),
-                        _ => Ok(this.reader.total),
-                    }
-                }
-            }
-            #[cfg(rmt_has_rx_wrap)]
-            Some(Event::Threshold) => {
-                raw.clear_rx_interrupts(Event::Threshold);
-
-                this.reader.read(&mut this.data, raw, false);
-
-                if this.reader.state == ReaderState::Active {
-                    raw.listen_rx_interrupt(Event::Threshold);
-                }
-
-                return Poll::Pending;
-            }
-            _ => return Poll::Pending,
-        };
-
-        this._guard.set_completed();
-
-        Poll::Ready(result)
-    }
-}
-
-/// RX channel in async mode.
-impl Channel<'_, Async, Rx> {
-    #[procmacros::doc_replace(
-        "rx_size_limit" => {
-            cfg(any(esp32, esp32s2)) => "The length of the received data cannot exceed the allocated RMT RAM.",
-            _ => ""
-        }
-    )]
-    /// Starts receiving a pulse code sequence.
-    ///
-    /// # {rx_size_limit}
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive(
-        &mut self,
-        data: &mut [PulseCode],
-    ) -> impl Future<Output = Result<usize, Error>> {
-        let raw = self.raw;
-        let memsize = raw.memsize();
-
-        let mut reader = RmtReader::new();
-
-        let _guard = if !property!("rmt.has_rx_wrap") && data.len() > memsize.codes() {
-            reader.state = ReaderState::Error(Error::InvalidDataLength);
-            RxGuard::new_empty()
-        } else {
-            raw.clear_rx_interrupts(EnumSet::all());
-            raw.listen_rx_interrupt(Event::End | Event::Error | Event::Threshold);
-            raw.start_receive(true, memsize);
-            RxGuard::new(raw)
-        };
-
-        RxFuture {
-            raw,
-            reader,
-            data,
-            _phantom: PhantomData,
-            _guard,
-        }
-    }
-}
+    assert_send::<TxChannel<'static, Blocking>>();
+    assert_send::<RxChannel<'static, Blocking>>();
+    assert_sync::<Rmt<'static, Blocking>>();
+    assert_sync::<Rmt<'static, Async>>();
+};
 
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2233,8 +2020,6 @@ impl DynChannelAccess<Rx> {
     }
 }
 
-type ClockSource = clocks::RmtSclkConfig;
-
 // Obtain maximum value for a register field from the PAC's register spec.
 macro_rules! max_from_register_spec {
     ($typ:ty, $reg:ident, $spec:ident, $w:ident) => {{
@@ -2261,7 +2046,6 @@ mod chip_specific {
     use super::{
         ChannelIndex,
         ClockSource,
-        ConfigError,
         Direction,
         DynChannelAccess,
         Event,
@@ -2269,6 +2053,7 @@ mod chip_specific {
         LoopMode,
         MemSize,
         RMT_LOCK,
+        RmtConfig,
         Rx,
         Tx,
         WAKER,
@@ -2278,28 +2063,49 @@ mod chip_specific {
     // Time to wait after a `conf_update`, see `DynChannelAccess::update`.
     static CONF_UPDATE_DELAY_US: AtomicU32 = AtomicU32::new(0);
 
-    pub(super) fn validate_clock(
-        source: ClockSource,
-        frequency: Rate,
-    ) -> Result<(u8, Rate), ConfigError> {
-        let src_clock = Rate::from_hz(clocks::RmtInstance::sclk_source_frequency(source));
-
-        if frequency > src_clock {
-            return Err(ConfigError::UnreachableTargetFrequency);
+    cfg_select! {
+        esp32p4 => {
+            use crate::soc::pac::hp_sys_clkrst::peri_clk_ctrl22 as sclk_conf;
+            type Spec = sclk_conf::PERI_CLK_CTRL22_SPEC;
+            type DivNumW<'a> = sclk_conf::RMT_CLK_DIV_NUM_W<'a, Spec>;
         }
-
-        let div = src_clock
-            .as_hz()
-            .checked_div(frequency.as_hz())
-            .ok_or(ConfigError::UnreachableTargetFrequency)?;
-
-        let div = u8::try_from(div - 1).map_err(|_| ConfigError::UnreachableTargetFrequency)?;
-        let actual_frequency = src_clock / (u32::from(div) + 1);
-
-        Ok((div, actual_frequency))
+        esp32s31 => {
+            use crate::soc::pac::hp_sys_clkrst::rmt_ctrl0 as sclk_conf;
+            type Spec = sclk_conf::RMT_CTRL0_SPEC;
+            type DivNumW<'a> = sclk_conf::CLK_DIV_NUM_W<'a, Spec>;
+        }
+        soc_has_pcr => {
+            use crate::soc::pac::pcr::rmt_sclk_conf as sclk_conf;
+            type Spec = sclk_conf::RMT_SCLK_CONF_SPEC;
+            type DivNumW<'a> = sclk_conf::SCLK_DIV_NUM_W<'a, Spec>;
+        }
+        _ => {
+            use crate::soc::pac::rmt::sys_conf as sclk_conf;
+            type Spec = sclk_conf::SYS_CONF_SPEC;
+            type DivNumW<'a> = sclk_conf::SCLK_DIV_NUM_W<'a, Spec>;
+        }
     }
 
-    pub(super) fn configure_clock(source: ClockSource, div: u8, frequency: Rate) {
+    // The SCLK divider is `div_num + 1` (the fractional part stays 0).
+    const MAX_DIVIDER: u32 = 1 << DivNumW::WIDTH;
+
+    // Returns the integer group divider that gives the nearest clock period, and the actual
+    // group clock frequency.
+    pub(super) fn group_clock(config: &RmtConfig) -> (u32, Rate) {
+        let src_clock = clocks::RmtInstance::sclk_source_frequency(config.clock_source);
+
+        let divider = match config.frequency {
+            None => 1,
+            Some(frequency) => match frequency.as_hz() {
+                0 => MAX_DIVIDER,
+                f => ((src_clock + f / 2) / f).clamp(1, MAX_DIVIDER),
+            },
+        };
+
+        (divider, Rate::from_hz(src_clock / divider))
+    }
+
+    pub(super) fn configure_clock(source: ClockSource, divider: u32, frequency: Rate) {
         // Synchronizing a `conf_update` into the SCLK domain takes about one SCLK cycle, wait for
         // two to leave some margin. For a fast SCLK, this is shorter than the register accesses
         // following the update, so don't delay at all.
@@ -2314,39 +2120,46 @@ mod chip_specific {
             clocks::RmtInstance::Rmt.configure_sclk(clocks, source);
         });
 
+        let div_num = (divider - 1) as u8;
+        // An integral divider is described as `0 / 1`, not as `0 / 0`.
+        let numerator = 0;
+        let denominator = 1;
+
         // TODO: configure dividers through clock tree
+        // `div_a` is the numerator and `div_b` the denominator, as the RMT clock sections of the
+        // TRMs state. Some register descriptions have them swapped.
         cfg_select! {
             esp32p4 => {
                 use crate::peripherals::HP_SYS_CLKRST;
                 HP_SYS_CLKRST::regs()
                     .peri_clk_ctrl22()
                     .modify(|_, w| unsafe {
-                        w.rmt_clk_div_num().bits(div);
-                        w.rmt_clk_div_numerator().bits(0);
-                        w.rmt_clk_div_denominator().bits(0)
+                        w.rmt_clk_div_num().bits(div_num);
+                        w.rmt_clk_div_numerator().bits(numerator);
+                        w.rmt_clk_div_denominator().bits(denominator)
                     });
             }
             esp32s31 => {
                 use crate::peripherals::HP_SYS_CLKRST;
                 HP_SYS_CLKRST::regs().rmt_ctrl0().modify(|_, w| unsafe {
-                    w.clk_div_num().bits(div);
-                    w.clk_div_numerator().bits(0);
-                    w.clk_div_denominator().bits(0)
+                    w.clk_div_num().bits(div_num);
+                    w.clk_div_numerator().bits(numerator);
+                    w.clk_div_denominator().bits(denominator)
                 });
             }
             soc_has_pcr => {
                 use crate::peripherals::PCR;
                 PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
-                    w.sclk_div_num().bits(div);
-                    w.sclk_div_a().bits(0);
-                    w.sclk_div_b().bits(0)
+                    w.sclk_div_num().bits(div_num);
+                    w.sclk_div_a().bits(numerator);
+                    w.sclk_div_b().bits(denominator)
                 });
             }
             _ => {
                 RMT::regs().sys_conf().modify(|_, w| unsafe {
-                    w.sclk_div_num().bits(div);
-                    w.sclk_div_a().bits(0);
-                    w.sclk_div_b().bits(0)
+                    w.sclk_div_num().bits(div_num);
+                    w.sclk_div_a().bits(numerator);
+                    w.sclk_div_b().bits(denominator)
                 });
             }
         }
@@ -2654,13 +2467,13 @@ mod chip_specific {
             });
         }
 
-        #[allow(unused)]
+        // Position in the channel RAM after the code that the hardware read last.
         pub fn hw_offset(self) -> usize {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
             let offset = rmt.ch_tx_status(ch_idx).read().mem_raddr_ex().bits();
-            usize::from(offset) - self.channel_ram_start_offset()
+            usize::from(offset).wrapping_sub(self.channel_ram_start_offset())
         }
     }
 
@@ -2844,33 +2657,26 @@ mod chip_specific {
     use super::{
         ChannelIndex,
         ClockSource,
-        ConfigError,
         Direction,
         DynChannelAccess,
         Event,
         Level,
         MemSize,
         RMT_LOCK,
+        RmtConfig,
         Rx,
         Tx,
         WAKER,
     };
     use crate::{peripherals::RMT, soc::clocks, time::Rate};
 
-    pub(super) fn validate_clock(
-        source: ClockSource,
-        frequency: Rate,
-    ) -> Result<(u8, Rate), ConfigError> {
-        let source_frequency = Rate::from_hz(clocks::RmtInstance::sclk_source_frequency(source));
-
-        if frequency != source_frequency {
-            return Err(ConfigError::UnreachableTargetFrequency);
-        }
-
-        Ok((1, frequency))
+    // These chips have no group divider: the group clock is the source clock.
+    pub(super) fn group_clock(config: &RmtConfig) -> (u32, Rate) {
+        let frequency = clocks::RmtInstance::sclk_source_frequency(config.clock_source);
+        (1, Rate::from_hz(frequency))
     }
 
-    pub(super) fn configure_clock(source: ClockSource, _div: u8, _frequency: Rate) {
+    pub(super) fn configure_clock(source: ClockSource, _divider: u32, _frequency: Rate) {
         let rmt = RMT::regs();
 
         clocks::ClockTree::with(|clocks| {
@@ -2893,6 +2699,9 @@ mod chip_specific {
             if st.ch_tx_end(ch_idx).bit() {
                 raw_tx.unlisten_tx_interrupt(EnumSet::all());
             } else if st.ch_rx_end(ch_idx).bit() {
+                // While `rx_en` is set, the receiver starts a new frame at the next edge. Clear
+                // it now, not when the task polls the future.
+                raw_rx.stop_rx(false);
                 raw_rx.unlisten_rx_interrupt(EnumSet::all());
             } else if st.ch_err(ch_idx).bit() {
                 // On error interrupts, don't bother whether the channel is in Rx or Tx mode, just
@@ -3127,6 +2936,13 @@ mod chip_specific {
             }
         }
 
+        // Whether the channel state machine is idle.
+        #[cfg(not(rmt_has_tx_immediate_stop))]
+        pub fn is_tx_idle(self) -> bool {
+            let rmt = crate::peripherals::RMT::regs();
+            rmt.chstatus(self.ch_idx as usize).read().state().bits() == 0
+        }
+
         #[inline(always)]
         pub fn set_tx_interrupt(self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
@@ -3152,13 +2968,13 @@ mod chip_specific {
             });
         }
 
-        #[allow(unused)]
+        // Position in the channel RAM after the code that the hardware read last.
         pub fn hw_offset(self) -> usize {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
             let offset = rmt.chstatus(ch).read().mem_raddr_ex().bits();
-            usize::from(offset) - self.channel_ram_start_offset()
+            usize::from(offset).wrapping_sub(self.channel_ram_start_offset())
         }
     }
 
@@ -3186,6 +3002,7 @@ mod chip_specific {
             );
         }
 
+        #[cfg(rmt_has_rx_demodulation)]
         pub fn set_rx_carrier(self, carrier: bool, high: u16, low: u16, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
@@ -3361,7 +3178,7 @@ mod chip_specific {
     }
 }
 
-/// The largest valid value for [`RxChannelConfig::with_idle_threshold`].
+/// The largest idle threshold of a receive channel, in ticks.
 pub use chip_specific::MAX_RX_IDLE_THRESHOLD;
 /// The largest valid value for loopcounts in [`LoopMode`].
 #[cfg(rmt_has_tx_loop_count)]

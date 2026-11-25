@@ -46,55 +46,54 @@ pub(crate) fn pre_init() {
     });
 }
 
-pub(crate) fn enable_branch_predictor() {
-    // Enable branch predictor
-    // Note that the branch predictor will start cache requests and needs to be disabled when
-    // the cache is disabled.
-    // MHCR: CSR 0x7c1
-    const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
-    const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
-    const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
-    unsafe {
-        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
-    }
-}
-
-#[cfg(feature = "unstable")]
-pub(crate) fn disable_branch_predictor() {
-    // Clears the bits set by `enable_branch_predictor`.
-    const MHCR_RS: u32 = 1 << 4;
-    const MHCR_BFE: u32 = 1 << 5;
-    const MHCR_BTB: u32 = 1 << 12;
-    unsafe {
-        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
-    }
-}
-
 /// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[crate::ram]
-#[expect(dead_code, reason = "No enabled driver needs cache maintenance yet.")]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(addr: u32, size: u32);
     }
 
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_WriteBack_Addr(addr, size);
+    });
+}
+
+/// Writes back every dirty line of the cache.
+///
+/// The write-back runs twice, as in the ESP-IDF patch of the ROM function `Cache_WriteBack_All`.
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_rom/patches/esp_rom_cache_writeback_esp32c5_esp32c61_esp32h4.c#L35-L45>.
+#[crate::ram]
+pub(crate) fn cache_writeback_all() {
+    const CACHE_MAP_FLASH_CACHE: u32 = 1 << 4;
+
+    let cache = crate::peripherals::CACHE::regs();
+    cache
+        .sync_map()
+        .write(|w| unsafe { w.bits(CACHE_MAP_FLASH_CACHE) });
+    cache.sync_addr().write(|w| unsafe { w.bits(0) });
+    cache.sync_size().write(|w| unsafe { w.bits(0) });
+    for _ in 0..2 {
+        // The register resets with `INVALIDATE_ENA` set, and an invalidate drops the dirty lines.
+        unsafe {
+            cache
+                .sync_ctrl()
+                .write_with_zero(|w| w.writeback_ena().set_bit())
+        };
+        while cache.sync_ctrl().read().sync_done().bit_is_clear() {}
     }
 }
 
 /// Invalidate a specific range of addresses in the cache.
 #[doc(hidden)]
 #[crate::ram]
-#[expect(dead_code, reason = "No enabled driver needs cache maintenance yet.")]
 pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
     }
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE, addr, size);
-    }
+    });
 }

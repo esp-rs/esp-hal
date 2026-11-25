@@ -29,28 +29,6 @@ pub(crate) fn pre_init() {
     }
 }
 
-const MHCR_RS: u32 = 1 << 4;
-const MHCR_BFE: u32 = 1 << 5;
-const MHCR_BTB: u32 = 1 << 12;
-const MHCR_BRANCH_PREDICTOR: u32 = MHCR_RS | MHCR_BFE | MHCR_BTB;
-
-pub(crate) fn enable_branch_predictor() {
-    // MHCR: CSR 0x7c1 — sourced from `components/riscv/include/riscv/rv_utils.h`. The predictor
-    // starts cache requests of its own, so it must be off while the cache is off.
-    unsafe {
-        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
-    }
-}
-
-#[cfg(any(feature = "rt", feature = "unstable"))]
-pub(crate) fn disable_branch_predictor() {
-    // Clears the bits set by `enable_branch_predictor`.
-    // `rt` covers the CPU-retention rendezvous; `unstable` covers flash cache suspend.
-    unsafe {
-        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
-    }
-}
-
 const CACHE_MAP_L1_ICACHE_0: u32 = 1 << 0;
 const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
@@ -64,24 +42,32 @@ fn cache_l2_bus(addr: u32) -> u32 {
 
 /// Writes back a specific range of data in the cache.
 pub(crate) unsafe fn cache_writeback_addr(addr: u32, size: u32) {
+    if crate::soc::is_uncached_ram_address(addr as usize) {
+        return;
+    }
+
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(bus: u32, addr: u32, size: u32);
     }
 
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_WriteBack_Addr(CACHE_MAP_L1_DCACHE | cache_l2_bus(addr), addr, size);
-    }
+    });
 }
 
 /// Invalidate a specific range of data in the cache.
 pub(crate) unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    if crate::soc::is_uncached_ram_address(addr as usize) {
+        return;
+    }
+
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(bus: u32, addr: u32, size: u32);
     }
 
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE | cache_l2_bus(addr), addr, size);
-    }
+    });
 }
 
 pub(crate) unsafe fn cache_invalidate_icache_addr(addr: u32, size: u32) {
@@ -89,11 +75,11 @@ pub(crate) unsafe fn cache_invalidate_icache_addr(addr: u32, size: u32) {
         fn Cache_Invalidate_Addr(bus: u32, addr: u32, size: u32);
     }
 
-    unsafe {
+    super::CACHE_SYNC_LOCK.lock(|| unsafe {
         Cache_Invalidate_Addr(
             CACHE_MAP_L1_ICACHE_0 | CACHE_MAP_L1_ICACHE_1 | cache_l2_bus(addr),
             addr,
             size,
         );
-    }
+    });
 }

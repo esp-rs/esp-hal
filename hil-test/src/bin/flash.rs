@@ -5,6 +5,8 @@
 //% FEATURES: unstable
 //% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "--cfg=__test_flash" ]
 //% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "--cfg=__test_flash" ]
+//% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = ["-Z", "stack-protector=all"]
+//% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = ["-Z", "stack-protector=all"]
 
 #![no_std]
 #![no_main]
@@ -55,6 +57,7 @@ mod tests {
     fn flash_from_peripherals(
         peripherals: esp_hal::peripherals::Peripherals,
     ) -> Flash<'static, Blocking> {
+        hil_test::init_logger!(peripherals);
         Flash::new(peripherals.FLASH, Config::default()).unwrap()
     }
 
@@ -306,6 +309,7 @@ mod tests {
         static TICKS: AtomicU32 = AtomicU32::new(0);
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
         let stack = mk_static!(Stack<8192>, Stack::new());
         let _guard = cpu_control
@@ -335,6 +339,99 @@ mod tests {
 
     #[cfg(multi_core)]
     #[test]
+    fn test_auto_park_other_core_in_cas_loop() {
+        use core::sync::atomic::{AtomicU32, Ordering};
+
+        use esp_hal::system::{CpuControl, Stack};
+        use hil_test::mk_static;
+
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+        let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, || {
+                loop {
+                    let mut current = COUNTER.load(Ordering::Relaxed);
+                    while let Err(actual) = COUNTER.compare_exchange_weak(
+                        current,
+                        current.wrapping_add(1),
+                        Ordering::AcqRel,
+                        Ordering::Relaxed,
+                    ) {
+                        current = actual;
+                    }
+                }
+            })
+            .unwrap();
+
+        while COUNTER.load(Ordering::Relaxed) == 0 {}
+
+        let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
+        let mut words = [0u32; 64];
+
+        for _ in 0..1000 {
+            flash.read(APP_DESC_OFFSET, &mut words).unwrap();
+            assert_eq!(as_bytes(&words), expected_app_desc());
+        }
+
+        let before = COUNTER.load(Ordering::Relaxed);
+        while COUNTER.load(Ordering::Relaxed) == before {}
+    }
+
+    #[cfg(multi_core)]
+    #[test]
+    fn test_auto_park_from_both_cores_at_the_same_time() {
+        use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
+        use esp_hal::system::{CpuControl, Stack};
+        use hil_test::mk_static;
+
+        const ROUNDS: u32 = 1000;
+
+        static START: AtomicBool = AtomicBool::new(false);
+        static APP_CORE_GOOD_READS: AtomicU32 = AtomicU32::new(0);
+        static APP_CORE_DONE: AtomicBool = AtomicBool::new(false);
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+        let app_core_flash = unsafe { peripherals.FLASH.clone_unchecked() };
+        let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, move || {
+                let mut flash = Flash::new(app_core_flash, Config::default()).unwrap();
+                let mut words = [0u32; 64];
+                while !START.load(Ordering::Acquire) {}
+                for _ in 0..ROUNDS {
+                    if flash.read(APP_DESC_OFFSET, &mut words).is_ok()
+                        && as_bytes(&words) == expected_app_desc()
+                    {
+                        APP_CORE_GOOD_READS.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+                APP_CORE_DONE.store(true, Ordering::Release);
+                loop {}
+            })
+            .unwrap();
+
+        let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
+        let mut words = [0u32; 64];
+
+        START.store(true, Ordering::Release);
+        for _ in 0..ROUNDS {
+            flash.read(APP_DESC_OFFSET, &mut words).unwrap();
+            assert_eq!(as_bytes(&words), expected_app_desc());
+        }
+
+        while !APP_CORE_DONE.load(Ordering::Acquire) {}
+        assert_eq!(APP_CORE_GOOD_READS.load(Ordering::Relaxed), ROUNDS);
+    }
+
+    #[cfg(multi_core)]
+    #[test]
     fn test_error_if_other_core_running() {
         use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -347,6 +444,7 @@ mod tests {
         static STARTED: AtomicBool = AtomicBool::new(false);
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
         let stack = mk_static!(Stack<8192>, Stack::new());
         let _guard = cpu_control
@@ -543,5 +641,37 @@ mod tests {
         }
 
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+    }
+
+    #[test]
+    fn test_booted_partition_is_the_factory_app() {
+        use esp_bootloader_esp_idf::partitions::{self, AppPartitionSubType, PartitionType};
+
+        let mut flash = flash_from_peripherals(esp_hal::init(esp_hal::Config::default()));
+        let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+        let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();
+
+        let booted = pt.booted_partition().unwrap().unwrap();
+        assert_eq!(
+            booted.partition_type(),
+            PartitionType::App(AppPartitionSubType::Factory)
+        );
+        assert_eq!(booted.offset(), APP_DESC_OFFSET - 0x20);
+    }
+
+    #[test]
+    fn test_drom_entry_offset_reads_the_window() {
+        use esp_hal::flash::{flash_mmu_drom_entries, flash_mmu_entry_offset};
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+        let drom = flash_mmu_drom_entries();
+
+        // The linker scripts put the app's rodata at the start of the DROM window.
+        assert_eq!(
+            flash_mmu_entry_offset(drom.start),
+            Some(APP_DESC_OFFSET - 0x20)
+        );
+        assert_eq!(flash_mmu_entry_offset(drom.end), None);
     }
 }

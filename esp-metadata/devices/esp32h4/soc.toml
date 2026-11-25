@@ -1,9 +1,6 @@
 # ESP32-H4 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo xtask update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32h4"
@@ -12,22 +9,23 @@ target = "riscv32imafc-unknown-none-elf"
 cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-h4_datasheet_en.pdf"
 trm       = "https://www.espressif.com/sites/default/files/documentation/esp32-h4_technical_reference_manual_en.pdf"
-support_note = "In early stages of development."
 
 [device.mmu]
 page_size = 0x10000
 entry_num = 512
 
 [device.flash]
-support_status = "partial"
+support_status = { status = "partial", issue = 6757 }
 
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
 has_md5_bsd = true
+no_libgcc   = true # since ECO2 (v0.2)
 
 [device.soc]
 multi_core_enabled = true
+cpu_pma_needs_core1_setup = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_has_zcmp_workaround = true
@@ -37,7 +35,10 @@ cpu_mcause_mask = 0x3f
 # by writing all ones into a free `pmpaddr` and reading it back: the lowest five bits are hardwired
 # to zero.
 cpu_pmp_granularity = 128
+cpu_powers_down_cache = true
 has_swd_watchdog = true
+has_bus_clock_update = true
+has_apb_frequency_reduction = true
 
 # SRAM_SEG_START = 0x40810000, SRAM_SEG_END = 0x4084F350
 # (from esp-idf components/esp_system/ld/esp32h4/memory.ld.in)
@@ -67,7 +68,7 @@ peripherals = [
     { name = "ETM", pac = "SOC_ETM" },
     { name = "GPIO" },
     { name = "GPIO_DEDICATED", virtual = true },
-    { name = "GPIO_SD" },
+    { name = "GPIO_SD", clock_group = "SDM" },
     { name = "HMAC" },
     { name = "HP_APM" },
     { name = "HP_SYS" },
@@ -97,13 +98,14 @@ peripherals = [
     { name = "MEM_MONITOR" },
     { name = "MODEM_LPCON" },
     { name = "MODEM_SYSCON" },
-    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" } },
+    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, clock_group = "PARL_IO" },
     { name = "PAU", interrupts = { peri = "PAU" } },
     { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
     { name = "PMU", interrupts = { peri = "PMU" } },
+    { name = "PSRAM", virtual = true },
     { name = "PVT" },
-    { name = "RMT", interrupts = { peri = "RMT" } },
+    { name = "RMT", interrupts = { peri = "RMT" }, clock_group = "RMT" },
     { name = "RNG" },
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "RTC_TIMER", pac = "LP_TIMER" },
@@ -119,7 +121,7 @@ peripherals = [
     { name = "TOUCH", interrupts = { peri = "TOUCH" } },
     { name = "TOUCH_AON" },
     # The single TWAI controller is a CAN-FD, the PAC just keeps the TWAI0 name.
-    { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" } },
+    { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" }, clock_group = "TWAI" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0" },
@@ -143,28 +145,24 @@ peripherals = [
 # {include clocks.toml}
 
 [device.gpio]
-support_status = "partial"
+support_status = { status = "partial", issue = 6758 }
 # {include gpio.toml}
 
 # The CSR interface is identical to the C6/H2 one (see `dedic_gpio_cpu_ll.h`), but each core has
 # its own set of 8 channels: CPU_GPIO_0..7 belong to core 0, CPU_GPIO_8..15 to core 1.
 [device.dedicated_gpio]
 version = "riscv_v1"
-support_status = "partial"
+support_status = { status = "partial", issue = 6753 }
 channels = [
     ["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2",  "CPU_GPIO_3",  "CPU_GPIO_4",  "CPU_GPIO_5",  "CPU_GPIO_6",  "CPU_GPIO_7" ],
     ["CPU_GPIO_8", "CPU_GPIO_9", "CPU_GPIO_10", "CPU_GPIO_11", "CPU_GPIO_12", "CPU_GPIO_13", "CPU_GPIO_14", "CPU_GPIO_15"],
 ]
 
 [device.io_mux]
-
-# GPIO0-5 are also LP pads, but ESP-IDF does not describe the LP IO MUX for this chip yet.
-[device.lp_io]
-support_status = "not_supported"
-version = "esp32h2"
+support_status = { status = "partial", issue = 6758 }
 
 [device.uart]
-support_status = "partial"
+support_status = { status = "partial", issue = 6782 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
@@ -175,11 +173,11 @@ peripheral_controls_mem_clk = true
 has_sclk_enable = true
 
 [device.uhci]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6783 }
 combined_uart_selector_field = true
 
 [device.i2c_master]
-support_status = "partial"
+support_status = { status = "partial", issue = 6760 }
 version = 4
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
@@ -200,10 +198,14 @@ bus_timeout_is_exponential = true
 has_pd_en = true
 
 [device.i2c_slave]
-support_status = { status = "not_supported", issue = 1909 }
+support_status = { status = "partial", issue = 6761 }
+instances = [
+    { name = "i2c0" },
+    { name = "i2c1" },
+]
 
 [device.spi_master]
-support_status = "partial"
+support_status = { status = "partial", issue = 6776 }
 version = 3
 fifo_size = 64
 has_app_interrupts = true
@@ -226,7 +228,7 @@ instances = [
 ]
 
 [device.spi_slave]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 1437 }
 instances = [
     {
         name = "spi2",
@@ -247,7 +249,7 @@ instances = [
 ]
 
 [device.i2s]
-support_status = "partial"
+support_status = { status = "partial", issue = 6762 }
 version = 3
 mclk_divider_bit_width = 9
 max_ws_width = 512
@@ -270,11 +272,13 @@ instances = [
 ]
 
 [device.parl_io]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6770 }
 version = 2
+max_data_width = 8
+has_tx_cs = true
 
 [device.rmt]
-support_status = "not_supported"
+support_status = "partial"
 ram_start = 0x6001e400
 channel_ram_size = 48
 channels = ["Tx", "Tx", "Rx", "Rx"]
@@ -287,20 +291,25 @@ has_rx_wrap = true
 has_rx_demodulation = true
 
 [device.canfd]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6746 }
+instances = [
+    { name = "twai0", sys_instance = "Twai0", rx = "TWAI0_RX", tx = "TWAI0_TX" },
+]
 
 [device.usb_otg]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6785 }
 fifo_depth_words = 256
 
 [device.usb_serial_jtag]
+support_status = { status = "partial", issue = 6787 }
+phy_pads = ["USJ", "USB_FS"]
 
 [device.bt]
-support_status = "partial"
+support_status = { status = "partial", issue = 6750 }
 controller = "btdm2"
 
 [device.ieee802154]
-support_status = "partial"
+support_status = { status = "partial", issue = 6763 }
 
 [device.phy]
 support_status = "partial"
@@ -329,7 +338,7 @@ channel_count = 8
 support_status = "not_supported"
 
 [device.pcnt]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6771 }
 instances = {
     PCNT = {
         sys_instance = "Pcnt",
@@ -346,13 +355,14 @@ instances = {
 [device.lp_timer]
 
 [device.sdm]
-support_status = "not_supported"
+support_status = "partial"
 channel_count = 4
 
 [device.systimer]
+support_status = { status = "partial", issue = 6777 }
 
 [device.timergroup]
-support_status = "partial"
+support_status = { status = "partial", issue = 6779 }
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 # see esp-idf components/esp_hw_support/port/esp32h4/rtc_time.c
@@ -365,7 +375,7 @@ rc_slow_calibration = { multiplier = 4 }
 wdt_has_conf_update = true
 
 [device.aes]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6748 }
 has_split_text_registers = true
 endianness_configurable = false
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
@@ -378,7 +388,7 @@ key_length = { options = [
 support_status = { status = "not_supported", issue = 5444 }
 
 [device.ecc]
-support_status = "not_supported"
+support_status = "partial"
 working_modes = [
     { id = 0, mode = "affine_point_multiplication" },
     { id = 2, mode = "affine_point_verification" },
@@ -393,16 +403,16 @@ working_modes = [
     { id = 11, mode = "modular_division" },
 ]
 curves = [
-    { id = 0, curve = 192 },
-    { id = 1, curve = 256 },
-    { id = 2, curve = 384 },
+    { id = 0, curve = "p192" },
+    { id = 1, curve = "p256" },
+    { id = 2, curve = "p384" },
 ]
 separate_jacobian_point_memory = true
 has_memory_clock_gate = true
 supports_enhanced_security = true
 
 [device.hmac]
-support_status = { status = "not_supported", issue = 5166 }
+support_status = { status = "partial", issue = 6759 }
 
 [device.key_manager]
 support_status = "not_supported"
@@ -413,7 +423,7 @@ trng_supported = false
 apb_cycle_wait_num = 16
 
 [device.sha]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6775 }
 algo = {
     sha1 = 0,
     sha224 = 1,
@@ -426,21 +436,45 @@ algo = {
 }
 
 [device.sleep]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6743 }
+light_sleep = true
+deep_sleep = true
+ext1_version = 2
+pin_wakeup_version = 3
+# esp-idf components/esp_hw_support/port/esp32h4/private_include/pmu_bit_defs.h
+wakeup_sources = {
+    Ext1 = 1,
+    Gpio = 2,
+    Timer = 4,
+    Uart0 = 6,
+    Uart1 = 7,
+    Bt = 10,
+    Usb = 14,
+}
+
+[device.sleep.retention]
+cpu_retention = "software"
+modem_retention = "regdma"
+regdma_list_count = 5
+regdma_link_configurable = true
+cpu_retention_frame = "h4"
+supports_top_power_down = true
 
 [device.assist_debug]
 support_status = "not_supported"
 
 [device.dma]
-support_status = "partial"
+support_status = { status = "partial", issue = 6754 }
 gdma_version = 3
 separate_in_out_interrupts = true
+psram_max_burst = 64
 engines = [
     {
         name = "AHB_GDMA",
         max_priority = 5,
+        burst_sizes = [4, 16, 32, 64],
         # Mux IDs below include later peripherals; only list HAL drivers that are enabled.
-        drivers = ["i2s", "spi_master"],
+        drivers = ["aes", "i2s", "parl_io", "sha", "spi_master", "spi_slave", "uhci"],
         # Peripheral selector values, TRM table 2.4-1.
         peripheral_instances = [
             { name = "SPI3", dma_id = 0 },
@@ -474,5 +508,5 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 context_switch_source = "ipc"
 
 [device.psram]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6773 }
 extmem_origin = 0x4200_0000

@@ -1,6 +1,7 @@
 //! This shows how to read and write text via USB Serial/JTAG using embassy.
 //! You need to connect via the Serial/JTAG interface to see any output.
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
+//! The example's log messages go to UART0's default TX pin.
 
 //% CHIP_FILTER: usb_serial_jtag_driver_supported
 
@@ -13,7 +14,7 @@ use esp_backtrace as _;
 use esp_hal::{
     Async,
     timer::timg::TimerGroup,
-    usb::usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
+    usb::usb_serial_jtag::{Config, UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
 };
 use static_cell::StaticCell;
 
@@ -33,6 +34,7 @@ async fn writer(
     )
     .await
     .unwrap();
+    embedded_io_async::Write::flush(&mut tx).await.unwrap();
     loop {
         let message = signal.wait().await;
         signal.reset();
@@ -56,22 +58,35 @@ async fn reader(
                 signal.signal(heapless::String::from_utf8(string_buffer).unwrap());
             }
             #[allow(unreachable_patterns)]
-            Err(e) => esp_println::println!("RX Error: {:?}", e),
+            Err(e) => log::info!("RX Error: {:?}", e),
         }
     }
 }
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
-    esp_println::println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // This example drives USB-Serial-JTAG, so it logs on UART0's default TX pin.
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    let (rx, tx) = UsbSerialJtag::new(peripherals.USB_DEVICE)
+    let (dp, dm) = cfg_select! {
+        feature = "esp32c3" => (peripherals.GPIO19, peripherals.GPIO18),
+        any(feature = "esp32c5", feature = "esp32h4") => (peripherals.GPIO14, peripherals.GPIO13),
+        any(feature = "esp32c6", feature = "esp32c61") => (peripherals.GPIO13, peripherals.GPIO12),
+        feature = "esp32h2" => (peripherals.GPIO27, peripherals.GPIO26),
+        feature = "esp32p4" => (peripherals.GPIO25, peripherals.GPIO24),
+        feature = "esp32s3" => (peripherals.GPIO20, peripherals.GPIO19),
+        feature = "esp32s31" => (peripherals.GPIO34, peripherals.GPIO33),
+    };
+
+    let (rx, tx) = UsbSerialJtag::new(peripherals.USB_DEVICE, dp, dm, Config::default())
+        .unwrap()
         .into_async()
         .split();
 

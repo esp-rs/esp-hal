@@ -15,7 +15,7 @@
 
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU},
-    soc::{regi2c, xtal32k},
+    soc::{regi2c, update_bus_clocks, with_single_bus_clock_update, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -93,7 +93,7 @@ impl ClockConfig {
             self.xtal_clk = Some(XtalClkConfig::_40);
         }
 
-        self.apply(clocks);
+        with_single_bus_clock_update(|| self.apply(clocks));
     }
 }
 
@@ -293,27 +293,44 @@ fn configure_hp_root_clk_impl(
         })
     });
 
-    bus_clock_update();
+    update_bus_clocks();
 }
 
-/// Applies the new `soc_clk_sel`, `cpu_div_num` and `ahb_div_num` values.
-fn bus_clock_update() {
-    PCR::regs()
-        .bus_clk_update()
-        .write(|w| w.bus_clock_update().set_bit());
-    while PCR::regs()
-        .bus_clk_update()
-        .read()
-        .bus_clock_update()
-        .bit_is_set()
-    {}
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+//
+// One bus clock update applies the root clock and both dividers together, so that CPU_CLK stays
+// an integer multiple of AHB_CLK, and AHB_CLK does not exceed XTAL_CLK.
+
+/// Switches the CPU clock to XTAL_CLK if it comes from the PLL, with configured dividers that
+/// [`restore_cpu_clock`] can restore. Returns whether the clock changed.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if clocks.hp_root_clk() != Some(HpRootClkConfig::PllF160m)
+        || clocks.cpu_clk().is_none()
+        || clocks.ahb_clk().is_none()
+    {
+        return false;
+    }
+    with_single_bus_clock_update(|| {
+        configure_hp_root_clk_impl(clocks, None, HpRootClkConfig::Xtal);
+        configure_cpu_clk_impl(clocks, None, CpuClkConfig::new(0));
+        configure_ahb_clk_impl(clocks, None, AhbClkConfig::new(0));
+    });
+    true
+}
+
+/// Restores the CPU clock that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    with_single_bus_clock_update(|| {
+        configure_ahb_clk_impl(clocks, None, unwrap!(clocks.ahb_clk()));
+        configure_cpu_clk_impl(clocks, None, unwrap!(clocks.cpu_clk()));
+        configure_hp_root_clk_impl(clocks, None, unwrap!(clocks.hp_root_clk()));
+    });
 }
 
 // CPU_CLK
-
-fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
-}
 
 fn configure_cpu_clk_impl(
     _clocks: &mut ClockTree,
@@ -324,14 +341,10 @@ fn configure_cpu_clk_impl(
         .cpu_freq_conf()
         .modify(|_, w| unsafe { w.cpu_div_num().bits(new_config.divisor() as u8) });
 
-    bus_clock_update();
+    update_bus_clocks();
 }
 
 // AHB_CLK
-
-fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
-}
 
 fn configure_ahb_clk_impl(
     _clocks: &mut ClockTree,
@@ -342,23 +355,28 @@ fn configure_ahb_clk_impl(
         .ahb_freq_conf()
         .modify(|_, w| unsafe { w.ahb_div_num().bits(new_config.divisor() as u8) });
 
-    bus_clock_update();
+    update_bus_clocks();
 }
 
 // APB_CLK
 
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    crate::soc::enable_apb_frequency_reduction(!en);
 }
 
 fn configure_apb_clk_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<ApbClkConfig>,
+    old_config: Option<ApbClkConfig>,
     new_config: ApbClkConfig,
 ) {
     PCR::regs()
         .apb_freq_conf()
         .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
+
+    // No driver uses APB_CLK before the first configuration.
+    if old_config.is_none() {
+        crate::soc::enable_apb_frequency_reduction(true);
+    }
 }
 
 // XTAL_D2_CLK
@@ -458,6 +476,31 @@ fn configure_timg_calibration_clock_impl(
     });
 }
 
+impl AdcInstance {
+    // ADC_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .saradc_clkm_conf()
+            .modify(|_, w| w.saradc_clkm_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<AdcFunctionClockConfig>,
+        new_config: AdcFunctionClockConfig,
+    ) {
+        PCR::regs().saradc_clkm_conf().modify(|_, w| unsafe {
+            w.saradc_clkm_sel().bits(match new_config {
+                AdcFunctionClockConfig::Xtal => 0,
+                AdcFunctionClockConfig::RcFast => 1,
+                AdcFunctionClockConfig::PllF80m => 2,
+            })
+        });
+    }
+}
+
 impl TimgInstance {
     // TIMG_FUNCTION_CLOCK
 
@@ -539,6 +582,13 @@ fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
+// BLE_LP_RC_SLOW_CLK
+
+fn enable_ble_lp_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do, divisor and gate are configured in BLE_LP_CLK
+    // (see modem_clock_select_lp_clock_source() in modem_clock.c).
+}
+
 // BLE_LP_CLK
 
 fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, en: bool) {
@@ -554,7 +604,10 @@ fn configure_ble_lp_clk_impl(
 ) {
     let divisor = match new_config {
         BleLpClkConfig::Xtal => xtal_clk_frequency() / ble_lp_xtal_clk_frequency() - 1,
-        _ => 0,
+        // Divided by 5 (div_num = 4), see esp_bt_rtc_slow_clk_select() in esp32c6/bt.c.
+        BleLpClkConfig::RcSlow => rc_slow_clk_frequency() / ble_lp_rc_slow_clk_frequency() - 1,
+        #[cfg(use_xtal32k)]
+        BleLpClkConfig::Xtal32k => 0,
     };
     let sel_xtal32k = cfg_select! {
         use_xtal32k => new_config == BleLpClkConfig::Xtal32k,

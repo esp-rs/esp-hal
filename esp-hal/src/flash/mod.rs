@@ -22,8 +22,7 @@
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/peripherals/spi_flash/index.html)")]
 //! ## Configuration
 //!
-//! On dual-core chips, [`Config`] selects the multi-core strategy (default:
-//! automatically park the other core).
+//! On a dual-core chip, [`Config`] selects the strategy for the other core.
 //!
 //! ## Usage
 //!
@@ -59,24 +58,31 @@
 //!   smaller.
 //! - Operations do not check whether the target flash range is mapped. Writing or erasing a mapped
 //!   section (such as `.text` or `.rodata`) can corrupt running code or immutable data.
-//! - Each [`Flash::read`] or [`Flash::write`] call executes a single ROM operation. The flash cache
-//!   remains disabled (and the other core remains parked) for the entire transfer. Split large
-//!   operations in higher-level code if latency is critical.
-//! - On dual-core chips, the default strategy stalls the other core around every operation,
-//!   including reads. The other core can freeze while holding a lock or executing an interrupt
-//!   handler.
+//! - Each [`Flash::read`] or [`Flash::write`] call executes one ROM operation. The flash cache
+//!   stays off for the whole transfer. Split a large transfer when latency matters.
+//! - On a dual-core chip, the multi-core strategy controls the other core for every operation,
+//!   including a read.
+//! - Each operation suspends the caches. See [Optimization level](crate#optimization-level) for the
+//!   build requirement.
 
 use core::marker::PhantomData;
 
+use esp_sync::{
+    RestoreState,
+    raw::{RawLock, SingleCoreInterruptLock},
+};
 use procmacros::{BuilderLite, ram};
-#[cfg(xtensa)]
-use xtensa_lx::interrupt::free;
 
-#[cfg(not(xtensa))]
-use crate::interrupt::free;
-use crate::{Blocking, DriverMode, peripherals::FLASH, soc::is_slice_in_dram};
+#[cfg(multi_core)]
+use crate::system::{Cpu, multi_core};
+use crate::{
+    Blocking,
+    DriverMode,
+    interrupt::free,
+    peripherals::FLASH,
+    soc::{cache, is_slice_in_dram},
+};
 
-mod cache;
 mod mmu;
 mod rom;
 
@@ -102,10 +108,10 @@ const ESP32_ENCRYPT_ROW: u32 = 32;
 pub struct Config {
     /// Strategy for the other core during flash operations.
     ///
-    /// Default: [`MultiCoreStrategy::AutoPark`].
-    ///
     /// [`MultiCoreStrategy::ignore`] is safe only when the other core cannot
     /// fetch from flash during the operation.
+    ///
+    /// Default: [`MultiCoreStrategy::AutoPark`].
     #[cfg(multi_core)]
     #[builder_lite(unstable)]
     multi_core_strategy: MultiCoreStrategy,
@@ -120,15 +126,16 @@ pub struct Config {
 pub enum MultiCoreStrategy {
     /// Returns [`Error::OtherCoreRunning`] if the other core is running.
     Error,
-    /// Parks the other core for the operation and unparks it afterward.
+    /// Parks the other core for the operation, as [`crate::system::CpuControl::park_core`] does.
     ///
-    /// The stall can freeze the other core at any instruction. The other core can hold a
-    /// lock or execute an interrupt handler. Parking uses CPU-control
-    /// registers even if the application already owns
-    /// [`crate::peripherals::CPU_CTRL`].
+    /// The operation waits until the other core parks. If the other core never takes the IPC
+    /// interrupt, the operation waits forever. Do not start the operation while the current core
+    /// holds a lock that an interrupt handler on the other core can wait for, for example a
+    /// critical section or a mutex. If the other core runs no code of this program, the operation
+    /// does not park the other core. See [`crate::system::is_running`].
     #[default]
     AutoPark,
-    /// Does not check or park the other core.
+    /// Does not check or stop the other core.
     ///
     /// Construct with [`Self::ignore`].
     Ignore(IgnoreMarker),
@@ -147,13 +154,13 @@ pub struct IgnoreMarker {
 
 #[cfg(multi_core)]
 impl MultiCoreStrategy {
-    /// Creates a strategy that does not check or park the other core.
+    /// Creates a strategy that does not check or stop the other core.
     ///
     /// # Safety
     ///
     /// The other core must not fetch instructions or data from flash during any
-    /// operation, including reads. Flash-backed caches are unavailable while
-    /// an operation runs.
+    /// operation, including reads. This also applies to the IPC requests that run on
+    /// that core. Flash-backed caches are unavailable while an operation runs.
     #[instability::unstable]
     pub const unsafe fn ignore() -> Self {
         Self::Ignore(IgnoreMarker { _private: () })
@@ -272,6 +279,24 @@ pub struct ChipInfo {
     pub page_size: u32,
 }
 
+/// Returns the flash MMU entries that map the data (DROM) window, in address
+/// order.
+///
+/// Entry `start` maps the window's first page and entry `end - 1` its last.
+#[instability::unstable]
+pub fn flash_mmu_drom_entries() -> core::ops::Range<u32> {
+    mmu::drom_entries()
+}
+
+/// Returns the flash offset that the DROM entry `index` maps.
+///
+/// Returns `None` when `index` is outside [`flash_mmu_drom_entries`], or when
+/// the entry is invalid or maps PSRAM.
+#[instability::unstable]
+pub fn flash_mmu_entry_offset(index: u32) -> Option<u32> {
+    mmu::drom_entry_offset(index)
+}
+
 /// Internal SPI flash driver.
 ///
 /// Constructible only in [`Blocking`] mode.
@@ -281,7 +306,6 @@ pub struct Flash<'d, Dm: DriverMode> {
     _flash: FLASH<'d>,
     capacity: usize,
     chip_id: u32,
-    unlocked: bool,
     #[cfg(multi_core)]
     multi_core_strategy: MultiCoreStrategy,
     _mode: PhantomData<Dm>,
@@ -321,7 +345,6 @@ impl<'d> Flash<'d, Blocking> {
             _flash: flash,
             capacity,
             chip_id,
-            unlocked: false,
             #[cfg(multi_core)]
             multi_core_strategy: config.multi_core_strategy,
             _mode: PhantomData,
@@ -399,7 +422,7 @@ impl<'d> Flash<'d, Blocking> {
         self.check_word_offset(offset)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
-        self.with_guard(None, |_| rom::read(offset, data))
+        self.with_guard(None, || rom::read(offset, data))
     }
 
     /// Writes `data` starting at byte address `offset`.
@@ -439,8 +462,7 @@ impl<'d> Flash<'d, Blocking> {
         self.check_word_offset(offset)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
-        self.ensure_unlocked()?;
-        self.with_guard(Some((offset, len as u32)), |_| rom::write(offset, data))
+        self.with_guard(Some((offset, len as u32)), || rom::write(offset, data))
     }
 
     /// Erases flash sectors in the range `[from, to)`.
@@ -479,7 +501,6 @@ impl<'d> Flash<'d, Blocking> {
 
         self.check_alignment(SECTOR_SIZE, from, len)?;
         self.check_bounds(from, len)?;
-        self.ensure_unlocked()?;
         self.erase_range(from, to)
     }
 
@@ -573,21 +594,25 @@ impl<'d> Flash<'d, Blocking> {
         self.check_alignment(ENCRYPT_BLOCK_SIZE, offset, len)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
-        self.ensure_unlocked()?;
 
         #[cfg(esp32)]
         let neighbors = self.esp32_row_neighbors(offset, len)?;
-        // On ESP32 the programmed range can extend one 16-byte block past each
-        // end; `with_guard` flushes the whole cache there, so the range only
-        // needs to cover the request.
-        self.with_guard(Some((offset, len as u32)), |_| {
-            write_encrypted_rows(
-                offset,
-                words_as_bytes(data),
-                #[cfg(esp32)]
-                &neighbors,
-            )
-        })
+        let data = words_as_bytes(data);
+        let mut row = EncryptRow([0; XTS_AES_BLOCK_MAX]);
+        let mut i = 0;
+        while i < data.len() {
+            let row_addr = offset + i as u32;
+            let (program_addr, program_len, consumed) = cfg_select! {
+                esp32 => prepare_esp32_row(&mut row.0, row_addr, &data[i..], &neighbors),
+                _ => prepare_xts_row(&mut row.0, row_addr, &data[i..]),
+            };
+            let row_ptr = row.0.as_mut_ptr().cast();
+            self.with_guard(Some((program_addr, program_len)), || {
+                rom::write_encrypted(program_addr, row_ptr, program_len)
+            })?;
+            i += consumed;
+        }
+        Ok(())
     }
 }
 
@@ -614,27 +639,6 @@ fn check_buffer(buf: &[u32]) -> Result<(), Error> {
 #[repr(C, align(4))]
 struct EncryptRow([u8; XTS_AES_BLOCK_MAX]);
 
-#[ram]
-fn write_encrypted_rows(
-    offset: u32,
-    data: &[u8],
-    #[cfg(esp32)] neighbors: &Esp32Neighbors,
-) -> Result<(), Error> {
-    let mut row = EncryptRow([0; XTS_AES_BLOCK_MAX]);
-    let mut i = 0;
-    while i < data.len() {
-        let row_addr = offset + i as u32;
-        let (program_addr, program_len, consumed) =
-            cfg_select! {
-                esp32 => prepare_esp32_row(&mut row.0, row_addr, &data[i..], neighbors),
-                _ => prepare_xts_row(&mut row.0, row_addr, &data[i..]),
-            };
-        rom::write_encrypted(program_addr, row.0.as_mut_ptr().cast(), program_len)?;
-        i += consumed;
-    }
-    Ok(())
-}
-
 #[cfg(esp32)]
 struct Esp32Neighbors {
     pre: [u32; 4],
@@ -647,7 +651,6 @@ struct Esp32Neighbors {
 /// AES blocks sharing an address-derived tweak, so a 16-byte write must carry
 /// the decrypted neighbor block along and re-encrypt it to the same ciphertext.
 #[cfg(esp32)]
-#[ram]
 fn prepare_esp32_row(
     buf: &mut [u8; XTS_AES_BLOCK_MAX],
     row_addr: u32,
@@ -680,7 +683,6 @@ const XTS_AES_BLOCK_MAX: usize = 64;
 
 /// Pick the largest aligned row, as ESP-IDF does for ESP32-S2 and later.
 #[cfg(not(esp32))]
-#[ram]
 fn prepare_xts_row(
     buf: &mut [u8; XTS_AES_BLOCK_MAX],
     row_addr: u32,
@@ -732,10 +734,8 @@ impl Flash<'_, Blocking> {
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<R, Error>,
     ) -> Result<R, Error> {
-        free(|| {
-            let _park = ParkGuard::enter(self)?;
-            f(self)
-        })
+        let _park = ParkGuard::enter(self)?;
+        free(|| f(self))
     }
 
     /// Plaintext of row halves the write will touch but not replace.
@@ -763,40 +763,16 @@ impl Flash<'_, Blocking> {
     fn with_guard<R>(
         &mut self,
         invalidate: Option<(u32, u32)>,
-        f: impl FnOnce(&mut Self) -> Result<R, Error>,
+        f: impl FnOnce() -> Result<R, rom::RomError>,
     ) -> Result<R, Error> {
+        let _park = ParkGuard::enter(self)?;
         free(|| {
-            let _park = ParkGuard::enter(self)?;
-            let cache = cache::CacheGuard::suspend();
-            let result = f(self);
-            cfg_select! {
-                esp32 => {
-                    // Address-based invalidate is unavailable; flush while still off.
-                    if invalidate.is_some() {
-                        cache.flush_while_off();
-                    }
-                    drop(cache);
-                }
-                _ => {
-                    drop(cache);
-                    if let Some((start, len)) = invalidate {
-                        mmu::invalidate_mapped(start, len);
-                    }
-                }
+            let result = with_caches_suspended(invalidate.is_some(), f);
+            #[cfg(not(esp32))]
+            if let Some((start, len)) = invalidate {
+                mmu::invalidate_mapped(start, len);
             }
-            result
-        })
-    }
-
-    #[ram]
-    fn ensure_unlocked(&mut self) -> Result<(), Error> {
-        if self.unlocked {
-            return Ok(());
-        }
-        self.with_guard(None, |this| {
-            rom::unlock()?;
-            this.unlocked = true;
-            Ok(())
+            Ok(result?)
         })
     }
 
@@ -804,21 +780,21 @@ impl Flash<'_, Blocking> {
     fn erase_range(&mut self, from: u32, to: u32) -> Result<(), Error> {
         let mut address = from;
         while address < to && !address.is_multiple_of(BLOCK_SIZE) {
-            self.with_guard(Some((address, SECTOR_SIZE)), |_| {
+            self.with_guard(Some((address, SECTOR_SIZE)), || {
                 rom::erase_sector(address / SECTOR_SIZE)
             })?;
             address += SECTOR_SIZE;
         }
 
         while (to - address) >= BLOCK_SIZE {
-            self.with_guard(Some((address, BLOCK_SIZE)), |_| {
+            self.with_guard(Some((address, BLOCK_SIZE)), || {
                 rom::erase_block(address / BLOCK_SIZE)
             })?;
             address += BLOCK_SIZE;
         }
 
         while address < to {
-            self.with_guard(Some((address, SECTOR_SIZE)), |_| {
+            self.with_guard(Some((address, SECTOR_SIZE)), || {
                 rom::erase_sector(address / SECTOR_SIZE)
             })?;
             address += SECTOR_SIZE;
@@ -828,10 +804,43 @@ impl Flash<'_, Blocking> {
     }
 }
 
-/// Parks the other core according to [`MultiCoreStrategy`], unparking on drop.
+/// Runs `f` with the caches suspended.
+///
+/// On ESP32, `flush` flushes every cache line before the caches resume. An invalidate by
+/// address is not available on ESP32.
+#[ram(unstable(checked))]
+fn with_caches_suspended<R>(
+    #[cfg_attr(not(esp32), expect(unused_variables))] flush: bool,
+    f: impl FnOnce() -> Result<R, rom::RomError>,
+) -> Result<R, rom::RomError> {
+    let cache = cfg_select! {
+        esp32 => {
+            if flush {
+                cache::CacheGuard::suspend_for_flush()
+            } else {
+                cache::CacheGuard::suspend()
+            }
+        }
+        _ => cache::CacheGuard::suspend(),
+    };
+    let result = f();
+    #[cfg(esp32)]
+    if flush {
+        cache.flush_while_off();
+    }
+    drop(cache);
+    result
+}
+
+/// Stops the other core according to [`MultiCoreStrategy`], and masks the interrupts of the
+/// current core. [`Drop`] releases that core, then ends the mask.
+///
+/// An interrupt handler of the current core thus never runs while the other core is parked.
 struct ParkGuard {
+    /// The core that the guard parked.
     #[cfg(multi_core)]
-    parked: Option<crate::system::Cpu>,
+    parked: Option<Cpu>,
+    mask: RestoreState,
 }
 
 impl ParkGuard {
@@ -841,31 +850,25 @@ impl ParkGuard {
             multi_core => {
                 let parked = match _flash.multi_core_strategy {
                     MultiCoreStrategy::Error => {
-                        for other in crate::system::Cpu::other() {
+                        for other in Cpu::other() {
                             if crate::system::is_running(other) {
                                 return Err(Error::OtherCoreRunning);
                             }
                         }
                         None
                     }
-                    MultiCoreStrategy::AutoPark => {
-                        let mut cpu_ctrl = crate::system::CpuControl::new(unsafe {
-                            crate::peripherals::CPU_CTRL::steal()
-                        });
-                        let mut parked = None;
-                        for other in crate::system::Cpu::other() {
-                            if crate::system::is_running(other) {
-                                unsafe { cpu_ctrl.park_core(other) };
-                                parked = Some(other);
-                            }
-                        }
-                        parked
-                    }
+                    MultiCoreStrategy::AutoPark => multi_core::park_other_masked(),
                     MultiCoreStrategy::Ignore(_) => None,
                 };
-                Ok(Self { parked })
+                let (parked, mask) = match parked {
+                    Some((core, mask)) => (Some(core), mask),
+                    None => (None, unsafe { SingleCoreInterruptLock.enter() }),
+                };
+                Ok(Self { parked, mask })
             }
-            _ => Ok(Self {}),
+            _ => Ok(Self {
+                mask: unsafe { SingleCoreInterruptLock.enter() },
+            }),
         }
     }
 }
@@ -873,16 +876,10 @@ impl ParkGuard {
 impl Drop for ParkGuard {
     #[ram]
     fn drop(&mut self) {
-        cfg_select! {
-            multi_core => {
-                if let Some(core) = self.parked {
-                    let mut cpu_ctrl = crate::system::CpuControl::new(unsafe {
-                        crate::peripherals::CPU_CTRL::steal()
-                    });
-                    cpu_ctrl.unpark_core(core);
-                }
-            }
-            _ => {}
+        #[cfg(multi_core)]
+        if let Some(core) = self.parked {
+            multi_core::unpark(core);
         }
+        unsafe { SingleCoreInterruptLock.exit(self.mask) };
     }
 }

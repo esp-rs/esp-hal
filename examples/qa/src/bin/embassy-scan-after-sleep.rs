@@ -1,7 +1,5 @@
-// ESP32 has some serious (light-)sleep issues - so don't include it here until that is fixed.
-
 //% FEATURES: esp-radio esp-radio/wifi esp-hal/unstable
-//% CHIP_FILTER: wifi_driver_supported && sleep_driver_supported && !esp32
+//% CHIP_FILTER: wifi_driver_supported && sleep_driver_supported
 
 #![no_std]
 #![no_main]
@@ -16,7 +14,6 @@ use esp_hal::{
     time::{Duration, Instant},
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use qa_test::DRAM2_UNINIT_SIZE;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -25,8 +22,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 async fn main(_spawner: Spawner) {
     // Enable logging from the ESP_LOG environment variable (set at build time)
     // Example: ESP_LOG=warn,esp_rtos=trace,esp_radio=info
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
     // Provide a heap for components that allocate (esp-rtos/esp-radio, etc.)
     esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
@@ -42,13 +39,13 @@ async fn main(_spawner: Spawner) {
     let mut lpwr = LowPower::new(peripherals.LPWR);
     lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(1));
 
-    esp_println::println!("Start sleep");
+    log::info!("Start sleep");
     delay.delay_millis(100);
 
     lpwr.sleep_light(RtcSleepConfig::default());
     delay.delay_millis(100);
 
-    esp_println::println!("Done sleeping");
+    log::info!("Done sleeping");
 
     // WiFi
     let mut controller =
@@ -59,11 +56,11 @@ async fn main(_spawner: Spawner) {
         .await
         .unwrap();
 
-    println!("Found {:?}", res);
+    log::info!("Found {:?}", res);
 
     if res.len() == 0 {
-        println!("No networks found - might indicate there is a problem");
+        log::info!("No networks found - might indicate there is a problem");
     }
 
-    println!("Test done");
+    log::info!("Test done");
 }

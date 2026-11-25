@@ -7,6 +7,9 @@ mod tests {
     #[test]
     #[cfg(rng_trng_supported)]
     fn test_trng_without_source_is_error() {
+        let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
+
         assert!(Trng::try_new().is_err());
 
         // Rng can be created anyway:
@@ -15,7 +18,8 @@ mod tests {
 
     #[test]
     fn test_rng_returns_random_values() {
-        let _p = esp_hal::init(Default::default());
+        let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         let rng = Rng::new();
 
         let mut rng_values = [0; 10];
@@ -28,6 +32,7 @@ mod tests {
     #[cfg(rng_trng_supported)]
     fn test_trng_returns_random_values() {
         let p = esp_hal::init(Default::default());
+        hil_test::init_logger!(p);
         let _source = TrngSource::new(p.RNG, p.ADC1);
 
         let rng = Trng::try_new().unwrap();
@@ -42,6 +47,7 @@ mod tests {
     #[cfg(rng_trng_supported)]
     fn test_trng_source_cannot_be_disabled_while_in_use() {
         let p = esp_hal::init(Default::default());
+        hil_test::init_logger!(p);
         let source = TrngSource::new(p.RNG, p.ADC1);
 
         let trng = Trng::try_new().unwrap();
@@ -60,6 +66,7 @@ mod tests {
     #[cfg(rng_trng_supported)]
     fn test_trng_source_cannot_be_dropped_while_in_use() {
         let p = esp_hal::init(Default::default());
+        hil_test::init_logger!(p);
         let source = TrngSource::new(p.RNG, p.ADC1);
 
         let _trng = Trng::try_new().unwrap();
@@ -71,6 +78,7 @@ mod tests {
     #[cfg(rng_trng_supported)]
     fn test_trng_source_can_be_dropped_if_unsafely_enabled() {
         let p = esp_hal::init(Default::default());
+        hil_test::init_logger!(p);
 
         let source = TrngSource::new(p.RNG, p.ADC1);
 

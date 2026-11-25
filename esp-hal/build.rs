@@ -80,6 +80,11 @@ fn try_main() -> Result<(), Box<dyn Error>> {
     // Define all necessary configuration symbols for the configured device:
     chip.define_cfgs();
 
+    println!("cargo:rustc-check-cfg=cfg(fpu_disabled_in_interrupts)");
+    if std::env::var_os("DEP_ESP_RISCV_RT_FPU_DISABLED_IN_INTERRUPTS").is_some() {
+        println!("cargo:rustc-cfg=fpu_disabled_in_interrupts");
+    }
+
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
@@ -92,48 +97,20 @@ fn try_main() -> Result<(), Box<dyn Error>> {
     // Only emit linker directives if the `rt` feature is enabled
     #[cfg(feature = "rt")]
     {
-        // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
-        // files:
         let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
         println!("cargo:rustc-link-search={}", out.display());
 
-        if chip.is_xtensa() {
-            let (irtc, drtc) = if cfg!(feature = "esp32s3") {
-                ("rtc_fast_seg", "rtc_fast_seg")
-            } else {
-                ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
-            };
-
-            let alias = format!(
-                r#"
-            REGION_ALIAS("ROTEXT", irom_seg);
-            REGION_ALIAS("RWTEXT", iram_seg);
-            REGION_ALIAS("RODATA", drom_seg);
-            REGION_ALIAS("RWDATA", dram_seg);
-            REGION_ALIAS("RTC_FAST_RWTEXT", {irtc});
-            REGION_ALIAS("RTC_FAST_RWDATA", {drtc});
-        "#
-            );
-
-            fs::write(out.join("alias.x"), alias)?;
-            fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
+        let hal_defaults = if chip.is_xtensa() {
+            "ld/xtensa/hal-defaults.x"
         } else {
-            // RISC-V devices:
+            "ld/riscv/hal-defaults.x"
+        };
+        preprocess_file(chip, &cfg, hal_defaults, out.join("hal-defaults.x"))?;
 
-            preprocess_file(chip, &cfg, "ld/riscv/asserts.x", out.join("asserts.x"))?;
-            preprocess_file(
-                chip,
-                &cfg,
-                "ld/riscv/hal-defaults.x",
-                out.join("hal-defaults.x"),
-            )?;
-        }
-
-        // With the architecture-specific linker scripts taken care of, we can copy all
-        // remaining linker scripts which are common to all devices:
-        copy_dir_all(chip, &cfg, "ld/sections", &out)?;
-        copy_dir_all(chip, &cfg, format!("ld/{}", chip.name()), &out)?;
+        // The parts of the memory layout that depend on esp-hal's configuration. The linker
+        // scripts of the bootloader support crate include them.
+        copy_dir_all(chip, &cfg, "ld/fragments", &out)?;
     }
 
     Ok(())
@@ -213,6 +190,9 @@ fn copy_dir_all(
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> Result<(), Box<dyn Error>> {
+    // The per-file directives miss files added to the directory.
+    println!("cargo:rerun-if-changed={}", src.as_ref().display());
+
     fs::create_dir_all(&dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;

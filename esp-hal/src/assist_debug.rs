@@ -311,7 +311,12 @@ impl DebugAssist<'_> {
     }
 
     fn internal_region_monitor_pc(&self, cpu: usize) -> u32 {
-        self.regs().cpu(cpu).area_pc().read().area_pc().bits()
+        let regs = self.regs();
+        let reg = cfg_select! {
+            esp32s3 => [regs.core_0_area_pc(), regs.core_1_area_pc()][cpu],
+            _ => regs.cpu(cpu).area_pc(),
+        };
+        reg.read().area_pc().bits()
     }
 
     /// Enables region monitoring of read/write performed by the main CPU in a

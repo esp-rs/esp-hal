@@ -150,7 +150,7 @@ impl RegisterAccess for SpiDmaTxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, SpiDmaChannel(any::Inner::Spi2(_)))
+        self.0.can_access_psram()
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
@@ -347,7 +347,7 @@ impl RegisterAccess for SpiDmaRxChannel<'_> {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, SpiDmaChannel(any::Inner::Spi2(_)))
+        self.0.can_access_psram()
     }
 
     fn compatible_peripherals(&self) -> &[u8] {
@@ -494,6 +494,8 @@ impl SpiDmaChannel<'_> {
             fn register_block(&self) -> &SpiRegisterBlock;
             fn info(&self) -> &'static ChannelInfo;
             fn state(&self) -> &'static ChannelState;
+            #[cfg(dma_can_access_psram)]
+            fn can_access_psram(&self) -> bool;
         }
     }
 }
@@ -509,6 +511,17 @@ impl<'d> From<SpiDmaChannel<'d>> for SpiDmaTxChannel<'d> {
     fn from(this: SpiDmaChannel<'d>) -> SpiDmaTxChannel<'d> {
         SpiDmaTxChannel(this)
     }
+}
+
+#[cfg(dma_can_access_psram)]
+for_each_dma_channel! {
+    ("SPI_DMA", $ch:ident, can_access_psram = $can_access_psram:literal) => {
+        impl crate::peripherals::$ch<'_> {
+            fn can_access_psram(&self) -> bool {
+                $can_access_psram
+            }
+        }
+    };
 }
 
 for_each_dma_channel_peri_pair! {
@@ -548,17 +561,50 @@ for_each_dma_channel_peri_pair! {
 
 pub(super) fn enable_spi_dma() {
     #[cfg(esp32)]
-    {
-        // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
-        // This assigns the DMA channels to the SPI peripherals, which is more
-        // restrictive than necessary but we currently support the same
-        // number of SPI peripherals as SPI DMA channels so it's not a big
-        // deal.
-        use crate::peripherals::DPORT;
+    esp32_quirks::select_dma_channels();
+}
 
-        DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
-            w.spi2_dma_chan_sel().bits(1);
-            w.spi3_dma_chan_sel().bits(2)
+#[cfg(esp32)]
+pub(crate) use esp32_quirks::connect_spi_dma;
+
+#[cfg(esp32)]
+mod esp32_quirks {
+    use esp_sync::RawMutex;
+
+    use crate::{dma::DmaPeripheral, peripherals::DPORT};
+
+    const SPI2_DMA_CHANNEL: u8 = 1;
+    const SPI3_DMA_CHANNEL: u8 = 2;
+
+    static SPI_DMA_CHAN_SEL_LOCK: RawMutex = RawMutex::new();
+
+    /// Assigns the DMA channels to the SPI hosts.
+    ///
+    /// This is more restrictive than necessary, but esp-hal supports as many SPI hosts as SPI
+    /// DMA channels.
+    pub(super) fn select_dma_channels() {
+        SPI_DMA_CHAN_SEL_LOCK.lock(|| {
+            DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
+                w.spi2_dma_chan_sel().bits(SPI2_DMA_CHANNEL);
+                w.spi3_dma_chan_sel().bits(SPI3_DMA_CHANNEL)
+            });
+        });
+    }
+
+    /// Connects an SPI host to its DMA channel, or disconnects it.
+    ///
+    /// A connected SPI host pushes received data into its RX DMA FIFO, also in a transfer without
+    /// DMA. The DMA resets do not empty that FIFO.
+    pub(crate) fn connect_spi_dma(peripheral: DmaPeripheral, connect: bool) {
+        let channel = |channel: u8| if connect { channel } else { 0 };
+        SPI_DMA_CHAN_SEL_LOCK.lock(|| {
+            DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
+                match peripheral {
+                    DmaPeripheral::SPI2 => w.spi2_dma_chan_sel().bits(channel(SPI2_DMA_CHANNEL)),
+                    DmaPeripheral::SPI3 => w.spi3_dma_chan_sel().bits(channel(SPI3_DMA_CHANNEL)),
+                    _ => w,
+                }
+            });
         });
     }
 }

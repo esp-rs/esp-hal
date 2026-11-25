@@ -16,6 +16,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_feeding_timg0_wdt() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -39,6 +40,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_wdt0_uses_prescaler() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -60,6 +62,7 @@ mod tests {
     #[cfg(timergroup_timg1)]
     fn test_feeding_timg1_wdt() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg1 = TimerGroup::new(p.TIMG1);
         let mut wdt1 = timg1.wdt;
@@ -83,6 +86,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_feeding_timg0_wdt_max_clock() {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -105,6 +109,7 @@ mod tests {
     #[test]
     fn test_feeding_rtc_wdt() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let mut rtc = Rtc::new(p.RTC_TIMER);
 
@@ -126,16 +131,30 @@ mod tests {
 
     #[test]
     fn test_init_disables_watchdogs() {
-        esp_hal::init(Config::default());
+        let peripherals = esp_hal::init(Config::default());
+        hil_test::init_logger!(peripherals);
 
         let delay = Delay::new();
         delay.delay(Duration::from_millis(1000));
     }
 
     #[test]
+    fn test_rom_delay_matches_cpu_clock() {
+        let peripherals =
+            esp_hal::init(Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()));
+        hil_test::init_logger!(peripherals);
+
+        let start = esp_hal::time::Instant::now();
+        esp_hal::rom::ets_delay_us(1000);
+        let elapsed = start.elapsed().as_micros();
+        assert!((900..=1200).contains(&elapsed), "elapsed: {elapsed} us");
+    }
+
+    #[test]
     #[cfg(timergroup_timg0)]
     fn test_timg0_wdt_timeout_is_applied() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -157,6 +176,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_timg0_wdt_stage_action_is_applied() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
@@ -179,6 +199,7 @@ mod tests {
     #[cfg(timergroup_timg0)]
     fn test_timg0_wdt_disable_is_applied() {
         let p = esp_hal::init(Config::default());
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;

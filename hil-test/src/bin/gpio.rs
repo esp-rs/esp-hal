@@ -147,6 +147,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         #[cfg(feature = "unstable")]
         let delay = Delay::new();
@@ -624,7 +625,7 @@ mod tests {
         })
         .await;
 
-        assert!(matches!(should_timeout, Either::Second(_)));
+        hil_test::assert_matches!(should_timeout, Either::Second(_));
     }
 
     #[test]
@@ -671,10 +672,10 @@ mod tests {
 
         assert_eq!(edge_counter, EDGE_COUNT);
 
-        unsafe {
-            // Park the second core, we don't need it anymore
-            CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
-        }
+        // Park the second core, we don't need it anymore
+        CpuControl::new(unsafe { CPU_CTRL::steal() })
+            .park_core(Cpu::AppCpu)
+            .keep_parked();
     }
 
     #[test]
@@ -853,25 +854,36 @@ mod tests {
     #[cfg(all(ulp_riscv_driver_supported, feature = "unstable"))]
     fn creating_lpio_does_not_panic() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
-        // Do not use JTAG or USB Serial/JTAG pins because they break the tests.
-        let debug_pins = cfg_select!(
-            esp32 => [13, 14, 15, 16],
-            any(esp32c2, esp32c3) => [4, 5],
-            esp32s3 => [19, 20],
-            _ => [],
-        );
+        macro_rules! into_lp {
+            ($gpio:ident, $pin:literal) => {
+                esp_hal::gpio::Input::new(peripherals.$gpio, esp_hal::gpio::InputConfig::default())
+                    .into_lp::<$pin>()
+                    .unwrap();
+            };
+        }
+
+        // Do not use the USB Serial/JTAG pins, because they break the tests. The logger also owns
+        // them, so the code must not name them.
+        #[cfg(esp32s3)]
+        macro_rules! lp_pin {
+            (GPIO19, $pin:literal) => {};
+            (GPIO20, $pin:literal) => {};
+            ($gpio:ident, $pin:literal) => {
+                into_lp!($gpio, $pin)
+            };
+        }
+        #[cfg(not(esp32s3))]
+        macro_rules! lp_pin {
+            ($gpio:ident, $pin:literal) => {
+                into_lp!($gpio, $pin)
+            };
+        }
 
         esp_metadata_generated::for_each_lp_function! {
             (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                if !debug_pins.contains(&$pin) {
-                    esp_hal::gpio::Input::new(
-                        peripherals.$gpio,
-                        esp_hal::gpio::InputConfig::default(),
-                    )
-                    .into_lp::<$pin>()
-                    .unwrap();
-                }
+                lp_pin!($gpio, $pin);
             };
         }
     }
@@ -894,11 +906,16 @@ mod pad_hold {
         #[cfg(not(esp32))]
         hp_probe: AnyPin<'static>,
         delay: Delay,
+        #[cfg(multi_core)]
+        cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
+        #[cfg(esp32)]
+        shared_register_pads: (AnyPin<'static>, AnyPin<'static>),
     }
 
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (lp_pad, lp_probe) = hil_test::lp_test_pins!(peripherals);
         #[cfg(not(esp32))]
@@ -912,6 +929,10 @@ mod pad_hold {
             #[cfg(not(esp32))]
             hp_probe: hp_probe.degrade(),
             delay: Delay::new(),
+            #[cfg(multi_core)]
+            cpu_ctrl: peripherals.CPU_CTRL,
+            #[cfg(esp32)]
+            shared_register_pads: (peripherals.GPIO32.degrade(), peripherals.GPIO33.degrade()),
         }
     }
 
@@ -961,6 +982,72 @@ mod pad_hold {
     #[cfg(not(esp32))]
     fn creating_a_driver_releases_the_hold_of_an_hp_pad(ctx: Context) {
         creating_a_driver_releases_the_hold(ctx.hp_pad, ctx.hp_probe, ctx.delay);
+    }
+
+    #[test]
+    #[timeout(10)]
+    #[cfg(multi_core)]
+    fn creating_a_driver_on_the_other_core_keeps_the_hold_of_an_lp_pad(ctx: Context) {
+        creating_a_driver_on_the_other_core_keeps_the_hold(ctx.lp_pad, ctx.lp_probe, ctx.cpu_ctrl);
+    }
+
+    // GPIO32 and GPIO33 share one pad register, which also stores the hold of both pads.
+    #[test]
+    #[timeout(10)]
+    #[cfg(esp32)]
+    fn creating_a_driver_on_the_other_core_keeps_the_hold_of_a_pad_in_a_shared_register(
+        ctx: Context,
+    ) {
+        creating_a_driver_on_the_other_core_keeps_the_hold(
+            ctx.shared_register_pads.0,
+            ctx.shared_register_pads.1,
+            ctx.cpu_ctrl,
+        );
+    }
+
+    #[cfg(multi_core)]
+    fn creating_a_driver_on_the_other_core_keeps_the_hold(
+        held: AnyPin<'static>,
+        mut other: AnyPin<'static>,
+        cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
+    ) {
+        use core::sync::atomic::{AtomicBool, Ordering};
+
+        use esp_hal::system::{CpuControl, Stack};
+        use hil_test::mk_static;
+
+        static STOP: AtomicBool = AtomicBool::new(false);
+        static STOPPED: AtomicBool = AtomicBool::new(false);
+
+        let mut held = Flex::new(held);
+
+        let mut cpu_control = CpuControl::new(cpu_ctrl);
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(app_core_stack, move || {
+                while !STOP.load(Ordering::Relaxed) {
+                    let _ = Flex::new(other.reborrow());
+                }
+                STOPPED.store(true, Ordering::Release);
+                loop {}
+            })
+            .unwrap();
+
+        let mut lost_updates = 0u32;
+        for _ in 0..100_000 {
+            held.set_pad_hold(true);
+            lost_updates += u32::from(!held.is_pad_held());
+            held.set_pad_hold(false);
+            lost_updates += u32::from(held.is_pad_held());
+        }
+
+        STOP.store(true, Ordering::Relaxed);
+        while !STOPPED.load(Ordering::Acquire) {}
+
+        assert_eq!(
+            lost_updates, 0,
+            "the other core overwrote the hold of the pad"
+        );
     }
 }
 

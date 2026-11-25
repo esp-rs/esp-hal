@@ -1,17 +1,4 @@
 pub(crate) fn enable_phy(en: bool) {
-    if en {
-        // IDF `modem_clock_hal_enable_soc_pll_source_cg` (0x3d). PHY calibration
-        // talks to analog via I2C and needs the modem PLL, not XTAL-only 0x25.
-        regs!(HP_SYS_CLKRST).modem_conf().modify(|_, w| {
-            w.modem_apb_clk_en().set_bit();
-            w.modem_rst_en().clear_bit();
-            w.modem_clk_en().set_bit();
-            w.modem_clk_source_sel().set_bit();
-            w.modem_pll_clk_en().set_bit();
-            w.modem_xtal_clk_en().set_bit()
-        });
-    }
-
     regs!(MODEM_SYSCON)
         .clk_conf_power_st()
         .modify(|_, w| unsafe {
@@ -51,20 +38,12 @@ pub(crate) fn enable_phy(en: bool) {
         w.clk_fe_160m_en().bit(en);
         w.clk_fe_dac_en().bit(en);
         w.clk_fe_pwdet_adc_en().bit(en);
-        w.clk_fe_adc_en().bit(en);
-
-        // Treat this as shared, BLE needs it.
-        // Must be kept enabled or many things fail.
-        w.clk_wifi_apb_en().bit(true);
-        w.clk_wifibb_80x1_en().bit(true);
-
-        w.clk_wifibb_160x1_en().bit(en);
-        w.clk_wifibb_40x1_en().bit(en);
-        w.clk_wifibb_80x_en().bit(en);
-        w.clk_wifibb_40x_en().bit(en);
-        w.clk_wifibb_80m_en().bit(en);
-        w.clk_wifibb_44m_en().bit(en);
-        w.clk_wifibb_40m_en().bit(en);
-        w.clk_wifibb_22m_en().bit(en)
+        w.clk_fe_adc_en().bit(en)
     });
 }
+
+/// `MODEM_SYSCON.clk_conf`: `clk_modem_sec_apb_en`.
+pub(crate) const CALIBRATION_CLK_CONF_MASK: u32 = 1 << 28;
+/// `MODEM_SYSCON.clk_conf1`: `clk_wifibb_*_en` (bits 0-8), `clk_wifi_apb_en`, `clk_bt_apb_en` and
+/// `clk_btbb_en`.
+pub(crate) const CALIBRATION_CLK_CONF1_MASK: u32 = 0x1ff | 1 << 10 | 1 << 16 | 1 << 17;

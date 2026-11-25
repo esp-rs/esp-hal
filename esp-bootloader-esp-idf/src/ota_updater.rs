@@ -94,7 +94,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         let next = if let Some(booted) = booted {
             if booted.partition_type() == crate::partitions::PartitionType::App(next) {
                 AppPartitionSubType::from_ota_app_number(
-                    (current.ota_app_number() + 2) % self.ota_count as u8,
+                    (next.ota_app_number() + 1) % self.ota_count as u8,
                 )?
             } else {
                 next

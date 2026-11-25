@@ -65,6 +65,10 @@ pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 
 /// Default wait cycles for the 8 MHz clock.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
+/// Default wait cycles for the PLL buffer.
+pub(super) const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
+/// Default wait cycles for the XTL buffer.
+pub(super) const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u8 = 20;
 /// Default wait cycles to enable the 8 MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 
@@ -135,7 +139,8 @@ impl RtcSleepConfig {
         let mut cfg = Self::default();
         cfg.set_deep_slp(true);
         cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_0V90);
-        // cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_0V90);
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32/rtc_sleep.c#L110
+        cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_0V90);
         cfg.set_vddsdio_pd_en(true);
         cfg.set_int_8m_pd_en(true);
         cfg.set_xtal_fpu(false);
@@ -211,6 +216,13 @@ impl RtcSleepConfig {
         });
 
         rtc_cntl.int_ena().modify(|_, w| w.brown_out().set_bit());
+
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32/rtc_init.c#L40
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32/rtc_init.c#L109-L110
+        rtc_cntl
+            .bias_conf()
+            .modify(|_, w| unsafe { w.dbg_atten().bits(RTC_CNTL_DBG_ATTEN_DEFAULT) });
+        rtc_cntl.int_clr().write(|w| unsafe { w.bits(u32::MAX) });
     }
 
     pub(crate) fn apply(&self) {
@@ -304,10 +316,18 @@ impl RtcSleepConfig {
                 w.pd_en().bit(self.rtc_peri_pd_en())
             });
 
-            // rtc_cntl.dig_pwc.modify(|_, w| w
-            //     .wifi_pd_en().bit(self.wifi_pd_en())
-            //     .rom0_pd_en().bit(self.rom_mem_pd_en())
-            // );
+            // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32/rtc_sleep.c#L198-L204
+            if self.wifi_pd_en() {
+                rtc_cntl
+                    .dig_iso()
+                    .modify(|_, w| w.wifi_force_noiso().clear_bit());
+                rtc_cntl.dig_pwc().modify(|_, w| {
+                    w.wifi_force_pu().clear_bit();
+                    w.wifi_pd_en().set_bit()
+                });
+            } else {
+                rtc_cntl.dig_pwc().modify(|_, w| w.wifi_pd_en().clear_bit());
+            }
 
             if self.deep_slp() {
                 rtc_cntl.dig_iso().modify(|_, w| {
@@ -338,9 +358,17 @@ impl RtcSleepConfig {
                 rtc_cntl
                     .dig_pwc()
                     .modify(|_, w| w.dg_wrap_pd_en().clear_bit());
-
-                rtc_cntl.bias_conf().modify(|_, w| w.dbg_atten().bits(0));
             }
+
+            // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32/rtc_sleep.c#L111
+            let dbg_atten = if self.deep_slp() && self.int_8m_pd_en() {
+                RTC_CNTL_DBG_ATTEN_DEFAULT
+            } else {
+                0
+            };
+            rtc_cntl
+                .bias_conf()
+                .modify(|_, w| w.dbg_atten().bits(dbg_atten));
 
             rtc_cntl
                 .options0()
@@ -373,8 +401,12 @@ impl RtcSleepConfig {
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call.
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
+    /// [`Self::enter_sleep`] requests the sleep after this call. The caller calls
+    /// [`SavedState::restore`] on the return value after [`Self::finish_sleep`].
+    #[crate::ram]
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> SavedState {
+        let cpu_clk = super::SleepCpuClock::switch_to_xtal();
+
         LPWR::regs()
             .reset_state()
             .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
@@ -391,6 +423,15 @@ impl RtcSleepConfig {
             w.gpio_reject_en().bit(rejects.contains(WakeupSource::Gpio));
             w.sdio_reject_en().bit(rejects.contains(WakeupSource::Sdio))
         });
+
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32/rtc_sleep.c#L288-L289
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32/rtc_sleep.c#L316-L317
+        LPWR::regs().int_clr().write(|w| {
+            w.slp_reject().clear_bit_by_one();
+            w.slp_wakeup().clear_bit_by_one()
+        });
+
+        SavedState { cpu_clk }
     }
 
     /// Requests the sleep.
@@ -414,5 +455,18 @@ impl RtcSleepConfig {
         LPWR::regs()
             .bias_conf()
             .modify(|_, w| unsafe { w.dbg_atten().bits(RTC_CNTL_DBG_ATTEN_DEFAULT) });
+    }
+}
+
+/// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
+#[must_use]
+pub(crate) struct SavedState {
+    cpu_clk: super::SleepCpuClock,
+}
+
+impl SavedState {
+    /// Restores the state. Runs after a wakeup and after a rejected sleep.
+    pub(crate) fn restore(self) {
+        self.cpu_clk.restore();
     }
 }

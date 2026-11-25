@@ -1,10 +1,14 @@
 //! Interrupt Tests
 //!     "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
+//! LEDC Tests
 //! MCPWM Tests
 //! PCNT Tests
 //! RNG Tests
+//! SDMMC Tests
 //! System Timer Tests
 //! TWAI Tests
+//! Debug Assist Tests
+//! Temperature Sensor Tests
 //% CHIP_FILTER: gpio_driver_supported
 //% FEATURES: unstable embassy
 
@@ -12,6 +16,179 @@
 #![no_main]
 
 use hil_test as _;
+
+#[cfg(temp_sensor_driver_supported)]
+#[embedded_test::tests(default_timeout = 3)]
+mod tsens {
+    use esp_hal::{
+        clock::ll::TsensInstance,
+        delay::Delay,
+        efuse,
+        peripherals::Peripherals,
+        time::{Duration, Instant},
+        tsens::{Config, MeasurementRange, Temperature, TemperatureSensor},
+    };
+    use hil_test::{assert, assert_eq};
+
+    const ADC_STEP_CELSIUS: f32 = 0.4386;
+    const ADC_ZERO_CELSIUS: f32 = -20.52;
+
+    #[init]
+    fn init() -> Peripherals {
+        esp_hal::init(esp_hal::Config::default())
+    }
+
+    fn check_temperature(sample: &Temperature) {
+        let uncalibrated = sample.to_uncalibrated_celsius();
+        let calibrated = sample.to_celsius();
+        match efuse::temperature_sensor_calibration() {
+            Some(calibration) => {
+                let celsius = calibrated.unwrap();
+                assert!((uncalibrated - celsius - f32::from(calibration) / 10.0).abs() < 0.001);
+                assert!((sample.to_fahrenheit().unwrap() - (celsius * 1.8 + 32.0)).abs() < 0.001);
+                assert!((sample.to_kelvin().unwrap() - (celsius + 273.15)).abs() < 0.001);
+            }
+            None => {
+                assert_eq!(calibrated, None);
+                assert_eq!(sample.to_fahrenheit(), None);
+                assert_eq!(sample.to_kelvin(), None);
+            }
+        }
+    }
+
+    #[test]
+    fn factory_calibration_and_recreation(mut p: Peripherals) {
+        hil_test::init_logger!(p);
+        let config = Config::default().with_range(MeasurementRange::Minus10To80C);
+        for _ in 0..32 {
+            let mut sensor = TemperatureSensor::new(p.TSENS.reborrow(), config).unwrap();
+            let sample = sensor.get_temperature();
+            let uncalibrated = sample.to_uncalibrated_celsius();
+            assert!(uncalibrated > ADC_ZERO_CELSIUS);
+            assert!(uncalibrated < f32::from(u8::MAX) * ADC_STEP_CELSIUS + ADC_ZERO_CELSIUS);
+            check_temperature(&sample);
+            let calibrated = sample.to_celsius();
+            // The test boards are at room temperature.
+            if let Some(celsius) = calibrated {
+                assert!((10.0..45.0).contains(&celsius));
+            }
+            drop(sensor);
+            assert_eq!(sample.to_uncalibrated_celsius(), uncalibrated);
+            assert_eq!(sample.to_celsius(), calibrated);
+        }
+    }
+
+    fn stabilization_duration() -> Duration {
+        let frequency = u64::from(TsensInstance::Tsens.sclk_frequency());
+        Duration::from_micros((20_000u64 * 1_000_000).div_ceil(frequency).max(
+            esp_metadata_generated::property!("temp_sensor.min_stabilization_time_us"),
+        ))
+    }
+
+    fn check_deferred_stabilization(sensor: &mut TemperatureSensor<'_>, start: Instant) {
+        let duration = stabilization_duration();
+        while start.elapsed() < duration / 2 {}
+        let before_read = Instant::now();
+        assert!(before_read - start < duration);
+        sensor.get_temperature();
+        let after_read = Instant::now();
+        assert!(after_read - start >= duration);
+        assert!(after_read - before_read < duration);
+    }
+
+    #[test]
+    fn stabilization_is_deferred_to_read(p: Peripherals) {
+        hil_test::init_logger!(p);
+        let config = Config::default();
+        let start = Instant::now();
+        let mut sensor = TemperatureSensor::new(p.TSENS, config).unwrap();
+        check_deferred_stabilization(&mut sensor, start);
+
+        let start = Instant::now();
+        let config = config.with_range(MeasurementRange::Plus20To100C);
+        sensor.apply_config(&config).unwrap();
+        check_deferred_stabilization(&mut sensor, start);
+    }
+
+    #[cfg(soc_clock_node_tsens_sclk_is_configurable)]
+    #[test]
+    fn clock_change_during_stabilization(mut p: Peripherals) {
+        hil_test::init_logger!(p);
+        use esp_hal::tsens::ClockSource;
+
+        let xtal = Config::default().with_clock_source(ClockSource::Xtal);
+        let rc_fast = xtal.with_clock_source(ClockSource::RcFast);
+        for (from, to) in [(xtal, rc_fast), (rc_fast, xtal)] {
+            let mut sensor = TemperatureSensor::new(p.TSENS.reborrow(), from).unwrap();
+            let start = Instant::now();
+            sensor.apply_config(&to).unwrap();
+            check_deferred_stabilization(&mut sensor, start);
+
+            let range = MeasurementRange::Plus20To100C;
+            sensor.apply_config(&to.with_range(range)).unwrap();
+            Delay::new().delay(stabilization_duration());
+            let start = Instant::now();
+            sensor.apply_config(&from.with_range(range)).unwrap();
+            sensor.get_temperature();
+            assert!(start.elapsed() < stabilization_duration());
+        }
+    }
+
+    #[test]
+    fn ranges_and_repeated_configurations(p: Peripherals) {
+        hil_test::init_logger!(p);
+        let base = Config::default();
+        assert_eq!(base.range(), MeasurementRange::Minus10To80C);
+        let mut sensor = TemperatureSensor::new(p.TSENS, base).unwrap();
+        let baseline = sensor.get_temperature().to_uncalibrated_celsius();
+        for _ in 0..4 {
+            for (range, offset) in [
+                (MeasurementRange::Minus40To20C, 2i8),
+                (MeasurementRange::Minus30To50C, 1),
+                (MeasurementRange::Minus10To80C, 0),
+                (MeasurementRange::Plus20To100C, -1),
+                (MeasurementRange::Plus50To125C, -2),
+            ] {
+                let config = base.with_range(range);
+                sensor.apply_config(&config).unwrap();
+                let immediate = sensor.get_temperature().to_uncalibrated_celsius();
+                Delay::new().delay_millis(20);
+                let reference = sensor.get_temperature().to_uncalibrated_celsius();
+                assert!((immediate - reference).abs() <= 2.0 * ADC_STEP_CELSIUS + 0.001);
+                sensor.apply_config(&config).unwrap();
+                let sample = sensor.get_temperature();
+                let expected_count =
+                    (baseline + f32::from(offset) * 27.88 - ADC_ZERO_CELSIUS) / ADC_STEP_CELSIUS;
+                if (2.0..=253.0).contains(&expected_count) {
+                    assert!(
+                        (sample.to_uncalibrated_celsius() - baseline).abs()
+                            < 14.0 * ADC_STEP_CELSIUS
+                    );
+                }
+                check_temperature(&sample);
+            }
+        }
+    }
+
+    #[cfg(soc_clock_node_tsens_sclk_is_configurable)]
+    #[test]
+    fn clock_sources_preserve_calibration(p: Peripherals) {
+        hil_test::init_logger!(p);
+        use esp_hal::tsens::ClockSource;
+
+        let config = Config::default();
+        let mut sensor = TemperatureSensor::new(p.TSENS, config).unwrap();
+        sensor.get_temperature();
+        for _ in 0..16 {
+            for source in [ClockSource::RcFast, ClockSource::Xtal] {
+                sensor
+                    .apply_config(&config.with_clock_source(source))
+                    .unwrap();
+                check_temperature(&sensor.get_temperature());
+            }
+        }
+    }
+}
 
 #[cfg(pcnt_driver_supported)]
 #[embedded_test::tests(default_timeout = 3)]
@@ -44,6 +221,7 @@ mod pcnt {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (din, dout) = hil_test::common_test_pins!(peripherals);
 
@@ -455,6 +633,7 @@ mod mcpwm {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (din, dout) = hil_test::common_test_pins!(peripherals);
 
@@ -503,6 +682,83 @@ mod mcpwm {
 
         let edges = unit.value();
         hil_test::assert!((98..=102).contains(&edges), "counted {} edges", edges);
+    }
+}
+
+#[cfg(ledc_driver_supported)]
+#[embedded_test::tests(default_timeout = 3)]
+mod ledc {
+    use esp_hal::{
+        gpio::{AnyPin, DriveMode, Input, InputConfig, Pin, Pull},
+        ledc::{
+            LSGlobalClkSource,
+            Ledc,
+            LowSpeed,
+            channel::{self, ChannelIFace},
+            timer::{self, TimerIFace},
+        },
+        peripherals::LEDC,
+        time::{Duration, Instant, Rate},
+    };
+
+    struct Context<'d> {
+        ledc: LEDC<'d>,
+        input: AnyPin<'d>,
+        output: AnyPin<'d>,
+    }
+
+    #[init]
+    fn init() -> Context<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+
+        let (din, dout) = hil_test::common_test_pins!(peripherals);
+
+        Context {
+            ledc: peripherals.LEDC,
+            input: din.degrade(),
+            output: dout.degrade(),
+        }
+    }
+
+    #[test]
+    fn low_speed_output_frequency_matches_configuration(ctx: Context<'static>) {
+        let mut ledc = Ledc::new(ctx.ledc);
+        ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
+
+        let mut timer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
+        timer0
+            .configure(timer::config::Config {
+                duty: timer::config::Duty::Duty10Bit,
+                clock_source: timer::LSClockSource::APBClk,
+                frequency: Rate::from_khz(1),
+            })
+            .unwrap();
+
+        let mut channel0 = ledc.channel(channel::Number::Channel0, ctx.output);
+        channel0
+            .configure(channel::config::Config {
+                timer: &timer0,
+                duty_pct: 50,
+                drive_mode: DriveMode::PushPull,
+            })
+            .unwrap();
+
+        // Not every chip has a PCNT, so count edges by polling.
+        let input = Input::new(ctx.input, InputConfig::default().with_pull(Pull::Down));
+        let mut edges = 0;
+        let mut was_high = input.is_high();
+        let deadline = Instant::now() + Duration::from_millis(20);
+        while Instant::now() < deadline {
+            let is_high = input.is_high();
+            if is_high && !was_high {
+                edges += 1;
+            }
+            was_high = is_high;
+        }
+
+        // 20 ms at 1 kHz is 20 rising edges.
+        hil_test::assert!((19..=21).contains(&edges), "counted {} edges", edges);
     }
 }
 
@@ -591,6 +847,7 @@ mod systimer {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
 
         Context {
@@ -701,6 +958,7 @@ mod twai {
         #[init]
         fn init() -> Context<Blocking> {
             let peripherals = esp_hal::init(esp_hal::Config::default());
+            hil_test::init_logger!(peripherals);
 
             let (loopback_pin, _) = hil_test::common_test_pins!(peripherals);
 
@@ -817,6 +1075,7 @@ mod twai {
         // also for non-async
         fn test_write_into_the_void() {
             let peripherals = esp_hal::init(esp_hal::Config::default());
+            hil_test::init_logger!(peripherals);
 
             // The bus is permanently recessive, so every transmission attempt
             // fails immediately (a transmitted dominant bit reads back
@@ -852,6 +1111,7 @@ mod twai {
         #[init]
         async fn init() -> Context<Async> {
             let peripherals = esp_hal::init(esp_hal::Config::default());
+            hil_test::init_logger!(peripherals);
 
             let (loopback_pin, _) = hil_test::common_test_pins!(peripherals);
 
@@ -966,6 +1226,7 @@ mod twai {
         // Regression test for https://github.com/esp-rs/esp-hal/issues/5307
         async fn test_write_into_the_void() {
             let peripherals = esp_hal::init(esp_hal::Config::default());
+            hil_test::init_logger!(peripherals);
 
             let timg0 = TimerGroup::new(peripherals.TIMG0);
             esp_rtos::start(timg0.timer0);
@@ -1012,6 +1273,7 @@ mod lp_timekeeping {
     #[init]
     fn init() -> Rtc<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         Rtc::new(peripherals.RTC_TIMER)
     }
@@ -1028,5 +1290,255 @@ mod lp_timekeeping {
             "RTC only advanced by {:?}",
             rtc_duration
         );
+    }
+}
+
+#[cfg(assist_debug_has_region_monitor)]
+#[embedded_test::tests(default_timeout = 3)]
+mod assist_debug {
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    use core::hint::spin_loop;
+    use core::ptr::addr_of;
+
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    use esp_hal::system::{CpuControl, Stack};
+    use esp_hal::{assist_debug::DebugAssist, peripherals::Peripherals};
+    use hil_test::mk_static;
+
+    #[esp_hal::ram]
+    fn monitored_write(address: u32) {
+        unsafe { (address as *mut u32).write_volatile(0x1234_5678) };
+    }
+
+    fn assert_pc_in_ram(pc: u32) {
+        unsafe extern "C" {
+            static _rwtext_start: u8;
+            static _rwtext_end: u8;
+        }
+
+        let code = addr_of!(_rwtext_start) as u32..addr_of!(_rwtext_end) as u32;
+        assert!(
+            code.contains(&pc),
+            "captured PC {pc:#x} is outside RAM code"
+        );
+    }
+
+    #[init]
+    fn init() -> Peripherals {
+        esp_hal::init(esp_hal::Config::default())
+    }
+
+    #[test]
+    fn region_monitor_pc(p: Peripherals) {
+        hil_test::init_logger!(p);
+        let address = mk_static!(u32, 0) as *mut u32 as u32;
+        let mut da = DebugAssist::new(p.ASSIST_DEBUG);
+        da.enable_region0_monitor(address, address + size_of::<u32>() as u32, false, true);
+
+        monitored_write(address);
+        assert!(da.is_region0_monitor_interrupt_set());
+        let pc = da.region_monitor_pc();
+        da.disable_region0_monitor();
+        da.clear_region0_monitor_interrupt();
+
+        assert_pc_in_ram(pc);
+    }
+
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    #[test]
+    fn core1_region_monitor_pc(p: Peripherals) {
+        hil_test::init_logger!(p);
+        let address = mk_static!(u32, 0) as *mut u32 as u32;
+        let mut da = DebugAssist::new(p.ASSIST_DEBUG);
+        da.enable_core1_region0_monitor(address, address + size_of::<u32>() as u32, false, true);
+
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, move || {
+                monitored_write(address);
+                loop {
+                    spin_loop();
+                }
+            })
+            .unwrap();
+
+        while !da.is_core1_region0_monitor_interrupt_set() {
+            spin_loop();
+        }
+        let pc = da.core1_region_monitor_pc();
+        da.disable_core1_region0_monitor();
+        da.clear_core1_region0_monitor_interrupt();
+
+        assert_pc_in_ram(pc);
+    }
+}
+
+#[cfg(esp32p4)]
+#[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
+mod sdmmc {
+    use block_device_adapters::BufStream;
+    use embassy_time::Delay;
+    use embedded_fatfs::{FileSystem, FsOptions, ReadWriteSeek};
+    use embedded_io_async::{Read, Seek, SeekFrom, Write};
+    use embedded_partitions::mbr::Scheme;
+    use esp_hal::{
+        Async,
+        sdmmc::{Config, DelayPhase, SdHostController, Slot, SlotConfig},
+        timer::timg::TimerGroup,
+    };
+    use hil_test::mk_static;
+    use sdio::{BlockDevice, sd::Card};
+
+    type SdCard = BlockDevice<Card, Slot<'static, 0, Async>, Delay, 512>;
+
+    const CARD_HZ: u32 = 40_000_000;
+
+    // The test writes the file only when it is missing, to limit wear on the card.
+    const TEST_FILE: &str = "ESPHIL.TXT";
+
+    // Spans several 512-byte blocks, so reads use the multi-block path.
+    const FILE_LEN: usize = 2048;
+
+    // The prime modulus keeps the pattern from lining up with block boundaries.
+    const fn pattern_byte(i: usize) -> u8 {
+        (i % 251) as u8
+    }
+
+    fn expected() -> [u8; FILE_LEN] {
+        core::array::from_fn(pattern_byte)
+    }
+
+    #[derive(Clone, Copy)]
+    enum ReadMethod {
+        ReadToEnd,
+        ReadExact,
+        Chunked,
+        Seek,
+    }
+
+    #[init]
+    async fn init() -> SdCard {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        let controller = mk_static!(
+            SdHostController<'static>,
+            SdHostController::new(peripherals.SDHOST, Config::default()).unwrap()
+        );
+        let slot = controller
+            .slot::<0>(SlotConfig::default().with_input_delay_phase(DelayPhase::_0))
+            .unwrap()
+            .with_clk(peripherals.GPIO43)
+            .with_cmd(peripherals.GPIO44)
+            .with_data0(peripherals.GPIO39)
+            .with_data1(peripherals.GPIO40)
+            .with_data2(peripherals.GPIO41)
+            .with_data3(peripherals.GPIO42)
+            .into_async();
+
+        BlockDevice::new_sd_card(slot, CARD_HZ, Delay)
+            .await
+            .unwrap()
+    }
+
+    async fn run_on_volume(card: &mut SdCard, method: ReadMethod) {
+        let stream = BufStream::<_, 512>::new(card);
+        match Scheme::open(stream).await.unwrap() {
+            Scheme::Mbr(mut mbr) => {
+                let idx = mbr
+                    .iter_used()
+                    .find(|(_, p)| p.is_fat())
+                    .map(|(i, _)| i)
+                    .expect("no FAT partition found");
+                check_file(mbr.open_partition(idx).await.unwrap(), method).await;
+            }
+            Scheme::Superfloppy(io) => check_file(io, method).await,
+            Scheme::Unknown(_) => panic!("unrecognised volume layout"),
+        }
+    }
+
+    async fn check_file<IO: ReadWriteSeek>(io: IO, method: ReadMethod) {
+        let expected = expected();
+        let fs = FileSystem::new(io, FsOptions::new()).await.unwrap();
+        {
+            let root = fs.root_dir();
+
+            match root.open_file(TEST_FILE).await {
+                Ok(_) => {}
+                Err(embedded_fatfs::Error::NotFound) => {
+                    let mut file = root.create_file(TEST_FILE).await.unwrap();
+                    file.write_all(&expected).await.unwrap();
+                    file.flush().await.unwrap();
+                }
+                Err(e) => panic!("open_file failed: {:?}", e),
+            }
+
+            let mut file = root.open_file(TEST_FILE).await.unwrap();
+            let mut buf = [0u8; FILE_LEN + 1];
+            match method {
+                ReadMethod::ReadToEnd => {
+                    let mut len = 0;
+                    loop {
+                        match file.read(&mut buf[len..]).await.unwrap() {
+                            0 => break,
+                            n => len += n,
+                        }
+                    }
+                    assert_eq!(len, FILE_LEN);
+                    assert_eq!(&buf[..len], &expected[..]);
+                }
+                ReadMethod::ReadExact => {
+                    file.read_exact(&mut buf[..FILE_LEN]).await.unwrap();
+                    assert_eq!(&buf[..FILE_LEN], &expected[..]);
+                    assert_eq!(file.read(&mut buf).await.unwrap(), 0);
+                }
+                ReadMethod::Chunked => {
+                    // 100 bytes does not divide the block size, so chunks cross block boundaries.
+                    for (i, chunk) in buf[..FILE_LEN].chunks_mut(100).enumerate() {
+                        file.read_exact(chunk).await.unwrap();
+                        let start = i * 100;
+                        assert_eq!(chunk, &expected[start..start + chunk.len()]);
+                    }
+                }
+                ReadMethod::Seek => {
+                    file.seek(SeekFrom::Start(700)).await.unwrap();
+                    file.read_exact(&mut buf[..1000]).await.unwrap();
+                    assert_eq!(&buf[..1000], &expected[700..1700]);
+
+                    file.seek(SeekFrom::End(-10)).await.unwrap();
+                    file.read_exact(&mut buf[..10]).await.unwrap();
+                    assert_eq!(&buf[..10], &expected[FILE_LEN - 10..]);
+
+                    file.seek(SeekFrom::Start(0)).await.unwrap();
+                    file.read_exact(&mut buf[..10]).await.unwrap();
+                    assert_eq!(&buf[..10], &expected[..10]);
+                }
+            }
+        }
+        fs.unmount().await.unwrap();
+    }
+
+    #[test]
+    async fn read_to_end(mut card: SdCard) {
+        run_on_volume(&mut card, ReadMethod::ReadToEnd).await;
+    }
+
+    #[test]
+    async fn read_exact(mut card: SdCard) {
+        run_on_volume(&mut card, ReadMethod::ReadExact).await;
+    }
+
+    #[test]
+    async fn read_in_chunks(mut card: SdCard) {
+        run_on_volume(&mut card, ReadMethod::Chunked).await;
+    }
+
+    #[test]
+    async fn seek_and_read(mut card: SdCard) {
+        run_on_volume(&mut card, ReadMethod::Seek).await;
     }
 }

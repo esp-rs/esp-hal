@@ -795,6 +795,10 @@ pub fn generate_build_command(
         builder.add_arg(arg);
     }
 
+    if !app.default_features() {
+        builder.add_arg("--no-default-features");
+    }
+
     if !app.configuration().is_empty() {
         log::info!("  Configuration: {}", app.configuration());
     }
@@ -935,9 +939,13 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
         let mut cmd = CargoArgsBuilder::default();
         if config.miri {
             log::info!("Running miri host tests for package: {}", package);
-            cmd = cmd.toolchain("nightly").subcommand("miri");
+            cmd = cmd
+                .toolchain("nightly")
+                .subcommand("miri")
+                .subcommand_arg("test");
+        } else {
+            cmd = cmd.subcommand("test");
         }
-        cmd = cmd.subcommand("test");
         for arg in &config.cargo_args {
             cmd = cmd.arg(arg);
         }

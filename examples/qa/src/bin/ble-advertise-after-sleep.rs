@@ -20,7 +20,6 @@ use esp_hal::{
     rtc_cntl::sleep::{LowPower, RtcSleepConfig},
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use esp_radio::ble::controller::BleConnector;
 use log::{info, warn};
 use qa_test::DRAM2_UNINIT_SIZE;
@@ -53,10 +52,9 @@ struct BatteryService {
 
 #[esp_hal::main]
 async fn main(_s: Spawner) {
-    esp_println::logger::init_logger_from_env();
-
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 72 * 1024);
@@ -90,7 +88,7 @@ async fn main(_s: Spawner) {
     let app = async {
         let mut iteration: u32 = 0;
         loop {
-            println!("================ iteration {iteration} ================");
+            log::info!("================ iteration {iteration} ================");
             info!("[iter {iteration}] advertising for {ADVERTISE_MS} ms - scan for \"TrouBLE\"");
 
             select(
@@ -111,7 +109,7 @@ async fn main(_s: Spawner) {
             );
             lpwr.sleep_light(RtcSleepConfig::default());
 
-            println!(
+            log::info!(
                 "[iter {iteration}] woke up - scan for \"TrouBLE\" now: on an affected C6 it will \
                  no longer be visible even though we re-enable advertising below"
             );

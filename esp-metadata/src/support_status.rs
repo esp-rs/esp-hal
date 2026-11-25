@@ -7,6 +7,69 @@ use serde::{
     de::{self, MapAccess, Visitor},
 };
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DriverStability {
+    Stable,
+    #[default]
+    Unstable,
+    Overhaul {
+        issue: Option<u32>,
+    },
+}
+
+impl DriverStability {
+    pub fn icon(self) -> &'static str {
+        match self {
+            DriverStability::Stable => "✔️",
+            DriverStability::Unstable => "🚧",
+            DriverStability::Overhaul { .. } => "⚠️",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            DriverStability::Stable => "Stable",
+            DriverStability::Unstable => "Unstable (requires the `unstable` feature)",
+            DriverStability::Overhaul { .. } => {
+                "Planned overhaul (unstable, expect major breaking changes)"
+            }
+        }
+    }
+
+    pub fn short_label(self) -> &'static str {
+        match self {
+            DriverStability::Stable => "Stable",
+            DriverStability::Unstable => "Unstable",
+            DriverStability::Overhaul { .. } => "Planned overhaul",
+        }
+    }
+
+    pub fn issue(self) -> Option<u32> {
+        match self {
+            DriverStability::Overhaul { issue } => issue,
+            _ => None,
+        }
+    }
+
+    pub(crate) fn write_legend(output: &mut impl fmt::Write) -> fmt::Result {
+        writeln!(
+            output,
+            " * {}: {}",
+            SupportStatusLevel::NotSupported.icon(),
+            SupportStatusLevel::NotSupported.status()
+        )?;
+        for s in [
+            DriverStability::Overhaul { issue: None },
+            DriverStability::Unstable,
+            DriverStability::Stable,
+        ] {
+            writeln!(output, " * {}: {}", s.icon(), s.label())?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum SupportStatusLevel {
@@ -34,28 +97,6 @@ impl SupportStatusLevel {
             SupportStatusLevel::Partial => "Partial support",
             SupportStatusLevel::Supported => "Supported",
         }
-    }
-
-    pub(crate) fn write_legend(output: &mut impl fmt::Write) -> fmt::Result {
-        for s in [
-            SupportStatusLevel::NotAvailable,
-            SupportStatusLevel::NotSupported,
-            SupportStatusLevel::Partial,
-            SupportStatusLevel::Supported,
-        ] {
-            writeln!(
-                output,
-                " * {}: {}",
-                if s.icon().is_empty() {
-                    "Empty cell"
-                } else {
-                    s.icon()
-                },
-                s.status()
-            )?;
-        }
-
-        Ok(())
     }
 }
 

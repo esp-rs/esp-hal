@@ -15,6 +15,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let mem2mem = cfg_select! {
             esp32s2 => Mem2Mem::new(peripherals.DMA_COPY),
@@ -44,6 +45,28 @@ mod tests {
         for i in 0..tx_buffer.len() {
             assert_eq!(rx_buffer[i], tx_buffer[i]);
         }
+    }
+
+    #[test]
+    fn test_mem2mem_transfers_after_invalid_alignment(ctx: Context) {
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
+
+        let mut mem2mem = ctx
+            .mem2mem
+            .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
+            .unwrap();
+
+        assert!(matches!(
+            mem2mem.start_transfer(&mut rx_buffer[1..], &tx_buffer[1..]),
+            Err(DmaError::InvalidAlignment(_))
+        ));
+
+        for (i, byte) in tx_buffer.iter_mut().enumerate() {
+            *byte = (i % 256) as u8;
+        }
+        let dma_wait = mem2mem.start_transfer(rx_buffer, tx_buffer).unwrap();
+        dma_wait.wait().unwrap();
+        assert_eq!(rx_buffer, tx_buffer);
     }
 
     #[test]

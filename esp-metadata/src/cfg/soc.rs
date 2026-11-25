@@ -516,7 +516,7 @@ impl ClockTreeNodeInstance {
         let request_direct_dependencies = self.node.request_direct_dependencies(self, tree);
         let release_direct_dependencies = self.node.release_direct_dependencies(self, tree);
 
-        // Only configurables have an apply fn
+        // Only configurable clock nodes have an apply fn
         let apply_fn = ty_name
             .as_ref()
             .map(|_| self.node.config_apply_function(self, tree));
@@ -543,6 +543,18 @@ impl ClockTreeNodeInstance {
                 quote! {
                     pub fn #source_frequency_function_name() -> u32 {
                         #body
+                    }
+                }
+            }
+            SourceFrequencySignature::SameAsConfig => {
+                let path = if receiver.is_empty() {
+                    quote! {}
+                } else {
+                    quote! { Self:: }
+                };
+                quote! {
+                    pub fn #source_frequency_function_name(source: #ty_name) -> u32 {
+                        #path #config_frequency_function_name(source)
                     }
                 }
             }
@@ -599,7 +611,17 @@ impl ClockTreeNodeInstance {
             cfg: self.node.rustc_cfg().map(str::to_string),
             request: Function {
                 _name: request_fn_name.to_string(),
-                implementation: if always_on {
+                implementation: if always_on && let Some(refcount_accessor) = &refcount_accessor {
+                    // The node holds its sources permanently, so only the consumer count changes.
+                    quote! {
+                        pub fn #request_fn_name(#(#receiver,)* clocks: &mut ClockTree) {
+                            trace!(#request_trace);
+                            if increment_reference_count(&mut #refcount_accessor) {
+                                #(#receiver.)* #enable_fn_impl_name(clocks, true);
+                            }
+                        }
+                    }
+                } else if always_on {
                     quote! {
                         fn #request_fn_name(#(#receiver,)* _clocks: &mut ClockTree) { }
                     }
@@ -618,7 +640,6 @@ impl ClockTreeNodeInstance {
                 } else if self.properties.has_enable() {
                     quote! {
                         pub fn #request_fn_name(#(#receiver,)* clocks: &mut ClockTree) {
-                            trace!(#request_trace);
                             trace!(#enable_trace);
                             #request_direct_dependencies
                             #(#receiver.)* #enable_fn_impl_name(clocks, true);
@@ -635,7 +656,16 @@ impl ClockTreeNodeInstance {
             },
             release: Function {
                 _name: release_fn_name.to_string(),
-                implementation: if always_on {
+                implementation: if always_on && let Some(refcount_accessor) = &refcount_accessor {
+                    quote! {
+                        pub fn #release_fn_name(#(#receiver,)* clocks: &mut ClockTree) {
+                            trace!(#release_trace);
+                            if decrement_reference_count(&mut #refcount_accessor) {
+                                #(#receiver.)* #enable_fn_impl_name(clocks, false);
+                            }
+                        }
+                    }
+                } else if always_on {
                     quote! {
                         fn #release_fn_name(#(#receiver,)* _clocks: &mut ClockTree) { }
                     }
@@ -654,7 +684,6 @@ impl ClockTreeNodeInstance {
                 } else if self.properties.has_enable() {
                     quote! {
                         pub fn #release_fn_name(#(#receiver,)* clocks: &mut ClockTree) {
-                            trace!(#release_trace);
                             trace!(#disable_trace);
                             #(#receiver.)* #enable_fn_impl_name(clocks, false);
                             #release_direct_dependencies
@@ -696,7 +725,6 @@ impl ClockTreeNodeInstance {
                         #[allow(unused_variables)]
                         pub fn #config_frequency_function_name(
                             #(#config_fn_self,)*
-                            clocks: &mut ClockTree,
                             config: #ty_name,
                         ) -> u32 {
                             #frequency_function_impl
@@ -716,10 +744,8 @@ impl ClockTreeNodeInstance {
                     let config_fn_self = needs_instance.then_some(quote! { self }).into_iter();
 
                     quote! {
-                        #[allow(unused_variables)]
                         pub fn #config_frequency_function_name(
                             #(#config_fn_self,)*
-                            clocks: &mut ClockTree,
                             config: #ty_name,
                         ) -> u32 {
                             #frequency_function_impl
@@ -778,7 +804,9 @@ impl ClockTreeNodeInstance {
             },
 
             hal_functions: vec![
-                if !always_on && (refcount_accessor.is_some() || self.properties.has_enable()) {
+                if (!always_on || refcount_accessor.is_some())
+                    && (refcount_accessor.is_some() || self.properties.has_enable())
+                {
                     quote! {
                         fn #enable_fn_impl_name(#(#receiver,)* _clocks: &mut ClockTree, _en: bool) {
                             todo!()
@@ -865,7 +893,7 @@ impl SystemClocks {
         let mut clock_tree_state_field_initializers = vec![];
         let mut clock_tree_refcount_field_decls = vec![];
         let mut clock_tree_refcount_field_inits = vec![];
-        let mut configurables = vec![];
+        let mut configurable_fields = vec![];
         let mut system_config_steps = HashMap::new();
 
         let mut first_instances = HashSet::new();
@@ -923,7 +951,7 @@ impl SystemClocks {
                     if let Some(instance_count) = instance_count.as_ref() {
                         clock_tree_refcount_field_decls.push(quote! {
                             #cfg_attr
-                            #refcount_field: [u32; #instance_count]
+                            pub(crate) #refcount_field: [u32; #instance_count]
                         });
                         clock_tree_refcount_field_inits.push(quote! {
                             #cfg_attr
@@ -932,7 +960,7 @@ impl SystemClocks {
                     } else {
                         clock_tree_refcount_field_decls.push(quote! {
                             #cfg_attr
-                            #refcount_field: u32
+                            pub(crate) #refcount_field: u32
                         });
                         clock_tree_refcount_field_inits.push(quote! {
                             #cfg_attr
@@ -1035,7 +1063,7 @@ impl SystemClocks {
 
                 let cfg_attr = clock_item.rustc_cfg_attr();
 
-                configurables.push(quote! {
+                configurable_fields.push(quote! {
                     #cfg_attr
                     #docline
                     pub #name: Option<#config_type_name>,
@@ -1138,9 +1166,9 @@ impl SystemClocks {
                 });
                 // Refresh stmt for template nodes uses an `instance` variable (passed by caller).
                 let config_freq_call = if node.config_frequency_needs_instance(tree) {
-                    quote! { instance.#config_freq_fn(clocks, config) }
+                    quote! { instance.#config_freq_fn(config) }
                 } else {
-                    quote! { #instance_type::#config_freq_fn(clocks, config) }
+                    quote! { #instance_type::#config_freq_fn(config) }
                 };
                 refresh_stmt_by_key.insert(
                     template_key.clone(),
@@ -1166,7 +1194,7 @@ impl SystemClocks {
                     quote! {
                         if let Some(config) = #config_field {
                             #cache_name.store(
-                                #config_freq_fn(clocks, config),
+                                #config_freq_fn(config),
                                 ::core::sync::atomic::Ordering::Release,
                             );
                         }
@@ -1467,7 +1495,7 @@ impl SystemClocks {
                     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                     #[instability::unstable]
                     pub struct ClockConfig {
-                        #(#configurables)*
+                        #(#configurable_fields)*
                     }
 
                     impl ClockConfig {
@@ -1563,12 +1591,24 @@ pub struct PeripheralClock {
     #[serde(default)]
     template_params: HashMap<String, String>,
 
-    /// When true, prevents resetting and disabling the peripheral on startup.
-    // TODO: we should do something better, as we keep too many things running. USB/UART depends on
-    // esp-println's output option and whether the USB JTAG is connected, TIMG0 is not necessary
-    // outside of clock calibrations when the device has Systimer.
+    /// Prevents resetting and disabling the peripheral on startup. Either `true`, or the name of
+    /// a cfg (usually an esp-hal config option) that decides it when esp-hal is compiled.
+    // TODO: TIMG0 is not necessary outside of clock calibrations when the device has Systimer.
     #[serde(default)]
-    keep_enabled: bool,
+    keep_enabled: KeepEnabled,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum KeepEnabled {
+    Bool(bool),
+    Cfg(String),
+}
+
+impl Default for KeepEnabled {
+    fn default() -> Self {
+        Self::Bool(false)
+    }
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -1601,9 +1641,15 @@ impl PeripheralClocks {
             .map(|clock| format_ident!("{}", clock.name))
             .collect::<Vec<_>>();
         let keep_enabled = clocks.iter().filter_map(|clock| {
-            clock
-                .keep_enabled
-                .then_some(format_ident!("{}", clock.name))
+            let name = format_ident!("{}", clock.name);
+            match &clock.keep_enabled {
+                KeepEnabled::Bool(true) => Some(quote! { Self::#name, }),
+                KeepEnabled::Bool(false) => None,
+                KeepEnabled::Cfg(cfg) => {
+                    let cfg = format_ident!("{}", cfg);
+                    Some(quote! { #[cfg(#cfg)] Self::#name, })
+                }
+            }
         });
 
         let clk_en_arms = clocks
@@ -1654,9 +1700,7 @@ impl PeripheralClocks {
 
                     impl Peripheral {
                         const KEEP_ENABLED: &[Peripheral] = &[
-                            #(
-                                Self::#keep_enabled,
-                            )*
+                            #(#keep_enabled)*
                         ];
 
                         const COUNT: usize = Self::ALL.len();
@@ -1925,8 +1969,17 @@ impl DeviceClocks {
             // referred to by the drivers.
             let is_peripheral_node = !node.group_instance.is_empty();
 
-            node.properties.refcounted =
-                is_peripheral_node || !(node.always_on() || has_one_direct_dependent);
+            if node.node.refcounted() && !node.always_on() {
+                anyhow::bail!(
+                    "Clock node `{}` is `refcounted` but not `always_on`; \
+                     other nodes get a reference count when they need one.",
+                    node.name_str()
+                );
+            }
+
+            node.properties.refcounted = node.node.refcounted()
+                || is_peripheral_node
+                || !(node.always_on() || has_one_direct_dependent);
 
             // Always-on clock sources don't need enable functions.
             node.properties.has_enable =

@@ -2,7 +2,7 @@
 name          = "esp-hal-procmacros"
 version       = "0.23.0"
 edition       = "2024"
-rust-version  = "1.95.0"
+rust-version  = "1.100.0"
 description   = "Procedural macros for esp-hal"
 documentation = "https://docs.espressif.com/projects/rust/esp-hal-procmacros/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
@@ -21,7 +21,8 @@ clippy-configs = [
     { features = [] },
 ]
 host-test-configs = [
-    { features = ["has-lp-core", "is-lp-core", "rtc-slow", "rtc-fast"] },
+    { features = [] },
+    { features = ["has-lp-core", "is-lp-core", "rtc-slow", "rtc-fast", "uncached"] },
 ]
 
 [package.metadata.docs.rs]
@@ -49,6 +50,9 @@ rtc-fast = []
 ## Indicates the target device has a data cache that when not used, is available
 ## in a memory section *separate* from DRAM.
 dcache-reclaimed = []
+
+## Indicates the target device can access internal SRAM through an L1-bypass address range.
+uncached = []
 
 #! ### Low-power Core Feature Flags
 ## Indicate that the SoC contains an LP core.

@@ -21,7 +21,7 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
     // SCL period. According to the TRM, we should always subtract 1 to SCL low
     // period
     let scl_low = scl_low - 1;
-    // Still according to the TRM, if filter is not enbled, we have to subtract 7,
+    // Still according to the TRM, if filter is not enabled, we have to subtract 7,
     // if SCL filter is enabled, we have to subtract:
     //   8 if SCL filter is between 0 and 2 (included)
     //   6 + SCL threshold if SCL filter is between 3 and 7 (included)

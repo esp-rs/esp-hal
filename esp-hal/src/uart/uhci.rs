@@ -389,8 +389,8 @@ impl<'d> Uhci<'d, Blocking> {
     ) -> Self {
         let guard = GenericPeripheralGuard::new();
 
-        let channel = Channel::new(channel.into());
-        channel.runtime_ensure_compatible(uhci.dma_peripheral());
+        let mut channel = Channel::new(channel.into());
+        channel.connect(uhci.dma_peripheral());
 
         let uhci = Uhci {
             uart,
@@ -426,7 +426,7 @@ impl<'d> Uhci<'d, Async> {
     }
 }
 
-/// Splitted Uhci structs, Tx part for sending data
+/// Split Uhci structs, Tx part for sending data
 pub struct UhciTx<'d, Dm>
 where
     Dm: DriverMode,
@@ -449,10 +449,7 @@ where
         mut self,
         mut tx_buffer: Buf,
     ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
-        let res = unsafe {
-            self.channel_tx
-                .prepare_transfer(self.uhci_per.dma_peripheral(), &mut tx_buffer)
-        };
+        let res = unsafe { self.channel_tx.prepare_transfer(&mut tx_buffer) };
         if let Err(err) = res {
             return Err((err.into(), self, tx_buffer));
         }
@@ -472,7 +469,7 @@ where
     }
 }
 
-/// Splitted Uhci structs, Rx part for receiving data
+/// Split Uhci structs, Rx part for receiving data
 pub struct UhciRx<'d, Dm>
 where
     Dm: DriverMode,
@@ -495,10 +492,7 @@ where
         mut rx_buffer: Buf,
     ) -> Result<UhciDmaRxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         {
-            let res = unsafe {
-                self.channel_rx
-                    .prepare_transfer(self.uhci_per.dma_peripheral(), &mut rx_buffer)
-            };
+            let res = unsafe { self.channel_rx.prepare_transfer(&mut rx_buffer) };
             if let Err(err) = res {
                 return Err((err.into(), self, rx_buffer));
             }

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- ESP32-C61: RAM and the `#[ram(reclaimed)]` region end 1 KB lower, below the ROM's data, as in ESP-IDF v6.1 (#6694)
 
 ### Removed
 

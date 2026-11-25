@@ -33,6 +33,13 @@ To run a single test on a target, run the following command from the workspace r
 cargo xtask test esp32c6 gpio
 ```
 
+To run only some of the test cases of a binary, add a filter as `binary::filter`:
+
+```shell
+# Run the GPIO test cases whose name contains `pad_hold` on ESP32-C6
+cargo xtask test esp32c6 gpio::pad_hold
+```
+
 If you want to run a test multiple times:
 
 ```shell
@@ -56,7 +63,8 @@ connected pair of each.
 Our self-hosted runners have the following setup:
 - ESP32-C2 (`esp32c2-jtag`):
   - Devkit: `ESP8684-DevKitM-1` connected via UART (`UART` port).
-    - `GPIO18` and `GPIO9` are I2C pins.
+    - `GPIO18` and `GPIO9` are I2C pins (connected to MCP4725).
+    - `GPIO1` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO3` are connected (LP pads).
     - `GPIO10` and `GPIO0` are connected (`GPIO10` is an HP pad, `GPIO0` an LP one - the board
       has no second free HP pad).
@@ -64,70 +72,84 @@ Our self-hosted runners have the following setup:
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C3 (`rustboard`):
   - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG (`USB` port).
-    - `GPIO4` and `GPIO5` are I2C pins.
+    - `GPIO4` and `GPIO5` are I2C pins (connected to MCP4725).
+    - `GPIO1` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO3` are connected (LP pads).
     - `GPIO6` and `GPIO7` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C5 (`esp32c5-usb`):
   - Devkit: `ESP32-C5-DevKitC-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
-    - `GPIO2` and `GPIO3` are I2C pins.
+    - `GPIO2` and `GPIO3` are I2C pins (connected to MCP4725).
+    - `GPIO6` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO9` and `GPIO10` are connected (HP pads).
     - `GPIO4` and `GPIO5` are connected (LP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C6 (`esp32c6-usb`):
   - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
-    - `GPIO6` and `GPIO7` are I2C pins.
+    - `GPIO6` and `GPIO7` are I2C pins (connected to MCP4725).
+    - `GPIO4` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO3` are connected (LP pads).
     - `GPIO22` and `GPIO23` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C61 (`esp32c61-usb`):
   - Devkit: `ESP32-C61-DevKitC-1 V2.0` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
-    - `GPIO6` and `GPIO7` are I2C pins.
+    - `GPIO6` and `GPIO7` are I2C pins (connected to MCP4725).
+    - `GPIO4` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO3` are connected (LP pads).
     - `GPIO22` and `GPIO23` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-H2 (`esp32h2-usb`):
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
-    - `GPIO12` and `GPIO22` are I2C pins.
+    - `GPIO12` and `GPIO22` are I2C pins (connected to MCP4725).
+    - `GPIO4` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO3` are connected (HP pads).
     - `GPIO10` and `GPIO11` are connected (LP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-H4 (`esp32h4-usb`):
   - Devkit: `ESP32-H4-DevKitC-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
-    - `GPIO26` and `GPIO27` are I2C pins.
+    - `GPIO26` and `GPIO27` are I2C pins (connected to MCP4725).
+    - `GPIO28` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO3` are connected (LP pads).
     - `GPIO19` and `GPIO20` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-P4 (`esp32p4`):
   - Devkit: `ESP32-P4 EV Board 1.6 (rev 3.1)` connected via USB-Serial-JTAG (`USB` port).
-    - `GPIO2` and `GPIO3` are I2C pins.
+    - `GPIO2` and `GPIO3` are I2C pins (connected to MCP4725).
+    - `GPIO20` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO5` and `GPIO6` are connected (LP pads).
     - `GPIO46` and `GPIO53` are connected (HP pads).
+    - `Ethernet` cable is connected to the runner
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S2 (`esp32s2-jtag`):
   - Devkit: `ESP32-S2-Saola-1` connected via UART (`UART` port).
-    - `GPIO2` and `GPIO3` are I2C pins.
+    - `GPIO2` and `GPIO3` are I2C pins (connected to MCP4725).
+    - `GPIO7` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO9` and `GPIO10` are connected (LP pads).
     - `GPIO37` and `GPIO38` are connected (HP pads).
   - Probe: `ESP-Prog` connected with the [following connections][connection_s2]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S3 (`esp32s3-usb`):
   - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
-    - `GPIO2` and `GPIO3` are I2C pins.
+    - `GPIO2` and `GPIO3` are I2C pins (connected to MCP4725).
+    - `GPIO7` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO9` and `GPIO10` are connected (LP pads).
     - `GPIO40` and `GPIO41` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S31 (`esp32s31-jtag`):
-  - Devkit: `ESP32-S31_QFN80_Test_Board` connected via UART (`USB-UART` port).
-    - `GPIO6` and `GPIO7` are I2C pins.
+  - Devkit: `ESP32-S31-Function-CoreBoard-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
+    - `GPIO0` and `GPIO1` are I2C pins (connected to MCP4725).
+    - `GPIO47` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO3` are connected (LP pads).
-    - `GPIO8` and `GPIO44` are connected (HP pads).
+    - `GPIO43` and `GPIO44` are connected (HP pads).
+    - `Ethernet` cable is connected to the runner
   - Probe: `ESP-Prog` connected with the [following connections][connection_s31]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32 (`esp32-jtag`):
   - Devkit: `ESP32-ETHERNET-A-v1.2` connected via USB-Serial-JTAG (`USB` port).
-    - `GPIO32` and `GPIO33` are I2C pins.
+    - `GPIO32` and `GPIO33` are I2C pins (connected to MCP4725).
+    - `GPIO36` is connected to MCP4725 `VOUT` (ADC1).
     - `GPIO2` and `GPIO4` are connected (LP pads). The used devkit exposes no free HP pad, so the HP tests do not run on this chip.
+    - `Ethernet` cable is connected to the runner
   - RPi: Raspbian 12 configured with the following [setup]
 
 [connection_s31]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
@@ -196,20 +218,29 @@ If the test is supported by all the targets, you can omit the header. See [`xtas
 
 ## Logging in tests
 
-The tests can use [defmt] to print logs. To enable log output, add the `defmt` feature to the test
-you want to run. Eg:
+The tests print [defmt] logs. The default `log-serial` feature prints them through `esp-log`,
+on the USB-Serial-JTAG port if the chip has one, and on UART0's default TX pin if not.
+`probe-rs run` reads the serial port of the probe and decodes the logs. It shows the log of a test
+only if the test fails. Use `--nocapture` to see the logs of all tests.
 
-```rust
-//! AES Test
+A test installs the logger with `hil_test::init_logger!(peripherals)` after `esp_hal::init`. The
+macro moves the port it logs on out of `peripherals`. The logger uses the unstable UART and
+USB-Serial-JTAG drivers, so a test that does not enable `unstable` prints no logs.
 
-//% CHIP_FILTER: esp32 || esp32c3 || esp32c6 || esp32h2 || esp32s2 || esp32s3
-//% FEATURES: defmt
+If the serial port of the probe is not connected to the chip, for example an ESP-Prog with the
+UART of the chip on a separate USB cable, set the port in the probe-rs configuration file:
+
+```toml
+[probes."0403:6010".serial]
+port = "/dev/ttyUSB2" # or `usb = "VID:PID[:serial]"`
 ```
 
-Make sure to remove this addition before you commit any modifications.
+A test that uses UART0 or the USB-Serial-JTAG port for itself logs over RTT instead. Polling RTT
+halts the cores, so use it only for these tests:
 
-> NOTE: log output is disabled by default. Enabling it can introduce some timing issues, which
-makes some tests fail randomly. This issue affects all Xtensa devices, as well as ESP32-C2 and
-ESP32-C3 currently.
+```rust
+//% FEATURES: log-rtt
+//% DEFAULT-FEATURES: false
+```
 
 [defmt]: https://github.com/knurling-rs/defmt

@@ -1107,7 +1107,7 @@ options:
     }
 
     #[test]
-    fn deserialization_fallback_contraint() {
+    fn deserialization_fallback_constraint() {
         let yml = r#"
 crate: esp-bootloader-esp-idf
 

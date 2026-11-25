@@ -8,7 +8,30 @@ mod tests {
 
     #[init]
     fn init() {
-        _ = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+    }
+
+    #[cfg(temp_sensor_driver_supported)]
+    #[test]
+    fn temperature_calibration_matches_efuse() {
+        let Some(calibration) = esp_hal::efuse::temperature_sensor_calibration() else {
+            return;
+        };
+        let (field, mask, sign_bit) = cfg_select! {
+            esp32s31 => (esp_hal::efuse::SYS_DATA_PART1_4, 0x3ff, 9),
+            esp32p4 => (esp_hal::efuse::TEMPERATURE_SENSOR, 0x3ff, 9),
+            any(esp32c5, esp32c61) => (esp_hal::efuse::TEMPERATURE_SENSOR, 0xffff, 8),
+            _ => (esp_hal::efuse::TEMP_CALIB, 0xffff, 8),
+        };
+        let raw = u32::from(esp_hal::efuse::read_field_le::<u16>(field)) & mask;
+        let magnitude = (raw & ((1 << sign_bit) - 1)) as i16;
+        let expected = if raw & (1 << sign_bit) == 0 {
+            magnitude
+        } else {
+            -magnitude
+        };
+        hil_test::assert_eq!(calibration, expected);
     }
 
     /// All available interface MACs must be distinct from each other.

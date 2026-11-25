@@ -11,6 +11,7 @@ use esp_sync::NonReentrantMutex;
 
 use crate::{
     asynch::AtomicWaker,
+    clock::CpuFrequencyLock,
     dma::aligned::InternalMemory,
     interrupt,
     mipi_dsi::{
@@ -178,6 +179,8 @@ fn dsi_bridge_isr() {
 /// continuously streaming frame buffers via VDMA.
 pub struct DsiDpi<'d> {
     _guard: crate::mipi_dsi::DphyGuard<'d>,
+    // VDMA streams the frame buffers from PSRAM, also while the CPU waits for an interrupt.
+    _cpu_frequency_lock: CpuFrequencyLock,
     fb_ptrs: [*mut u8; MAX_FBS],
     fb_size: usize,
     num_fbs: usize,
@@ -215,6 +218,7 @@ impl<'d> DsiDpi<'d> {
         config: DpiConfig,
         framebuffers: &[&'d mut [u8]],
     ) -> Result<Self, ConfigError> {
+        let cpu_frequency_lock = CpuFrequencyLock::new();
         let num_fbs = framebuffers.len();
         debug_assert!((1..=MAX_FBS).contains(&num_fbs));
         let fb_size = framebuffers[0].len();
@@ -225,10 +229,10 @@ impl<'d> DsiDpi<'d> {
         // upstream PLL reference count is maintained correctly.
         let (_dpi_clk_config, real_dpi_mhz) = ClockTree::with(|clocks| {
             // Obtain source frequency (div_num = 0 → no division applied yet).
-            let src_hz = MipiDsiInstance::dpi_clk_config_frequency(
-                clocks,
-                MipiDsiDpiClkConfig::new(config.dpi_clk_src, 0),
-            );
+            let src_hz = MipiDsiInstance::dpi_clk_config_frequency(MipiDsiDpiClkConfig::new(
+                config.dpi_clk_src,
+                0,
+            ));
             let src_mhz = src_hz as f32 / 1_000_000.0;
             let div = ((src_mhz / config.pixel_clock_mhz) + 0.5) as u32;
             let div = div.max(1);
@@ -422,6 +426,7 @@ impl<'d> DsiDpi<'d> {
         let MipiDsi { guard, .. } = bus;
         Ok(Self {
             _guard: guard,
+            _cpu_frequency_lock: cpu_frequency_lock,
             fb_ptrs,
             fb_size,
             num_fbs,

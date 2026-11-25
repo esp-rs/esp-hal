@@ -21,8 +21,97 @@ use crate::efuse::ChipRevision;
 #[cfg_attr(esp32s31, path = "esp32s31/mod.rs")]
 mod implementation;
 
+#[cfg(soc_cpu_has_branch_predictor)]
+pub(crate) mod branch_predictor;
+
+#[cfg(any(feature = "unstable", cpu_retention = "software"))]
+pub(crate) mod cache;
+
 #[cfg(soc_has_xtal32k_pads)]
 pub(crate) mod xtal32k;
+
+#[cfg(soc_has_usb_device)]
+pub(crate) mod usb_phy;
+
+#[cfg(soc_has_bus_clock_update)]
+mod bus_clock_update {
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    static DEFERRED: AtomicBool = AtomicBool::new(false);
+
+    /// Applies the new CPU root clock and the new CPU and bus clock dividers.
+    ///
+    /// Inside [`with_single_bus_clock_update`], this function does nothing. The bus can stop if
+    /// the new combination is not valid.
+    pub(crate) fn update_bus_clocks() {
+        if DEFERRED.load(Ordering::Relaxed) {
+            return;
+        }
+
+        cfg_select! {
+            soc_has_hp_sys_clkrst => {
+                use crate::peripherals::HP_SYS_CLKRST;
+
+                HP_SYS_CLKRST::regs()
+                    .root_clk_ctrl0()
+                    .modify(|_, w| w.soc_clk_div_update().set_bit());
+                while HP_SYS_CLKRST::regs()
+                    .root_clk_ctrl0()
+                    .read()
+                    .soc_clk_div_update()
+                    .bit_is_set()
+                {
+                    core::hint::spin_loop();
+                }
+            }
+            _ => {
+                use crate::peripherals::PCR;
+
+                PCR::regs()
+                    .bus_clk_update()
+                    .write(|w| w.bus_clock_update().set_bit());
+                while PCR::regs()
+                    .bus_clk_update()
+                    .read()
+                    .bus_clock_update()
+                    .bit_is_set()
+                {
+                    core::hint::spin_loop();
+                }
+            }
+        }
+
+        // `ets_delay_us` counts CPU cycles, so the ROM must know the CPU frequency.
+        esp_rom_sys::rom::ets_update_cpu_frequency_rom(
+            super::clocks::cpu_clk_frequency() / 1_000_000,
+        );
+    }
+
+    /// Runs `f`, then applies all clock changes of `f` with one bus clock update.
+    ///
+    /// Separate updates can apply an intermediate combination that overclocks a bus.
+    pub(crate) fn with_single_bus_clock_update(f: impl FnOnce()) {
+        DEFERRED.store(true, Ordering::Relaxed);
+        f();
+        DEFERRED.store(false, Ordering::Relaxed);
+        update_bus_clocks();
+    }
+}
+
+#[cfg(soc_has_bus_clock_update)]
+pub(crate) use bus_clock_update::{update_bus_clocks, with_single_bus_clock_update};
+
+/// Lets the hardware lower APB_CLK while the APB bus is idle.
+#[cfg(soc_has_apb_frequency_reduction)]
+pub(crate) fn enable_apb_frequency_reduction(enable: bool) {
+    const DIVIDER: u16 = esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_APB_FREQUENCY_REDUCTION");
+
+    // The hardware divides AHB_CLK by the field value + 1. The value 0 disables the reduction.
+    let field = if enable { (DIVIDER - 1) as u8 } else { 0 };
+    crate::peripherals::PCR::regs()
+        .apb_freq_conf()
+        .modify(|_, w| unsafe { w.apb_decrease_div_num().bits(field) });
+}
 
 cfg_select! {
     all(feature = "unstable", ulp_riscv_driver_supported) => {
@@ -33,13 +122,45 @@ cfg_select! {
     }
 }
 
+/// The cores share the cache sync registers. A cache operation from one core while the other
+/// core's operation runs can discard either one.
+#[cfg(all(multi_core, not(esp32)))]
+pub(crate) static CACHE_SYNC_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+
 #[allow(unused)]
 pub(crate) fn is_valid_ram_address(address: usize) -> bool {
-    addr_in_range(address, memory_range!("DRAM"))
+    addr_in_range(address, memory_range!("DRAM")) || is_uncached_ram_address(address)
+}
+
+/// Returns whether `address` is in the linked uncached sections.
+pub(crate) fn is_uncached_ram_address(address: usize) -> bool {
+    let range = cfg_select! {
+        esp32p4 => uncached_ram_range(),
+        // Other chips have no uncached RAM.
+        _ => 0..0,
+    };
+    range.contains(&address)
+}
+
+#[cfg(esp32p4)]
+fn uncached_ram_range() -> Range<usize> {
+    unsafe extern "C" {
+        static _uncached_data_start: u8;
+        static _uncached_end: u8;
+    }
+
+    let start = &raw const _uncached_data_start as usize;
+    let end = &raw const _uncached_end as usize;
+    start..end
 }
 
 #[allow(unused)]
 pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
+    #[cfg(esp32p4)]
+    if slice_in_range(slice, uncached_ram_range()) {
+        return true;
+    }
+
     slice_in_range(slice, memory_range!("DRAM"))
 }
 
@@ -86,23 +207,28 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
         fn main(a0: usize, a1: usize, a2: usize) -> !;
     }
 
-    setup_stack_guard();
-
     unsafe {
+        setup_stack_guard();
+        __esp_bootloader_init();
         main(a0, a1, a2);
     }
 }
 
+#[cfg(feature = "rt")]
+unsafe extern "C" {
+    /// Hardware setup a bootloader support crate needs once `.data` and `.bss` are initialized,
+    /// just before `main`. `hal-defaults.x` maps it to `__esp_bootloader_default_init` unless the
+    /// bootloader support crate defines it.
+    fn __esp_bootloader_init();
+}
+
+#[cfg(feature = "rt")]
+#[unsafe(export_name = "__esp_bootloader_default_init")]
+extern "C" fn esp_bootloader_default_init() {}
+
 #[cfg(all(xtensa, feature = "rt"))]
 mod xtensa {
     use core::arch::{global_asm, naked_asm};
-
-    /// The ESP32 has a first stage bootloader that handles loading program data into the right
-    /// place, so loading is skipped here. Called by xtensa-lx-rt in Reset.
-    #[unsafe(export_name = "__init_data")]
-    extern "C" fn __init_data() -> bool {
-        false
-    }
 
     extern "C" fn __init_persistent() -> bool {
         matches!(
@@ -146,6 +272,8 @@ mod xtensa {
         .literal sym_rtc_slow_bss_end, {_rtc_slow_bss_end}
         .literal sym_rtc_slow_persistent_end, {_rtc_slow_persistent_end}
         .literal sym_rtc_slow_persistent_start, {_rtc_slow_persistent_start}
+
+        .literal sym_esp_bootloader_init, {__esp_bootloader_init}
         ",
         __init_persistent = sym __init_persistent,
         _xtensa_lx_rt_zero_fill = sym _xtensa_lx_rt_zero_fill,
@@ -162,6 +290,8 @@ mod xtensa {
         _rtc_slow_bss_start = sym _rtc_slow_bss_start,
         _rtc_slow_persistent_end = sym _rtc_slow_persistent_end,
         _rtc_slow_persistent_start = sym _rtc_slow_persistent_start,
+
+        __esp_bootloader_init = sym super::__esp_bootloader_init,
     );
 
     #[unsafe(export_name = "__post_init")]
@@ -199,6 +329,8 @@ mod xtensa {
             callx4 a2                                  // Zero-fill
 
         .Lpost_init_return:
+            l32r   a2, sym_esp_bootloader_init         // Let the bootloader support crate finish
+            callx4 a2                                  // its setup
             retw.n
         ",
         )
@@ -258,26 +390,48 @@ mod xtensa {
 }
 
 #[cfg(feature = "rt")]
+#[ram(unstable(checked))]
 #[unsafe(export_name = "__stack_chk_fail")]
-unsafe extern "C" fn stack_chk_fail() {
+unsafe extern "C" fn stack_chk_fail() -> ! {
+    // Instrumented code in `.rwtext.checked` calls this function, so it lives there too, and the
+    // link fails if it calls the panic machinery in flash directly. The link check cannot see a
+    // call through a pointer, and the volatile read keeps the compiler from turning it back into a
+    // direct call. While the caches are suspended, the call cannot fetch its code and the core
+    // locks up.
+    #[ram]
+    static PANIC: fn() -> ! = stack_chk_panic;
+    let panic = unsafe { (&raw const PANIC).read_volatile() };
+    panic()
+}
+
+#[cfg(feature = "rt")]
+fn stack_chk_panic() -> ! {
     panic!("Stack corruption detected");
 }
 
 #[cfg(all(feature = "rt", riscv))]
-fn setup_stack_guard() {
-    unsafe extern "C" {
-        static mut __stack_chk_guard: u32;
-    }
+unsafe extern "C" {
+    static mut __stack_chk_guard: u32;
+}
 
-    unsafe {
-        let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
-        // we _should_ use a random value but we don't have a good source for random
-        // numbers here
-        stack_chk_guard.write_volatile(esp_config::esp_config_int!(
-            u32,
-            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-        ));
-    }
+#[cfg(all(feature = "rt", riscv))]
+#[unsafe(naked)]
+unsafe extern "C" fn setup_stack_guard() {
+    // `-Z stack-protector=all` instruments every normal function. This store is what plants the
+    // canary, so a prologue would snapshot the old word and the epilogue would report corruption.
+    // Until rustc 1.102 the helper was inlined into `hal_main` (`-> !`), and LLVM deleted that
+    // unreachable check. 1.102 leaves the helper as its own function, so the check runs. Naked
+    // code has no prologue. Xtensa does the same store in `__pre_init`.
+    core::arch::naked_asm!(
+        "
+        la   t0, {guard}
+        li   t1, {value}
+        sw   t1, 0(t0)
+        ret
+        ",
+        guard = sym __stack_chk_guard,
+        value = const esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_VALUE"),
+    );
 }
 
 #[cfg(all(init_stack_ptr_range_check, feature = "rt"))]

@@ -227,7 +227,7 @@ impl FunctionMap {
     /// Returns the signal associated with the nth alternate function.
     ///
     /// Note that not all alternate functions are defined. The number of the
-    /// GPIO function is available separately. Not all alternate function have
+    /// GPIO function is available separately. Not all alternate functions have
     /// IO signals.
     pub fn get(&self, af: usize) -> Option<&str> {
         match af {
@@ -470,9 +470,9 @@ pub(crate) fn generate_gpios(
                 af: Option<&TokenStream>,
                 lp_groups: Option<&TokenStream>,
             ) {
-                // Split "NAMEnumber" format fragments into the NAME and the number. The function
-                // returns `None` if the input string is not in this format. The NAME part can be
-                // empty (i.e. this function can return `Some("", number)`).
+                // Split `name` + `number` fragments (e.g. `UART0`) into the name and the number.
+                // The function returns `None` if the input string is not in this format. The name
+                // part can be empty (i.e. this function can return `Some("", number)`).
                 fn split_signal_with_number(fragment: &str) -> Option<(&str, usize)> {
                     // Find the first character that is not a letter.
                     let Some(breakpoint) = fragment

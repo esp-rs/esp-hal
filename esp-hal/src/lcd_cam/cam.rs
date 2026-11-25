@@ -102,15 +102,7 @@ use crate::{
         OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    lcd_cam::{
-        BitOrder,
-        ByteOrder,
-        CamDmaRxChannel,
-        ClockError,
-        ErasedRxChannel,
-        calculate_clkm,
-        ll,
-    },
+    lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, ErasedRxChannel, calculate_clkm},
     pac,
     peripherals::LCD_CAM,
     soc::clocks::{ClockTree, LcdCamCamClockConfig, LcdCamInstance},
@@ -208,8 +200,8 @@ impl<'d> Camera<'d, Blocking> {
         channel: impl CamDmaRxChannel<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let rx_channel = ChannelRx::new(channel.into());
-        rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
+        let mut rx_channel = ChannelRx::new(channel.into());
+        rx_channel.connect(DmaPeripheral::LCD_CAM);
 
         let mut this = Self { cam, rx_channel };
 
@@ -304,7 +296,9 @@ impl<'d, Dm: DriverMode> Camera<'d, Dm> {
             w.cam_vsync_inv().bit(config.invert_vsync)
         });
 
-        ll::set_cam_conv_bypass(self.regs());
+        self.regs()
+            .cam_rgb_yuv()
+            .write(|w| w.cam_conv_enable().clear_bit());
 
         self.regs()
             .cam_ctrl()
@@ -483,7 +477,7 @@ impl<'d, Dm: DriverMode> Camera<'d, Dm> {
         // Start DMA to receive incoming transfer.
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
+                .prepare_transfer(&mut buf)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
 

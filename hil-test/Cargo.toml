@@ -33,6 +33,11 @@ harness           = false
 required-features = ["esp-alloc"]
 
 [[bin]]
+name              = "ieee802154"
+harness           = false
+required-features = ["esp-alloc"]
+
+[[bin]]
 name              = "gpio"
 harness           = false
 
@@ -73,6 +78,11 @@ name              = "parl_io"
 harness           = false
 
 [[bin]]
+name              = "ppa"
+harness           = false
+required-features = ["unstable", "psram", "esp-rtos"]
+
+[[bin]]
 name              = "rmt"
 harness           = false
 required-features = ["embassy", "esp-alloc"]
@@ -94,17 +104,22 @@ harness           = false
 name              = "uart"
 harness           = false
 
+[[bin]]
+name              = "usb_serial_jtag"
+harness           = false
+
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
 critical-section   = "1"
 defmt              = "1.1"
-defmt-rtt          = { version = "1.0.0", optional = true }
+rtt-target         = { version = "0.6.2", features = ["defmt"], optional = true }
 embassy-executor   = { version = "0.10.0", default-features = false }
 embassy-futures    = "0.1"
 embassy-sync       = "0.8.0"
 embassy-time       = "0.5.0"
 embedded-hal       = "1.0.0"
 embedded-io        = "0.7.1"
+embedded-io-06     = { package = "embedded-io", version = "0.6" }
 embedded-io-async  = "0.7.0"
 embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
@@ -112,13 +127,14 @@ esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
 esp-metadata-generated = { path = "../esp-metadata-generated" }
+esp-log       = { path = "../esp-log", default-features = false, features = ["defmt"], optional = true }
 esp-rtos           = { path = "../esp-rtos", optional = true }
 esp-sync           = { path = "../esp-sync" }
 esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
 portable-atomic    = "1.11"
 static_cell        = { version = "2.1.1" }
-semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
+semihosting        = { version = "0.1", features= ["stdio"] }
 
 trouble-host = { version = "0.8.0", features = [
     "default-packet-pool-mtu-255",
@@ -126,8 +142,10 @@ trouble-host = { version = "0.8.0", features = [
     "scan",
 ], optional = true }
 
+aes-gcm             = { version = "0.11", default-features = false, features = ["aes"] }
 primeorder          = { version = "0.13.0", default-features = false }
 crypto-bigint       = { version = "0.7.5", default-features = false }
+ctr                 = "0.10.1"
 digest              = { version = "0.11", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }
@@ -136,21 +154,41 @@ nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 p384                = { version = "0.13.1", default-features = false, features = ["arithmetic"] }
+sm2                 = { version = "0.13.3", default-features = false, features = ["arithmetic"] }
 sha1                = { version = "0.11", default-features = false }
 sha2                = { version = "0.11", default-features = false }
 sm3                 = { version = "0.5", default-features = false }
 
 paste               = "1.0.15"
 
+sdio                  = "0.5"
+block-device-adapters = "0.2.0"
+embedded-fatfs        = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112", default-features = false }
+embedded-partitions   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+# Only the build script uses the `links` metadata of `esp-riscv-rt`.
+esp-riscv-rt = { path = "../esp-riscv-rt" }
+
+[target.'cfg(target_arch = "xtensa")'.dependencies]
+# Only the build script uses the `links` metadata of `xtensa-lx-rt`.
+xtensa-lx-rt = { path = "../xtensa-lx-rt" }
+
 [build-dependencies]
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
-default = []
+default = ["log-serial"]
 unstable = ["esp-hal/unstable"]
+esp-rtos = ["dep:esp-rtos"]
 
-# Add the `embedded-test/defmt` feature for more verbose testing
-defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt", "esp-radio-rtos-driver?/defmt"]
+# Logs on the serial port of the probe. Only tests that enable `unstable` log, because the
+# logger uses the unstable UART and USB-Serial-JTAG drivers.
+log-serial = ["dep:esp-log", "defmt"]
+# Logs over RTT, for the tests that use UART0 or the USB-Serial-JTAG port. Disable `log-serial`.
+log-rtt = ["dep:rtt-target", "defmt"]
+# Enabled by `log-serial` and `log-rtt`.
+defmt = ["embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt", "esp-radio-rtos-driver?/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 esp-radio-unstable = ["esp-radio/unstable"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
@@ -158,6 +196,7 @@ rtos-radio-driver = ["dep:esp-rtos", "esp-rtos/esp-radio", "dep:esp-radio-rtos-d
 
 # Device support (required!):
 esp32 = [
+    "esp-log?/esp32",
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32",
     "esp-alloc?/esp32",
@@ -167,6 +206,7 @@ esp32 = [
     "esp-rtos?/esp32",
 ]
 esp32c2 = [
+    "esp-log?/esp32c2",
     "esp-hal/esp32c2",
     "esp-alloc?/esp32c2",
     "esp-radio?/esp32c2",
@@ -175,6 +215,7 @@ esp32c2 = [
     "esp-rtos?/esp32c2"
 ]
 esp32c3 = [
+    "esp-log?/esp32c3",
     "esp-hal/esp32c3",
     "esp-alloc?/esp32c3",
     "esp-radio?/esp32c3",
@@ -183,6 +224,7 @@ esp32c3 = [
     "esp-rtos?/esp32c3",
 ]
 esp32c5 = [
+    "esp-log?/esp32c5",
     "esp-hal/esp32c5",
     "esp-alloc?/esp32c5",
     "esp-radio?/esp32c5",
@@ -191,6 +233,7 @@ esp32c5 = [
     "esp-rtos?/esp32c5",
 ]
 esp32c6 = [
+    "esp-log?/esp32c6",
     "esp-hal/esp32c6",
     "esp-alloc?/esp32c6",
     "esp-radio?/esp32c6",
@@ -199,6 +242,7 @@ esp32c6 = [
     "esp-rtos?/esp32c6",
 ]
 esp32c61 = [
+    "esp-log?/esp32c61",
     "esp-hal/esp32c61",
     "esp-alloc?/esp32c61",
     "esp-radio?/esp32c61",
@@ -207,6 +251,7 @@ esp32c61 = [
     "esp-rtos?/esp32c61",
 ]
 esp32h2 = [
+    "esp-log?/esp32h2",
     "esp-hal/esp32h2",
     "esp-alloc?/esp32h2",
     "esp-radio?/esp32h2",
@@ -215,6 +260,7 @@ esp32h2 = [
     "esp-rtos?/esp32h2",
 ]
 esp32h4 = [
+    "esp-log?/esp32h4",
     "esp-hal/esp32h4",
     "esp-alloc?/esp32h4",
     "esp-radio?/esp32h4",
@@ -223,6 +269,7 @@ esp32h4 = [
     "esp-rtos?/esp32h4",
 ]
 esp32p4 = [
+    "esp-log?/esp32p4",
     "esp-hal/esp32p4",
     "esp-alloc?/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
@@ -230,6 +277,7 @@ esp32p4 = [
     "esp-rtos?/esp32p4",
 ]
 esp32s2 = [
+    "esp-log?/esp32s2",
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s2",
     "esp-alloc?/esp32s2",
@@ -239,6 +287,7 @@ esp32s2 = [
     "esp-rtos?/esp32s2"
 ]
 esp32s3 = [
+    "esp-log?/esp32s3",
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s3",
     "esp-alloc?/esp32s3",
@@ -248,6 +297,7 @@ esp32s3 = [
     "esp-rtos?/esp32s3",
 ]
 esp32s31 = [
+    "esp-log?/esp32s31",
     "esp-hal/esp32s31",
     "esp-alloc?/esp32s31",
     "esp-radio?/esp32s31",
@@ -268,6 +318,10 @@ incremental      = false
 opt-level        = "z"
 overflow-checks  = true
 
+[profile.dev.package.esp-hal]
+# Light sleep and flash operations need esp-hal at opt-level 2 or 3
+opt-level = 2
+
 [profile.release]
 codegen-units    = 1
 debug-assertions = true
@@ -277,3 +331,10 @@ lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = true
 # We rarely debug HIL binaries, so let's shrink the .ELF size
 debug            = 0
+
+[patch.crates-io]
+block-device-driver   = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+block-device-adapters = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+
+[package.metadata.cargo-machete]
+ignored = ["esp-riscv-rt", "xtensa-lx-rt"]

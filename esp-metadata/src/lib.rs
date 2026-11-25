@@ -19,7 +19,7 @@ mod support_status;
 
 use crate::{
     cfg::{SupportItem, Value},
-    support_status::SupportStatusLevel,
+    support_status::{DriverStability, SupportStatus, SupportStatusLevel},
 };
 
 /// Path of the metadata cache shared with the devtool.
@@ -495,9 +495,27 @@ impl Config {
             );
         }
 
+        if let Some(dac) = self.device.peri_config.dac.as_ref()
+            && dac.support_status.is_supported()
+        {
+            ensure!(
+                dac.channel_count.count > 0,
+                "DAC needs at least one channel"
+            );
+            ensure!(
+                (1..=2).contains(&dac.version),
+                "Unsupported DAC register layout"
+            );
+            ensure!(
+                (1..=16).contains(&dac.resolution),
+                "DAC resolution must be 1..=16 bits"
+            );
+        }
+
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
             dma.engines
                 .validate_mem2mem(dma.mem2mem_requires_peripheral)?;
+            dma.engines.validate_psram(dma.psram_max_burst)?;
         }
 
         if let Some(adc) = &self.device.peri_config.adc
@@ -516,12 +534,6 @@ impl Config {
                     adc.channel_count.is_some_and(|count| count > 0),
                     "{chip}: digital ADC needs adc.channel_count"
                 );
-                if adc.pcr_clock {
-                    ensure!(
-                        adc.pll_clock_sel.is_some_and(|sel| sel > 0),
-                        "{chip}: PCR ADC clock needs adc.pll_clock_sel"
-                    );
-                }
             }
         }
 
@@ -749,7 +761,10 @@ impl Config {
 
         // TODO: repeat for all drivers that have Instance traits
         if let Some(peri) = self.device.peri_config.i2c_master.as_ref() {
-            tokens.extend(cfg::generate_i2c_master_peripherals(peri));
+            tokens.extend(cfg::generate_i2c_master_peripherals(
+                peri,
+                self.peripherals(),
+            ));
         };
         if let Some(peri) = self.device.peri_config.i2s.as_ref() {
             tokens.extend(cfg::generate_i2s_peripherals(peri));
@@ -779,6 +794,7 @@ impl Config {
         let mut all_peripherals = vec![];
         let mut singleton_peripherals = vec![];
         let mut dma_peripherals: Vec<(String, u32, proc_macro2::Ident)> = vec![];
+        let mut dma2d_channels = TokenStream::new();
 
         let mut stable_peris = vec![];
 
@@ -872,6 +888,30 @@ This pin may be available with certain limitations. Check your hardware to make 
             }
         }
 
+        if let Some(dma2d) = self.device.peri_config.dma2d.as_ref()
+            && dma2d.support_status.is_supported()
+        {
+            let mut tx = vec![];
+            let mut rx = vec![];
+            for (direction, variant_prefix, count, channels) in [
+                ("TX", "Tx", dma2d.tx_channel_count, &mut tx),
+                ("RX", "Rx", dma2d.rx_channel_count, &mut rx),
+            ] {
+                for index in 0..count {
+                    let name = format_ident!("DMA2D_{direction}_CH{index}");
+                    let variant = format_ident!("{variant_prefix}Ch{index}");
+                    let docs = format!("{name} peripheral singleton");
+                    let index = number(index);
+                    all_peripherals.push(quote! {
+                        @peri_type #[doc = #docs] #name <= virtual () (unstable)
+                    });
+                    singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
+                    channels.push(quote! { #index, #name, #variant });
+                }
+            }
+            dma2d_channels = generate_for_each_macro("dma2d_channel", &[("tx", &tx), ("rx", &rx)]);
+        }
+
         if let Some(pcnt) = self.device.peri_config.pcnt.as_ref()
             && pcnt.support_status.is_supported()
         {
@@ -885,6 +925,39 @@ This pin may be available with certain limitations. Check your hardware to make 
                     all_peripherals.push(quote! { @peri_type #tokens (unstable) });
                     singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
                 }
+            }
+        }
+
+        if let Some(dac) = self.device.peri_config.dac.as_ref()
+            && dac.support_status.is_supported()
+        {
+            for channel in 1..=dac.channel_count.count {
+                let name = format_ident!("DAC{channel}");
+                let singleton_doc = format!("{name} peripheral singleton");
+                let tokens = quote! {
+                    #[doc = #singleton_doc] #name <= virtual ()
+                };
+                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
+            }
+        }
+
+        if let Some(rmt) = self.device.peri_config.rmt.as_ref()
+            && rmt.support_status.is_supported()
+        {
+            for (channel, capability) in rmt.channels.0.iter().enumerate() {
+                let name = format_ident!("RMT_CH{channel}");
+                let direction = match capability {
+                    cfg::RmtChannelCapability::Tx => "Transmit only.",
+                    cfg::RmtChannelCapability::Rx => "Receive only.",
+                    cfg::RmtChannelCapability::RxTx => "Transmit or receive.",
+                };
+                let singleton_doc = format!("RMT channel {channel}. {direction}");
+                let tokens = quote! {
+                    #[doc = #singleton_doc] #name <= virtual ()
+                };
+                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
             }
         }
 
@@ -974,14 +1047,15 @@ This pin may be available with certain limitations. Check your hardware to make 
             dma_eligible.push(quote! { #peri, #variant_name, #dma_id_num, #any_channel });
         }
 
-        generate_for_each_macro(
+        dma2d_channels.extend(generate_for_each_macro(
             "peripheral",
             &[
                 ("all", &all_peripherals),
                 ("singletons", &singleton_peripherals),
                 ("dma_eligible", &dma_eligible),
             ],
-        )
+        ));
+        dma2d_channels
     }
 
     pub fn active_cfgs(&self) -> Vec<String> {
@@ -1558,35 +1632,132 @@ pub fn generate_lib_rs() -> TokenStream {
     }
 }
 
-pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result {
-    // The legend applies to every table, so it is written once, before the
-    // first one.
-    SupportStatusLevel::write_legend(output)?;
-    writeln!(output)?;
+impl SupportItem {
+    fn chip_status(&self, chip: Chip) -> SupportStatus {
+        Config::for_chip(&chip)
+            .device
+            .peri_config
+            .support_status(self.config_group)
+    }
 
-    let visible = PeriConfig::drivers()
-        .iter()
-        .filter(|driver| !driver.hide_from_peri_table)
-        .collect::<Vec<_>>();
+    /// Returns true if this driver is supported (partially or fully) on at least one chip.
+    fn is_implemented(&self) -> bool {
+        Chip::iter().any(|chip| self.chip_status(chip).is_supported())
+    }
 
-    // A group is written where its first driver is declared, so the order of
-    // the tables is controlled by the order of the driver definitions.
-    let mut groups = Vec::new();
-    for driver in visible.iter() {
-        if !groups.contains(&driver.group) {
-            groups.push(driver.group);
+    /// Returns the driver-wide icon and optional tracking issue for the README summary table.
+    fn readme_status(&self) -> (&'static str, Option<u32>) {
+        if self.is_implemented() {
+            (self.stability.icon(), self.stability.issue())
+        } else {
+            let mut not_supported = Chip::iter().filter_map(|chip| {
+                let status = self.chip_status(chip);
+                (status.status == SupportStatusLevel::NotSupported).then_some(status.issue)
+            });
+
+            let shared_issue = not_supported.next().flatten().and_then(|first| {
+                not_supported
+                    .all(|issue| issue == Some(first))
+                    .then_some(first)
+            });
+
+            (SupportStatusLevel::NotSupported.icon(), shared_issue)
         }
     }
 
-    let mut issues = Vec::new();
-    for group in groups {
-        let drivers = visible
-            .iter()
-            .filter(|driver| driver.group == group)
-            .copied()
-            .collect::<Vec<_>>();
+    fn write_html_api_cell(&self, output: &mut impl Write) -> std::fmt::Result {
+        if self.is_implemented() {
+            write_html_status_cell(
+                output,
+                Some("api-col"),
+                self.stability.icon(),
+                self.stability.short_label(),
+                self.stability.issue(),
+            )
+        } else {
+            write!(
+                output,
+                r#"<td class="api-col"><span class="not-impl" title="Not supported">—</span></td>"#
+            )
+        }
+    }
+}
 
-        writeln!(output, "### {group}")?;
+impl SupportStatus {
+    fn write_html_cell(&self, output: &mut impl Write) -> std::fmt::Result {
+        match self.status {
+            SupportStatusLevel::NotAvailable => {
+                write!(
+                    output,
+                    r#"<td class="na-cell" title="Not available">—</td>"#
+                )
+            }
+            level => write_html_status_cell(output, None, level.icon(), level.status(), self.issue),
+        }
+    }
+}
+
+fn visible_driver_groups() -> Vec<(&'static str, Vec<&'static SupportItem>)> {
+    // A group is written where its first driver is declared, so the order of
+    // the tables is controlled by the order of the driver definitions.
+    let mut groups: Vec<(&'static str, Vec<&'static SupportItem>)> = Vec::new();
+    for driver in PeriConfig::drivers()
+        .iter()
+        .filter(|driver| !driver.hide_from_peri_table)
+    {
+        if let Some((_, drivers)) = groups.iter_mut().find(|(group, _)| *group == driver.group) {
+            drivers.push(driver);
+        } else {
+            groups.push((driver.group, vec![driver]));
+        }
+    }
+    groups
+}
+
+/// Returns the `(chip, driver name)` pairs of the support table that are marked as
+/// partially supported, but do not link to an issue that says what is missing.
+pub fn partial_support_without_issue() -> Vec<(Chip, &'static str)> {
+    let mut unlinked = Vec::new();
+    for driver in PeriConfig::drivers()
+        .iter()
+        .filter(|driver| !driver.hide_from_peri_table)
+    {
+        for chip in Chip::iter() {
+            let status = driver.chip_status(chip);
+            if status.status == SupportStatusLevel::Partial && status.issue.is_none() {
+                unlinked.push((chip, driver.name));
+            }
+        }
+    }
+    unlinked
+}
+
+const PERIPHERAL_SUPPORT_INDEX_URL: &str =
+    "https://docs.espressif.com/projects/rust/esp-hal/main/index.html";
+
+fn group_slug(group: &str) -> String {
+    group.to_ascii_lowercase().replace(' ', "-")
+}
+
+pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result {
+    writeln!(
+        output,
+        "For a detailed per-chip support matrix, see the [documentation index]({PERIPHERAL_SUPPORT_INDEX_URL}#peripheral-support)."
+    )?;
+    writeln!(output)?;
+
+    // The legend applies to every table, so it is written once, before the
+    // first one.
+    DriverStability::write_legend(output)?;
+    writeln!(output)?;
+
+    let mut issues = Vec::new();
+    for (group, drivers) in visible_driver_groups() {
+        let slug = group_slug(group);
+        writeln!(
+            output,
+            "### [{group}]({PERIPHERAL_SUPPORT_INDEX_URL}#{slug})"
+        )?;
         writeln!(output)?;
         write_support_table(output, &drivers, &mut issues)?;
         writeln!(output)?;
@@ -1621,6 +1792,7 @@ fn write_support_table(
     issues: &mut Vec<u32>,
 ) -> std::fmt::Result {
     let nothing = "";
+    let status_header = "Status";
 
     // The width of the first column is calculated per table, so that adding a
     // driver only reflows the table it is added to.
@@ -1631,48 +1803,117 @@ fn write_support_table(
         .unwrap();
 
     // Header
-    write!(output, "| {:driver_col_width$} |", "Driver")?;
-    for chip in Chip::iter() {
-        write!(output, " {} |", chip.pretty_name())?;
-    }
-    writeln!(output)?;
+    writeln!(
+        output,
+        "| {:driver_col_width$} | {status_header} |",
+        "Driver"
+    )?;
 
     // Header separator
-    write!(output, "| {nothing:-<driver_col_width$} |")?;
-    for chip in Chip::iter() {
-        write!(
-            output,
-            ":{nothing:-<width$}:|",
-            width = chip.pretty_name().len()
-        )?;
-    }
-    writeln!(output)?;
+    writeln!(
+        output,
+        "| {nothing:-<driver_col_width$} |:{nothing:-<width$}:|",
+        width = status_header.len()
+    )?;
 
     // Driver support status
-    for SupportItem {
-        name, config_group, ..
-    } in drivers
-    {
-        write!(output, "| {name:driver_col_width$} |")?;
-        for chip in Chip::iter() {
-            let config = Config::for_chip(&chip);
+    for driver in drivers {
+        let name = driver.name;
+        let (icon, issue) = driver.readme_status();
+        // VSCode displays emojis just a bit wider than 2 characters, making this
+        // approximation a bit too wide but good enough.
+        let status_cell_width = status_header.len() - !icon.is_empty() as usize;
 
-            let status = config.device.peri_config.support_status(config_group);
-            // VSCode displays emojis just a bit wider than 2 characters, making this
-            // approximation a bit too wide but good enough.
-            let support_cell_width =
-                chip.pretty_name().len() - !status.status.icon().is_empty() as usize;
-            if let Some(issue) = status.issue {
-                write!(output, " [{}][{issue}] [^1] |", status.status.icon())?;
-                issues.push(issue);
-            } else {
-                write!(output, " {:support_cell_width$} |", status.status.icon())?;
-            }
+        write!(output, "| {name:driver_col_width$} |")?;
+        if let Some(issue) = issue {
+            writeln!(output, " [{icon}][{issue}] [^1] |")?;
+            issues.push(issue);
+        } else {
+            writeln!(output, " {icon:status_cell_width$} |")?;
         }
-        writeln!(output)?;
     }
 
     Ok(())
+}
+
+/// Generates the collapsible HTML peripheral support groups for the `esp-hal`
+/// documentation index page.
+pub fn generate_chip_support_status_html(output: &mut impl Write) -> std::fmt::Result {
+    let chip_headers: String = Chip::iter()
+        .map(|chip| format!("<th>{}</th>", chip.pretty_name()))
+        .collect();
+
+    for (group, drivers) in visible_driver_groups() {
+        let slug = group_slug(group);
+        let count = drivers.len();
+        let driver_word = if count == 1 { "driver" } else { "drivers" };
+
+        writeln!(
+            output,
+            r#"        <details class="peri-group" id="{slug}">
+          <summary class="peri-group-summary">
+            <span>{group}</span>
+            <span class="peri-group-count">{count} {driver_word}</span>
+          </summary>
+          <div class="peri-table-wrap">
+            <table class="peri-table">
+              <thead>
+                <tr>
+                  <th class="driver-col">Driver</th>
+                  <th class="api-col">API</th>
+                  {chip_headers}
+                </tr>
+              </thead>
+              <tbody>"#
+        )?;
+
+        for driver in drivers {
+            write!(
+                output,
+                r#"                <tr><td class="driver-col">{}</td>"#,
+                driver.name
+            )?;
+            driver.write_html_api_cell(output)?;
+            for chip in Chip::iter() {
+                driver.chip_status(chip).write_html_cell(output)?;
+            }
+            writeln!(output, "</tr>")?;
+        }
+
+        writeln!(
+            output,
+            r#"              </tbody>
+            </table>
+          </div>
+        </details>"#
+        )?;
+    }
+
+    Ok(())
+}
+
+fn write_html_status_cell(
+    output: &mut impl Write,
+    class: Option<&str>,
+    icon: &str,
+    label: &str,
+    issue: Option<u32>,
+) -> std::fmt::Result {
+    let class_attr = match class {
+        Some(c) => format!(r#" class="{c}""#),
+        None => String::new(),
+    };
+    if let Some(issue) = issue {
+        write!(
+            output,
+            r#"<td{class_attr}><a class="issue-link" href="https://github.com/esp-rs/esp-hal/issues/{issue}" title="{label} (issue #{issue})">{icon}</a></td>"#
+        )
+    } else {
+        write!(
+            output,
+            r#"<td{class_attr}><span title="{label}">{icon}</span></td>"#
+        )
+    }
 }
 
 pub fn generate_supported_devices_table(output: &mut impl Write) -> std::fmt::Result {

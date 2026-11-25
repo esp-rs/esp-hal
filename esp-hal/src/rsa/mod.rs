@@ -21,7 +21,7 @@ mod low_level;
 use core::{marker::PhantomData, ptr::NonNull, task::Poll};
 
 #[cfg(rsa_version = "1")]
-use portable_atomic::{AtomicBool, Ordering};
+use esp_sync::NonReentrantMutex;
 use procmacros::{handler, ram};
 
 use crate::{
@@ -44,6 +44,53 @@ pub struct Rsa<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     _guard: RsaGuard,
 }
+
+/// RSA accelerator configuration.
+///
+/// The default is the most secure: constant time on and search acceleration off. The ESP32 has
+/// neither option, so its `Config` is empty.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct Config {
+    /// Constant time operation for modular exponentiation.
+    ///
+    /// Turning it off makes modular exponentiation faster for an exponent with many 0 bits,
+    /// and exposes the exponent to timing-based side-channel attacks. Turn it off only for a
+    /// public exponent, such as when verifying a signature.
+    ///
+    /// Default value: `true`.
+    #[cfg(not(rsa_version = "1"))]
+    constant_time: bool,
+
+    /// Search acceleration for modular exponentiation.
+    ///
+    /// Turning it on makes modular exponentiation faster by skipping the exponent's bits above
+    /// its most significant set bit, and exposes the exponent's length. Turn it on only for a
+    /// public exponent, such as when verifying a signature.
+    ///
+    /// Default value: `false`.
+    #[cfg(not(rsa_version = "1"))]
+    search_acceleration: bool,
+}
+
+#[cfg_attr(rsa_version = "1", expect(clippy::derivable_impls))]
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            #[cfg(not(rsa_version = "1"))]
+            constant_time: true,
+            #[cfg(not(rsa_version = "1"))]
+            search_acceleration: false,
+        }
+    }
+}
+
+/// RSA configuration error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConfigError {}
 
 // There are two distinct peripheral versions: ESP32, and all else. There is a naming split in the
 // later devices, and they use different (memory size, operand size increment) parameters, but they
@@ -112,11 +159,11 @@ impl Drop for RsaGuard {
 }
 
 impl<'d> Rsa<'d, Blocking> {
-    /// Creates a new instance in [Blocking] mode.
+    /// Creates a new instance in [Blocking] mode, with the given configuration.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(rsa: RSA<'d>) -> Self {
-        let this = Self {
+    pub fn new(rsa: RSA<'d>, config: Config) -> Result<Self, ConfigError> {
+        let mut this = Self {
             rsa,
             phantom: PhantomData,
             _guard: RsaGuard::new(),
@@ -124,7 +171,8 @@ impl<'d> Rsa<'d, Blocking> {
 
         while !this.ready() {}
 
-        this
+        this.apply_config(&config)?;
+        Ok(this)
     }
 
     /// Reconfigures the RSA driver to operate in asynchronous mode.
@@ -196,17 +244,27 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Starts the modular exponentiation operation.
     fn start_modexp(&self) {
-        low_level::start_modexp(self.regs());
+        self.start_operation(low_level::start_modexp);
     }
 
     /// Starts the multiplication operation.
     fn start_multi(&self) {
-        low_level::start_multi(self.regs());
+        self.start_operation(low_level::start_multi);
     }
 
     /// Starts the modular multiplication operation.
     fn start_modmulti(&self) {
-        low_level::start_modmulti(self.regs());
+        self.start_operation(low_level::start_modmulti);
+    }
+
+    fn start_operation(&self, start: impl FnOnce(&pac::rsa::RegisterBlock)) {
+        cfg_select! {
+            rsa_version = "1" => SIGNALED.with(|signaled| {
+                *signaled = false;
+                start(self.regs());
+            }),
+            _ => start(self.regs()),
+        }
     }
 
     /// Clears the RSA interrupt flag.
@@ -216,7 +274,12 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Returns whether the RSA peripheral is idle.
     fn is_idle(&self) -> bool {
-        low_level::is_idle(self.regs())
+        cfg_select! {
+            rsa_version = "1" => {
+                SIGNALED.with(|signaled| *signaled || low_level::is_idle(self.regs()))
+            }
+            _ => low_level::is_idle(self.regs()),
+        }
     }
 
     fn wait_for_idle(&mut self) {
@@ -304,39 +367,25 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
         self.read_out(outbuf);
     }
 
-    /// Enables or disables constant time operation.
+    /// Applies a new configuration.
     ///
-    /// Disabling constant time operation increases the performance of modular
-    /// exponentiation by simplifying the calculation concerning the 0 bits
-    /// of the exponent. I.e. the less the Hamming weight, the greater the
-    /// performance.
-    ///
-    /// Compromises security by enabling timing-based side-channel attacks.
-    ///
-    /// For more information refer to the
+    /// For more information on the options, refer to the
     #[doc = trm_markdown_link!("rsa")]
-    #[cfg(not(rsa_version = "1"))]
-    pub fn disable_constant_time(&mut self, disable: bool) {
-        self.regs()
-            .constant_time()
-            .write(|w| w.constant_time().bit(disable));
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.write_config(config);
+        Ok(())
     }
 
-    /// Enables or disables search acceleration.
-    ///
-    /// When enabled it would increase the performance of modular
-    /// exponentiation by discarding the exponent's bits before the most
-    /// significant set bit.
-    ///
-    /// Compromises security by effectively decreasing the key length.
-    ///
-    /// For more information refer to the
-    #[doc = trm_markdown_link!("rsa")]
-    #[cfg(not(rsa_version = "1"))]
-    pub fn search_acceleration(&mut self, enable: bool) {
-        self.regs()
-            .search_enable()
-            .write(|w| w.search_enable().bit(enable));
+    fn write_config(&mut self, _config: &Config) {
+        #[cfg(not(rsa_version = "1"))]
+        {
+            self.regs()
+                .constant_time()
+                .write(|w| w.constant_time().bit(_config.constant_time));
+            self.regs()
+                .search_enable()
+                .write(|w| w.search_enable().bit(_config.search_acceleration));
+        }
     }
 
     /// Returns whether the search functionality is enabled in the RSA hardware.
@@ -610,7 +659,7 @@ where
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 #[cfg(rsa_version = "1")]
-static SIGNALED: AtomicBool = AtomicBool::new(false);
+static SIGNALED: NonReentrantMutex<bool> = NonReentrantMutex::new(false);
 
 /// `Future` that waits for the RSA operation to complete.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -621,9 +670,6 @@ struct RsaFuture<'a, 'd> {
 
 impl<'a, 'd> RsaFuture<'a, 'd> {
     fn new(driver: &'a Rsa<'d, Async>) -> Self {
-        #[cfg(rsa_version = "1")]
-        SIGNALED.store(false, Ordering::Relaxed);
-
         driver.internal_enable_disable_interrupt(true);
 
         Self {
@@ -634,7 +680,7 @@ impl<'a, 'd> RsaFuture<'a, 'd> {
 
     fn is_done(&self) -> bool {
         cfg_select! {
-            rsa_version = "1" => SIGNALED.load(Ordering::Acquire),
+            rsa_version = "1" => SIGNALED.with(|signaled| *signaled),
             _ => self.driver.is_idle(),
         }
     }
@@ -733,10 +779,16 @@ where
 pub(super) fn rsa_interrupt_handler() {
     let rsa = RSA::regs();
 
-    #[cfg(rsa_version = "1")]
-    SIGNALED.store(true, Ordering::Release);
-
-    low_level::clear_interrupt(rsa);
+    cfg_select! {
+        rsa_version = "1" => SIGNALED.with(|signaled| {
+            // A blocking read may have already acknowledged this interrupt.
+            if low_level::is_idle(rsa) {
+                *signaled = true;
+                low_level::clear_interrupt(rsa);
+            }
+        }),
+        _ => low_level::clear_interrupt(rsa),
+    }
 
     WAKER.wake();
 }
@@ -857,6 +909,8 @@ impl<'d> RsaBackend<'d> {
     }
 
     fn process_item(&mut self, item: &mut RsaWorkItem) -> work_queue::Poll {
+        // Use `low_level` here. `Rsa::is_idle` and `Rsa::start_*` use `SIGNALED`, which only
+        // `rsa_interrupt_handler` updates.
         match core::mem::take(&mut self.state) {
             RsaBackendState::Idle => {
                 let driver = Rsa {
@@ -872,6 +926,7 @@ impl<'d> RsaBackend<'d> {
                 // instruct the work queue to wake the polling task immediately.
                 self.state = if rsa.ready() {
                     rsa.set_interrupt_handler(rsa_work_queue_handler);
+                    low_level::clear_interrupt(rsa.regs());
                     rsa.enable_disable_interrupt(true);
                     RsaBackendState::Ready(rsa)
                 } else {
@@ -880,11 +935,7 @@ impl<'d> RsaBackend<'d> {
                 work_queue::Poll::Pending(true)
             }
             RsaBackendState::Ready(mut rsa) => {
-                #[cfg(not(rsa_version = "1"))]
-                {
-                    rsa.disable_constant_time(!item.constant_time);
-                    rsa.search_acceleration(item.search_acceleration);
-                }
+                rsa.write_config(&item.config);
 
                 match item.operation {
                     RsaOperation::Multiplication { x, y } => {
@@ -894,7 +945,7 @@ impl<'d> RsaBackend<'d> {
                         // Non-modular multiplication result is twice as wide as its operands.
                         rsa.write_multi_mode(2 * n / WORDS_PER_INCREMENT - 1, false);
                         rsa.write_multi_operand_b(unsafe { y.as_ref() });
-                        rsa.start_multi();
+                        low_level::start_multi(rsa.regs());
                     }
 
                     RsaOperation::ModularMultiplication {
@@ -918,7 +969,7 @@ impl<'d> RsaBackend<'d> {
                         rsa.write_mprime(m_prime);
                         rsa.write_r(unsafe { r_inv.as_ref() });
 
-                        rsa.start_modmulti();
+                        low_level::start_modmulti(rsa.regs());
 
                         #[cfg(rsa_version = "1")]
                         {
@@ -946,7 +997,7 @@ impl<'d> RsaBackend<'d> {
                         rsa.write_r(unsafe { r_inv.as_ref() });
 
                         #[cfg(not(rsa_version = "1"))]
-                        if item.search_acceleration {
+                        if item.config.search_acceleration {
                             fn find_search_pos(exponent: &[u32]) -> u32 {
                                 for (i, byte) in exponent.iter().rev().enumerate() {
                                     if *byte == 0 {
@@ -961,7 +1012,7 @@ impl<'d> RsaBackend<'d> {
                             rsa.write_search_position(find_search_pos(unsafe { y.as_ref() }));
                         }
 
-                        rsa.start_modexp();
+                        low_level::start_modexp(rsa.regs());
                     }
                 }
 
@@ -972,14 +1023,16 @@ impl<'d> RsaBackend<'d> {
 
             #[cfg(rsa_version = "1")]
             RsaBackendState::ModularMultiplicationRoundOne(mut rsa) => {
-                if rsa.is_idle() {
+                if low_level::is_idle(rsa.regs()) {
                     let RsaOperation::ModularMultiplication { y, .. } = item.operation else {
                         unreachable!();
                     };
 
+                    low_level::clear_interrupt(rsa.regs());
+
                     // Y needs to be written to the X memory.
                     rsa.write_operand_a(unsafe { y.as_ref() });
-                    rsa.start_modmulti();
+                    low_level::start_modmulti(rsa.regs());
 
                     self.state = RsaBackendState::Processing(rsa);
                 } else {
@@ -990,7 +1043,8 @@ impl<'d> RsaBackend<'d> {
             }
 
             RsaBackendState::Processing(rsa) => {
-                if rsa.is_idle() {
+                if low_level::is_idle(rsa.regs()) {
+                    low_level::clear_interrupt(rsa.regs());
                     rsa.read_out(unsafe { item.result.as_mut() });
 
                     self.state = RsaBackendState::Ready(rsa);
@@ -1032,11 +1086,7 @@ impl<'t, 'd> RsaWorkQueueDriver<'t, 'd> {
 
 #[derive(Clone)]
 struct RsaWorkItem {
-    // Acceleration options
-    #[cfg(not(rsa_version = "1"))]
-    search_acceleration: bool,
-    #[cfg(not(rsa_version = "1"))]
-    constant_time: bool,
+    config: Config,
 
     // The operation to execute.
     operation: RsaOperation,
@@ -1075,11 +1125,9 @@ enum RsaOperation {
 #[handler]
 #[ram]
 fn rsa_work_queue_handler() {
-    if !RSA_WORK_QUEUE.process() {
-        // The queue may indicate that it needs to be polled again. In this case, we do not clear
-        // the interrupt bit, which causes the interrupt to be re-handled.
-        low_level::clear_interrupt(RSA::regs());
-    }
+    // Only `process_item` clears the interrupt. A clear here can drop the completion of the
+    // operation that `process` started.
+    RSA_WORK_QUEUE.process();
 }
 
 /// An RSA work queue user.
@@ -1110,10 +1158,7 @@ impl RsaContext {
     pub fn new() -> Self {
         Self {
             frontend: WorkQueueFrontend::new(RsaWorkItem {
-                #[cfg(not(rsa_version = "1"))]
-                search_acceleration: false,
-                #[cfg(not(rsa_version = "1"))]
-                constant_time: true,
+                config: Config::default(),
                 operation: RsaOperation::Multiplication {
                     x: NonNull::from(&[]),
                     y: NonNull::from(&[]),
@@ -1135,7 +1180,7 @@ impl RsaContext {
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
     pub fn enable_search_acceleration(&mut self) {
-        self.frontend.data_mut().search_acceleration = true;
+        self.frontend.data_mut().config.search_acceleration = true;
     }
 
     #[cfg(not(rsa_version = "1"))]
@@ -1151,7 +1196,7 @@ impl RsaContext {
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
     pub fn enable_acceleration(&mut self) {
-        self.frontend.data_mut().constant_time = false;
+        self.frontend.data_mut().config.constant_time = false;
     }
 
     fn post(&mut self) -> RsaHandle<'_> {

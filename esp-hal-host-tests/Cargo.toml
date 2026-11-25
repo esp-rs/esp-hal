@@ -1,0 +1,33 @@
+[package]
+name         = "esp-hal-host-tests"
+version      = "0.0.0"
+edition      = "2024"
+rust-version = "1.100.0"
+description  = "Host tests of esp-hal code that does not need hardware"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+publish      = false
+
+[package.metadata.espressif]
+needs-build-std = false
+forever-unstable = true
+changelog-exempt = true
+check-configs = [
+    { features = [] },
+]
+clippy-configs = []
+host-test-configs = [
+    { features = [] },
+    { features = [], miri = true },
+]
+
+[dev-dependencies]
+esp-hal = { package = "esp-hal-host-shim", path = "esp-hal-shim" }
+portable-atomic = { version = "1.11", default-features = false }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(kani)',
+    'cfg(sleep_light_sleep)',
+    'cfg(feature, values("rtos-trace"))',
+] }

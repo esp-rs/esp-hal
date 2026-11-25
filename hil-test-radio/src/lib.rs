@@ -1,10 +1,7 @@
 #![no_std]
 
-// By default, we don't want probe-rs to interfere with test timings by halting
-// cores and polling RTT. The tests don't produce output most of the time
-// anyway. The only cases where output can be interesting are: during
-// development, and when a test fails. In these cases, you can enable
-// the `defmt` feature to get the output.
+// The tests log through esp-log, on the serial port that probe-rs reads. Logging over the
+// serial port does not halt the cores, as RTT polling does.
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -22,8 +19,26 @@ unsafe impl defmt::Logger for Logger {
     unsafe fn write(_bytes: &[u8]) {}
 }
 
-#[cfg(feature = "defmt")]
-use defmt_rtt as _;
+#[cfg(feature = "log-serial")]
+#[doc(hidden)]
+pub use esp_log;
+
+/// Installs the logger on the USB-Serial-JTAG port, which probe-rs reads. Moves the fields it uses
+/// out of `$peripherals`.
+///
+/// The driver is unstable, so this does nothing unless the test enables `unstable`.
+#[macro_export]
+macro_rules! init_logger {
+    ($peripherals:expr) => {
+        #[cfg(all(feature = "log-serial", feature = "unstable"))]
+        $crate::init_logger!(@install $peripherals);
+        #[cfg(not(all(feature = "log-serial", feature = "unstable")))]
+        let _ = &$peripherals;
+    };
+    (@install $peripherals:expr) => {
+        $crate::esp_log::init_usb!($peripherals)
+    };
+}
 
 #[cfg(feature = "defmt")]
 #[macro_export]
@@ -37,6 +52,17 @@ macro_rules! assert_eq {
     ($($t:tt)*) => { defmt::assert_eq!($($t)*) }
 }
 
+#[cfg(feature = "defmt")]
+#[macro_export]
+macro_rules! assert_matches {
+    ($left:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?))
+    };
+    ($left:expr, $pattern:pat $(if $guard:expr)?, $($arg:tt)+) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?), $($arg)+)
+    };
+}
+
 #[cfg(not(feature = "defmt"))]
 #[macro_export]
 macro_rules! assert {
@@ -47,6 +73,12 @@ macro_rules! assert {
 #[macro_export]
 macro_rules! assert_eq {
     ($($t:tt)*) => { ::core::assert_eq!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! assert_matches {
+    ($($t:tt)*) => { ::core::assert_matches!($($t)*) }
 }
 
 /// Signal to the radio HIL runner that harness firmware is ready.
@@ -72,6 +104,27 @@ pub mod ieee802154 {
     pub const SUPPORT_ADDRESS: u16 = 0x2323;
     /// Payload the DUT transmits and the support firmware echoes back.
     pub const PAYLOAD: &[u8] = b"esp-radio 802.15.4 HIL";
+    /// Payload the support firmware echoes back in a frame that requests an ACK.
+    pub const PAYLOAD_ACKED: &[u8] = b"esp-radio 802.15.4 HIL, acked";
+}
+
+/// Shared parameters for the BLE L2CAP HIL test.
+///
+/// The `ble_peripheral_support` firmware sends the data and the device-under-test
+/// checks it.
+pub mod ble {
+    /// PSM of the L2CAP channel.
+    pub const L2CAP_PSM: u16 = 0x0081;
+    /// LE data length the support firmware sends with. The ESP32-C6 controller
+    /// splits received ACL packets with 189 to 194 data bytes over two mbufs.
+    pub const DATA_LENGTH: u16 = 191;
+    /// Number of bytes the support firmware sends.
+    pub const L2CAP_BYTES: usize = 8 * 1024;
+
+    /// Byte at `index` of the data the support firmware sends.
+    pub fn l2cap_byte(index: usize) -> u8 {
+        index as u8
+    }
 }
 
 #[macro_export]

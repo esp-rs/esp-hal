@@ -1,6 +1,6 @@
 //! Interrupt handling
 
-#[cfg(esp32)]
+#[cfg(any(feature = "unstable", esp32))]
 pub(crate) use xtensa_lx::interrupt::free;
 
 use crate::{
@@ -276,7 +276,7 @@ impl TryFrom<u8> for ElevatedRunLevel {
     }
 }
 
-pub(super) const DISABLED_CPU_INTERRUPT: u32 = 16;
+pub(crate) const DISABLED_CPU_INTERRUPT: u32 = 16;
 
 // CPU interrupt API. These don't take a core, because the control mechanisms are generally
 // core-local.
@@ -402,7 +402,7 @@ cfg_select! {
 /// # Safety
 ///
 /// Must be called only during core startup.
-#[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
+#[cfg(feature = "rt")]
 pub(crate) unsafe fn init_vectoring() {
     // Enable vectored interrupts. No configuration is needed because these interrupts have
     // fixed priority and trigger mode.
@@ -415,6 +415,8 @@ pub(crate) unsafe fn init_vectoring() {
     ] {
         cpu_int.enable();
     }
+    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
+    crate::soc::cache_livelock::enable_cpu_interrupt();
 }
 
 #[cfg(feature = "rt")]
@@ -529,10 +531,11 @@ pub(crate) mod rt {
             };
 
             let core = Cpu::current();
-            for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
-                crate::interrupt::should_handle(core, interrupt_nr as u32, LEVEL)
-            }) {
-                let handler = unsafe { crate::pac::__INTERRUPTS[interrupt_nr as usize]._handler };
+            for interrupt in status
+                .iterator()
+                .filter(|&interrupt| crate::interrupt::should_handle(core, interrupt as u32, LEVEL))
+            {
+                let handler = unsafe { crate::pac::__INTERRUPTS[interrupt as usize]._handler };
                 let handler: fn(&mut Context) = unsafe {
                     core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
                 };

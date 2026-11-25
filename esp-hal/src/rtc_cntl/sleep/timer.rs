@@ -43,6 +43,33 @@ pub(crate) fn clear_deadline() {
     disarm();
 }
 
+/// Moves the armed deadline to the slow clock period that a calibration just stored.
+///
+/// The comparator holds the deadline in ticks of `old_period`. The time until the deadline stays
+/// the same. A deadline that has passed keeps its value, because arming clears the status that
+/// reports it.
+pub(crate) fn rescale_deadline(old_period: u32) {
+    if !super::enabled_sources().contains(WakeupSource::Timer) {
+        return;
+    }
+
+    let target = target_ticks();
+    let now = crate::rtc_cntl::time_since_boot_raw();
+    if target <= now {
+        return;
+    }
+
+    // `remaining * old_period` can overflow, so the division comes first. The remainder is less
+    // than the period, so `r * old_period` does not overflow either.
+    let remaining = target - now;
+    let old_period = u64::from(old_period);
+    let new_period = u64::from(crate::clock::rtc_slow_cal_period());
+    let (q, r) = (remaining / new_period, remaining % new_period);
+    let scaled = q * old_period + r * old_period / new_period;
+
+    arm(now.saturating_add(scaled));
+}
+
 /// Returns whether the armed deadline is too near for the sleep transition to catch it.
 ///
 /// A deep sleep that misses the alarm does not wake. The transition is not rejected, and the
@@ -54,6 +81,7 @@ pub(crate) fn clear_deadline() {
 /// is readable on every chip, also where the alarm enable beside it is not readable. Only a caller
 /// that finds the timer source enabled calls this function, so the target always comes from this
 /// run.
+#[cfg(sleep_deep_sleep)]
 pub(crate) fn deadline_missed() -> bool {
     target_ticks() < crate::rtc_cntl::time_since_boot_raw() + ALARM_TO_SLEEP_TICKS
 }
@@ -151,7 +179,7 @@ fn target_ticks() -> u64 {
     let regs = RTC_TIMER::regs();
 
     let (low, high) = cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31) => (
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32h4, esp32p4, esp32s31) => (
             regs.tar0_low().read().main_timer_tar_low0().bits(),
             regs.tar0_high().read().main_timer_tar_high0().bits(),
         ),
@@ -183,7 +211,7 @@ fn arm(ticks: u64) {
     let regs = RTC_TIMER::regs();
 
     cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31) => {
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32h4, esp32p4, esp32s31) => {
             regs.int_clr().write(|w| w.soc_wakeup().clear_bit_by_one());
             regs.tar0_low()
                 .write(|w| unsafe { w.main_timer_tar_low0().bits(low) });
@@ -208,7 +236,7 @@ fn disarm() {
     let regs = RTC_TIMER::regs();
 
     cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31) => {
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32h4, esp32p4, esp32s31) => {
             regs.tar0_high()
                 .modify(|_, w| w.main_timer_tar_en0().clear_bit());
             regs.int_clr().write(|w| w.soc_wakeup().clear_bit_by_one());

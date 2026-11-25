@@ -557,17 +557,8 @@ fn configure_low_power_clk_impl(
 fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // TODO: these functions (peripheral bus clock control) should be generated,
     // replacing current PeripheralClockControl code.
-    // Enabling clock should probably not reset the peripheral.
-    let regs = SYSTEM::regs();
-
-    if en {
-        regs.perip_rst_en0()
-            .modify(|_, w| w.uart_mem_rst().bit(true));
-        regs.perip_rst_en0()
-            .modify(|_, w| w.uart_mem_rst().bit(false));
-    }
-
-    regs.perip_clk_en0()
+    SYSTEM::regs()
+        .perip_clk_en0()
         .modify(|_, w| w.uart_mem_clk_en().bit(en));
 }
 
@@ -591,6 +582,19 @@ fn configure_timg_calibration_clock_impl(
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });
+}
+
+impl AdcInstance {
+    // ADC_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::APB_SARADC::regs()
+            .clkm_conf()
+            .modify(|_, w| unsafe {
+                w.clk_en().bit(en);
+                w.clk_sel().bits(if en { 2 } else { 0 })
+            });
+    }
 }
 
 impl SdmInstance {

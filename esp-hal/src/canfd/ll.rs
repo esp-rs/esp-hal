@@ -630,11 +630,11 @@ impl Driver {
         debug_assert!(!self.is_enabled(), "mode may only change while disabled");
 
         self.r().mode_settings().modify(|_, w| {
-            // Listen-only needs `rom` and `acf` alongside `bmm` on the
+            // Listen-only needs `rom` alongside `bmm`, and `acf` too on the
             // ESP32-C5 (errata 0v2 issue 5, esp-idf#17461).
             w.bmm().bit(settings.listen_only);
             w.rom().bit(settings.listen_only);
-            w.acf().bit(settings.listen_only);
+            w.acf().bit(cfg!(esp32c5) && settings.listen_only);
             w.stm().bit(settings.self_test);
             w.ilbp().bit(settings.loopback);
             w.fde().bit(settings.fd_enabled);

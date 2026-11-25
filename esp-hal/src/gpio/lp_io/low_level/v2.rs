@@ -1,6 +1,6 @@
 use crate::{
-    gpio::{Level, LpPin, lp_io::LpFunction},
-    peripherals::{GPIO, LPWR, RTC_IO, SENS},
+    gpio::{GPIO_LOCK, Level, LpPin, lp_io::LpFunction},
+    peripherals::{GPIO, LPWR, RTC_IO},
 };
 
 #[rustfmt::skip]
@@ -90,11 +90,13 @@ for_each_lp_function! {
     // field by the low-power number.
     (LP_GPIOn $( (($_lp:ident, LP_GPIOn, $n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),*) => {
         pub(crate) fn pad_hold(lp: u8, enable: bool) {
-            LPWR::regs().pad_hold().modify(|_, w| {
-                match lp {
-                    $( $n => hold_field!(w, $gpio).bit(enable), )*
-                    _ => unreachable!(),
-                }
+            GPIO_LOCK.lock(|| {
+                LPWR::regs().pad_hold().modify(|_, w| {
+                    match lp {
+                        $( $n => hold_field!(w, $gpio).bit(enable), )*
+                        _ => unreachable!(),
+                    }
+                });
             });
         }
 
@@ -128,10 +130,12 @@ pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
     };
 
     let mask = 1 << bit;
-    LPWR::regs().dig_pad_hold().modify(|r, w| unsafe {
-        let bits = r.dig_pad_hold().bits();
-        w.dig_pad_hold()
-            .bits(if enable { bits | mask } else { bits & !mask })
+    GPIO_LOCK.lock(|| {
+        LPWR::regs().dig_pad_hold().modify(|r, w| unsafe {
+            let bits = r.dig_pad_hold().bits();
+            w.dig_pad_hold()
+                .bits(if enable { bits | mask } else { bits & !mask })
+        });
     });
 }
 
@@ -176,8 +180,7 @@ pub(crate) fn wakeup_status() -> u32 {
 pub(crate) fn wakeup_enabled_mask() -> u32 {
     let mut mask = 0;
     let mut pads = ALL_PADS;
-    while pads != 0 {
-        let lp = pads.trailing_zeros();
+    while let Some(lp) = pads.lowest_one() {
         pads &= !(1 << lp);
 
         if RTC_IO::regs()
@@ -279,14 +282,13 @@ pub(crate) fn reset_pin(lp: u8) {
 fn enable_iomux_clk_gate() {
     cfg_select! {
         esp32s2 => {
-            SENS::regs()
+            crate::peripherals::SENS::regs()
                 .sar_io_mux_conf()
                 .modify(|_, w| w.iomux_clk_gate_en().set_bit());
         }
-        esp32s3 => {
-            SENS::regs()
-                .sar_peri_clk_gate_conf()
-                .modify(|_, w| w.iomux_clk_en().set_bit());
-        }
+        esp32s3 => crate::system::PeripheralClockControl::set_enabled_untracked(
+            crate::system::Peripheral::RtcIoMux,
+            true,
+        ),
     }
 }

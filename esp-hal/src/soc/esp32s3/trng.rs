@@ -1,7 +1,5 @@
 use crate::soc::regi2c;
 
-const SYSTEM_WIFI_CLK_RNG_EN: u32 = 1 << 15;
-
 /// Enables true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
@@ -12,13 +10,7 @@ pub(crate) fn ensure_randomness() {
         let sens = crate::peripherals::SENS::regs();
         let syscon = crate::peripherals::APB_CTRL::regs();
 
-        // `wifi_clk_en` register is defined in a really weird way, for now just simple
-        // bit edit
-        syscon.wifi_clk_en().modify(|r, w| {
-            let current_bits = r.bits();
-            let new_bits = current_bits | SYSTEM_WIFI_CLK_RNG_EN;
-            w.bits(new_bits)
-        });
+        syscon.wifi_clk_en().modify(|_, w| w.rng_clk_en().set_bit());
 
         // Enable 8M clock source for RNG (this is actually enough to produce strong
         // random results, but enabling the SAR ADC as well adds some insurance.)
@@ -27,14 +19,19 @@ pub(crate) fn ensure_randomness() {
             .modify(|_, w| w.dig_clk8m_en().set_bit());
 
         // Enable SAR ADC to read a disconnected input for additional entropy
-        // Reset ADC clock
         system
             .perip_clk_en0()
             .modify(|_, w| w.apb_saradc_clk_en().set_bit());
 
         system
-            .perip_clk_en0()
-            .modify(|_, w| w.apb_saradc_clk_en().clear_bit());
+            .perip_rst_en0()
+            .modify(|_, w| w.apb_saradc_rst().clear_bit());
+
+        // SAR I2C must be powered before ADC sampling starts.
+        regi2c::ADC_SAR1_ENCAL_REF.write_field(1);
+        regi2c::ADC_SAR_ENT_TSENS.write_field(1);
+        regi2c::ADC_SAR_ENT_RTC.write_field(1);
+        regi2c::ADC_SAR_DTEST_RTC.write_field(1);
 
         apb_saradc.clkm_conf().modify(|_, w| w.clk_sel().bits(2));
         apb_saradc.ctrl().modify(|_, w| w.sar_clk_gated().set_bit());
@@ -85,11 +82,6 @@ pub(crate) fn ensure_randomness() {
 
         apb_saradc.ctrl2().modify(|_, w| w.timer_sel().set_bit());
         apb_saradc.ctrl2().modify(|_, w| w.timer_en().set_bit());
-
-        regi2c::ADC_SAR1_ENCAL_REF.write_field(1);
-        regi2c::ADC_SAR_ENT_TSENS.write_field(1);
-        regi2c::ADC_SAR_ENT_RTC.write_field(1);
-        regi2c::ADC_SAR_DTEST_RTC.write_field(1);
     }
 }
 

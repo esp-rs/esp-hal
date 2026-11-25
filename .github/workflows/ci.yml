@@ -13,7 +13,12 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+    # No `labeled`/`unlabeled`: a label change would rebuild everything and
+    # cancel the run in progress. `calculate` reads labels live instead, so
+    # "Re-run all jobs" picks up labels added after the run started.
+    # Re-run after removing `skip-ci-non-code-change`: the merge queue does not
+    # run `esp-hal` or `xtensa-lld`, so a stale green run would skip them.
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
 
@@ -22,6 +27,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   DEFMT_LOG: trace
   PROBE_RS_CONFIG_PRESET: local-hil
+  ESP_GENERATE_VERSION: v2.0.0
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -36,8 +42,7 @@ jobs:
   # jobs and reusable workflows run.  Every other job/workflow in this file
   # gates on `calculate` outputs.
   # Draft PRs run no CI at all: every other job needs `calculate`, so skipping
-  # it skips them too. Closed and merged PRs are skipped the same way, since
-  # label events fire on them as well.
+  # it skips them too. Closed and merged PRs are skipped the same way.
   calculate:
     if: >
       !github.event.pull_request.draft &&
@@ -52,7 +57,6 @@ jobs:
       run-msrv: ${{ steps.decide.outputs.run-msrv }}
       run-host-tests: ${{ steps.decide.outputs.run-host-tests }}
       run-hil: ${{ steps.decide.outputs.run-hil }}
-      run-changelog: ${{ steps.decide.outputs.run-changelog }}
       run-semver-check: ${{ steps.decide.outputs.run-semver-check }}
     steps:
       - uses: actions/checkout@v6
@@ -61,12 +65,14 @@ jobs:
         id: labels
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_GROUP_REF: ${{ github.event.merge_group.head_ref }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
-            LABELS=$(printf "%b" "${{ join(github.event.pull_request.labels.*.name, '\n') }}")
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Not the event payload: a re-run reuses it, labels and all.
+            LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels --jq '.labels[].name')
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            COMMIT_MSG=$(git log -1 --pretty=%B)
-            PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*" || true)
+            # The queue ref is `refs/heads/gh-readonly-queue/<base>/pr-<number>-<sha>`.
+            PR_NUMBER=$(echo "$MERGE_GROUP_REF" | { grep -oP '(?<=/pr-)[0-9]+(?=-)' || true; })
             if [ -n "$PR_NUMBER" ]; then
               LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>/dev/null || true)
             fi
@@ -93,7 +99,7 @@ jobs:
           LABELS: ${{ steps.labels.outputs.labels }}
         run: |
           BUILD=true; DOCS=true; MSRV=true; HOST=true
-          CHANGELOG=true; SEMVER=true
+          SEMVER=true
           HIL=false
 
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
@@ -108,7 +114,6 @@ jobs:
             HIL=false
           fi
           if echo "$LABELS" | grep -qw 'skip-semver-checks'; then SEMVER=false; fi
-          if echo "$LABELS" | grep -qw 'skip-changelog'; then CHANGELOG=false; fi
 
           for pair in \
             "run-build=$BUILD" \
@@ -116,12 +121,11 @@ jobs:
             "run-msrv=$MSRV" \
             "run-host-tests=$HOST" \
             "run-hil=$HIL" \
-            "run-changelog=$CHANGELOG" \
             "run-semver-check=$SEMVER"; do
             echo "$pair" >> "$GITHUB_OUTPUT"
           done
 
-          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST hil=$HIL changelog=$CHANGELOG semver=$SEMVER"
+          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST hil=$HIL semver=$SEMVER"
 
   # Merge freeze — see documentation/CONTRIBUTING.md.
   #
@@ -416,6 +420,7 @@ jobs:
             extras/bench-server -> target
             extras/esp-wifishark -> target
             extras/ieee802154-sniffer -> target
+            extras/usb-serial-jtag-host -> target
 
       # Run xtask tests
       - name: Run xtask tests
@@ -440,11 +445,13 @@ jobs:
           args: >
             esp-alloc
             esp-backtrace
+            esp-bootloader-direct-boot
             esp-bootloader-esp-idf
             esp-config
             esp-hal
             esp-hal-procmacros
             esp-lp-hal
+            esp-log
             esp-metadata
             esp-phy
             esp-println
@@ -470,6 +477,57 @@ jobs:
         run: cd extras/esp-wifishark && cargo build
       - name: Build ieee802154-sniffer
         run: cd extras/ieee802154-sniffer && cargo build
+      - name: Build usb-serial-jtag-host
+        run: cd extras/usb-serial-jtag-host && cargo build
+
+  # --------------------------------------------------------------------------
+  # Check that the esp-generate template in `template/` renders and builds
+  # against this commit
+
+  template:
+    needs: calculate
+    if: needs.calculate.outputs.run-build == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      TEMPLATE_SWEEP: >-
+        --exclude-category toolchain
+        --cross-group base-template
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-toolchains
+        with:
+          xtensa: "true"
+          xtensa-buildtargets: esp32s3
+          riscv: "true"
+
+      - name: Install nightly for stack-smashing-protection
+        uses: ./.github/actions/setup-nightly
+        with:
+          targets: riscv32imac-unknown-none-elf
+          components: rust-src, clippy, rustfmt
+          alias: "true"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install esp-generate
+        run: |
+          mkdir -p "$RUNNER_TEMP/esp-generate"
+          gh release download "$ESP_GENERATE_VERSION" --repo esp-rs/esp-generate \
+            --pattern esp-generate-x86_64-unknown-linux-gnu \
+            --output "$RUNNER_TEMP/esp-generate/esp-generate"
+          chmod +x "$RUNNER_TEMP/esp-generate/esp-generate"
+          echo "$RUNNER_TEMP/esp-generate" >> "$GITHUB_PATH"
+
+      - name: Render the esp-generate template for every chip
+        run: esp-generate --template template check
+
+      - name: Build the esp-generate template (RISC-V)
+        run: esp-generate --template template check -o esp32c6 $TEMPLATE_SWEEP --build
+
+      - name: Build the esp-generate template (Xtensa)
+        run: esp-generate --template template check -o esp32s3 $TEMPLATE_SWEEP --build
 
   # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files
@@ -500,17 +558,6 @@ jobs:
   # --------------------------------------------------------------------------
   # Reusable workflow calls — gated by calculate outputs
 
-  changelog:
-    needs: calculate
-    if: >
-      github.event_name == 'pull_request' &&
-      !github.event.pull_request.draft &&
-      needs.calculate.outputs.run-changelog == 'true'
-    uses: ./.github/workflows/changelog.yml
-    with:
-      pr-number: ${{ github.event.pull_request.number }}
-    secrets: inherit
-
   semver-check:
     needs: calculate
     if: needs.calculate.outputs.run-semver-check == 'true'
@@ -536,7 +583,8 @@ jobs:
   # --------------------------------------------------------------------------
   # Gate job for branch protection
   #
-  # Branch protection should require this single job instead of individual jobs.
+  # Branch protection should require this job instead of individual jobs, plus
+  # `changelog` from changelog.yml.
   # Skipped jobs (due to calculate outputs) are treated as success.
   # Failed or cancelled jobs cause this gate to fail.
   #
@@ -556,7 +604,7 @@ jobs:
       - msrv
       - xtensa-lld
       - host-tests
-      - changelog
+      - template
       - semver-check
       - hil
       - merge-freeze-gate

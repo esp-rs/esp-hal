@@ -53,6 +53,12 @@ use clocks::RtcSlowClkConfig;
 use clocks::TimgFunctionClockConfig;
 
 pub(crate) mod dividers;
+mod idle;
+
+#[instability::unstable]
+pub use idle::CpuFrequencyLock;
+#[cfg(idle_frequency_scaling)]
+pub(crate) use idle::wait_for_interrupt;
 
 /// # Low-level clock control
 ///
@@ -213,6 +219,8 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
             clocks::McpwmInstance::Mcpwm1.configure_function_clock(clocks, Default::default());
         }
         // Until we have every clock consumer modelled, we should manually keep clocks alive
+        #[cfg(esp32s31)]
+        clocks::request_flash_clock_source(clocks);
         #[cfg(soc_has_clock_node_rc_fast_clk)]
         clocks::request_rc_fast_clk(clocks);
         #[cfg(soc_has_clock_node_rc_slow_clk)]
@@ -231,6 +239,11 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
         clocks::request_rc_fast_div_clk(clocks);
         #[cfg(soc_has_clock_node_rtc_slow_clk)]
         clocks::request_rtc_slow_clk(clocks);
+        // esp-println writes to UART0's FIFO without a driver, and the UARTs share this memory.
+        // esp-println is deprecated, but this stays as long as esp-println is supported, see
+        // https://github.com/esp-rs/esp-hal/issues/6860.
+        #[cfg(soc_has_clock_node_uart_mem_clk)]
+        clocks::request_uart_mem_clk(clocks);
     });
 
     calibrate_rtc_slow_clock();
@@ -365,11 +378,32 @@ impl RtcClock {
             });
         }
 
-        TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_max().bits(calibration_cycles as u16);
-            w.rtc_cali_start_cycling().clear_bit();
-            w.rtc_cali_start().set_bit()
-        });
+        let start_calibration = || {
+            TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
+                w.rtc_cali_max().bits(calibration_cycles as u16);
+                w.rtc_cali_start_cycling().clear_bit();
+                w.rtc_cali_start().set_bit()
+            })
+        };
+        start_calibration();
+
+        // After some resets the timeout flag is already set when the calibration starts, before
+        // any cycle could be counted. Restarting the calibration clears it.
+        #[cfg(not(esp32))]
+        for _ in 0..3 {
+            if TIMG0::regs()
+                .rtccalicfg2()
+                .read()
+                .rtc_cali_timeout()
+                .bit_is_clear()
+            {
+                break;
+            }
+            TIMG0::regs()
+                .rtccalicfg()
+                .modify(|_, w| w.rtc_cali_start().clear_bit());
+            start_calibration();
+        }
 
         // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
         // waiting.
@@ -452,7 +486,7 @@ impl RtcClock {
 }
 
 #[cfg(not(soc_has_clock_node_timg_calibration_clock))]
-fn calibrate_rtc_slow_clock() {
+pub(crate) fn calibrate_rtc_slow_clock() {
     // Do nothing until TIMG_CALIBRATION_CLOCK is added to device metadata.
 }
 
@@ -510,7 +544,22 @@ pub(crate) fn calibrate_rtc_slow_clock() {
         _ => LP_AON::regs().store1(),
     };
 
+    // The RTC time is the boot time plus the ticks since power-up multiplied by this period. The
+    // boot time takes the difference, so a new period does not move the RTC time.
+    #[cfg(lp_timer_driver_supported)]
+    let ticks = crate::rtc_cntl::time_since_boot_raw();
+    #[cfg(lp_timer_driver_supported)]
+    let old_us = rtc_ticks_to_us(ticks);
+
     reg.write(|w| unsafe { w.bits(cal_val) });
+
+    // A period of 0 is not a calibration yet, for example after a power-on reset.
+    #[cfg(lp_timer_driver_supported)]
+    if old_us != 0 {
+        let new_us = rtc_ticks_to_us(ticks);
+        let boot_time_us = crate::rtc_cntl::boot_time_us();
+        crate::rtc_cntl::set_boot_time_us(boot_time_us.wrapping_add(old_us).wrapping_sub(new_us));
+    }
 
     if rc_slow_selected {
         let frequency = ((1_000_000u64 << RtcClock::CAL_FRACT) / cal_val as u64) as u32;

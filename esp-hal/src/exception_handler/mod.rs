@@ -92,6 +92,17 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
         }
     }
 
+    #[cfg(fpu_disabled_in_interrupts)]
+    if code == 2
+        && riscv::register::mstatus::read().fs() == riscv::register::mstatus::FS::Off
+        && is_fpu_instruction(mtval)
+    {
+        panic!(
+            "[{:?}] Floating-point instruction in an interrupt handler at 0x{:08x}. Enable the `float-save-restore` feature of `esp-hal` to use floating-point code in interrupt handlers.\n{:?}",
+            core, mepc, context
+        );
+    }
+
     let code_str = match code {
         0 => "Instruction address misaligned",
         1 => "Instruction access fault",
@@ -118,4 +129,23 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
         "[{:?}] Exception '{} ({:x})' mepc=0x{:08x}, mtval=0x{:08x}\n{:?}",
         core, code_str, code, mepc, mtval, context
     );
+}
+
+/// Returns whether `instruction` reads or writes FPU state.
+///
+/// On an illegal instruction exception, `mtval` contains the instruction.
+#[cfg(fpu_disabled_in_interrupts)]
+fn is_fpu_instruction(instruction: usize) -> bool {
+    // C.FLW, C.FSW, C.FLWSP and C.FSWSP
+    if instruction & 0b11 != 0b11 {
+        return instruction & 0b01 == 0 && (instruction >> 13) & 0b011 == 0b011;
+    }
+
+    match instruction & 0x7f {
+        // FLW, FSW, FMADD, FMSUB, FNMSUB, FNMADD and OP-FP
+        0x07 | 0x27 | 0x43 | 0x47 | 0x4b | 0x4f | 0x53 => true,
+        // CSR access to `fflags`, `frm` or `fcsr`
+        0x73 => (instruction >> 12) & 0b111 != 0 && matches!(instruction >> 20, 1..=3),
+        _ => false,
+    }
 }

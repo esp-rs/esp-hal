@@ -23,6 +23,15 @@ pub struct AesKeyLength {
 }
 
 impl GenericProperty for AesKeyLength {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        Some(
+            self.options
+                .iter()
+                .map(|opt| format!("aes_key_length_{}", opt.bits))
+                .collect(),
+        )
+    }
+
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
         let bits = self
             .options

@@ -42,6 +42,14 @@ unsafe extern "C" {
 
 global_asm!(
     "
+    // LLVM does not emit `.xtensa.info`. Without an input `.xtensa.info`, GNU ld crashes in
+    // `NOCROSSREFS` checks.
+    .section .xtensa.info,\"\",@note
+    .4byte 12, 32, 1
+    .asciz \"Xtensa_Info\"
+    .ascii \"USE_ABSOLUTE_LITERALS=0\\nABI=0\\n\"
+    .2byte 0
+
     .section .rwtext,\"ax\",@progbits
     .literal sym__pre_init, {__pre_init}
     .literal sym__post_init, {__post_init}

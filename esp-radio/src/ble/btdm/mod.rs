@@ -9,7 +9,8 @@ use super::{Config, ReceivedPacket};
 use crate::sys::include;
 use crate::{
     asynch::AtomicWaker,
-    compat::common::str_from_c,
+    compat::common::{str_from_c, task_core},
+    counting_lock::CountingLock,
     hal::ram,
     sys::{c_types::*, include::*},
 };
@@ -19,7 +20,12 @@ use crate::{
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod chip_specific;
 
+#[cfg(modem_retention = "backup_dma")]
+mod mac_bb;
+
 use chip_specific::{G_OSI_FUNCS, osi_funcs_s};
+#[cfg(modem_retention = "backup_dma")]
+pub(super) use mac_bb::{power_down as power_down_mac_bb, power_up as power_up_mac_bb};
 
 pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
     unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
@@ -92,29 +98,18 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-static CRITICAL_NEST: AtomicU32 = AtomicU32::new(0);
-static CRITICAL_TOKEN: AtomicU32 = AtomicU32::new(0);
+static CRITICAL: CountingLock = CountingLock::new();
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {
     trace!("interrupt_enable");
-    if CRITICAL_NEST.fetch_sub(1, Ordering::Release) == 1 {
-        let last = CRITICAL_TOKEN.load(Ordering::Relaxed);
-
-        unsafe {
-            super::ESP_RADIO_LOCK.release(esp_sync::RestoreState::new(last));
-        }
-    }
+    unsafe { CRITICAL.release() };
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    let last = CRITICAL_NEST.fetch_add(1, Ordering::Release);
-    if last == 0 {
-        let token = unsafe { super::ESP_RADIO_LOCK.acquire().inner() };
-        CRITICAL_TOKEN.store(token, Ordering::Relaxed);
-    }
+    unsafe { CRITICAL.acquire() };
 }
 
 #[ram]
@@ -167,7 +162,7 @@ unsafe extern "C" fn task_create(
             task_func,
             param,
             prio,
-            if core_id < 2 { Some(core_id) } else { None },
+            Some(task_core(core_id)),
             stack_depth as usize,
         );
         *(handle as *mut usize) = task.as_ptr() as usize;
@@ -310,7 +305,22 @@ unsafe extern "C" fn btdm_sleep_enter_phase1(lpcycles: i32) {
         esp32 => lp_time,
         _ => lp_time >> 1,
     };
-    let uncertainty = (us_to_sleep >> 11).max(MIN_UNCERTAINTY_US);
+    let uncertainty = cfg_select! {
+        esp32 => us_to_sleep >> 11,
+        _ => {
+            // When either the controller sleep clock or the RTC wakeup timer runs
+            // on an RC oscillator, allow a 7% drift margin.
+            if super::lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source)
+                || super::lp_clk::source_is_rc(esp_hal::clock::ll::rtc_slow_clk_root_source)
+            {
+                const RC_DRIFT_PERCENT: u64 = 7;
+                (u64::from(us_to_sleep) * RC_DRIFT_PERCENT / 100) as u32
+            } else {
+                us_to_sleep >> 11
+            }
+        }
+    };
+    let uncertainty = uncertainty.max(MIN_UNCERTAINTY_US);
     let now = esp_hal::time::Instant::now()
         .duration_since_epoch()
         .as_micros();
@@ -330,6 +340,8 @@ pub(super) fn time_until_controller_wakes() -> esp_hal::time::Duration {
 }
 
 unsafe extern "C" fn btdm_sleep_enter_phase2() {
+    #[cfg(modem_retention = "backup_dma")]
+    mac_bb::controller_sleeps();
     if super::modem_sleep_enabled() {
         super::modem_phy_release();
     }
@@ -354,6 +366,9 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
         }
         _ => {
             let _ = phy_restored;
+            if super::lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source) {
+                LP_CYCLE_US.store(super::lp_clk::btdm_lpcycle_us(), Ordering::Relaxed);
+            }
             unsafe { while btdm_sleep_clock_sync() != 0 {} }
         }
     }
@@ -451,6 +466,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         chip_specific::disable_sleep_mode();
 
+        #[cfg(modem_retention = "backup_dma")]
+        mac_bb::init(config.modem_sleep() && super::lp_clk::light_sleep_supported());
+
         let res = btdm_controller_init(
             #[cfg(esp32)]
             {
@@ -512,6 +530,9 @@ pub(crate) fn ble_deinit() {
     unsafe {
         btdm_controller_deinit();
     }
+
+    #[cfg(modem_retention = "backup_dma")]
+    mac_bb::deinit();
 
     super::lp_clk::release();
     // Disabling the PHY happens automatically, when the BLEController gets dropped.

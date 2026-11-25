@@ -63,7 +63,6 @@ fn read_one(wait_cycles: usize) -> u32 {
                 *last_wait_start = now;
 
                 cfg_select! {
-                    any(esp32c5, esp32c61) => Some(RNG::regs().rng_data_sync().read().bits()),
                     rng_is_lp_sys => Some(RNG::regs().rng_data().read().bits()),
                     esp32s31 => Some(RNG::regs().crc_sync_data().read().bits()),
                     _ => Some(RNG::regs().data().read().bits()),
@@ -79,6 +78,10 @@ fn read_one(wait_cycles: usize) -> u32 {
 }
 
 pub(super) fn fill_ptr_range(data: *mut u8, len: usize) {
+    // The RNG gets entropy on each APB_CLK cycle. The wait time assumes the nominal frequency.
+    #[cfg(soc_has_apb_frequency_reduction)]
+    clocks::ClockTree::with(clocks::request_apb_clk);
+
     let cpu_to_apb_freq_ratio = clocks::cpu_clk_frequency() / clocks::apb_clk_frequency();
     let wait_cycles = cpu_to_apb_freq_ratio as usize * property!("rng.apb_cycle_wait_num");
 
@@ -93,4 +96,7 @@ pub(super) fn fill_ptr_range(data: *mut u8, len: usize) {
         }
         remaining -= bytes_to_copy;
     }
+
+    #[cfg(soc_has_apb_frequency_reduction)]
+    clocks::ClockTree::with(clocks::release_apb_clk);
 }

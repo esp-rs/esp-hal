@@ -529,6 +529,15 @@ pub unsafe fn wake_pin(pin: u8) {
 }
 
 for_each_analog_function! {
+    (($_ch:ident, DACn, $_n:literal), $gpio:ident) => {
+        #[cfg(dac_version = "2")]
+        #[instability::unstable]
+        impl $crate::gpio::AnalogPin for crate::peripherals::$gpio<'_> {
+            fn set_analog(&self, _: private::Internal) {
+                lp_io::low_level::init_analog(self.lp_number());
+            }
+        }
+    };
     (($_ch:ident, ADCn_CHm, $_n:literal, $_m:literal), $gpio:ident) => {
         #[instability::unstable]
         impl $crate::gpio::AnalogPin for crate::peripherals::$gpio<'_> {
@@ -1622,65 +1631,7 @@ impl<'lt> AnyPin<'lt> {
 
     pub(crate) fn disable_usb_pads(&self) {
         #[cfg(soc_has_usb_device)]
-        {
-            /// Workaround to make D+ and D- work when the pin is assigned to
-            /// the `USB_SERIAL_JTAG` peripheral by default.
-            fn disable_usb_pads(_gpionum: u8) {
-                crate::peripherals::USB_DEVICE::regs()
-                    .conf0()
-                    .modify(|_, w| {
-                        w.usb_pad_enable().clear_bit();
-                        w.dm_pullup().clear_bit();
-                        w.dm_pulldown().clear_bit();
-                        w.dp_pullup().clear_bit();
-                        w.dp_pulldown().clear_bit()
-                    });
-            }
-
-            #[cfg(any(esp32h4, esp32p4))]
-            fn disable_usb_fs_pads(_gpionum: u8) {
-                crate::peripherals::USB_WRAP::regs()
-                    .otg_conf()
-                    .modify(|_, w| {
-                        w.pad_pull_override().set_bit();
-                        w.dm_pullup().clear_bit();
-                        w.dm_pulldown().clear_bit();
-                        w.dp_pullup().clear_bit();
-                        w.dp_pulldown().clear_bit()
-                    });
-            }
-
-            #[cfg(soc_has_usb_fs)]
-            macro_rules! disable_usb_fs_pads {
-                ($gpio:ident) => {
-                    if self.number() == crate::peripherals::$gpio::NUMBER {
-                        cfg_select! {
-                            any(esp32h4, esp32p4) => {
-                                disable_usb_fs_pads(crate::peripherals::$gpio::NUMBER);
-                            }
-                            _ => {
-                                disable_usb_pads(crate::peripherals::$gpio::NUMBER);
-                            }
-                        }
-                    }
-                };
-            }
-
-            for_each_analog_function! {
-                (USJ_DM, $gpio:ident) => {
-                    if self.number() == crate::peripherals::$gpio::NUMBER {
-                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
-                    }
-                };
-                (USJ_DP, $gpio:ident) => {
-                    if self.number() == crate::peripherals::$gpio::NUMBER {
-                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
-                    }
-                };
-                (USB_FS_DM, $gpio:ident) => { disable_usb_fs_pads!($gpio) };
-                (USB_FS_DP, $gpio:ident) => { disable_usb_fs_pads!($gpio) };
-            }
-        }
+        crate::soc::usb_phy::release_pad(self.number());
     }
 
     /// Takes or releases the hold of the pad.
@@ -1693,13 +1644,11 @@ impl<'lt> AnyPin<'lt> {
     /// other pad has a bit in a register of the digital pads.
     #[cfg(lp_io_driver_supported)]
     pub(crate) fn set_pad_hold(&self, enable: bool) {
-        GPIO_LOCK.lock(|| {
-            if let Some(lp) = lp_io::lp_number(self.number()) {
-                lp_io::low_level::pad_hold(lp, enable);
-            } else {
-                lp_io::low_level::digital_pad_hold(self.number(), enable);
-            }
-        })
+        if let Some(lp) = lp_io::lp_number(self.number()) {
+            lp_io::low_level::pad_hold(lp, enable);
+        } else {
+            lp_io::low_level::digital_pad_hold(self.number(), enable);
+        }
     }
 
     /// Returns whether something holds the pad.
@@ -2295,6 +2244,25 @@ for_each_gpio! {
 }
 
 define_io_mux_reg!();
+
+/// Switches every pin whose IO MUX function outputs `signal` back to GPIO.
+///
+/// The boot ROM leaves UART0's default pins on their IO MUX function. Without this, UART0 would
+/// keep driving them next to the pin the driver routes through the GPIO matrix.
+pub(crate) fn disconnect_io_mux_output(signal: OutputSignal) {
+    for_each_gpio! {
+        ($n:literal, $gpio:ident $inputs:tt ($( $af_output_num:ident => $af_output_signal:ident )*) $attrs:tt) => {
+            $(
+                if signal == OutputSignal::$af_output_signal {
+                    let reg = io_mux_reg($n);
+                    if reg.read().mcu_sel().bits() == AlternateFunction::$af_output_num as u8 {
+                        reg.modify(|_, w| unsafe { w.mcu_sel().bits(AlternateFunction::GPIO as u8) });
+                    }
+                }
+            )*
+        };
+    }
+}
 
 // documentation only - renders nicer than the blanket implementation, but
 // doesn't prevent generic code from working.

@@ -6,6 +6,9 @@
 //! - ESP32-S2/S3:
 //!   - DP => GPIO20
 //!   - DM => GPIO19
+//! - ESP32-H4:
+//!   - DP => GPIO22
+//!   - DM => GPIO21
 //! - ESP32-P4:
 //!   - DP => GPIO27
 //!   - DM => GPIO26
@@ -35,19 +38,21 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    #[cfg(not(feature = "esp32p4"))]
-    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
-
-    #[cfg(feature = "esp32p4")]
-    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO27, peripherals.GPIO26);
+    let (dp, dm) = cfg_select! {
+        feature = "esp32h4" => (peripherals.GPIO22, peripherals.GPIO21),
+        feature = "esp32p4" => (peripherals.GPIO27, peripherals.GPIO26),
+        _ => (peripherals.GPIO20, peripherals.GPIO19),
+    };
+    let usb = Usb::new_fs(peripherals.USB_FS, dp, dm);
 
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 1024];
@@ -91,9 +96,9 @@ async fn main(_spawner: Spawner) {
     let echo_fut = async {
         loop {
             class.wait_connection().await;
-            esp_println::println!("Connected");
+            log::info!("Connected");
             let _ = echo(&mut class).await;
-            esp_println::println!("Disconnected");
+            log::info!("Disconnected");
         }
     };
 

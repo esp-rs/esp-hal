@@ -1,4 +1,4 @@
-//! The low-power path of esp32c5, esp32c6, esp32c61 and esp32h2.
+//! The low-power path of esp32c5, esp32c6, esp32c61, esp32h2 and esp32h4.
 //!
 //! On these chips, `ext1` has one level per pad, covers every low-power pad, and does not increase
 //! the sleep current. There is thus nothing to compare, and every pin goes to `ext1`. These chips
@@ -49,14 +49,7 @@ pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
         return false;
     };
 
-    cause.contains(WakeupSource::Ext1)
-        && LP_AON::regs()
-            .ext_wakeup_cntl()
-            .read()
-            .ext_wakeup_status()
-            .bits()
-            & (1 << lp)
-            != 0
+    cause.contains(WakeupSource::Ext1) && ext1_status() & (1 << lp) != 0
 }
 
 /// Releases the pads that the previous run armed for a deep sleep.
@@ -76,13 +69,44 @@ pub(super) fn wake_io_reset() {
     }
 }
 
-fn write_ext1(pads: u8, levels: u8) {
-    LP_AON::regs()
-        .ext_wakeup_cntl()
-        .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
-    LP_AON::regs().ext_wakeup_cntl().modify(|_, w| unsafe {
-        w.ext_wakeup_status_clr().clear_bit();
-        w.ext_wakeup_sel().bits(pads);
-        w.ext_wakeup_lv().bits(levels)
-    });
+fn ext1_status() -> u16 {
+    cfg_select! {
+        esp32h4 => LP_AON::regs()
+            .ext_wakeup_cntl1()
+            .read()
+            .ext_wakeup_status()
+            .bits(),
+        _ => LP_AON::regs()
+            .ext_wakeup_cntl()
+            .read()
+            .ext_wakeup_status()
+            .bits() as u16,
+    }
+}
+
+fn write_ext1(pads: u16, levels: u16) {
+    cfg_select! {
+        esp32h4 => {
+            LP_AON::regs()
+                .ext_wakeup_cntl1()
+                .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
+            LP_AON::regs()
+                .ext_wakeup_cntl1()
+                .modify(|_, w| w.ext_wakeup_status_clr().clear_bit());
+            LP_AON::regs().ext_wakeup_cntl().modify(|_, w| unsafe {
+                w.ext_wakeup_sel().bits(pads);
+                w.ext_wakeup_lv().bits(levels)
+            });
+        }
+        _ => {
+            LP_AON::regs()
+                .ext_wakeup_cntl()
+                .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
+            LP_AON::regs().ext_wakeup_cntl().modify(|_, w| unsafe {
+                w.ext_wakeup_status_clr().clear_bit();
+                w.ext_wakeup_sel().bits(pads as u8);
+                w.ext_wakeup_lv().bits(levels as u8)
+            });
+        }
+    }
 }

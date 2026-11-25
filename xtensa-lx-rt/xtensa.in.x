@@ -26,7 +26,7 @@ SECTIONS {
        `.text.<f>`. Splitting literals and text into separate `*(...)`
        groups instead bunches all literals at the start and can push late
        code past the 256 KB L32R window in large images (see
-       `esp-hal/ld/sections/text.x`). */
+       `esp-bootloader-esp-idf/ld/sections/text.x`). */
     *(.literal .text .literal.* .text.*)
     _text_end = ABSOLUTE(.);
     _etext = .;

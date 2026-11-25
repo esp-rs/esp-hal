@@ -115,7 +115,7 @@ global_asm!(
     //   context.
     //
     // - If the WOE bit is not enabled (for example, in code written for
-    //   the CALL0 ABI), this becomes a silent noop and operates compatbily.
+    //   the CALL0 ABI), this becomes a silent noop and operates compatibly.
     //
     // - Hilariously it's ACTUALLY FASTER than the HAL routine.  And not
     //   just a little bit, it's MUCH faster.  With a mostly full register
@@ -527,6 +527,8 @@ __default_naked_exception:
 
     call4   __level_1_interrupt       // call handler <= actual call!
 
+    call0   __level_1_interrupt_exit  // can move sp to the context to return to
+
 .RestoreContext:
     RESTORE_CONTEXT 1
 
@@ -544,6 +546,15 @@ __default_naked_exception:
 
 .Ldefault_naked_exception_end:
     .size .Ldefault_naked_exception_start, .Ldefault_naked_exception_end
+
+    // The default `__level_1_interrupt_exit` returns to the interrupted context.
+    .section .rwtext,\"ax\",@progbits
+    .global __default_level_1_interrupt_exit
+    .p2align 2
+    .type __default_level_1_interrupt_exit,@function
+__default_level_1_interrupt_exit:
+    ret
+    .size __default_level_1_interrupt_exit, . - __default_level_1_interrupt_exit
 
     // Handle Double Exceptions by storing full context and then calling regular
     // function Double exceptions are not a normal occurrence. They indicate a bug

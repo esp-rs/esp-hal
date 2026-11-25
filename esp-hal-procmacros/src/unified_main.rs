@@ -92,8 +92,18 @@ fn gen_async(f: ItemFn) -> TokenStream {
     let lint_attrs: Vec<&Attribute> = fattrs
         .iter()
         .filter(|a| {
-            a.path().is_ident("deny") || a.path().is_ident("allow") || a.path().is_ident("warn")
+            a.path().is_ident("deny")
+                || a.path().is_ident("allow")
+                || a.path().is_ident("warn")
+                || a.path().is_ident("expect")
         })
+        .collect();
+
+    // An expectation only goes on the module: copied onto both functions, it
+    // would be unfulfilled on whichever one doesn't trigger the lint.
+    let fattrs: Vec<&Attribute> = fattrs
+        .iter()
+        .filter(|a| !a.path().is_ident("expect"))
         .collect();
 
     let root = esp_hal_crate();
@@ -491,6 +501,50 @@ mod tests {
                     #[allow(allowed)]
                     #[deny(denied)]
                     #[warn(warning)]
+                    #[ram]
+                    #[esp_hal::main]
+                    fn main() -> ! {
+                        let mut executor = ::esp_rtos::embassy::Executor::new();
+                        let executor = unsafe { __make_static(&mut executor) };
+                        executor.run(|spawner| {
+                            spawner.spawn(__embassy_main(spawner).unwrap());
+                        })
+                    }
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_expect_only_on_module() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[expect(expected)]
+                #[ram]
+                async fn foo(spawner: Spawner) -> () {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[expect(expected)]
+                #[doc(hidden)]
+                pub(crate) mod __main {
+                    use super::*;
+                    #[doc(hidden)]
+                    #[ram]
+                    #[::embassy_executor::task()]
+                    async fn __embassy_main(spawner: Spawner) -> () {
+                        {}
+                    }
+                    #[doc(hidden)]
+                    unsafe fn __make_static<T>(t: &mut T) -> &'static mut T {
+                        ::core::mem::transmute(t)
+                    }
                     #[ram]
                     #[esp_hal::main]
                     fn main() -> ! {

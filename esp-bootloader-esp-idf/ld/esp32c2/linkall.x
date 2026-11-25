@@ -1,0 +1,12 @@
+INCLUDE "esp_hal_config.x"
+INCLUDE "memory.x"
+
+REGION_ALIAS("ROTEXT", IROM);
+REGION_ALIAS("RODATA", DROM);
+
+REGION_ALIAS("RWDATA", DRAM);
+REGION_ALIAS("RWTEXT", IRAM);
+
+INCLUDE "esp32c2.x"
+INCLUDE "hal-defaults.x"
+INCLUDE "esp_idf_boot.x"

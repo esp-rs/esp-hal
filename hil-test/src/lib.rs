@@ -1,14 +1,70 @@
 #![no_std]
 
-// By default, we don't want probe-rs to interfere with test timings by halting
-// cores and polling RTT. The tests don't produce output most of the time
-// anyway. The only cases where output can be interesting are: during
-// development, and when a test fails. In these cases, you can enable
-// the `defmt` feature to get the output.
+// By default, the tests log through esp-log on the serial port that probe-rs reads, because
+// polling RTT halts the cores. The tests that use UART0 or the USB-Serial-JTAG port for themselves
+// log over RTT.
+
+#[cfg(all(feature = "log-serial", feature = "log-rtt"))]
+compile_error!(
+    "Enable only one of `log-serial` and `log-rtt`. Add `//% DEFAULT-FEATURES: false` to use `log-rtt`."
+);
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 use esp_hal as _;
+#[cfg(feature = "log-serial")]
+#[doc(hidden)]
+pub use esp_log;
+
+/// Installs the logger on the serial port that probe-rs reads: USB-Serial-JTAG where the chip has
+/// it, otherwise UART0 on its default TX pin. Moves the fields it uses out of `$peripherals`.
+///
+/// The drivers are unstable, so this does nothing unless the test enables `unstable`. It also does
+/// nothing with `log-rtt`.
+#[macro_export]
+macro_rules! init_logger {
+    ($peripherals:expr) => {
+        #[cfg(all(feature = "log-serial", feature = "unstable"))]
+        $crate::init_logger!(@install $peripherals);
+        #[cfg(not(all(feature = "log-serial", feature = "unstable")))]
+        let _ = &$peripherals;
+    };
+    (@install $peripherals:expr) => {{
+        cfg_select! {
+            // `esp_log::init_usb!` uses the pins of the default PHY, but the eFuse of some boards
+            // selects the other one.
+            soc_has_usb_device => {
+                static WRITER: static_cell::StaticCell<
+                    esp_hal::usb::usb_serial_jtag::UsbSerialJtagTx<'static, esp_hal::Blocking>,
+                > = static_cell::StaticCell::new();
+                let (_, tx) = $crate::usb_serial_jtag!($peripherals, Default::default())
+                    .unwrap()
+                    .split();
+                $crate::esp_log::init(WRITER.init(tx));
+            }
+            _ => {
+                $crate::esp_log::init_uart!($peripherals);
+            }
+        }
+    }};
+}
+
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
+    // Without a debugger, a semihosting call raises a debug exception that panics again. On
+    // Xtensa, the nested panics run at the debug interrupt level, so the stack grows into the
+    // peripheral registers until the chip resets, and the chip state can stay damaged after the
+    // reset.
+    #[cfg(target_arch = "xtensa")]
+    if !esp_hal::debugger::debugger_connected() {
+        loop {
+            core::hint::spin_loop();
+        }
+    }
+
+    semihosting::eprintln!("{info}");
+    semihosting::process::exit(101)
+}
 
 #[cfg(not(feature = "defmt"))]
 #[defmt::global_logger]
@@ -21,9 +77,6 @@ unsafe impl defmt::Logger for Logger {
     unsafe fn release() {}
     unsafe fn write(_bytes: &[u8]) {}
 }
-
-#[cfg(feature = "defmt")]
-use defmt_rtt as _;
 
 #[cfg(feature = "defmt")]
 #[macro_export]
@@ -41,6 +94,17 @@ macro_rules! assert_eq {
 #[macro_export]
 macro_rules! assert_ne {
     ($($t:tt)*) => { defmt::assert_ne!($($t)*) }
+}
+
+#[cfg(feature = "defmt")]
+#[macro_export]
+macro_rules! assert_matches {
+    ($left:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?))
+    };
+    ($left:expr, $pattern:pat $(if $guard:expr)?, $($arg:tt)+) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?), $($arg)+)
+    };
 }
 
 #[cfg(feature = "defmt")]
@@ -69,6 +133,12 @@ macro_rules! assert_ne {
 
 #[cfg(not(feature = "defmt"))]
 #[macro_export]
+macro_rules! assert_matches {
+    ($($t:tt)*) => { ::core::assert_matches!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
 macro_rules! panic {
     ($($t:tt)*) => { ::core::panic!($($t)*) }
 }
@@ -81,7 +151,7 @@ macro_rules! i2c_pins {
             any(esp32s2, esp32s3) => ($peripherals.GPIO3, $peripherals.GPIO2),
             esp32 => ($peripherals.GPIO32, $peripherals.GPIO33),
             any(esp32c6, esp32c61) => ($peripherals.GPIO6, $peripherals.GPIO7),
-            esp32s31 => ($peripherals.GPIO7, $peripherals.GPIO6),
+            esp32s31 => ($peripherals.GPIO1, $peripherals.GPIO0),
             esp32h2 => ($peripherals.GPIO12, $peripherals.GPIO22),
             esp32h4 => ($peripherals.GPIO26, $peripherals.GPIO27),
             esp32c2 => ($peripherals.GPIO18, $peripherals.GPIO9),
@@ -135,7 +205,7 @@ macro_rules! hp_test_pins {
             esp32p4 => ($peripherals.GPIO46, $peripherals.GPIO53),
             esp32s2 => ($peripherals.GPIO37, $peripherals.GPIO38),
             esp32s3 => ($peripherals.GPIO40, $peripherals.GPIO41),
-            esp32s31 => ($peripherals.GPIO8, $peripherals.GPIO44),
+            esp32s31 => ($peripherals.GPIO43, $peripherals.GPIO44),
             // The HP pair of the C5 and of the H2 is the one of `common_test_pins!`.
             any(esp32c5, esp32h2) => $crate::common_test_pins!($peripherals),
         }
@@ -160,6 +230,87 @@ macro_rules! unconnected_pin {
             _ => $peripherals.GPIO9,
         }
     }};
+}
+
+// The ADC1 GPIO connected to the MCP4725 DAC's VOUT pin.
+#[macro_export]
+macro_rules! adc_pin {
+    ($peripherals:expr) => {{
+        cfg_select! {
+            esp32 => $peripherals.GPIO36,
+            any(esp32c2, esp32c3) => $peripherals.GPIO1,
+            esp32c5 => $peripherals.GPIO6,
+            any(esp32c6, esp32c61, esp32h2) => $peripherals.GPIO4,
+            esp32h4 => $peripherals.GPIO28,
+            esp32p4 => $peripherals.GPIO20,
+            any(esp32s2, esp32s3) => $peripherals.GPIO7,
+            esp32s31 => $peripherals.GPIO47,
+        }
+    }};
+}
+
+// Creates the USB Serial/JTAG driver on the D+ and D- pins of the PHY that the controller uses.
+// With `other_phy`, it passes the pins of the other PHY of the chip instead.
+//
+// The H4 rig board has the `USB_PHY_SEL` eFuse burned, so the pins differ between boards.
+#[macro_export]
+macro_rules! usb_serial_jtag {
+    ($peripherals:expr, $config:expr) => {
+        $crate::usb_serial_jtag!(@new $peripherals, $config, $crate::usb_phy_sel_burned!())
+    };
+    ($peripherals:expr, $config:expr, other_phy) => {
+        $crate::usb_serial_jtag!(@new $peripherals, $config, !$crate::usb_phy_sel_burned!())
+    };
+    (@new $peripherals:expr, $config:expr, $usb_fs_phy:expr) => {{
+        // Order: (D+, D-)
+        cfg_select! {
+            esp32c3 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO19, GPIO18),
+            esp32c5 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO14, GPIO13),
+            any(esp32c6, esp32c61) => {
+                $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO13, GPIO12)
+            }
+            esp32h2 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO27, GPIO26),
+            esp32h4 => {
+                if $usb_fs_phy {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO22, GPIO21)
+                } else {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO14, GPIO13)
+                }
+            }
+            esp32p4 => {
+                if $usb_fs_phy {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO27, GPIO26)
+                } else {
+                    $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO25, GPIO24)
+                }
+            }
+            esp32s3 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO20, GPIO19),
+            esp32s31 => $crate::usb_serial_jtag!(@pins $peripherals, $config, GPIO34, GPIO33),
+        }
+    }};
+    (@pins $peripherals:expr, $config:expr, $dp:ident, $dm:ident) => {
+        esp_hal::usb::usb_serial_jtag::UsbSerialJtag::new(
+            $peripherals.USB_DEVICE,
+            $peripherals.$dp,
+            $peripherals.$dm,
+            $config,
+        )
+    };
+}
+
+// Returns whether the `USB_PHY_SEL` eFuse moves USB Serial/JTAG to the USB FS PHY. The tests do not
+// write the PHY selection register, so the eFuse selects the PHY.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! usb_phy_sel_burned {
+    () => {
+        cfg_select! {
+            all(usb_serial_jtag_phy_pads_usj, usb_serial_jtag_phy_pads_usb_fs) => {
+                esp_hal::efuse::read_bit(esp_hal::efuse::USB_PHY_SEL)
+            }
+            _ => false,
+        }
+    };
 }
 
 #[macro_export]
@@ -211,13 +362,40 @@ pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
 
-/// Disables every watchdog timer with raw register writes.
+/// Starts the RTT logger if `log-rtt` is enabled, and disables every watchdog timer with raw
+/// register writes.
 ///
-/// This prevents the firmware reset loop if no debugger is attached. The function must not depend
-/// on esp-hal drivers, because a driver that is broken or half-initialized must not stop the tests
-/// from running.
+/// Disabling the watchdogs prevents the firmware reset loop if no debugger is attached. The
+/// function must not depend on esp-hal drivers, because a driver that is broken or half-initialized
+/// must not stop the tests from running.
 #[embedded_test::setup]
-fn disable_watchdogs_before_semihosting() {
+fn init_rtt_and_disable_watchdogs() {
+    #[cfg(feature = "log-rtt")]
+    {
+        let channels = cfg_select! {
+            esp32p4 => rtt_target::rtt_init! {
+                up: {
+                    0: {
+                        size: 1024,
+                        name: "defmt",
+                        section: ".uncached.data",
+                    }
+                }
+                section_cb: ".uncached.data"
+            },
+            _ => rtt_target::rtt_init! {
+                up: {
+                    0: {
+                        size: 1024,
+                        name: "defmt",
+                    }
+                }
+            },
+        };
+
+        rtt_target::set_defmt_channel(channels.up.0);
+    }
+
     cfg_select! {
         soc_has_lp_wdt => {
             use esp_hal::peripherals::LP_WDT;

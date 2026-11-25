@@ -2,7 +2,7 @@
 //!
 //! The program holds every case for [`HOLD`], then moves to the next. The console
 //! prints the case name before the hold, so you can align the meter with the
-//! UART log. Use a UART port. USB Serial/JTAG stops across sleep.
+//! UART log. The console is on the UART, because USB Serial/JTAG stops across sleep.
 //!
 //! Active cases combine CPU clock (default and maximum), core count, and either a
 //! busy loop or WAITI/WFI. Sleep cases are light sleep without CPU power-down,
@@ -12,8 +12,20 @@
 //! A chip whose default CPU clock is already the maximum skips the duplicate
 //! maximum-clock active cases. Dual-core cases run only on multi-core chips.
 //! CPU power-down and tag-memory cases run only where the hardware supports them.
+//!
+//! On a chip with a PSRAM driver, the program enables PSRAM, so the currents include
+//! PSRAM. Each light-sleep case writes a pattern to all of PSRAM before the sleep, and
+//! checks the pattern after the wake. The program then writes and checks the inverted
+//! pattern. The program panics if a pattern does not read back.
+//!
+//! On a chip that supports idle frequency scaling, each WAITI/WFI case also runs while a
+//! `CpuFrequencyLock` is held, so the currents with and without scaling can be compared. Set
+//! `ESP_HAL_CONFIG_IDLE_FREQUENCY_SCALING=true` to enable the scaling. The timer interrupt handler
+//! measures the CPU clock, and the program panics if the handler sees a slow clock. On a chip that
+//! switches PSRAM to a low speed during idle, each active case writes a pattern to all of PSRAM
+//! before the hold, and checks the pattern after the hold.
 
-//% CHIP_FILTER: sleep_driver_supported
+//% CHIP_FILTER: sleep_driver_supported && sleep_deep_sleep
 
 #![no_std]
 #![no_main]
@@ -34,12 +46,13 @@ use esp_hal::{
     time::{Duration, Instant},
     timer::{PeriodicTimer, timg::TimerGroup},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[cfg(multi_core)]
 use core::ptr::addr_of_mut;
+#[cfg(sleep_idle_frequency_scaling)]
+use core::sync::atomic::{AtomicU32, Ordering};
 
 #[cfg(multi_core)]
 use esp_hal::{interrupt::Priority, peripherals::Interrupt};
@@ -50,14 +63,44 @@ const HOLD: Duration = Duration::from_secs(3);
 /// Interrupt period that lets WAITI/WFI return and check the hold deadline.
 const WAITI_TICK: Duration = Duration::from_millis(250);
 
-#[cfg(not(any(feature = "esp32c2", feature = "esp32c61")))]
+#[cfg(psram_driver_supported)]
+fn psram_pattern(index: usize, invert: u32) -> u32 {
+    (index as u32).wrapping_mul(0x9E37_79B9) ^ invert
+}
+
+#[cfg(psram_driver_supported)]
+fn fill_psram(words: &mut [u32], invert: u32) {
+    for (i, word) in words.iter_mut().enumerate() {
+        unsafe { core::ptr::write_volatile(word, psram_pattern(i, invert)) };
+    }
+}
+
+#[cfg(psram_driver_supported)]
+fn check_psram(label: &str, words: &[u32], invert: u32) {
+    let mut bad = 0;
+    let mut first = None;
+    for (i, word) in words.iter().enumerate() {
+        if unsafe { core::ptr::read_volatile(word) } != psram_pattern(i, invert) {
+            bad += 1;
+            first.get_or_insert(i);
+        }
+    }
+    match first {
+        None => log::info!("PSRAM {label}: ok"),
+        Some(first) => panic!("PSRAM {label}: {bad} bad words, first at {first}"),
+    }
+}
+
+#[cfg(not(any(feature = "esp32c2", feature = "esp32c61", feature = "esp32h4")))]
 #[esp_hal::ram(unstable(rtc_fast, persistent))]
 static mut PHASE: u32 = 0;
 
 fn load_phase() -> u32 {
     cfg_select! {
         feature = "esp32c2" => esp_hal::peripherals::LPWR::regs().store6().read().bits(),
-        feature = "esp32c61" => esp_hal::peripherals::LP_AON::regs().store6().read().bits(),
+        any(feature = "esp32c61", feature = "esp32h4") => {
+            esp_hal::peripherals::LP_AON::regs().store6().read().bits()
+        }
         _ => unsafe { PHASE },
     }
 }
@@ -69,7 +112,7 @@ fn store_phase(value: u32) {
                 .store6()
                 .write(|w| unsafe { w.bits(value) });
         }
-        feature = "esp32c61" => {
+        any(feature = "esp32c61", feature = "esp32h4") => {
             esp_hal::peripherals::LP_AON::regs()
                 .store6()
                 .write(|w| unsafe { w.bits(value) });
@@ -84,6 +127,7 @@ enum Case {
         max_clock: bool,
         two_cores: bool,
         waiti: bool,
+        freq_lock: bool,
     },
     LightSleep {
         two_cores: bool,
@@ -98,45 +142,81 @@ const CASES: &[Case] = &[
         max_clock: false,
         two_cores: false,
         waiti: false,
+        freq_lock: false,
     },
     Case::Active {
         max_clock: false,
         two_cores: false,
         waiti: true,
+        freq_lock: false,
+    },
+    #[cfg(sleep_idle_frequency_scaling)]
+    Case::Active {
+        max_clock: false,
+        two_cores: false,
+        waiti: true,
+        freq_lock: true,
     },
     #[cfg(multi_core)]
     Case::Active {
         max_clock: false,
         two_cores: true,
         waiti: false,
+        freq_lock: false,
     },
     #[cfg(multi_core)]
     Case::Active {
         max_clock: false,
         two_cores: true,
         waiti: true,
+        freq_lock: false,
+    },
+    #[cfg(all(sleep_idle_frequency_scaling, multi_core))]
+    Case::Active {
+        max_clock: false,
+        two_cores: true,
+        waiti: true,
+        freq_lock: true,
     },
     Case::Active {
         max_clock: true,
         two_cores: false,
         waiti: false,
+        freq_lock: false,
     },
     Case::Active {
         max_clock: true,
         two_cores: false,
         waiti: true,
+        freq_lock: false,
+    },
+    #[cfg(sleep_idle_frequency_scaling)]
+    Case::Active {
+        max_clock: true,
+        two_cores: false,
+        waiti: true,
+        freq_lock: true,
     },
     #[cfg(multi_core)]
     Case::Active {
         max_clock: true,
         two_cores: true,
         waiti: false,
+        freq_lock: false,
     },
     #[cfg(multi_core)]
     Case::Active {
         max_clock: true,
         two_cores: true,
         waiti: true,
+        freq_lock: false,
+    },
+    #[cfg(all(sleep_idle_frequency_scaling, multi_core))]
+    Case::Active {
+        max_clock: true,
+        two_cores: true,
+        waiti: true,
+        freq_lock: true,
     },
     Case::LightSleep {
         two_cores: false,
@@ -199,14 +279,20 @@ fn print_case(index: usize, case: Case) {
             max_clock,
             two_cores,
             waiti,
+            freq_lock,
         } => {
-            println!(
-                "=== [{}/{}] active CPU={} cores={} idle={} ({} s) ===",
+            log::info!(
+                "=== [{}/{}] active CPU={} cores={} idle={}{} ({} s) ===",
                 index + 1,
                 CASES.len(),
                 if max_clock { "max" } else { "default" },
                 if two_cores { 2 } else { 1 },
                 if waiti { "WAITI/WFI" } else { "busy" },
+                if freq_lock {
+                    " CpuFrequencyLock held"
+                } else {
+                    ""
+                },
                 HOLD.as_secs(),
             );
         }
@@ -215,7 +301,7 @@ fn print_case(index: usize, case: Case) {
             cpu_pd,
             tagmem,
         } => {
-            println!(
+            log::info!(
                 "=== [{}/{}] light sleep cores={} cpu_pd={} tagmem={} ({} s) ===",
                 index + 1,
                 CASES.len(),
@@ -226,7 +312,7 @@ fn print_case(index: usize, case: Case) {
             );
         }
         Case::DeepSleep => {
-            println!(
+            log::info!(
                 "=== [{}/{}] deep sleep ({} s) ===",
                 index + 1,
                 CASES.len(),
@@ -251,6 +337,22 @@ fn app_waiti() -> bool {
     unsafe { core::ptr::read_volatile(&raw const APP_WAITI) }
 }
 
+/// The lowest CPU clock in MHz that the timer interrupt handler measured in the current case.
+#[cfg(sleep_idle_frequency_scaling)]
+static HANDLER_MIN_MHZ: AtomicU32 = AtomicU32::new(u32::MAX);
+
+#[cfg(sleep_idle_frequency_scaling)]
+fn cpu_cycles() -> u32 {
+    let cycles: u32;
+    cfg_select! {
+        any(feature = "esp32c6", feature = "esp32h2") => unsafe {
+            core::arch::asm!("csrr {0}, 0x7e2", out(reg) cycles)
+        },
+        _ => unsafe { core::arch::asm!("csrr {0}, mcycle", out(reg) cycles) },
+    }
+    cycles
+}
+
 #[esp_hal::handler]
 fn timer_handler() {
     unsafe {
@@ -258,18 +360,31 @@ fn timer_handler() {
             timer.clear_interrupt();
         }
     }
+
+    #[cfg(sleep_idle_frequency_scaling)]
+    {
+        let start_cycles = cpu_cycles();
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_micros(50) {}
+        let mhz = cpu_cycles().wrapping_sub(start_cycles) / start.elapsed().as_micros() as u32;
+        HANDLER_MIN_MHZ.fetch_min(mhz, Ordering::Relaxed);
+    }
+}
+
+/// Panics if the timer interrupt handler measured a CPU clock below 90% of the configured clock.
+#[cfg(sleep_idle_frequency_scaling)]
+fn check_handler_clock() {
+    let full_mhz = esp_hal::clock::cpu_clock().as_mhz();
+    let min_mhz = HANDLER_MIN_MHZ.swap(u32::MAX, Ordering::Relaxed);
+    assert!(
+        min_mhz >= full_mhz * 9 / 10,
+        "handler CPU clock {min_mhz} MHz of {full_mhz} MHz"
+    );
+    log::info!("lowest handler CPU clock: {min_mhz} MHz of {full_mhz} MHz");
 }
 
 #[cfg(multi_core)]
 fn app_core_entry() -> ! {
-    cfg_select! {
-        xtensa => unsafe {
-            let _ = esp_hal::xtensa_lx::interrupt::enable();
-        },
-        riscv => unsafe {
-            let _ = esp_hal::riscv::interrupt::enable();
-        },
-    }
     interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::min());
 
     loop {
@@ -281,7 +396,8 @@ fn app_core_entry() -> ! {
     }
 }
 
-fn hold_active(waiti: bool) {
+fn hold_active(waiti: bool, freq_lock: bool) {
+    let _lock = freq_lock.then(esp_hal::clock::CpuFrequencyLock::new);
     let end = Instant::now() + HOLD;
     if waiti {
         while Instant::now() < end {
@@ -329,6 +445,19 @@ fn main() -> ! {
         hal_config = hal_config.with_cpu_clock(CpuClock::max());
     }
     let peripherals = esp_hal::init(hal_config);
+    esp_log::init_uart!(peripherals);
+
+    #[cfg(psram_driver_supported)]
+    let psram_words: &mut [u32] = {
+        let psram =
+            esp_hal::psram::Psram::new(peripherals.PSRAM, esp_hal::psram::PsramConfig::default());
+        let (start, size) = psram.raw_parts();
+        if size == 0 {
+            &mut []
+        } else {
+            unsafe { core::slice::from_raw_parts_mut(start.cast::<u32>(), size / 4) }
+        }
+    };
 
     let delay = Delay::new();
     let mut lpwr = LowPower::new(peripherals.LPWR);
@@ -343,7 +472,7 @@ fn main() -> ! {
     }
 
     #[cfg(multi_core)]
-    let mut cpu_control = {
+    let cpu_control = {
         use esp_hal::system::{CpuControl, Stack};
 
         static mut APP_CORE_STACK: Stack<8192> = Stack::new();
@@ -354,8 +483,17 @@ fn main() -> ! {
             })
             .unwrap();
         core::mem::forget(guard);
-        unsafe { cpu_control.park_core(Cpu::AppCpu) };
         cpu_control
+    };
+    #[cfg(multi_core)]
+    let mut app_core_parked = Some(cpu_control.park_core(Cpu::AppCpu));
+    #[cfg(multi_core)]
+    let mut set_app_core_parked = |parked: bool| {
+        if !parked {
+            app_core_parked = None;
+        } else if app_core_parked.is_none() {
+            app_core_parked = Some(cpu_control.park_core(Cpu::AppCpu));
+        }
     };
 
     #[cfg(supports_cpu_power_down)]
@@ -363,7 +501,7 @@ fn main() -> ! {
     #[cfg(supports_tagmem_power_down)]
     let mut tagmem_installed = false;
 
-    println!(
+    log::info!(
         "sleep_current: reset={:?} wake={:?} CPU={:?} phase={}/{}",
         reset_reason(Cpu::ProCpu),
         wakeup_cause(),
@@ -385,7 +523,7 @@ fn main() -> ! {
         if let Some(wants_max) = case_wants_max_clock(CASES[phase])
             && wants_max != max_clock
         {
-            println!(
+            log::info!(
                 "reset to {} CPU clock",
                 if wants_max { "max" } else { "default" }
             );
@@ -400,22 +538,33 @@ fn main() -> ! {
 
         match case {
             Case::Active {
-                two_cores, waiti, ..
+                two_cores,
+                waiti,
+                freq_lock,
+                ..
             } => {
                 #[cfg(multi_core)]
                 {
                     set_app_waiti(waiti);
-                    if two_cores {
-                        cpu_control.unpark_core(Cpu::AppCpu);
-                    } else {
-                        unsafe { cpu_control.park_core(Cpu::AppCpu) };
-                    }
+                    set_app_core_parked(!two_cores);
                     delay.delay_millis(50);
                 }
                 #[cfg(not(multi_core))]
                 let _ = two_cores;
 
-                hold_active(waiti);
+                #[cfg(psram_idle_low_speed_switch)]
+                fill_psram(psram_words, 0);
+                #[cfg(sleep_idle_frequency_scaling)]
+                HANDLER_MIN_MHZ.store(u32::MAX, Ordering::Relaxed);
+
+                hold_active(waiti, freq_lock);
+
+                #[cfg(sleep_idle_frequency_scaling)]
+                check_handler_clock();
+                #[cfg(psram_idle_low_speed_switch)]
+                if !psram_words.is_empty() {
+                    check_psram("after the hold", psram_words, 0);
+                }
             }
             Case::LightSleep {
                 two_cores,
@@ -428,11 +577,7 @@ fn main() -> ! {
                 #[cfg(multi_core)]
                 {
                     set_app_waiti(true);
-                    if two_cores {
-                        cpu_control.unpark_core(Cpu::AppCpu);
-                    } else {
-                        unsafe { cpu_control.park_core(Cpu::AppCpu) };
-                    }
+                    set_app_core_parked(!two_cores);
                     delay.delay_millis(50);
                 }
                 #[cfg(not(multi_core))]
@@ -443,7 +588,7 @@ fn main() -> ! {
                     lpwr.install_cpu_retention_memory(CPU_RETENTION_MEMORY.take())
                         .unwrap();
                     cpu_pd_installed = true;
-                    println!("installed CPU retention memory");
+                    log::info!("installed CPU retention memory");
                 }
                 #[cfg(not(supports_cpu_power_down))]
                 let _ = cpu_pd;
@@ -453,24 +598,32 @@ fn main() -> ! {
                     lpwr.install_cache_tag_retention_memory(CACHE_TAGMEM.take())
                         .unwrap();
                     tagmem_installed = true;
-                    println!("installed cache tag retention memory");
+                    log::info!("installed cache tag retention memory");
                 }
                 #[cfg(not(supports_tagmem_power_down))]
                 let _ = tagmem;
 
+                #[cfg(psram_driver_supported)]
+                fill_psram(psram_words, 0);
+
                 delay.delay_millis(100);
                 lpwr.set_wakeup_deadline(Instant::now() + HOLD);
                 lpwr.sleep_light(RtcSleepConfig::default());
-                println!("woke from light sleep, cause={:?}", wakeup_cause());
+                log::info!("woke from light sleep, cause={:?}", wakeup_cause());
+
+                #[cfg(psram_driver_supported)]
+                if !psram_words.is_empty() {
+                    check_psram("after the sleep", psram_words, 0);
+                    fill_psram(psram_words, u32::MAX);
+                    check_psram("after a new write", psram_words, u32::MAX);
+                }
             }
             Case::DeepSleep => {
                 periodic.unlisten();
                 let _ = periodic.cancel();
 
                 #[cfg(multi_core)]
-                unsafe {
-                    cpu_control.park_core(Cpu::AppCpu);
-                }
+                set_app_core_parked(true);
 
                 let next = ((phase + 1) % CASES.len()) as u32;
                 store_phase(next);

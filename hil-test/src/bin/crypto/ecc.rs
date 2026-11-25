@@ -15,7 +15,7 @@ use esp_hal::rng::TrngSource;
 use esp_hal::{
     Blocking,
     clock::CpuClock,
-    ecc::{Ecc, EllipticCurve, OperationError},
+    ecc::{Config, ConfigError, Ecc, EllipticCurve, OperationError},
     rng::Rng,
 };
 use hex_literal::hex;
@@ -180,29 +180,58 @@ const P384_TEST_DATA: TestData<48> = TestData {
     ],
 };
 
+#[cfg(all(
+    any(ecc_has_point_addition, ecc_has_modular_arithmetic),
+    ecc_has_curve_sm2
+))]
+const SM2_TEST_DATA: TestData<32> = TestData {
+    curve: EllipticCurve::Sm2,
+    mod_base: EccModBase::OrderOfCurve,
+    x: hex!("c7744c3389455a71e10b66f2bf0be38f94c9396a4604995f1981191f2caec432"),
+    y: hex!("a0f03921e532df0240472ac67c87a9d05321696be3cebd599c77f6f4a23637bc"),
+    num: hex!("c7744c3389455a71e10b66f2bf0be38f94c9396a4604995f1981191f2caec432"),
+    den: hex!("a0f03921e532df0240472ac67c87a9d05321696be3cebd599c77f6f4a23637bc"),
+    expected_sum: hex!("676586546e783974215390b83c938c60e8eaa2d529d356b9b5f80f14cfe4fbee"),
+    expected_diff: hex!("4ac5e74bad0637c2ccc9014eae633d3140a8d0fe6235db057d09232a88778d76"),
+    expected_prod: hex!("23669ddfa03452818d9c8e031cb479c7e96249291ba1e9b54bb6f0cbd59672cf"),
+    expected_div: hex!("ef1d8483cd699edb733c44bdc1021b2635f984c95a03b04d837cbbfe07187e80"),
+};
+
+#[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+const SM2_PRIME_TEST_DATA: TestData<32> = TestData {
+    mod_base: EccModBase::PrimeModulus,
+    expected_sum: hex!("676586546e783974215390b83c938c60e8eaa2d529d356b9b5f80f14cfe4fbee"),
+    expected_diff: hex!("26841212a4127b6ea2c43b2c428439bf40a8d0fe6235db057d09232a88778d76"),
+    expected_prod: hex!("6ae7ac91993431c4f382f002f2db4653523a035710daa1cf0c63c4bd45e7d7ed"),
+    expected_div: hex!("f1d46363a49c41f0f3a1b502bb1b6ccd5daf4a857eedfaa8a22e877b8d325f32"),
+    ..SM2_TEST_DATA
+};
+
 fn for_each_test_case(mut test: impl FnMut(&[u8], EllipticCurve)) {
-    let prime_fields: &[&[u8]] = &[
-        &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
-        &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
+    let test_cases: &[(&[u8], EllipticCurve)] = &[
+        (
+            &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
+            EllipticCurve::P192,
+        ),
+        (
+            &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
+            EllipticCurve::P256,
+        ),
         #[cfg(ecc_has_curve_p384)]
-        &hex!(
-            "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff"
+        (
+            &hex!(
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff"
+            ),
+            EllipticCurve::P384,
+        ),
+        #[cfg(ecc_has_curve_sm2)]
+        (
+            &hex!("fffffffeffffffffffffffffffffffffffffffff00000000ffffffffffffffff"),
+            EllipticCurve::Sm2,
         ),
     ];
 
-    for &prime_field in prime_fields {
-        let curve;
-        for_each_ecc_curve! {
-            (all $(($_id:tt, $name:tt, $bits:literal)),*) => {
-                curve = match prime_field.len() {
-                    $(
-                        v if v == $bits / 8 => EllipticCurve::$name,
-                    )*
-                    _ => unimplemented!(),
-                }
-            };
-        };
-
+    for &(prime_field, curve) in test_cases {
         test(prime_field, curve)
     }
 }
@@ -243,6 +272,9 @@ macro_rules! curve_crate {
         (P384 $($rest:tt)*) => {
             p384 $($rest)*
         };
+        (Sm2 $($rest:tt)*) => {
+            sm2 $($rest)*
+        };
     }
 
 macro_rules! uint {
@@ -254,6 +286,9 @@ macro_rules! uint {
     };
     (P384) => {
         crypto_bigint::U384
+    };
+    (Sm2) => {
+        crypto_bigint::U256
     };
 }
 
@@ -368,6 +403,27 @@ macro_rules! buffers {
     }
 }
 
+/// The scalar 1, big-endian.
+#[cfg(ecc_supports_enhanced_security)]
+const ONE: [u8; 32] = {
+    let mut k = [0u8; 32];
+    k[31] = 1;
+    k
+};
+
+/// A scalar with alternating bits, below the order of P-256.
+#[cfg(ecc_supports_enhanced_security)]
+const ALTERNATING: [u8; 32] = [0xaa; 32];
+
+/// Returns whether this chip revision has the enhanced security mode. Only an ESP32-H2 below
+/// revision 1.2 does not. The default turns the mode off there, and the driver refuses a
+/// configuration that asks for it.
+#[cfg(ecc_supports_enhanced_security)]
+fn enhanced_security_available() -> bool {
+    !cfg!(esp32h2)
+        || esp_hal::efuse::chip_revision() >= esp_hal::efuse::ChipRevision::from_combined(102)
+}
+
 #[embedded_test::tests(default_timeout = 10)]
 mod tests {
     use super::*;
@@ -378,16 +434,92 @@ mod tests {
         _rng_source: TrngSource<'a>,
     }
 
+    /// Returns the microseconds one P-256 k * G takes in the blocking driver, including the result
+    /// read.
+    #[cfg(ecc_supports_enhanced_security)]
+    fn p256_multiplication_us(ecc: &mut Ecc<'static, Blocking>, k: &[u8; 32]) -> u64 {
+        let mut k = *k;
+        let mut x = [0u8; 32];
+        let mut y = [0u8; 32];
+        affine_point_coords(EllipticCurve::P256, &mut x, &mut y);
+        reverse!(k, x, y);
+        let start = esp_hal::time::Instant::now();
+        ecc.affine_point_multiplication(EllipticCurve::P256, &k, &x, &y)
+            .unwrap()
+            .read_affine_point_result(&mut x, &mut y)
+            .unwrap();
+        start.elapsed().as_micros()
+    }
+
     #[init]
     fn init() -> Context<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
 
         Context {
-            ecc: Ecc::new(p.ECC, Default::default()),
+            ecc: Ecc::new(p.ECC, Default::default()).unwrap(),
             #[cfg(rng_trng_supported)]
             _rng_source: TrngSource::new(p.RNG, p.ADC1),
         }
+    }
+
+    #[test]
+    #[cfg(ecc_supports_enhanced_security)]
+    fn test_enhanced_security_off_takes_longer_for_an_alternating_scalar(
+        mut ctx: Context<'static>,
+    ) {
+        // With enhanced security off, the time of a point multiplication depends on the scalar's
+        // digit pattern.
+        ctx.ecc
+            .apply_config(&Config::default().with_enhanced_security(false))
+            .unwrap();
+
+        // An untimed run first, so that neither timed run pays for cache misses.
+        p256_multiplication_us(&mut ctx.ecc, &ALTERNATING);
+        let one_us = p256_multiplication_us(&mut ctx.ecc, &ONE);
+        let alternating_us = p256_multiplication_us(&mut ctx.ecc, &ALTERNATING);
+
+        // k = 1 is the shortest and sparsest scalar and 0xaa..aa the longest and densest under a
+        // signed-digit recoding, so the two bound the block's time. The measured difference is far
+        // above the factor of 5.
+        hil_test::assert!(
+            one_us * 5 < alternating_us,
+            "k = 1 {} us, k = 0xaa..aa {} us",
+            one_us,
+            alternating_us
+        );
+    }
+
+    #[test]
+    #[cfg(ecc_supports_enhanced_security)]
+    fn test_enhanced_security_is_on_by_default(mut ctx: Context<'static>) {
+        if !enhanced_security_available() {
+            // ESP32-H2 revisions below 1.2 do not have the enhanced security mode, so asking
+            // for it is refused.
+            hil_test::assert_eq!(
+                ctx.ecc
+                    .apply_config(&Config::default().with_enhanced_security(true)),
+                Err(ConfigError::EnhancedSecurityUnsupported)
+            );
+            return;
+        }
+
+        // `init` built the driver with `Config::default()`. An untimed run first, so that neither
+        // timed run pays for cache misses.
+        p256_multiplication_us(&mut ctx.ecc, &ALTERNATING);
+        let one_us = p256_multiplication_us(&mut ctx.ecc, &ONE);
+        let alternating_us = p256_multiplication_us(&mut ctx.ecc, &ALTERNATING);
+
+        // With enhanced security off, 0xaa..aa takes more than five times k = 1, as the off test
+        // asserts. With it on, the two differ by the timer's resolution and the driver's overhead
+        // only, so 1 % tells the modes apart.
+        hil_test::assert!(
+            one_us.abs_diff(alternating_us) * 100 < one_us,
+            "k = 1 {} us, k = 0xaa..aa {} us",
+            one_us,
+            alternating_us
+        );
     }
 
     #[test]
@@ -717,6 +849,12 @@ mod tests {
         test_ecc_point_addition(ctx, P384_TEST_DATA);
     }
 
+    #[test]
+    #[cfg(all(ecc_has_point_addition, ecc_has_curve_sm2))]
+    fn test_ecc_point_addition_sm2(ctx: Context<'static>) {
+        test_ecc_point_addition(ctx, SM2_TEST_DATA);
+    }
+
     #[cfg(ecc_has_modular_arithmetic)]
     fn run_mod_tests<const N: usize>(mut ctx: Context<'static>, test_case: TestData<N>) {
         let result = &mut [0; N][..];
@@ -787,6 +925,18 @@ mod tests {
     fn test_ecc_mod_operations_384(ctx: Context<'static>) {
         run_mod_tests(ctx, P384_TEST_DATA);
     }
+
+    #[test]
+    #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+    fn test_ecc_mod_operations_sm2(ctx: Context<'static>) {
+        run_mod_tests(ctx, SM2_TEST_DATA);
+    }
+
+    #[test]
+    #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+    fn test_ecc_mod_operations_sm2_prime(ctx: Context<'static>) {
+        run_mod_tests(ctx, SM2_PRIME_TEST_DATA);
+    }
 }
 
 #[embedded_test::tests(default_timeout = 10)]
@@ -805,12 +955,64 @@ mod work_queue_tests {
     fn init() -> Context<'static> {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
 
         Context {
-            ecc: EccBackend::new(p.ECC, Default::default()),
+            ecc: EccBackend::new(p.ECC, Default::default()).unwrap(),
             #[cfg(rng_trng_supported)]
             _rng_source: TrngSource::new(p.RNG, p.ADC1),
         }
+    }
+
+    #[test]
+    #[cfg(ecc_supports_enhanced_security)]
+    fn test_ecc_work_queue_enhanced_security_is_on_by_default(mut ctx: Context<'static>) {
+        if !enhanced_security_available() {
+            // ESP32-H2 revisions below 1.2 do not have the enhanced security mode, so asking
+            // for it is refused.
+            drop(ctx.ecc);
+            // The backend above was the only owner of the peripheral.
+            let ecc = unsafe { esp_hal::peripherals::ECC::steal() };
+            hil_test::assert!(matches!(
+                EccBackend::new(ecc, Config::default().with_enhanced_security(true)),
+                Err(ConfigError::EnhancedSecurityUnsupported)
+            ));
+            return;
+        }
+
+        let _backend = ctx.ecc.start();
+
+        // `init` built the backend with `Config::default()`.
+        let multiplication_us = |k: &[u8; 32]| {
+            let mut k = *k;
+            let mut x = [0u8; 32];
+            let mut y = [0u8; 32];
+            affine_point_coords(EllipticCurve::P256, &mut x, &mut y);
+            reverse!(k, x, y);
+            let (mut rx, mut ry) = ([0u8; 32], [0u8; 32]);
+            let mut op = EllipticCurve::P256
+                .affine_point_multiplication(&k, &x, &y)
+                .and_then(|op| op.with_affine_point_result(&mut rx, &mut ry))
+                .unwrap();
+            let start = esp_hal::time::Instant::now();
+            op.process().wait_blocking();
+            start.elapsed().as_micros()
+        };
+
+        // An untimed run first, so that neither timed run pays for cache misses.
+        multiplication_us(&ALTERNATING);
+        let one_us = multiplication_us(&ONE);
+        let alternating_us = multiplication_us(&ALTERNATING);
+
+        // With enhanced security off, 0xaa..aa takes more than five times k = 1, as the off test
+        // asserts. With it on, the two differ by the timer's resolution and the driver's overhead
+        // only, so 1 % tells the modes apart.
+        hil_test::assert!(
+            one_us.abs_diff(alternating_us) * 100 < one_us,
+            "k = 1 {} us, k = 0xaa..aa {} us",
+            one_us,
+            alternating_us
+        );
     }
 
     #[test]
@@ -901,5 +1103,19 @@ mod work_queue_tests {
     fn test_ecc_backend_mod_operations_384(mut ctx: Context<'static>) {
         let _backend = ctx.ecc.start();
         run_backend_mod_tests(P384_TEST_DATA);
+    }
+
+    #[test]
+    #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+    fn test_ecc_backend_mod_operations_sm2(mut ctx: Context<'static>) {
+        let _backend = ctx.ecc.start();
+        run_backend_mod_tests(SM2_TEST_DATA);
+    }
+
+    #[test]
+    #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+    fn test_ecc_backend_mod_operations_sm2_prime(mut ctx: Context<'static>) {
+        let _backend = ctx.ecc.start();
+        run_backend_mod_tests(SM2_PRIME_TEST_DATA);
     }
 }

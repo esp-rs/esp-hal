@@ -36,7 +36,6 @@ use esp_hal::{
     flash::{Config, Error, Flash},
     main,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -49,8 +48,8 @@ const CASES: &[(u32, usize)] = &[(0, 4), (0, 8), (0, 12), (16, 4), (16, 8), (16,
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
     assert!(
         esp_hal::efuse::flash_encryption(),
@@ -89,7 +88,7 @@ fn main() -> ! {
         }
         assert_erased(&mut flash, SCRATCH + offset + len, 16);
 
-        println!("ok: {len} bytes at offset {offset}");
+        log::info!("ok: {len} bytes at offset {offset}");
     }
 
     assert_eq!(
@@ -103,7 +102,7 @@ fn main() -> ! {
 
     unsafe { flash.erase(SCRATCH, SCRATCH + sector).unwrap() };
 
-    println!("Test passed");
+    log::info!("Test passed");
 
     loop {}
 }

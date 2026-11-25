@@ -53,11 +53,11 @@ critical_frame! {
     {
         mtvt,
     },
-    #[cfg(any(cpu_retention_frame = "clic", esp32p4, esp32s31))]
+    #[cfg(any(cpu_retention_frame = "clic", esp32h4, esp32p4, esp32s31))]
     {
         mintthresh,
     },
-    #[cfg(any(esp32p4, esp32s31))]
+    #[cfg(any(esp32h4, esp32p4, esp32s31))]
     {
         fpu_ft0, fpu_ft1, fpu_ft2, fpu_ft3, fpu_ft4, fpu_ft5, fpu_ft6, fpu_ft7,
         fpu_ft8, fpu_ft9, fpu_ft10, fpu_ft11,
@@ -88,6 +88,7 @@ macro_rules! non_critical_frame {
             /// # Safety
             ///
             /// The caller must own the CPU state that the frame describes.
+            #[crate::ram(unstable(checked))]
             pub(crate) unsafe fn save(&mut self) {
                 $(self.$field = unsafe { read_csr!($csr) };)*
             }
@@ -97,6 +98,7 @@ macro_rules! non_critical_frame {
             /// # Safety
             ///
             /// The frame must hold a state that [`Self::save`] read from this core.
+            #[crate::ram(unstable(checked))]
             pub(crate) unsafe fn restore(&self) {
                 $(unsafe { write_csr!($csr, self.$field) };)*
             }
@@ -108,6 +110,7 @@ pub(crate) use non_critical_frame;
 
 #[cfg_attr(cpu_retention_frame = "c6_h2", path = "c6_h2.rs")]
 #[cfg_attr(cpu_retention_frame = "clic", path = "clic.rs")]
+#[cfg_attr(cpu_retention_frame = "h4", path = "h4.rs")]
 #[cfg_attr(cpu_retention_frame = "p4", path = "p4.rs")]
 #[cfg_attr(cpu_retention_frame = "s31", path = "s31.rs")]
 pub(crate) mod chip;

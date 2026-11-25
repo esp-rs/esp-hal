@@ -119,6 +119,51 @@
 //! }
 //! # }
 //! ```
+//!
+//! ### I2S Write
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! # use esp_hal::time::Rate;
+//! # use esp_hal::i2s::master::{I2s, Channels, DataFormat, TdmConfig};
+//! # use esp_hal::dma_tx_stream_buffer;
+//! let tx_buffer = dma_tx_stream_buffer!(4 * 4092, 1024);
+//! let samples: &[u8] = &[0; 32000]; // Make sure you're handling a slice with actual data
+//!
+//! let i2s = I2s::new(
+//!     peripherals.I2S0,
+//!     peripherals.__dma_channel__,
+//!     TdmConfig::new_tdm_philips()
+//!         .with_sample_rate(Rate::from_hz(44100))
+//!         .with_data_format(DataFormat::Data16Channel16)
+//!         .with_channels(Channels::STEREO),
+//! )?;
+//! # {mclk}
+//!
+//! let i2s_tx = i2s
+//!     .i2s_tx
+//!     .with_bclk(peripherals.GPIO2)
+//!     .with_ws(peripherals.GPIO4)
+//!     .with_dout(peripherals.GPIO5)
+//!     .build();
+//!
+//! let mut transfer = i2s_tx.write(tx_buffer)?;
+//!
+//! let mut written = 0;
+//! let samples_len = samples.iter().len();
+//! while written < samples_len {
+//!     if transfer.available_bytes() > 0 {
+//!         let out_written = transfer.push(&samples[written..]);
+//!         written += out_written;
+//!     }
+//! }
+//!
+//! // Wait for DMA to completely transfer the bytes written above
+//! let (result, _i2s_tx, _tx_buffer) = transfer.wait();
+//! result?;
+//!
+//! # {after_snippet}
+//! ```
 #![cfg_attr(
     any(i2s_supports_pdm_tx, i2s_supports_pdm_rx),
     doc = r"## PDM mode
@@ -958,6 +1003,11 @@ impl Channels {
     fn active_count(&self) -> u8 {
         self.mask.count_ones() as u8
     }
+
+    #[cfg(not(i2s_version = "1"))]
+    pub(crate) const fn is_enabled(&self, ch: u8) -> bool {
+        self.mask & (1 << ch) != 0
+    }
 }
 
 /// Internal I2S peripheral configuration (TDM or PDM mode).
@@ -1459,9 +1509,9 @@ impl<'d> I2s<'d, Blocking> {
         channel: I2sMasterErased<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let channel = Channel::new(channel);
+        let mut channel = Channel::new(channel);
         let i2s = i2s.degrade();
-        channel.runtime_ensure_compatible(i2s.dma_peripheral());
+        channel.connect(i2s.dma_peripheral());
 
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -1700,7 +1750,7 @@ where
         self.i2s.info().reset_tx();
         let res = unsafe {
             self.tx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = res {
@@ -1773,7 +1823,7 @@ where
 
         let res = unsafe {
             self.rx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = res {

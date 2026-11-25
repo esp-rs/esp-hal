@@ -1,5 +1,6 @@
 pub(crate) mod aes;
 pub(crate) mod canfd;
+pub(crate) mod dac;
 pub(crate) mod dma;
 pub(crate) mod ecc;
 pub(crate) mod gpio;
@@ -17,11 +18,13 @@ pub(crate) mod sleep;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
+pub(crate) mod temp_sensor;
 pub(crate) mod timergroup;
 pub(crate) mod uart;
 
 pub(crate) use aes::*;
 pub(crate) use canfd::*;
+pub(crate) use dac::*;
 pub(crate) use dma::*;
 pub(crate) use ecc::*;
 pub(crate) use gpio::*;
@@ -38,10 +41,11 @@ pub(crate) use sleep::*;
 pub(crate) use soc::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
+pub(crate) use temp_sensor::*;
 pub(crate) use timergroup::*;
 pub(crate) use uart::*;
 
-use crate::support_status::{SupportStatus, SupportStatusLevel};
+use crate::support_status::{DriverStability, SupportStatus, SupportStatusLevel};
 
 pub(crate) trait GenericProperty {
     fn cfgs(&self) -> Option<Vec<String>> {
@@ -170,6 +174,8 @@ pub(crate) struct SupportItem {
     /// The heading of the table the driver is listed in. Groups are written in
     /// the order they first appear in.
     pub group: &'static str,
+    /// Driver-wide API stability status.
+    pub stability: DriverStability,
     /// If true, this driver is not shown in the peripheral support table.
     pub hide_from_peri_table: bool,
 }
@@ -195,6 +201,8 @@ macro_rules! driver_configs {
 
     (@default $default:literal) => { $default };
     (@default $default:literal $opt:literal) => { $opt };
+    (@stability) => { DriverStability::Unstable };
+    (@stability $stability:expr) => { $stability };
 
     // Creates a single struct
     (@one
@@ -249,6 +257,8 @@ macro_rules! driver_configs {
                     // Driver name, used in the generated documentation.
                     name: $name:literal,
 
+                    $(stability: $stability:expr,)?
+
                     $(hide_from_peri_table: $hide:literal,)?
 
                     // When set, the type must provide `fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)>`.
@@ -284,6 +294,7 @@ macro_rules! driver_configs {
                             name: $name,
                             config_group: stringify!($driver),
                             group: $table_group,
+                            stability: driver_configs!(@stability $($stability)?),
                             hide_from_peri_table: driver_configs!(@default false $($hide)?),
                         },
                     )+)+
@@ -355,6 +366,7 @@ driver_configs![
         GpioProperties {
             driver: gpio,
             name: "GPIO",
+            stability: DriverStability::Stable,
             has_computed_properties: true,
             properties: {
                 /// Digital GPIO register-layout generation derived from the chip SVD.
@@ -416,6 +428,7 @@ driver_configs![
         UartProperties<UartInstanceConfig> {
             driver: uart,
             name: "UART",
+            stability: DriverStability::Stable,
             properties: {
                 ram_size: u32,
                 version: u32,
@@ -447,6 +460,7 @@ driver_configs![
         I2cMasterProperties<I2cMasterInstanceConfig> {
             driver: i2c_master,
             name: "I2C master",
+            stability: DriverStability::Stable,
             properties: {
                 /// Register-layout generation derived from the chip SVD. Also bumped when only the
                 /// function clock configuration differs.
@@ -514,6 +528,7 @@ driver_configs![
         SpiMasterProperties<SpiMasterInstanceConfig> {
             driver: spi_master,
             name: "SPI master",
+            stability: DriverStability::Stable,
             properties: {
                 /// Register-layout generation derived from the chip SVD.
                 version: u32,
@@ -584,8 +599,21 @@ driver_configs![
             driver: parl_io,
             name: "PARL_IO",
             properties: {
+                /// Register block.
+                ///
+                /// `1` uses `tx_cfg0` and `rx_cfg0`, stores a byte length, and shares one interrupt.
+                /// `2` uses separate data, clock, and general registers, stores a bit length, and
+                /// has separate TX and RX interrupts.
                 version: u32,
-                // TODO: model signal counts, RC CLK out capability, etc.
+                /// Number of data lines on the TX unit and on the RX unit.
+                ///
+                /// The driver accepts 8 and 16.
+                max_data_width: u32,
+                /// The TX unit has a dedicated chip-select output, `PARL_TX_CS`.
+                ///
+                /// When this is false, the most significant TX data line carries the valid signal.
+                #[serde(default)]
+                has_tx_cs: bool,
             }
         },
         RmtProperties {
@@ -659,7 +687,11 @@ driver_configs![
         UsbSerialJtagProperties {
             driver: usb_serial_jtag,
             name: "USB Serial/JTAG",
-            properties: {}
+            properties: {
+                /// The analog pad groups that the USB Serial/JTAG controller can use, for example
+                /// `USJ` for the `USJ_DM`/`USJ_DP` pins.
+                phy_pads: Vec<String>,
+            }
         },
     ]
 
@@ -669,6 +701,10 @@ driver_configs![
             name: "Bluetooth",
             properties: {
                 controller: String,
+                /// Whether the CPU clock must stay at its configured frequency while the
+                /// controller uses the PHY.
+                #[serde(default)]
+                requires_fast_cpu: bool,
             }
         },
         WifiProperties {
@@ -688,12 +724,21 @@ driver_configs![
                 /// The Wi-Fi blobs contain Fine Timing Measurement code (`SOC_WIFI_FTM_SUPPORT`).
                 #[serde(default)]
                 has_ftm: bool,
+                /// Whether the CPU clock must stay at its configured frequency while the modem is
+                /// awake.
+                #[serde(default)]
+                requires_fast_cpu: bool,
             }
         },
         IeeeProperties {
             driver: ieee802154,
             name: "IEEE 802.15.4",
-            properties: {}
+            properties: {
+                /// Whether the CPU clock must stay at its configured frequency while the radio is
+                /// awake.
+                #[serde(default)]
+                requires_fast_cpu: bool,
+            }
         },
         EthernetProperties {
             driver: ethernet,
@@ -707,7 +752,7 @@ driver_configs![
                 rx_store_and_forward: bool,
                 /// When true, Type-2 RX IP checksum offload (`MAC.config.IPC`) is
                 /// enabled and the driver inspects RDES4. False on chips whose COE
-                /// mis-flags valid frames.
+                /// can false-positive on valid frames.
                 #[serde(default)]
                 rx_checksum_offload: bool,
                 /// When true, TX IP/TCP/UDP checksum insertion (`TDES0.CIC`) is
@@ -718,6 +763,9 @@ driver_configs![
                 /// Programmable DMA burst length (`DMABUSMODE.PBL`). A 32-beat burst
                 /// overflows the AXI bus on some chips.
                 dma_burst_len: u32,
+                /// The alignment, in bytes, that the EMAC DMA needs for each descriptor and
+                /// buffer.
+                dma_alignment: u32,
                 /// When true, the MAC exposes RGMII (1000 Mbps) pads in addition to RMII/MII.
                 #[serde(default)]
                 has_rgmii: bool,
@@ -757,6 +805,12 @@ driver_configs![
             name: "RGB display", // LCD_CAM, ESP32 I2S, S2 I2S
             properties: {
                 output_lines: u32,
+                /// `LCD_RGB_VERTICAL`, `LCD_RGB_HORIZONTAL`, `LCD_RGB_BLANK` and `LCD_RGB_CTRL`
+                /// hold the timing, and `LCD_RGB_MODE_EN` is in `LCD_MISC`. The other layout
+                /// stores the timing in `LCD_CTRL`, `LCD_CTRL1` and `LCD_CTRL2`, and
+                /// `LCD_RGB_MODE_EN` in `LCD_CTRL`.
+                #[serde(default)]
+                has_rgb_timing_registers: bool,
             }
         },
         SpiLcdProperties {
@@ -833,8 +887,6 @@ driver_configs![
                 #[serde(default)]
                 pcr_clock: bool,
                 #[serde(default)]
-                pll_clock_sel: Option<u32>,
-                #[serde(default)]
                 pcr_sar_clk_div: bool,
                 #[serde(default)]
                 sar_power_override: bool,
@@ -848,12 +900,30 @@ driver_configs![
         DacProperties {
             driver: dac,
             name: "DAC",
-            properties: {}
+            properties: {
+                /// Register layout used by the DAC controller.
+                ///
+                /// `1` uses RTC_IO and SENS; `2` uses a dedicated DAC register block.
+                #[serde(default)]
+                version: u32,
+                #[serde(default)]
+                channel_count: DacChannels,
+                /// Number of bits in a direct-output DAC code.
+                #[serde(default)]
+                resolution: u32,
+            }
         },
         TempProperties {
             driver: temp_sensor,
             name: "Temperature sensor",
-            properties: {}
+            properties: {
+                #[serde(default)]
+                register_block: TempSensorRegisterBlock,
+                /// Shortest settle time after power-up or a range change, in microseconds.
+                /// The sensor needs this time at every clock frequency.
+                #[serde(default)]
+                min_stabilization_time_us: u32,
+            }
         },
         TouchProperties {
             driver: touch,
@@ -866,10 +936,19 @@ driver_configs![
         LedcProperties {
             driver: ledc,
             name: "LEDC",
+            stability: DriverStability::Overhaul { issue: Some(2286) },
             properties: {
                 /// Register-layout generation derived from the chip SVD.
                 version: u32,
                 channel_count: u32,
+            }
+        },
+        Dma2dProperties {
+            driver: dma2d,
+            name: "2D DMA",
+            properties: {
+                tx_channel_count: u32,
+                rx_channel_count: u32,
             }
         },
         McpwmProperties {
@@ -970,6 +1049,7 @@ driver_configs![
         RngProperties {
             driver: rng,
             name: "RNG",
+            stability: DriverStability::Stable,
             properties: {
                 apb_cycle_wait_num: u32,
                 #[serde(default)]
@@ -1036,6 +1116,10 @@ driver_configs![
                 /// that have none. `cfgs()` returns `None` when the table is empty.
                 #[serde(default)]
                 retention: SleepRetentionProperties,
+                /// Whether `wait_for_interrupt` can switch the CPU clock to XTAL_CLK. No peripheral
+                /// function clock may derive from the CPU clock or from the bus clocks.
+                #[serde(default)]
+                idle_frequency_scaling: bool,
             }
         },
         UlpFsmProperties {
@@ -1074,6 +1158,10 @@ driver_configs![
                 separate_in_out_interrupts: bool,
                 #[serde(default)]
                 gdma_version: Option<u32>,
+                /// Not `Option<PsramMaxBurst>`: an optional property also emits
+                /// `dma_psram_max_burst_is_set` when the value is absent.
+                #[serde(default)]
+                psram_max_burst: PsramMaxBurst,
                 #[serde(default)]
                 engines: DmaEngines,
             }
@@ -1118,7 +1206,14 @@ driver_configs![
                 octal_spi: bool,
                 #[serde(default)]
                 hex_spi: bool,
+                /// The MSPI can tune the flash and PSRAM input timing.
+                #[serde(default)]
+                has_timing_tuning: bool,
                 extmem_origin: u32,
+                /// Whether PSRAM must switch to a low speed while the CPU clock comes from
+                /// XTAL_CLK, because the AXI bus clock limits the PSRAM clock.
+                #[serde(default)]
+                idle_low_speed_switch: bool,
             }
         },
         RomProperties {
@@ -1134,6 +1229,8 @@ driver_configs![
                 has_md5_bsd: bool,
                 #[serde(default)]
                 has_md5_mbedtls: bool,
+                #[serde(default)]
+                no_libgcc: bool,
             }
         },
         SocProperties {
@@ -1151,12 +1248,25 @@ driver_configs![
                 cpu_has_zcmp_workaround: bool,
                 #[serde(default)]
                 multi_core_enabled: bool,
+                /// The bootloader sets the PMA entries on core 0 only. Core 1 must copy them.
+                #[serde(default)]
+                cpu_pma_needs_core1_setup: bool,
                 #[serde(default)]
                 cpu_csr_prv_mode: Option<u32>,
                 #[serde(default)]
                 internal_memory_cached: bool,
+                /// Whether the cache is in the CPU power domain. A CPU power-down loses the dirty
+                /// cache lines.
+                #[serde(default)]
+                cpu_powers_down_cache: bool,
                 #[serde(default)]
                 has_swd_watchdog: bool,
+                /// New CPU and bus clock dividers take effect only after a shared update signal.
+                #[serde(default)]
+                has_bus_clock_update: bool,
+                /// The hardware can lower APB_CLK while the APB bus is idle.
+                #[serde(default)]
+                has_apb_frequency_reduction: bool,
                 #[serde(default)]
                 cpu_mcause_mask: u32,
                 /// PMP address matching granularity, in bytes.

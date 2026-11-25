@@ -16,6 +16,8 @@
 //! When using AES-DMA, the peripheral can be configured to use different block
 //! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128.
 //!
+//! `aes::gcm::AesGcmContext` runs AES-GCM.
+//!
 //! ## Examples
 //!
 //! ### Encrypting and decrypting a message
@@ -54,6 +56,7 @@ use crate::{
 };
 
 pub mod cipher_modes;
+pub mod gcm;
 
 for_each_aes_key_length! {
     ($len:literal) => {
@@ -358,7 +361,7 @@ pub enum Endianness {
 /// This module enhances the AES capabilities by utilizing DMA to handle data
 /// transfer, which can significantly speed up operations when dealing with
 /// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
-/// CTR, CFB8, and CFB128.
+/// CTR, CFB8, and CFB128. It also runs `aes::gcm::AesGcmContext`.
 #[cfg(aes_supports_dma)]
 pub mod dma {
     use core::{mem::ManuallyDrop, ptr::NonNull};
@@ -398,6 +401,9 @@ pub mod dma {
         work_queue::{Poll, Status, VTable, WorkQueueDriver},
     };
 
+    #[cfg(aes_dma_mode_gcm)]
+    pub(super) mod gcm;
+
     /// Specifies the block cipher modes available for AES operations.
     #[derive(Clone, Copy, PartialEq, Eq)]
     pub enum CipherMode {
@@ -419,12 +425,24 @@ pub mod dma {
         /// Cipher Feedback Mode with 128-bit shifting.
         #[cfg(aes_dma_mode_cfb128)]
         Cfb128 = 5,
-        // TODO: GCM needs different handling, not supported yet
+        /// Galois/Counter Mode. [`AesGcmContext`](crate::aes::gcm::AesGcmContext) runs it, and
+        /// [`AesDma::process`] does not take it.
+        #[cfg(aes_dma_mode_gcm)]
+        Gcm    = 6,
     }
 
     // If we can process from PSRAM, we need 2 extra descriptors. One will store the unaligned head,
     // one will store the unaligned tail.
     const OUT_DESCR_COUNT: usize = 1 + 2 * cfg!(dma_can_access_psram) as usize;
+
+    // The AES backend runs one operation at a time, so the modes can share descriptors.
+    const DESCR_COUNT: usize = cfg_select! {
+        aes_dma_mode_gcm => crate::dma::max(
+            OUT_DESCR_COUNT + 1,
+            gcm::INPUT_DESCRIPTORS + gcm::OUTPUT_DESCRIPTORS,
+        ),
+        _ => OUT_DESCR_COUNT + 1,
+    };
 
     /// A DMA capable AES instance.
     #[instability::unstable]
@@ -438,8 +456,8 @@ pub mod dma {
     impl<'d> super::Aes<'d> {
         /// Enables DMA for the current instance of the AES driver.
         pub fn with_dma(self, channel: impl AesDmaChannel<'d>) -> AesDma<'d> {
-            let channel = Channel::new(channel.into());
-            channel.runtime_ensure_compatible(self.aes.dma_peripheral());
+            let mut channel = Channel::new(channel.into());
+            channel.connect(self.aes.dma_peripheral());
             AesDma { aes: self, channel }
         }
     }
@@ -482,10 +500,8 @@ pub mod dma {
             TXBUF: DmaTxBuffer,
             RXBUF: DmaRxBuffer,
         {
-            let peri = self.aes.aes.dma_peripheral();
-
-            if let Err(error) = unsafe { self.channel.tx.prepare_transfer(peri, &mut input) }
-                .and_then(|_| unsafe { self.channel.rx.prepare_transfer(peri, &mut output) })
+            if let Err(error) = unsafe { self.channel.tx.prepare_transfer(&mut input) }
+                .and_then(|_| unsafe { self.channel.rx.prepare_transfer(&mut output) })
                 // Start them together, to avoid the latter prepare discarding data from FIFOs.
                 .and_then(|_| self.channel.tx.start_transfer())
                 .and_then(|_| self.channel.rx.start_transfer())
@@ -568,12 +584,13 @@ pub mod dma {
                 .block_mode()
                 .modify(|_, w| unsafe { w.block_mode().bits(mode as u8) });
 
-            // FIXME
+            // FIXME: users should be able to choose between INC32 and INC128.
+            // The CPU-driven `Ctr` needs to be updated to match if that's added.
             if mode == CipherMode::Ctr {
                 self.aes
                     .regs()
                     .inc_sel()
-                    .modify(|_, w| w.inc_sel().clear_bit());
+                    .modify(|_, w| w.inc_sel().set_bit());
             }
         }
 
@@ -618,13 +635,24 @@ pub mod dma {
         /// Waits for the transfer to finish and returns the peripheral and
         /// buffers.
         pub fn wait(mut self) -> (AesDma<'d>, RX::Final, TX::Final) {
+            self.wait_for_dma();
+            self.release()
+        }
+
+        /// Waits until the AES block has processed the input and the DMA has written all of the
+        /// output, then stops the DMA. The AES block keeps its registers until [`Self::release`].
+        fn wait_for_dma(&mut self) {
             while !self.is_done() {}
             while !self.aes_dma.channel.rx.is_done() {}
 
             // Stop the DMA as it doesn't know that the aes has stopped.
             self.aes_dma.channel.rx.stop_transfer();
             self.aes_dma.channel.tx.stop_transfer();
+        }
 
+        /// Resets the AES block, which clears its registers, and returns the peripheral and
+        /// buffers.
+        fn release(mut self) -> (AesDma<'d>, RX::Final, TX::Final) {
             self.aes_dma.finish_transform();
 
             unsafe {
@@ -680,8 +708,7 @@ pub mod dma {
     const AES_DMA_VTABLE: VTable<super::AesOperation> = VTable {
         post: |driver, item| {
             let driver = unsafe { AesDmaBackend::from_raw(driver) };
-            driver.start_processing(item);
-            Some(Poll::Pending(false))
+            Some(driver.start_processing(item))
         },
         poll: |driver, item| {
             let driver = unsafe { AesDmaBackend::from_raw(driver) };
@@ -704,7 +731,10 @@ pub mod dma {
         Idle(AesDma<'d>),
         WaitingForDma {
             transfer: AesTransfer<'d, NoBuffer, NoBuffer>,
-            remaining_bytes: usize,
+            /// The output this transfer writes. The operation continues from its end. Only its own
+            /// lines are invalidated: an earlier transfer's last partial line, which the CPU wrote
+            /// from a bounce buffer, can be a whole line inside the operation's output.
+            written: NonNull<[u8]>,
         },
     }
 
@@ -765,7 +795,10 @@ pub mod dma {
 
         #[cfg(dma_can_access_psram)]
         unaligned_data_buffers: [Option<ManualWritebackBuffer>; 2],
-        descriptors: InternalMemory<[DmaDescriptor; OUT_DESCR_COUNT + 1]>,
+        descriptors: InternalMemory<[DmaDescriptor; DESCR_COUNT]>,
+
+        #[cfg(aes_dma_mode_gcm)]
+        gcm: InternalMemory<gcm::GcmDma>,
     }
 
     // The DMA descriptors prevent auto-implementing Sync and Send, but they can be treated as Send
@@ -805,7 +838,10 @@ pub mod dma {
 
                 #[cfg(dma_can_access_psram)]
                 unaligned_data_buffers: [const { None }; 2],
-                descriptors: InternalMemory::new([DmaDescriptor::EMPTY; OUT_DESCR_COUNT + 1]),
+                descriptors: InternalMemory::new([DmaDescriptor::EMPTY; DESCR_COUNT]),
+
+                #[cfg(aes_dma_mode_gcm)]
+                gcm: InternalMemory::new(gcm::GcmDma::new()),
             }
         }
 
@@ -856,6 +892,11 @@ pub mod dma {
                 DriverState::Idle(aes_dma) => aes_dma,
                 _ => unreachable!(),
             };
+
+            #[cfg(aes_dma_mode_gcm)]
+            if let Some(gcm) = item.gcm {
+                return self.start_gcm(driver, item, gcm);
+            }
 
             // There are some constraints that make us (partially) fall back to CPU-driven mode:
             // - The algo isn't implemented in hardware. Not much to do here, we process the whole
@@ -910,6 +951,8 @@ pub mod dma {
                 cipher_mode: item.cipher_mode,
                 buffers: unsafe { item.buffers.byte_add(flushed) },
                 key: item.key.copy(),
+                #[cfg(aes_dma_mode_gcm)]
+                gcm: None,
             };
 
             // If there is enough data for the DMA, set it up:
@@ -923,6 +966,11 @@ pub mod dma {
         }
 
         fn poll_status(&mut self, item: &mut AesOperation) -> Poll {
+            #[cfg(aes_dma_mode_gcm)]
+            if let Some(gcm) = item.gcm {
+                return self.finish_gcm(item, gcm);
+            }
+
             match &self.state {
                 DriverState::WaitingForDma { transfer, .. } if !transfer.is_done() => {
                     Poll::Pending(false)
@@ -930,17 +978,24 @@ pub mod dma {
 
                 DriverState::WaitingForDma { .. } => {
                     let DriverState::WaitingForDma {
-                        transfer,
-                        remaining_bytes,
+                        mut transfer,
+                        written,
                     } = core::mem::replace(&mut self.state, DriverState::None)
                     else {
                         unreachable!()
                     };
 
-                    let (driver, _, _) = transfer.wait();
-                    unsafe { item.cipher_mode.as_mut() }.read_state(&driver);
+                    // The IV the hardware left for the context's next call is read after the DMA
+                    // has finished, and before `release` resets the peripheral, which clears it.
+                    transfer.wait_for_dma();
+                    unsafe { item.cipher_mode.as_mut() }.read_state(&transfer.aes_dma);
+                    let (driver, _, _) = transfer.release();
 
                     driver.clear_interrupt();
+
+                    // The CPU must not read a stale line of the output the DMA wrote.
+                    #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                    crate::dma::invalidate_received(written);
 
                     // Write out PSRAM data if needed:
                     #[cfg(dma_can_access_psram)]
@@ -952,16 +1007,19 @@ pub mod dma {
                         *buffer = None;
                     }
 
+                    // The operation is done up to the end of what this transfer wrote.
+                    let done =
+                        written.addr().get() + written.len() - item.buffers.output.addr().get();
+
                     // Now process the remainder:
-                    if remaining_bytes > 0 {
+                    if done < item.buffers.output.len() {
                         let mut temp_item = AesOperation {
                             mode: item.mode,
                             cipher_mode: item.cipher_mode,
-                            buffers: unsafe {
-                                item.buffers
-                                    .byte_add(item.buffers.input.len() - remaining_bytes)
-                            },
+                            buffers: unsafe { item.buffers.byte_add(done) },
                             key: item.key.copy(),
+                            #[cfg(aes_dma_mode_gcm)]
+                            gcm: None,
                         };
 
                         // If there is enough data for the DMA, set it up again:
@@ -989,8 +1047,8 @@ pub mod dma {
             mut driver: AesDma<'d>,
             work_item: &mut AesOperation,
         ) -> Result<(), AesDma<'d>> {
-            let input_len = work_item.buffers.input.len();
-            let (input_dscr, output_dscr) = self.descriptors.get_mut().into_inner().split_at_mut(1);
+            let (input_dscr, output_dscr) =
+                self.descriptors.get_mut().into_inner()[..OUT_DESCR_COUNT + 1].split_at_mut(1);
             let (input_buffer, data_len) = unsafe {
                 // This unwrap is infallible as AES-DMA devices don't have TX DMA alignment
                 // requirements.
@@ -1040,7 +1098,10 @@ pub mod dma {
 
             self.state = DriverState::WaitingForDma {
                 transfer,
-                remaining_bytes: input_len - data_len,
+                written: NonNull::slice_from_raw_parts(
+                    work_item.buffers.output.cast::<u8>(),
+                    data_len,
+                ),
             };
 
             Ok(())
@@ -1336,6 +1397,9 @@ struct AesOperation {
     // change during AES operation.
     buffers: UnsafeCryptoBuffers,
     key: Key,
+    // Set for an AES-GCM operation, which uses this instead of `cipher_mode`.
+    #[cfg(aes_dma_mode_gcm)]
+    gcm: Option<NonNull<gcm::GcmState>>,
 }
 
 impl Clone for AesOperation {
@@ -1345,6 +1409,8 @@ impl Clone for AesOperation {
             cipher_mode: self.cipher_mode,
             buffers: self.buffers,
             key: self.key.copy(),
+            #[cfg(aes_dma_mode_gcm)]
+            gcm: self.gcm,
         }
     }
 }
@@ -1473,6 +1539,14 @@ impl<'d> AesBackend<'d> {
     }
 
     fn process(&mut self, item: &mut AesOperation) -> Poll {
+        // This backend cannot run the hardware GCM item. It refuses the item before any key
+        // reaches the registers, and the operation runs as AES-CTR steps instead.
+        #[cfg(aes_dma_mode_gcm)]
+        if let Some(mut gcm) = item.gcm {
+            unsafe { gcm.as_mut() }.refuse();
+            return Poll::Ready(Status::Completed);
+        }
+
         let driver = self.driver.get_or_insert_with(|| {
             let peri = unsafe { self.peri.clone_unchecked() };
             Aes::new(peri)
@@ -1536,6 +1610,8 @@ impl AesContext {
                 cipher_mode: NonNull::dangling(),
                 buffers: unsafe { CryptoBuffers::new_in_place(&mut []).into_inner() },
                 key: key.into(),
+                #[cfg(aes_dma_mode_gcm)]
+                gcm: None,
             }),
         }
     }

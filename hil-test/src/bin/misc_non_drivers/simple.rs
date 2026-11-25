@@ -31,7 +31,8 @@ mod tests {
     // Test time
 
     #[test]
-    fn duration_since_epoch_is_not_relative_to_now() {
+    fn duration_since_epoch_is_not_relative_to_now(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         let now = Instant::EPOCH;
 
         Delay::new().delay_ns(10_000);
@@ -40,7 +41,8 @@ mod tests {
     }
 
     #[test]
-    fn large_instant_difference_does_not_panic() {
+    fn large_instant_difference_does_not_panic(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         assert_eq!(
             (Instant::EPOCH + Duration::MAX).duration_since_epoch(),
             Duration::MAX
@@ -51,6 +53,7 @@ mod tests {
     #[test]
     fn test_current_time_construct_systimer(ctx: Context) {
         time_moves_forward_during(ctx, |ctx| {
+            hil_test::init_logger!(ctx.p);
             // construct the timer in between calls to current_time
             let _ = esp_hal::timer::systimer::SystemTimer::new(ctx.p.SYSTIMER);
         })
@@ -60,13 +63,15 @@ mod tests {
     #[test]
     fn test_current_time_construct_timg0(ctx: Context) {
         time_moves_forward_during(ctx, |ctx| {
+            hil_test::init_logger!(ctx.p);
             // construct the timer in between calls to current_time
             let _ = esp_hal::timer::timg::TimerGroup::new(ctx.p.TIMG0);
         })
     }
 
     #[test]
-    fn delay_ns() {
+    fn delay_ns(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         let t1 = Instant::now();
         Delay::new().delay_ns(600_000);
         let t2 = Instant::now();
@@ -80,7 +85,8 @@ mod tests {
     }
 
     #[test]
-    fn delay_70millis() {
+    fn delay_70millis(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         let t1 = Instant::now();
         Delay::new().delay_millis(70);
         let t2 = Instant::now();
@@ -94,7 +100,8 @@ mod tests {
     }
 
     #[test]
-    fn delay_1_500us() {
+    fn delay_1_500us(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         let t1 = Instant::now();
         Delay::new().delay_us(1_500);
         let t2 = Instant::now();
@@ -108,7 +115,8 @@ mod tests {
     }
 
     #[test]
-    fn delay_300ms() {
+    fn delay_300ms(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         let t1 = Instant::now();
         Delay::new().delay_ms(300);
         let t2 = Instant::now();
@@ -124,7 +132,8 @@ mod tests {
     // Test ROM functions
 
     #[test]
-    fn test_crc() {
+    fn test_crc(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         let data = "123456789";
 
         let crc_hdlc = crc::crc32_le(!0xffffffff, data.as_ref());
@@ -147,14 +156,16 @@ mod tests {
     }
 
     #[test]
-    fn test_crc_rom_function() {
+    fn test_crc_rom_function(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         let crc = esp_bootloader_esp_idf::Crc32ForTesting::new();
         let res = crc.crc(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
         assert_eq!(res, 436745307);
     }
 
     #[test]
-    fn test_md5() {
+    fn test_md5(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         let sentence = "The quick brown fox jumps over a lazy dog";
 
         let mut md5_ctx = md5::Context::new();
@@ -187,7 +198,8 @@ mod tests {
     /// (i.e. every test here fails with an unhelpful `ERROR probe_rs_debug::debug_info:Other("Stack
     /// pointer is too far away to unwind")``)
     #[test]
-    fn can_boot() {
+    fn can_boot(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
         #[repr(align(64))]
         struct Aligned {
             _data: [u8; 128],
@@ -195,13 +207,5 @@ mod tests {
 
         #[used]
         static ALIGNED: Aligned = Aligned { _data: [0; 128] };
-    }
-
-    #[test]
-    #[cfg(usb_serial_jtag_driver_supported)]
-    fn creating_peripheral_does_not_break_debug_connection(ctx: Context) {
-        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
-
-        _ = UsbSerialJtag::new(ctx.p.USB_DEVICE).into_async().split();
     }
 }

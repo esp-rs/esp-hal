@@ -72,6 +72,7 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
+    clock::CpuFrequencyLock,
     ethernet::phy::PhyError,
     gpio::{
         AlternateFunction,
@@ -783,6 +784,8 @@ fn eth_mac_isr() {
 pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
     _eth: ETH<'d>,
     _clock_guard: GenericPeripheralGuard<{ Peripheral::Emac as u8 }>,
+    // The DMA receives frames at any time, also while the CPU waits for an interrupt.
+    _cpu_frequency_lock: CpuFrequencyLock,
     tx: TDesRing<'d>,
     rx: RDesRing<'d>,
     phy: P,
@@ -801,7 +804,8 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
     /// Creates an Ethernet driver using RMII ([`RmiiPinBundle`]) or MII ([`MiiPinBundle`]).
     #[cfg_attr(
         ethernet_has_rgmii,
-        doc = "On chips with RGMII, use [`RgmiiPinBundle`]."
+        doc = "On chips with RGMII, use [`RgmiiPinBundle`]. RGMII is limited to 100 Mbps when the
+    MPLL does not divide to its 125 MHz transmit clock."
     )]
     pub fn new<B: EthernetPinBundle + 'd, const RX: usize, const TX: usize>(
         eth: ETH<'d>,
@@ -814,13 +818,24 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
 
         pins.apply();
 
+        let max_speed = cfg_select! {
+            ethernet_has_rgmii => {
+                if B::MAX_SPEED == Speed::_1000M {
+                    clock::rgmii_max_speed()
+                } else {
+                    B::MAX_SPEED
+                }
+            }
+            _ => B::MAX_SPEED,
+        };
+
         init_common(
             clock_guard,
             storage,
             mac_addr,
             phy,
             eth,
-            B::MAX_SPEED,
+            max_speed,
             B::apply_speed,
         )
     }
@@ -862,6 +877,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
             apply_speed: self.apply_speed,
             duplex: self.duplex,
             _clock_guard: self._clock_guard,
+            _cpu_frequency_lock: self._cpu_frequency_lock,
             _eth: self._eth,
             _mode: PhantomData,
         }
@@ -1006,6 +1022,7 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
             apply_speed: self.apply_speed,
             duplex: self.duplex,
             _clock_guard: self._clock_guard,
+            _cpu_frequency_lock: self._cpu_frequency_lock,
             _eth: self._eth,
             _mode: PhantomData,
         }
@@ -1067,6 +1084,7 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
         apply_speed,
         duplex: Duplex::Full,
         _clock_guard: clock_guard,
+        _cpu_frequency_lock: CpuFrequencyLock::new(),
         _eth: eth,
         _mode: PhantomData,
     };

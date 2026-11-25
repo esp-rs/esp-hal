@@ -9,9 +9,14 @@ Reviewers ask for the same changes again and again. Check your PR against this l
 for a review.
 
 - **Comments**: Keep only comments that tell the reader something the code cannot, such as a
-  hardware quirk or an order that must hold. Remove comments that narrate the code, explain how you
-  found the bug, or describe how the code worked before. Do not add section separators. Do not add
-  a `TODO` for a known limitation: fix it in the PR, or open an issue.
+  hardware quirk or an order that must hold. Do not write comments for the reviewer into the code.
+  Remove comments that narrate the code, explain how you found the bug, or describe how the code
+  worked before. Do not add section separators. Do not add a `TODO` for a known limitation: fix it
+  in the PR, or open an issue.
+- **ESP-IDF references**: In code ported from ESP-IDF, state the hardware constraint, not the
+  ESP-IDF function that the code copies. Do not write "Like esp-idf's `x`, this code …" or "Ports
+  esp-idf's `x`". Put the permalink, with a commit hash, on a separate `See <link>.` line. See
+  [Maintainability] for details.
 - **Approach**: Fix the cause, not the symptom. Make the smallest change that solves the problem.
   Before you add new code, a dependency or an abstraction, look for one that the codebase already
   has.
@@ -39,6 +44,7 @@ for a review.
   Do not merge or rebase on `main` unless there is a conflict, because each push runs CI again.
 
 [esp-rs developer guidelines]: ./DEVELOPER-GUIDELINES.md
+[Maintainability]: ./DEVELOPER-GUIDELINES.md#maintainability
 [Changelog and Migration Guide Entries]: #changelog-and-migration-guide-entries
 
 ## Writing the description
@@ -109,8 +115,8 @@ maintainer will either write them or apply the `skip-changelog` label before the
 PR is merged.
 
 If you do want to document your change, add entries directly in the PR description
-using the structured sections in the template. Do **not** edit `CHANGELOG.md`.
-Those files are updated automatically at release time from the PR descriptions.
+using the structured sections in the template. Do **not** edit `CHANGELOG.md` or
+`MIGRATING-*.md`. Those files are updated automatically at release time from the PR descriptions.
 
 ### Format
 
@@ -163,6 +169,10 @@ Each item in the `# Changelog` section must begin with one of:
 If your change requires user code to be updated, add a `# Migration guide` section. Each breaking
 change needs a `## crate/area` heading and a `### Title` for the specific change, followed by the
 migration steps.
+
+Write a migration guide entry only when users need a step that the changelog entry does not give,
+for example a replacement API or a changed signature. Do not repeat the changelog entry in other
+words. For example, "Removed: Support for embassy-sync 0.6 and 0.7." needs no migration guide entry.
 
 If your change breaks the stable API of a crate, the PR needs the `breaking-change-<crate-name>`
 label (e.g. `breaking-change-esp-hal`). Without it, the semver check in CI fails. Ask a maintainer

@@ -5,6 +5,14 @@ use crate::{
     soc::{clocks::ClockConfig, regi2c},
 };
 
+// `backup_clk_sel` uses `SOC_CPU_CLK_SRC_*`, where XTAL = 0.
+const HP_SYSCLK_XTAL: u8 = 0;
+
+// `backup_mode` is `PMU_HP_RETENTION_REGDMA_CONFIG(dir, entry)`: the direction in bit 2, where 1
+// is the backup, then the REGDMA entry.
+const RESTORE_ENTRY_0: u8 = 0;
+const BACKUP_ENTRY_0: u8 = 1 << 2;
+
 pub(crate) fn init(_config: &ClockConfig) {
     // * No peripheral reg i2c power up required on the target */
     regi2c::I2C_PMU_EN_I2C_RTC_DREG.write_field(0);
@@ -53,6 +61,21 @@ pub(crate) fn init(_config: &ClockConfig) {
             w.hp_sleep_sys_clk_slp_sel().set_bit();
             w.hp_sleep_icg_slp_sel().set_bit()
         });
+
+        // The retention parameters that the REGDMA uses between the active and the sleep state.
+        // See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_hw_support/port/esp32h2/pmu_param.c#L278-L322>.
+        pmu.hp_active_backup().modify(|_, w| {
+            w.hp_sleep2active_backup_modem_clk_code().bits(3);
+            w.hp_sleep2active_backup_clk_sel().bits(HP_SYSCLK_XTAL);
+            w.hp_sleep2active_backup_mode().bits(RESTORE_ENTRY_0)
+        });
+        pmu.hp_sleep_backup().modify(|_, w| {
+            w.hp_active2sleep_backup_modem_clk_code().bits(3);
+            w.hp_active2sleep_backup_clk_sel().bits(HP_SYSCLK_XTAL);
+            w.hp_active2sleep_backup_mode().bits(BACKUP_ENTRY_0)
+        });
+        pmu.hp_active_backup_clk().write(|w| w.bits(u32::MAX));
+        pmu.hp_sleep_backup_clk().write(|w| w.bits(u32::MAX));
 
         pmu.slp_wakeup_cntl5()
             .modify(|_, w| w.lp_ana_wait_target().bits(15));
@@ -135,6 +158,8 @@ bitfield::bitfield! {
     #[derive(Clone, Copy, Default)]
     pub struct HpClkPower(u32);
 
+    pub bool, i2c_iso_en   , set_i2c_iso_en   : 26;
+    pub bool, i2c_retention, set_i2c_retention: 27;
     pub bool, xpd_bbpll    , set_xpd_bbpll    : 30;
 }
 

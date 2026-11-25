@@ -1,11 +1,14 @@
 //! Light sleep while the station is in power save.
 //!
-//! The blob wakes the chip for each beacon through the TSF hardware and the `Wifi` wakeup source.
-//! The entry hook refuses every sleep that the blob is not ready for.
+//! The blob wakes the chip for each beacon through the TSF hardware and the `Wifi` wakeup source,
+//! or with software timers on the ESP32. The entry hook refuses every sleep that the blob is not
+//! ready for. With the MAC and baseband power-down, the hooks also let the blob save and restore
+//! them.
 
 use esp_hal::rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig};
 use portable_atomic::{AtomicBool, AtomicU32, Ordering};
 
+#[cfg(not(esp32))]
 unsafe extern "C" {
     fn esp_wifi_internal_is_tsf_active() -> bool;
     fn esp_wifi_internal_update_light_sleep_wake_ahead_time(time_us: u32);
@@ -15,6 +18,7 @@ unsafe extern "C" {
 ///
 /// The blob starts this much earlier before a beacon. esp-hal does not measure its wake time, so
 /// this is an estimate with margin. ESP-IDF uses about 370 µs on the C6.
+#[cfg(not(esp32))]
 const WAKE_AHEAD_US: u32 = 2000;
 
 static POWER_SAVE: AtomicBool = AtomicBool::new(false);
@@ -35,13 +39,36 @@ pub(crate) fn set_station_only(station_only: bool) {
 
 /// The blob takes this lock while it must stay awake, for example during a scan or while it waits
 /// for a beacon.
+///
+/// While the lock is held, the CPU clock also stays at its configured frequency.
 pub(crate) fn acquire_sleep_lock() {
     SLEEP_LOCK.fetch_add(1, Ordering::Relaxed);
+    #[cfg(wifi_requires_fast_cpu)]
+    esp_hal::clock::CpuFrequencyLock::acquire();
 }
 
 /// Releases the lock taken by [`acquire_sleep_lock`].
 pub(crate) fn release_sleep_lock() {
-    let _ = SLEEP_LOCK.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1));
+    if SLEEP_LOCK
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1))
+        .is_ok()
+    {
+        #[cfg(wifi_requires_fast_cpu)]
+        esp_hal::clock::CpuFrequencyLock::release();
+    }
+}
+
+/// Releases the locks that the blob still holds.
+///
+/// Call this after `esp_wifi_deinit`.
+pub(crate) fn clear_sleep_lock() {
+    let held = SLEEP_LOCK.swap(0, Ordering::Relaxed);
+    #[cfg(wifi_requires_fast_cpu)]
+    for _ in 0..held {
+        esp_hal::clock::CpuFrequencyLock::release();
+    }
+    #[cfg(not(wifi_requires_fast_cpu))]
+    let _ = held;
 }
 
 /// Claims the `Wifi` wakeup source, so that the chip can sleep while the station is in power
@@ -51,12 +78,19 @@ pub(crate) fn release_sleep_lock() {
 pub(crate) fn claim_wake_source() {
     let mhz = esp_hal::clock::cpu_clock().as_mhz() as i32;
     unsafe {
+        #[cfg(not(esp32))]
         esp_wifi_internal_update_light_sleep_wake_ahead_time(WAKE_AHEAD_US);
         // Without this call, the blob does not arm the TSF wakeup for the next beacon.
         crate::sys::include::esp_wifi_internal_update_light_sleep_default_params(mhz, mhz);
     }
 
-    WakeupSource::Wifi.enable_with_hooks(Some(sleep_entry), None);
+    WakeupSource::Wifi.enable_with_hooks(
+        Some(sleep_entry),
+        cfg_select! {
+            all(supports_modem_power_down, feature = "unstable") => Some(super::mac_bb::power_up),
+            _ => None,
+        },
+    );
 }
 
 /// Releases the claim taken by [`claim_wake_source`].
@@ -72,11 +106,17 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     }
 
     let station_idle = POWER_SAVE.load(Ordering::Relaxed) && STATION_ONLY.load(Ordering::Relaxed);
+    let tsf_active = cfg_select! {
+        esp32 => false,
+        _ => unsafe { esp_wifi_internal_is_tsf_active() },
+    };
 
-    if !station_idle
-        || SLEEP_LOCK.load(Ordering::Relaxed) > 0
-        || unsafe { esp_wifi_internal_is_tsf_active() }
-    {
+    if !station_idle || SLEEP_LOCK.load(Ordering::Relaxed) > 0 || tsf_active {
         config.reject_sleep();
+    } else {
+        // Only when the blob accepts the sleep, because it still uses the MAC and baseband
+        // otherwise. If a later hook refuses the sleep, the exit hook restores them.
+        #[cfg(all(supports_modem_power_down, feature = "unstable"))]
+        super::mac_bb::power_down();
     }
 }

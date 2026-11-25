@@ -9,13 +9,9 @@
 #![allow(dead_code, reason = "Some of this is bound to be unused")]
 #![allow(missing_docs, reason = "Experimental")]
 
-use core::sync::atomic::{AtomicBool, Ordering};
-
-use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
-
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU},
-    soc::{regi2c, xtal32k},
+    soc::{regi2c, update_bus_clocks, with_single_bus_clock_update, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -88,39 +84,20 @@ impl ClockConfig {
     }
 
     pub(crate) fn configure(self, clocks: &mut ClockTree) {
-        // HP_ROOT_CLK and the CPU, AHB and APB dividers share one update signal. Write the
-        // complete configuration before latching it, applying each change separately would
-        // temporarily overclock the buses.
-        BUS_CLOCK_UPDATE_DEFERRED.store(true, Ordering::Relaxed);
-        self.apply(clocks);
-        BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
-
-        update_bus_clocks();
-
-        // esp_rom_set_cpu_ticks_per_us(), the ROM delay functions need this.
-        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+        with_single_bus_clock_update(|| self.apply(clocks));
     }
 }
 
-static BUS_CLOCK_UPDATE_DEFERRED: AtomicBool = AtomicBool::new(false);
-
-/// Applies a new `soc_clk_sel`, `cpu_div_num`, `ahb_div_num` or `apb_div_num`.
+/// Powers up and configures the BBPLL and the XTAL frequency doubler again, if a clock uses them.
 ///
-/// The bus may get stuck if the new combination is invalid.
-fn update_bus_clocks() {
-    if BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
-        return;
+/// The PMU powers both circuits down in light sleep, and the BBPLL loses its analog configuration.
+pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
+    if clocks.pll_f96m_clk_refcount > 0 {
+        enable_pll_f96m_clk_impl(clocks, true);
     }
-
-    PCR::regs()
-        .bus_clk_update()
-        .write(|w| w.bus_clock_update().set_bit());
-    while PCR::regs()
-        .bus_clk_update()
-        .read()
-        .bus_clock_update()
-        .bit_is_set()
-    {}
+    if clocks.xtal_x2_clk_refcount > 0 {
+        enable_xtal_x2_clk_impl(clocks, true);
+    }
 }
 
 // PLL_F96M_CLK
@@ -332,18 +309,23 @@ fn configure_ahb_clk_impl(
 
 // APB_CLK
 
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do here.
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    crate::soc::enable_apb_frequency_reduction(!en);
 }
 
 fn configure_apb_clk_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<ApbClkConfig>,
+    old_config: Option<ApbClkConfig>,
     new_config: ApbClkConfig,
 ) {
     PCR::regs()
         .apb_freq_conf()
         .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
+
+    // No driver uses APB_CLK before the first configuration.
+    if old_config.is_none() {
+        crate::soc::enable_apb_frequency_reduction(true);
+    }
 
     update_bus_clocks();
 }
@@ -414,7 +396,8 @@ fn configure_ble_lp_clk_impl(
 ) {
     let divisor = match new_config {
         BleLpClkConfig::Xtal => xtal_clk_frequency() / ble_lp_xtal_clk_frequency() - 1,
-        _ => 0,
+        #[cfg(use_xtal32k)]
+        BleLpClkConfig::Xtal32k => 0,
     };
     let sel_xtal32k = cfg_select! {
         use_xtal32k => new_config == BleLpClkConfig::Xtal32k,
@@ -422,8 +405,7 @@ fn configure_ble_lp_clk_impl(
     };
 
     LP_CLKRST::regs().lpperi().modify(|_, w| unsafe {
-        w.lp_sel_osc_slow()
-            .bit(new_config == BleLpClkConfig::RcSlow);
+        w.lp_sel_osc_slow().clear_bit();
         w.lp_sel_osc_fast().clear_bit();
         w.lp_sel_xtal().bit(new_config == BleLpClkConfig::Xtal);
         w.lp_sel_xtal32k().bit(sel_xtal32k);
@@ -538,5 +520,111 @@ impl TimgInstance {
                 .timergroup1_wdt_clk_conf()
                 .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(sel) }),
         };
+    }
+}
+
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.function_clk_en().bit(en));
+    }
+}
+
+impl RmtInstance {
+    // RMT_SCLK
+
+    fn enable_sclk_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .rmt_sclk_conf()
+            .modify(|_, w| w.sclk_en().bit(en));
+    }
+
+    fn configure_sclk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<RmtSclkConfig>,
+        new_config: RmtSclkConfig,
+    ) {
+        PCR::regs().rmt_sclk_conf().modify(|_, w| {
+            w.sclk_sel().bit(match new_config {
+                RmtSclkConfig::XtalClk => false,
+                RmtSclkConfig::RcFastClk => true,
+            })
+        });
+    }
+}
+
+impl TwaiInstance {
+    // TWAI_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .twai0_func_clk_conf()
+            .modify(|_, w| w.twai0_func_clk_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<TwaiFunctionClockConfig>,
+        new_config: TwaiFunctionClockConfig,
+    ) {
+        PCR::regs().twai0_func_clk_conf().modify(|_, w| unsafe {
+            w.twai0_func_clk_sel().bits(match new_config {
+                TwaiFunctionClockConfig::Xtal => 0,
+                TwaiFunctionClockConfig::PllF96m => 2,
+            })
+        });
+    }
+}
+
+impl ParlIoInstance {
+    // PARL_IO_RX_CLOCK
+
+    fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .parl_clk_rx_conf()
+            .modify(|_, w| w.parl_clk_rx_en().bit(en));
+    }
+
+    fn configure_rx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
+    ) {
+        PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
+            w.parl_clk_rx_sel().bits(match new_config {
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 1,
+                ParlIoClkConfig::PllF96m => 2,
+            })
+        });
+    }
+
+    // PARL_IO_TX_CLOCK
+
+    fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .parl_clk_tx_conf()
+            .modify(|_, w| w.parl_clk_tx_en().bit(en));
+    }
+
+    fn configure_tx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
+    ) {
+        PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
+            w.parl_clk_tx_sel().bits(match new_config {
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 1,
+                ParlIoClkConfig::PllF96m => 2,
+            })
+        });
     }
 }

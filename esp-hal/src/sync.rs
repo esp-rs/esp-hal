@@ -47,7 +47,7 @@ impl RawLock for PriorityLock {
             return unsafe { SingleCoreInterruptLock.exit(token) };
         }
         assert!(Self::current_priority() <= self.0);
-        // Ensure no preceeding memory accesses are reordered to after interrupts are
+        // Ensure no preceding memory accesses are reordered to after interrupts are
         // enabled.
         compiler_fence(Ordering::SeqCst);
 

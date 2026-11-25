@@ -288,7 +288,7 @@ impl<'d> PeripheralOutput<'d> for OutputSignal<'d> {
 }
 
 impl gpio::InputSignal {
-    fn can_use_gpio_matrix(self) -> bool {
+    pub(crate) const fn can_use_gpio_matrix(self) -> bool {
         self as usize <= property!("gpio.input_signal_max")
     }
 
@@ -310,7 +310,7 @@ impl gpio::InputSignal {
 }
 
 impl gpio::OutputSignal {
-    fn can_use_gpio_matrix(self) -> bool {
+    pub(crate) const fn can_use_gpio_matrix(self) -> bool {
         self as usize <= property!("gpio.output_signal_max")
     }
 
@@ -333,6 +333,27 @@ impl gpio::OutputSignal {
     pub fn disconnect_from<'d>(self, pin: &impl PeripheralOutput<'d>) {
         pin.disconnect_from_peripheral_output();
     }
+}
+
+// The `Debug` impls of the signal enums keep a name table, which can be placed in RAM. Release
+// builds print the signal number instead, so the linker can drop the table. `defmt` keeps the
+// names on the host, so it always prints them.
+macro_rules! assert_gpio_matrix_routable {
+    ($cond:expr, $signal:expr) => {
+        if cfg!(any(debug_assertions, feature = "defmt")) {
+            assert!(
+                $cond,
+                "{:?} cannot be routed through the GPIO matrix",
+                $signal
+            );
+        } else {
+            assert!(
+                $cond,
+                "Signal {} cannot be routed through the GPIO matrix",
+                $signal as usize
+            );
+        }
+    };
 }
 
 enum Signal<'d> {
@@ -393,11 +414,7 @@ impl Signal<'_> {
         };
 
         if !signal.can_use_gpio_matrix() {
-            assert!(
-                !use_gpio_matrix,
-                "{:?} cannot be routed through the GPIO matrix",
-                signal
-            );
+            assert_gpio_matrix_routable!(!use_gpio_matrix, signal);
             // At this point we have set up the AF. The signal does not have a `func_in_sel_cfg`
             // register, and we must not try to write to it.
             return;
@@ -446,11 +463,7 @@ impl Signal<'_> {
 
         let use_gpio_matrix = af == AlternateFunction::GPIO;
 
-        assert!(
-            signal.can_use_gpio_matrix() || !use_gpio_matrix,
-            "{:?} cannot be routed through the GPIO matrix",
-            signal
-        );
+        assert_gpio_matrix_routable!(signal.can_use_gpio_matrix() || !use_gpio_matrix, signal);
 
         GPIO::regs()
             .func_out_sel_cfg(pin.number() as usize)
@@ -467,12 +480,15 @@ impl Signal<'_> {
     }
 
     fn disconnect_from_peripheral_output(&self) {
-        let Some(number) = self.gpio_number() else {
+        let Signal::Pin(pin) = self else {
             return;
         };
+        // Reset `out_sel` first, it may still select an older signal while the pin uses an IO MUX
+        // function.
         GPIO::regs()
-            .func_out_sel_cfg(number as usize)
+            .func_out_sel_cfg(pin.number() as usize)
             .modify(|_, w| unsafe { w.out_sel().bits(gpio::OutputSignal::GPIO as _) });
+        pin.set_alternate_function(AlternateFunction::GPIO);
     }
 }
 

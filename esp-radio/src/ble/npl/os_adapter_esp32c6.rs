@@ -2,7 +2,7 @@ use procmacros::BuilderLite;
 
 use super::*;
 use crate::{
-    ble::InvalidConfigError,
+    ble::{InvalidConfigError, lp_clk},
     hal::{interrupt, peripherals::BT},
     interrupt_dispatch::Handler,
     sys::include::esp_bt_controller_config_t,
@@ -284,8 +284,13 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_rsp_dup_list_count: config.ll_rsp_dup_list_count,
         ble_ll_adv_dup_list_count: config.ll_adv_dup_list_count,
         ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
-        rtc_freq: u64::from(super::super::lp_clk::frequency_hz()),
-        ble_ll_sca: 60,
+        rtc_freq: u64::from(lp_clk::frequency_hz()),
+        // ESP-IDF: `ble_rtc_clk_init()` in `bt.c`.
+        ble_ll_sca: if lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source) {
+            lp_clk::RC_SCA_PPM
+        } else {
+            60
+        },
         ble_ll_scan_phy_number: 2,
         ble_ll_conn_def_auth_pyld_tmo: 3000,
         ble_ll_jitter_usecs: 16,
@@ -376,6 +381,15 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
         7 => unsafe {
             ISR_INTERRUPT_7.set(handler, arg);
             BT::steal().enable_lp_timer_interrupt(interrupt::Priority::Priority1);
+            // `r_hal_timer_init` pulses `TASKS_STOP`, `TASKS_CLEAR`, and `TASKS_START` on the BLE
+            // RTC timer back-to-back before allocating this interrupt, and
+            // `r_ble_controller_enable` pulses `TASKS_START` again
+            // (`r_hal_timer_task_start`) right after `r_hal_timer_init` returns. Wait
+            // for `TASKS_STOP` / `TASKS_CLEAR` to cross into the `BLE_LP_CLK` domain
+            // before `r_hal_timer_task_start` runs, otherwise `TASKS_STOP` overrides both
+            // `TASKS_START` strobes and the timer stays stopped at 0.
+            let cycle_us = 1_000_000u32.div_ceil(lp_clk::frequency_hz());
+            esp_hal::rom::ets_delay_us(cycle_us * 2);
         },
         _ => panic!("Unexpected interrupt source {}", source),
     }

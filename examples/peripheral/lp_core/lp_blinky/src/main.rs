@@ -27,14 +27,13 @@ cfg_select! {
         use esp_hal::lp_core::{LpCore, LpCoreWakeupSource};
     }
 }
-use esp_println::{print, println};
-
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     // configure GPIO 1 as LP output pin
     let lp_pin = Output::new(peripherals.GPIO1, Level::Low, OutputConfig::default())
@@ -42,16 +41,14 @@ fn main() -> ! {
         .unwrap();
 
     let mut lp_core = cfg_select! {
-        any(feature = "esp32s2", feature = "esp32s3") => {
-            UlpCore::new(peripherals.ULP_RISCV_CORE)
-        }
+        any(feature = "esp32s2", feature = "esp32s3") => UlpCore::new(peripherals.ULP_RISCV_CORE),
         _ => LpCore::new(peripherals.LP_CORE),
     };
 
     #[cfg(not(feature = "esp32s2"))]
     {
         lp_core.stop(); // currently not implemented for ESP32-S2.
-        println!("ulp core stopped");
+        log::info!("ulp core stopped");
     }
 
     // load code to LP core
@@ -65,14 +62,13 @@ fn main() -> ! {
     };
 
     // start LP core
-    let wakeup_source =
-        cfg_select! {
-            any(feature = "esp32s2", feature = "esp32s3") => UlpCoreWakeupSource::HpCpu,
-            _ => LpCoreWakeupSource::HpCpu,
-        };
+    let wakeup_source = cfg_select! {
+        any(feature = "esp32s2", feature = "esp32s3") => UlpCoreWakeupSource::HpCpu,
+        _ => LpCoreWakeupSource::HpCpu,
+    };
     lp_core_code.run(&mut lp_core, wakeup_source, lp_pin);
 
-    println!("lp core run");
+    log::info!("lp core run");
 
     const ADDR: usize = cfg_select! {
         any(feature = "esp32s2", feature = "esp32s3") => 0x5000_0400,
@@ -80,9 +76,12 @@ fn main() -> ! {
     };
 
     let data = (ADDR) as *const u32;
+    let mut last = None;
     loop {
-        print!("Current {:x}           \u{000d}", unsafe {
-            data.read_volatile()
-        });
+        let current = unsafe { data.read_volatile() };
+        if last != Some(current) {
+            log::info!("Current {:x}", current);
+            last = Some(current);
+        }
     }
 }
