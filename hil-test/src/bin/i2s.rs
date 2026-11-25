@@ -1661,6 +1661,22 @@ mod pdm_tx_tests {
     }
 
     #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    fn pdm_tx_pcm_bypass_i2s0() {
+        let (i2s, dma_channel, _, _) = pdm_instance_resources!(I2S0);
+        let info = i2s.info();
+        let tx_cfg = if info.pcm2pdm {
+            PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono)
+        } else {
+            PdmTxConfig::new_raw_default(Rate::from_hz(1_024_000), PdmSlotMode::Mono)
+        };
+        let _i2s = I2s::new_pdm(i2s, dma_channel, PdmConfig::tx_only(tx_cfg)).unwrap();
+
+        let regs = esp_hal::peripherals::I2S0::regs();
+        assert!(regs.tx_conf().read().tx_pcm_bypass().bit_is_set());
+    }
+
+    #[test]
     #[cfg(soc_has_i2s1)]
     fn pdm_tx_config_validate_i2s1() {
         let peripherals = esp_hal::init(Default::default());
