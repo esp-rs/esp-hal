@@ -16,6 +16,21 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
+for_each_dma_engine! {
+    ("AXI_GDMA", $($level:literal),+) => {
+        priority_enum!(AxiPriority, "AXI GDMA", $($level),+);
+    };
+}
+
+/// Configuration of an AXI GDMA channel.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AxiGdmaConfig {
+    /// The channel priority.
+    priority: AxiPriority,
+}
+
 /// Immutable per-channel metadata owned by each `AXI_DMA_CH*` singleton.
 pub(crate) struct ChannelInfo {
     pub(crate) channel: u8,
@@ -70,6 +85,7 @@ impl AxiGdmaChannel<'_> {
 
 impl crate::private::Sealed for AxiGdmaChannel<'_> {}
 impl<'d> DmaChannel for AxiGdmaChannel<'d> {
+    type Config = AxiGdmaConfig;
     type Rx = AxiGdmaRxChannel<'d>;
     type Tx = AxiGdmaTxChannel<'d>;
 
@@ -117,6 +133,8 @@ impl AxiGdmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AxiGdmaTxChannel<'_> {
+    type Config = AxiGdmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -138,10 +156,10 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
-    fn set_priority(&self, priority: DmaPriority) {
+    fn apply_config(&self, config: &AxiGdmaConfig) {
         self.ch()
             .out_pri()
-            .write(|w| unsafe { w.tx_pri().bits(priority as u8) });
+            .write(|w| unsafe { w.tx_pri().bits(config.priority() as u8) });
     }
 
     fn set_peripheral(&self, peripheral: u8) {
@@ -307,6 +325,8 @@ impl AxiGdmaRxChannel<'_> {
 }
 
 impl RegisterAccess for AxiGdmaRxChannel<'_> {
+    type Config = AxiGdmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -328,10 +348,10 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
-    fn set_priority(&self, priority: DmaPriority) {
+    fn apply_config(&self, config: &AxiGdmaConfig) {
         self.ch()
             .in_pri()
-            .write(|w| unsafe { w.rx_pri().bits(priority as u8) });
+            .write(|w| unsafe { w.rx_pri().bits(config.priority() as u8) });
     }
 
     fn set_peripheral(&self, peripheral: u8) {

@@ -15,6 +15,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaConfigError,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
@@ -33,8 +34,11 @@ use crate::{
 /// [`Mem2Mem`] and the other memory-to-memory types take this engine as a type parameter.
 #[instability::unstable]
 pub trait Mem2MemEngine: crate::private::Sealed {
+    /// The configuration type of this engine.
+    type Config: Copy + Default;
+
     #[doc(hidden)]
-    type Channel<'d>: DmaChannel;
+    type Channel<'d>: DmaChannel<Config = Self::Config>;
 }
 
 /// A DMA channel singleton that supports memory-to-memory transfers on this chip.
@@ -58,7 +62,7 @@ pub trait Mem2MemCapableChannel<'d>: DmaChannel {
 }
 
 for_each_mem2mem_channel! {
-    (engines $( ($engine:literal, $variant:ident, $any_ch:ident) ),* ) => {
+    (engines $( ($engine:tt, $variant:ident, $any_ch:ident) ),* ) => {
         $(
             #[doc = concat!("Marker type for the `", $engine, "` [`Mem2MemEngine`].")]
             #[derive(Debug)]
@@ -68,6 +72,7 @@ for_each_mem2mem_channel! {
             impl crate::private::Sealed for $variant {}
 
             impl Mem2MemEngine for $variant {
+                type Config = crate::dma::engine_config!($engine);
                 type Channel<'d> = crate::dma::$any_ch<'d>;
             }
         )*
@@ -208,6 +213,23 @@ where
         config: BurstConfig,
     ) -> Result<SimpleMem2Mem<'d, Blocking, E>, DmaError> {
         SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors, config)
+    }
+}
+
+impl<Dm, E> Mem2Mem<'_, Dm, E>
+where
+    Dm: DriverMode,
+    E: Mem2MemEngine,
+{
+    /// Applies a DMA configuration to both halves of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &E::Config) -> Result<(), DmaConfigError> {
+        self.rx.channel.apply_config(config)?;
+        self.tx.channel.apply_config(config)
     }
 }
 

@@ -131,12 +131,13 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, RegisterAccess},
+    dma::{ChannelTx, DmaConfigError, DmaError, DmaPeripheral, DmaTxBuffer, RegisterAccess},
     gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
         ByteOrder,
         ClockError,
+        DmaConfig,
         ErasedTxChannel,
         Instance,
         LCD_VSYNC_WAKER,
@@ -196,6 +197,16 @@ where
 
     fn regs(&self) -> &pac::lcd_cam::RegisterBlock {
         self.lcd.regs()
+    }
+
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.tx_channel.apply_config(config)
     }
 
     /// Applies the configuration to the peripheral.

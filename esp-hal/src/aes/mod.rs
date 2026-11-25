@@ -386,6 +386,7 @@ pub mod dma {
         },
         dma::{
             Channel,
+            DmaConfigError,
             DmaDescriptor,
             DmaEligiblePeripheral,
             DmaError,
@@ -469,6 +470,27 @@ pub mod dma {
     }
 
     impl<'d> AesDma<'d> {
+        /// `config` must be one that the channel accepts.
+        fn new_with_dma_config(
+            aes: super::Aes<'d>,
+            channel: AesErased<'d>,
+            config: &DmaConfig,
+        ) -> Self {
+            let mut this = aes.with_dma(channel);
+            unwrap!(this.apply_dma_config(config));
+            this
+        }
+
+        /// Applies a DMA configuration to both halves of the DMA channel.
+        ///
+        /// # Errors
+        ///
+        /// [`DmaConfigError`] when the channel cannot apply the configuration.
+        #[instability::unstable]
+        pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+            self.channel.apply_config(config)
+        }
+
         fn write_key(&mut self, key: &Key) {
             let key = key.as_slice();
             self.aes.write_key(key);
@@ -791,6 +813,7 @@ pub mod dma {
     pub struct AesDmaBackend<'d> {
         peri: AES<'d>,
         dma: AesErased<'d>,
+        dma_config: DmaConfig,
         state: DriverState<'d>,
 
         #[cfg(dma_can_access_psram)]
@@ -834,6 +857,7 @@ pub mod dma {
             Self {
                 peri: aes,
                 dma: dma.into(),
+                dma_config: DmaConfig::default(),
                 state: DriverState::None,
 
                 #[cfg(dma_can_access_psram)]
@@ -843,6 +867,19 @@ pub mod dma {
                 #[cfg(aes_dma_mode_gcm)]
                 gcm: InternalMemory::new(gcm::GcmDma::new()),
             }
+        }
+
+        /// Sets the DMA configuration that the backend uses for its DMA channel.
+        ///
+        /// The configuration takes effect when the backend next starts processing operations.
+        ///
+        /// # Errors
+        ///
+        /// [`DmaConfigError`] when the channel cannot apply the configuration.
+        #[instability::unstable]
+        pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+            self.dma_config = *config;
+            Ok(())
         }
 
         #[procmacros::doc_replace(
@@ -883,7 +920,8 @@ pub mod dma {
                 DriverState::None => {
                     let peri = unsafe { self.peri.clone_unchecked() };
                     let dma = unsafe { self.dma.clone_unchecked() };
-                    let driver = super::Aes::new(peri).with_dma(dma);
+                    let driver =
+                        AesDma::new_with_dma_config(super::Aes::new(peri), dma, &self.dma_config);
 
                     driver.aes.aes.bind_peri_interrupt(interrupt_handler);
 
@@ -1281,6 +1319,8 @@ pub mod dma {
     with_aes_dma_engine! {
         ($engine:tt, $any_channel:ident) => {
             type AesErased<'d> = crate::dma::$any_channel<'d>;
+
+            crate::dma::driver_dma_config!($engine);
 
             crate::macros::impl_dma_channel_trait! {
                 $engine,

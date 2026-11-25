@@ -1444,7 +1444,12 @@ macro_rules! for_each_dma_engine {
         macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
         _for_each_inner_dma_engine!(("AXI_GDMA"));
-        _for_each_inner_dma_engine!((all("AHB_GDMA"), ("AXI_GDMA")));
+        _for_each_inner_dma_engine!(("AHB_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+        12, 13, 14, 15)); _for_each_inner_dma_engine!(("AXI_GDMA", 0, 1, 2, 3, 4, 5, 6,
+        7, 8, 9, 10, 11, 12, 13, 14, 15)); _for_each_inner_dma_engine!((all("AHB_GDMA"),
+        ("AXI_GDMA"))); _for_each_inner_dma_engine!((priority("AHB_GDMA", 0, 1, 2, 3, 4,
+        5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15), ("AXI_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8,
+        9, 10, 11, 12, 13, 14, 15)));
     };
 }
 #[macro_export]

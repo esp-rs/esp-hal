@@ -100,7 +100,14 @@ use crate::{
     DriverMode,
     RegisterToggle,
     clock::dividers::FractionalDivider,
-    dma::{ChannelTx, DmaEligiblePeripheral, DmaError, DmaTxBuffer, asynch::DmaTxFuture},
+    dma::{
+        ChannelTx,
+        DmaConfigError,
+        DmaEligiblePeripheral,
+        DmaError,
+        DmaTxBuffer,
+        asynch::DmaTxFuture,
+    },
     gpio::{
         OutputConfig,
         OutputSignal,
@@ -457,6 +464,16 @@ where
             i2s: ManuallyDrop::new(self),
             buf_view: ManuallyDrop::new(data.into_view()),
         })
+    }
+
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.tx_channel.apply_config(config)
     }
 }
 
@@ -974,6 +991,8 @@ with_i2s_dma_engine! {
                 impl<'d> I2sParallelDmaChannel<'d, $peri> for $ch {}
             }
         }
+
+        crate::dma::driver_dma_config!($engine);
     };
 }
 

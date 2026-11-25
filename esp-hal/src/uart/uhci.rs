@@ -100,6 +100,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaConfigError,
         DmaEligiblePeripheral,
         DmaError,
         DmaRxBuffer,
@@ -378,6 +379,16 @@ where
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
     }
+
+    /// Applies a DMA configuration to both halves of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.channel.apply_config(config)
+    }
 }
 
 impl<'d> Uhci<'d, Blocking> {
@@ -467,6 +478,16 @@ where
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
     }
+
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.channel_tx.apply_config(config)
+    }
 }
 
 /// Split Uhci structs, Rx part for receiving data
@@ -510,6 +531,16 @@ where
     pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
+    }
+
+    /// Applies a DMA configuration to the RX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.channel_rx.apply_config(config)
     }
 }
 
@@ -821,5 +852,7 @@ with_uhci_dma_engine! {
         type ErasedChannel<'d> = crate::dma::$any_channel<'d>;
         type ErasedTxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Tx;
         type ErasedRxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Rx;
+
+        crate::dma::driver_dma_config!($engine);
     };
 }

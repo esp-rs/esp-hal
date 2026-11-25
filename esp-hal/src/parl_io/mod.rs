@@ -137,6 +137,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaConfigError,
         DmaError,
         DmaPeripheral,
         DmaRxBuffer,
@@ -1400,6 +1401,16 @@ impl<'d, Dm> ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.tx_channel.apply_config(config)
+    }
+
     /// Performs a DMA write.
     ///
     /// Returns a [`ParlIoTxTransfer`] that can be used to wait for the
@@ -1751,6 +1762,16 @@ impl<'d, Dm> ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
 {
+    /// Applies a DMA configuration to the RX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.rx_channel.apply_config(config)
+    }
+
     /// Performs a DMA read.
     ///
     /// Returns a [`ParlIoRxTransfer`] that can be used to wait for the
@@ -2670,5 +2691,7 @@ with_parl_io_dma_engine! {
         type ErasedChannel<'d> = crate::dma::$any_channel<'d>;
         type ErasedTxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Tx;
         type ErasedRxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Rx;
+
+        crate::dma::driver_dma_config!($engine);
     };
 }

@@ -21,6 +21,14 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
+/// Configuration of an I2S DMA channel.
+///
+/// These channels have no priority registers.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct I2sDmaConfig {}
+
 /// Immutable per-channel metadata.
 #[doc(hidden)]
 pub struct ChannelInfo {
@@ -78,6 +86,8 @@ impl crate::private::Sealed for I2sDmaTxChannel<'_> {}
 impl DmaTxChannel for I2sDmaTxChannel<'_> {}
 
 impl RegisterAccess for I2sDmaTxChannel<'_> {
+    type Config = I2sDmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(self.0.peripheral()))
@@ -92,6 +102,8 @@ impl RegisterAccess for I2sDmaTxChannel<'_> {
             .lc_conf()
             .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
+
+    fn apply_config(&self, _config: &I2sDmaConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.regs()
@@ -263,6 +275,8 @@ impl InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for I2sDmaRxChannel<'_> {
+    type Config = I2sDmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(self.0.peripheral()))
@@ -273,6 +287,8 @@ impl RegisterAccess for I2sDmaRxChannel<'_> {
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+
+    fn apply_config(&self, _config: &I2sDmaConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.regs()
@@ -448,6 +464,7 @@ crate::any_peripheral! {
 }
 
 impl<'d> DmaChannel for I2sDmaChannel<'d> {
+    type Config = I2sDmaConfig;
     type Rx = I2sDmaRxChannel<'d>;
     type Tx = I2sDmaTxChannel<'d>;
 
