@@ -781,6 +781,7 @@ mod ledc {
             channel0.start_duty_fade(0, end_duty, 100).unwrap();
             delay.delay_micros(200);
             hil_test::assert!(input.is_low());
+            hil_test::assert!(!channel0.is_duty_fade_running());
         }
     }
 }

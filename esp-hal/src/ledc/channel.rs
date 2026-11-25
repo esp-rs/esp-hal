@@ -253,7 +253,7 @@ where
 
         let abs_duty_diff = end_duty_value.abs_diff(start_duty_value);
         if abs_duty_diff == 0 {
-            self.set_duty_hw(end_duty_value);
+            self.start_duty_fade_hw(end_duty_value, true, 1, 1, 0);
             return Ok(());
         }
 
