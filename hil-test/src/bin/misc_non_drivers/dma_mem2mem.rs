@@ -60,6 +60,33 @@ mod tests {
     }
 
     #[test]
+    fn test_mem2mem_transfers_after_dma_config(ctx: Context) {
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(1024);
+
+        let config = cfg_select! {
+            esp32s2 => esp_hal::dma::CopyDmaConfig::default(),
+            esp32s31 => esp_hal::dma::AxiGdmaConfig::default()
+                .with_priority(esp_hal::dma::AxiPriority::Priority5),
+            _ => esp_hal::dma::AhbGdmaConfig::default()
+                .with_priority(esp_hal::dma::AhbPriority::Priority5),
+        };
+
+        let mut mem2mem = ctx.mem2mem;
+        mem2mem.apply_dma_config(&config).unwrap();
+
+        let mut mem2mem = mem2mem
+            .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
+            .unwrap();
+
+        for (i, byte) in tx_buffer.iter_mut().enumerate() {
+            *byte = (i % 256) as u8;
+        }
+        let dma_wait = mem2mem.start_transfer(rx_buffer, tx_buffer).unwrap();
+        dma_wait.wait().unwrap();
+        assert_eq!(rx_buffer, tx_buffer);
+    }
+
+    #[test]
     fn test_mem2mem_transfers_after_invalid_alignment(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 

@@ -23,6 +23,8 @@ impl AhbGdmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AhbGdmaTxChannel<'_> {
+    type Config = AhbGdmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -45,10 +47,10 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
-    fn set_priority(&self, priority: DmaPriority) {
+    fn apply_config(&self, config: &AhbGdmaConfig) {
         self.ch()
             .out_pri()
-            .write(|w| unsafe { w.tx_pri().bits(priority as u8) });
+            .write(|w| unsafe { w.tx_pri().bits(config.priority() as u8) });
     }
 
     fn set_peripheral(&self, peripheral: u8) {
@@ -224,6 +226,8 @@ impl AhbGdmaRxChannel<'_> {
 }
 
 impl RegisterAccess for AhbGdmaRxChannel<'_> {
+    type Config = AhbGdmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -246,10 +250,10 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
-    fn set_priority(&self, priority: DmaPriority) {
+    fn apply_config(&self, config: &AhbGdmaConfig) {
         self.ch()
             .in_pri()
-            .write(|w| unsafe { w.rx_pri().bits(priority as u8) });
+            .write(|w| unsafe { w.rx_pri().bits(config.priority() as u8) });
     }
 
     fn set_peripheral(&self, peripheral: u8) {

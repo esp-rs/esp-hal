@@ -169,7 +169,7 @@ pub mod dma {
     use crate::RegisterToggle;
     use crate::{
         DriverMode,
-        dma::{Channel, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
+        dma::{Channel, DmaConfigError, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
         rtc_cntl::WakeLock,
         spi::Error,
     };
@@ -232,6 +232,16 @@ pub mod dma {
             DmaDriver {
                 info: self.spi.info(),
             }
+        }
+
+        /// Applies a DMA configuration to both halves of the DMA channel.
+        ///
+        /// # Errors
+        ///
+        /// [`DmaConfigError`] when the channel cannot apply the configuration.
+        #[instability::unstable]
+        pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+            self.channel.apply_config(config)
         }
 
         /// Registers a buffer for a DMA write.
@@ -608,6 +618,8 @@ pub mod dma {
             }
 
             type SpiSlaveErased<'d> = crate::dma::$any_channel<'d>;
+
+            crate::dma::driver_dma_config!($engine);
         };
     }
 }

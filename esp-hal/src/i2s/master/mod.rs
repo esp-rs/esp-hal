@@ -230,6 +230,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaConfigError,
         DmaEligiblePeripheral,
         DmaError,
         DmaRxBuffer,
@@ -320,6 +321,8 @@ with_i2s_dma_engine! {
 
         // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
         type I2sMasterErased<'d> = crate::dma::$any_channel<'d>;
+
+        crate::dma::driver_dma_config!($engine);
     };
 }
 
@@ -1775,6 +1778,16 @@ where
             self.data_format,
         )
     }
+
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.tx_channel.apply_config(config)
+    }
 }
 
 /// I2S RX channel.
@@ -1848,6 +1861,16 @@ where
             #[cfg(i2s_version = "1")]
             self.data_format,
         )
+    }
+
+    /// Applies a DMA configuration to the RX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.rx_channel.apply_config(config)
     }
 }
 

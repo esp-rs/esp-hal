@@ -68,6 +68,7 @@ pub struct DmaEngineDef {
     /// The name of the engine (e.g. `"AHB_GDMA"`, `"SPI_DMA"`, `"I2S_DMA"`).
     pub name: String,
 
+    /// The highest channel priority level. Absent on engines without priority registers.
     #[serde(default)]
     pub max_priority: Option<u32>,
 
@@ -200,10 +201,6 @@ impl DmaEngines {
 
         Ok(())
     }
-
-    fn max_priority(&self) -> Option<u32> {
-        self.0.iter().flat_map(|e| e.max_priority).max()
-    }
 }
 
 impl GenericProperty for DmaEngines {
@@ -235,12 +232,6 @@ impl GenericProperty for DmaEngines {
             }
         }
 
-        // TODO: temporary
-        if let Some(max_priority) = self.max_priority() {
-            cfgs.push(format!("dma.max_priority=\"{}\"", max_priority));
-            cfgs.push("dma.max_priority_is_set".to_string());
-        }
-
         Some(cfgs)
     }
 
@@ -251,6 +242,7 @@ impl GenericProperty for DmaEngines {
         let mut split = vec![];
 
         let mut engines = vec![];
+        let mut priorities = vec![];
         let mut engine_channels = vec![];
         let mut engine_any_channels = vec![];
         let mut psram = vec![];
@@ -270,6 +262,11 @@ impl GenericProperty for DmaEngines {
         for engine in self.0.iter() {
             let engine_name = engine.name.as_str();
             engines.push(quote! { #engine_name });
+
+            if let Some(max_priority) = engine.max_priority {
+                let levels = (0..=max_priority).map(number);
+                priorities.push(quote! { #engine_name, #(#levels),* });
+            }
 
             let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
             let any_channel = format_ident!("{channel}Channel");
@@ -391,7 +388,10 @@ impl GenericProperty for DmaEngines {
             None
         };
 
-        let dma_engines_macro = generate_for_each_macro("dma_engine", &[("all", &engines)]);
+        let dma_engines_macro = generate_for_each_macro(
+            "dma_engine",
+            &[("all", &engines), ("priority", &priorities)],
+        );
 
         // Always emit for_each_dma_channel_peri_pair! so drivers can call it
         // unconditionally. On GDMA chips it expands to nothing.

@@ -20,6 +20,7 @@ use crate::{
     dma::{
         CHUNK_SIZE,
         Channel,
+        DmaConfigError,
         DmaDescriptor,
         DmaEligiblePeripheral,
         DmaRxBuf,
@@ -1445,6 +1446,16 @@ aligned, otherwise the driver requires copying the entire buffer."
         self.driver().apply_config(config)
     }
 
+    /// Applies a DMA configuration to both halves of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.channel.apply_config(config)
+    }
+
     fn transfer_buffers_dma(
         &mut self,
         read_bytes: usize,
@@ -2097,5 +2108,7 @@ with_spi_master_dma_engine! {
 
         // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
         type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
+
+        crate::dma::driver_dma_config!($engine);
     };
 }

@@ -677,54 +677,19 @@ impl From<DmaBufError> for DmaError {
     }
 }
 
-/// DMA Priorities.
-#[cfg(dma_max_priority_is_set)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// A DMA configuration that the channel cannot apply.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum DmaPriority {
-    /// The lowest priority level (Priority 0).
-    Priority0  = 0,
-    /// Priority level 1.
-    Priority1  = 1,
-    /// Priority level 2.
-    Priority2  = 2,
-    /// Priority level 3.
-    Priority3  = 3,
-    /// Priority level 4.
-    Priority4  = 4,
-    /// Priority level 5.
-    Priority5  = 5,
-    /// Priority level 6.
-    #[cfg(any(dma_max_priority = "9", dma_max_priority = "15"))]
-    Priority6  = 6,
-    /// Priority level 7.
-    #[cfg(any(dma_max_priority = "9", dma_max_priority = "15"))]
-    Priority7  = 7,
-    /// Priority level 8.
-    #[cfg(any(dma_max_priority = "9", dma_max_priority = "15"))]
-    Priority8  = 8,
-    /// Priority level 9.
-    #[cfg(any(dma_max_priority = "9", dma_max_priority = "15"))]
-    Priority9  = 9,
-    /// Priority level 10.
-    #[cfg(dma_max_priority = "15")]
-    Priority10 = 10,
-    /// Priority level 11.
-    #[cfg(dma_max_priority = "15")]
-    Priority11 = 11,
-    /// Priority level 12.
-    #[cfg(dma_max_priority = "15")]
-    Priority12 = 12,
-    /// Priority level 13.
-    #[cfg(dma_max_priority = "15")]
-    Priority13 = 13,
-    /// Priority level 14.
-    #[cfg(dma_max_priority = "15")]
-    Priority14 = 14,
-    /// Priority level 15.
-    #[cfg(dma_max_priority = "15")]
-    Priority15 = 15,
+#[non_exhaustive]
+pub enum DmaConfigError {}
+
+impl core::fmt::Display for DmaConfigError {
+    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match *self {}
+    }
 }
+
+impl core::error::Error for DmaConfigError {}
 
 /// The owner bit of a DMA descriptor.
 #[derive(PartialEq, PartialOrd)]
@@ -996,6 +961,7 @@ where
         rx_impl.set_mem2mem_mode(false);
 
         rx_impl.set_descr_burst_mode(true);
+        rx_impl.apply_config(&Default::default());
 
         if let Some(interrupt) = rx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
@@ -1063,10 +1029,10 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
-    /// Configures the channel.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.rx_impl.set_priority(priority);
+    /// Applies the engine configuration to the channel.
+    pub(crate) fn apply_config(&mut self, config: &CH::Config) -> Result<(), DmaConfigError> {
+        self.rx_impl.apply_config(config);
+        Ok(())
     }
 
     fn do_prepare(&mut self, preparation: Preparation) -> Result<(), DmaError> {
@@ -1232,6 +1198,7 @@ where
         let _guard = tx_impl.enable();
 
         tx_impl.set_descr_burst_mode(true);
+        tx_impl.apply_config(&Default::default());
 
         if let Some(interrupt) = tx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
@@ -1314,10 +1281,10 @@ where
         self.set_peripheral(peripheral);
     }
 
-    /// Configures the channel priority.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.tx_impl.set_priority(priority);
+    /// Applies the engine configuration to the channel.
+    pub(crate) fn apply_config(&mut self, config: &CH::Config) -> Result<(), DmaConfigError> {
+        self.tx_impl.apply_config(config);
+        Ok(())
     }
 
     fn do_prepare(&mut self, preparation: Preparation) -> Result<(), DmaError> {
@@ -1516,13 +1483,6 @@ where
         }
     }
 
-    /// Configures the channel priorities.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.tx.set_priority(priority);
-        self.rx.set_priority(priority);
-    }
-
     /// Converts a blocking channel to an async channel.
     pub fn into_async(self) -> Channel<Async, CH> {
         Channel {
@@ -1547,6 +1507,12 @@ where
     pub(crate) fn connect(&mut self, peripheral: DmaPeripheral) {
         self.rx.connect(peripheral);
         self.tx.connect(peripheral);
+    }
+
+    /// Applies the engine configuration to both halves of the channel.
+    pub(crate) fn apply_config(&mut self, config: &CH::Config) -> Result<(), DmaConfigError> {
+        self.rx.apply_config(config)?;
+        self.tx.apply_config(config)
     }
 }
 

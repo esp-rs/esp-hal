@@ -21,6 +21,14 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
+/// Configuration of an SPI DMA channel.
+///
+/// These channels have no priority registers.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct SpiDmaConfig {}
+
 /// Immutable per-channel metadata.
 #[doc(hidden)]
 pub struct ChannelInfo {
@@ -78,6 +86,8 @@ impl crate::private::Sealed for SpiDmaTxChannel<'_> {}
 impl DmaTxChannel for SpiDmaTxChannel<'_> {}
 
 impl RegisterAccess for SpiDmaTxChannel<'_> {
+    type Config = SpiDmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         cfg_select! {
@@ -104,6 +114,8 @@ impl RegisterAccess for SpiDmaTxChannel<'_> {
             .dma_conf()
             .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
+
+    fn apply_config(&self, _config: &SpiDmaConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.regs()
@@ -279,6 +291,8 @@ impl InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for SpiDmaRxChannel<'_> {
+    type Config = SpiDmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         cfg_select! {
@@ -301,6 +315,8 @@ impl RegisterAccess for SpiDmaRxChannel<'_> {
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+
+    fn apply_config(&self, _config: &SpiDmaConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.regs()
@@ -474,6 +490,7 @@ crate::any_peripheral! {
 }
 
 impl<'d> DmaChannel for SpiDmaChannel<'d> {
+    type Config = SpiDmaConfig;
     type Rx = SpiDmaRxChannel<'d>;
     type Tx = SpiDmaTxChannel<'d>;
 
