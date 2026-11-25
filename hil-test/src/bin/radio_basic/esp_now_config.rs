@@ -16,6 +16,19 @@ mod tests {
     const PMK: [u8; 16] = [0x42; 16];
     const LMK: [u8; 16] = [0x11; 16];
 
+    const WIFI_MODE_NULL: u32 = 0;
+    const WIFI_MODE_STA: u32 = 1;
+
+    unsafe extern "C" {
+        fn esp_wifi_get_mode(mode: *mut u32) -> i32;
+    }
+
+    fn wifi_mode() -> u32 {
+        let mut mode = 0;
+        assert_eq!(unsafe { esp_wifi_get_mode(&mut mode) }, 0);
+        mode
+    }
+
     fn peer(index: u8, encrypt: bool) -> PeerInfo {
         PeerInfo {
             interface: EspNowWifiInterface::Station,
@@ -127,12 +140,30 @@ mod tests {
             )),
             Err(WifiError::InvalidArguments)
         );
+        assert_eq!(wifi_mode(), WIFI_MODE_STA);
 
         esp_now
             .send(&BROADCAST_ADDRESS, b"hello")
             .unwrap()
             .wait()
             .unwrap();
+    }
+
+    #[test]
+    fn failed_set_config_stops_unshared_wifi(p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        let mut controller = WifiController::new(p.WIFI, Default::default()).unwrap();
+
+        assert_eq!(
+            controller.set_config(&Config::AccessPointStation(
+                StationConfig::default(),
+                AccessPointConfig::default().with_channel(13),
+            )),
+            Err(WifiError::InvalidArguments)
+        );
+        assert_eq!(wifi_mode(), WIFI_MODE_NULL);
     }
 
     #[test]
