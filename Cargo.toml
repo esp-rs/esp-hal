@@ -16,6 +16,7 @@ exclude  = [
     "esp-metadata-generated",
     "esp-phy",
     "esp-println",
+    "esp-provisioning",
     "esp-rtos",
     "esp-radio-rtos-driver",
     "esp-riscv-rt",
