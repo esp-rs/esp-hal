@@ -218,8 +218,14 @@ pub struct PdmTxClockConfig {
     /// Target PCM sample rate.
     pub sample_rate: Rate,
     /// Upsampling factor numerator (`fp`).
+    ///
+    /// The PCM-to-PDM converter supports only two settings: `fp = 960, fs = 480`
+    /// (PDM clock at 128 × sample rate) and `fp = 960, fs = sample_rate / 100`
+    /// (PDM clock at 128 × 48 kHz). Other combinations are unsupported; `fp == fs`,
+    /// for example, outputs noise.
     pub up_sample_fp: u32,
-    /// Upsampling factor denominator (`fs`).
+    /// Upsampling factor denominator (`fs`), at most 480. See
+    /// [`Self::up_sample_fp`].
     pub up_sample_fs: u32,
     /// Bit clock divider.
     pub bclk_div: u32,

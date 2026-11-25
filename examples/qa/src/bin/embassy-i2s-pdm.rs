@@ -1,8 +1,16 @@
-//! PDM TX for an NS4150,LM386 or similar amplifier connected via low-pass filter,
-//! playing ESP-IDF's "Twinkle Twinkle Little Star" demo.
+//! PDM TX playing ESP-IDF's "Twinkle Twinkle Little Star" demo with the codec-line defaults
+//! (`PdmTxConfig::new_codec_default`), as ESP-IDF's `i2s_pdm` example does without
+//! `CONFIG_EXAMPLE_PDM_TX_DAC`.
 //!
-//! e.g. ESP32-C3-LCDKit (on-board NS4150), PDM data goes to the on-board NS4150 on **GPIO3**
-//! (`AUDIO_PA`). No separate clock pin. (DAC case)
+//! Only the data line is routed, on **GPIO3** (**GPIO4** on ESP32). No clock pin. That is enough
+//! to hear the demo on an amplifier fed through a low-pass filter, e.g. the on-board NS4150 on
+//! the ESP32-C3-LCDKit (`AUDIO_PA`), or an LM386. For that wiring
+//! `PdmTxConfig::new_dac_default` (not on ESP32) is the intended configuration; a PDM codec also
+//! needs the clock pin.
+//!
+//! The output is quiet: `AMPLITUDE` matches ESP-IDF's example (about -30 dBFS), and the codec
+//! defaults halve the signal in the high-pass stage. Raise `AMPLITUDE` or switch to the DAC
+//! defaults for more volume.
 
 //% CHIP_FILTER: i2s_driver_supported && i2s_supports_pdm_tx
 //% FEATURES: unstable

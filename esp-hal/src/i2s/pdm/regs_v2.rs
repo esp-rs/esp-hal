@@ -40,7 +40,7 @@ fn configure_tx(i2s: &Info, config: &super::PdmTxConfig) -> Result<(), PdmError>
     i2s.regs().tx_conf().modify(|_, w| {
         w.tx_slave_mod().clear_bit();
         w.tx_tdm_en().clear_bit();
-        w.tx_pcm_bypass().clear_bit();
+        w.tx_pcm_bypass().set_bit();
         w.tx_mono().bit(is_mono);
         w.tx_mono_fst_vld().set_bit();
         #[cfg(i2s_version = "3")]
