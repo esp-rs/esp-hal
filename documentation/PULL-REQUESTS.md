@@ -115,8 +115,8 @@ maintainer will either write them or apply the `skip-changelog` label before the
 PR is merged.
 
 If you do want to document your change, add entries directly in the PR description
-using the structured sections in the template. Do **not** edit `CHANGELOG.md`.
-Those files are updated automatically at release time from the PR descriptions.
+using the structured sections in the template. Do **not** edit `CHANGELOG.md` or
+`MIGRATING-*.md`. Those files are updated automatically at release time from the PR descriptions.
 
 ### Format
 
