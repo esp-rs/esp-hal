@@ -176,6 +176,10 @@ mod tests {
             d.wrapping_rem_vartime(&modulus.resize()).resize()
         }
 
+        // Computing these at runtime needs more stack than the ESP32-S2 has left.
+        static R: MAX = compute_r(&MODULUS);
+        const MPRIME: u32 = compute_mprime(&MODULUS);
+
         // 10^3 mod bignum = 1000
 
         let mut outbuf = [u32::MAX; MAX::LIMBS];
@@ -183,10 +187,9 @@ mod tests {
             &mut ctx.rsa,
             THREE.as_words(),
             MODULUS.as_words(),
-            compute_mprime(&MODULUS),
+            MPRIME,
         );
-        let r = compute_r(&MODULUS);
-        mod_exp.start_exponentiation(TEN.as_words(), r.as_words());
+        mod_exp.start_exponentiation(TEN.as_words(), R.as_words());
         mod_exp.read_results(&mut outbuf);
 
         let words = RESULT.as_words();
