@@ -10,10 +10,12 @@
 //! On chips other than the ESP32, ESP32-C2 and ESP32-S2, the example installs Wi-Fi retention
 //! memory, so light sleep also powers the Wi-Fi MAC and baseband down.
 //!
-//! The console is on the UART, because USB Serial/JTAG stops across sleep.
+//! The console is on the UART. A USB host on USB Serial/JTAG keeps more of the chip powered in
+//! sleep, and the ESP32-C3 and ESP32-S3 disconnect USB Serial/JTAG across sleep.
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
 //% CHIP_FILTER: wifi_driver_supported && sleep_light_sleep
+//% ENV-IF(esp32c3 || esp32s3): ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED=false
 
 #![no_std]
 #![no_main]

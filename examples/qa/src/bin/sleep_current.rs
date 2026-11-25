@@ -2,7 +2,8 @@
 //!
 //! The program holds every case for [`HOLD`], then moves to the next. The console
 //! prints the case name before the hold, so you can align the meter with the
-//! UART log. The console is on the UART, because USB Serial/JTAG stops across sleep.
+//! UART log. The console is on the UART. A USB host on USB Serial/JTAG keeps more of the chip
+//! powered in sleep, and the ESP32-C3 and ESP32-S3 disconnect USB Serial/JTAG across sleep.
 //!
 //! Active cases combine CPU clock (default and maximum), core count, and either a
 //! busy loop or WAITI/WFI. Sleep cases are light sleep without CPU power-down,

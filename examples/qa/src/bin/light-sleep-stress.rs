@@ -67,7 +67,8 @@
 //! again at [`FIRST_PHASE`]. A sleep that never ends hangs the test, because the RTC watchdog is
 //! not active during a light sleep.
 //!
-//! The console is on the UART, because USB Serial/JTAG stops across sleep.
+//! The console is on the UART. A USB host on USB Serial/JTAG keeps more of the chip powered in
+//! sleep, and the ESP32-C3 and ESP32-S3 disconnect USB Serial/JTAG across sleep.
 
 //% CHIP_FILTER: sleep_light_sleep && sleep_has_wakeup_source_timer
 //% ENV-IF(esp32c3 || esp32s3): ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED=false
