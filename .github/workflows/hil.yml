@@ -25,6 +25,12 @@ on:
         required: false
         type: string
         default: "hil-test"
+      # Set only by ci.yml; hil-gate does not run on the dispatch path.
+      required_chips:
+        description: "Space-separated SoCs whose hil-run failure alone fails hil-gate"
+        required: false
+        type: string
+        default: ""
       # Set only by the workflow_dispatch path. Declared here with empty
       # defaults so the `inputs.branch == ''` tests that select the plain
       # checkout, enable continue-on-error and enable hil-gate are
@@ -309,9 +315,8 @@ jobs:
   hil-run:
     needs: [build, devtool]
     if: ${{ inputs.package != 'hil-test-radio' }}
-    # When called from ci.yml, hil-gate below decides the verdict from the ≥50%
-    # rule, so a single flaky runner must not fail the run and with it the
-    # caller's job.
+    # When called from ci.yml, hil-gate below decides the verdict, so a single
+    # flaky runner must not fail the run and with it the caller's job.
     continue-on-error: ${{ inputs.branch == '' }}
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
@@ -457,9 +462,10 @@ jobs:
           rm -rf tests/ || true
           rm -f esp-devtool || true
 
-  # Merge gate for hil-run matrix legs.  Blocks when ≥50% of legs that actually
-  # ran tests failed or were cancelled.  Skipped legs (no ELFs for that chip)
-  # are excluded.  hil-run-radio is not part of this gate.
+  # Merge gate for hil-run matrix legs.  Blocks when four or more legs failed or
+  # were cancelled, or when any chip in `required_chips` failed or ran no
+  # tests.  Skipped legs (no ELFs for that chip) do not count as failures.
+  # hil-run-radio is not part of this gate.
   hil-gate:
     needs: [build, hil-run]
     if: >
@@ -475,10 +481,17 @@ jobs:
 
       - name: Evaluate hil-run results
         uses: actions/github-script@v7
+        env:
+          REQUIRED_CHIPS: ${{ inputs.required_chips }}
         with:
           script: |
             const { evaluateHilGate } = require('./.github/scripts/hil-gate.js');
-            await evaluateHilGate({ github, context, core });
+            await evaluateHilGate({
+              github,
+              context,
+              core,
+              requiredChips: process.env.REQUIRED_CHIPS,
+            });
 
   # The dispatcher cannot report the verdict: a run it starts with GITHUB_TOKEN
   # raises no workflow_run event. Reporting from inside the run also covers
