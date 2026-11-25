@@ -52,10 +52,10 @@ esp32c6 = []
 esp32c61 = []
 ## Target the ESP32-H2.
 esp32h2 = []
-## Target the ESP32-H4.
-esp32h4 = ["dep:procmacros"]
 ## Target the ESP32-H21.
 esp32h21 = []
+## Target the ESP32-H4.
+esp32h4 = ["dep:procmacros"]
 ## Target the ESP32-P4.
 esp32p4 = ["dep:procmacros"]
 ## Target the ESP32-S2.

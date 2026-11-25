@@ -63,8 +63,8 @@ const SHIFT_TIMESTAMP_FLAG: u32 = 0x8000_0000;
 const SHIFT_MASK: u32 = 0x0000_FFFF;
 // If the tick rate is not an integer number of microseconds: Since the divider is 2.5,
 // and we assume XTAL is an integer number of MHz, we can multiply by 5, then divide by
-// 5 to improve accuracy. On H2 the divider is 2, so we can multiply by 2, then divide by
-// 2.
+// 5 to improve accuracy. On H2 and H21 the divider is 2, so we can multiply by 2, then
+// divide by 2.
 const UNEVEN_DIVIDER_FLAG: u32 = 0x4000_0000;
 const UNEVEN_MULTIPLIER: u32 = if cfg!(any(esp32h2, esp32h21)) { 2 } else { 5 };
 const UNEVEN_DIVIDER_MASK: u32 = 0x0000_FFFF;
@@ -197,16 +197,14 @@ impl<'d> SystemTimer<'d> {
         // FIXME: this requires a critical section. We can probably do better, if we can formulate
         // invariants well.
         cfg_select! {
-            esp32c5 => {
+            any(esp32c5, esp32h4) => {
                 // Assuming SYSTIMER runs from XTAL, the hardware always runs at 16 MHz.
                 16_000_000
             }
             _ => {
                 cfg_select! {
                     esp32s2 => crate::soc::clocks::apb_clk_frequency() as u64,
-                    any(esp32h2, esp32h4, esp32h21) => {
-                        (crate::soc::clocks::xtal_clk_frequency() / 2) as u64
-                    }
+                    any(esp32h2, esp32h21) => (crate::soc::clocks::xtal_clk_frequency() / 2) as u64,
                     _ => (crate::soc::clocks::xtal_clk_frequency() * 10 / 25) as u64,
                 }
             }

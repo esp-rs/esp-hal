@@ -44,7 +44,11 @@ static PERIPHERAL_REF_COUNT: NonReentrantMutex<RefCounts> =
 pub(crate) fn disable_peripherals() {
     // Gating the clock alone leaves the D+ pull-up on, and the host keeps talking to a device that
     // no longer answers.
-    #[cfg(all(soc_has_usb_device, not(keep_usb_serial_jtag_enabled)))]
+    #[cfg(all(
+        soc_has_usb_device,
+        gpio_driver_supported,
+        not(keep_usb_serial_jtag_enabled)
+    ))]
     crate::soc::usb_phy::disconnect_usj();
 
     // Take the critical section up front to avoid taking it multiple times.

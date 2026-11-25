@@ -160,18 +160,18 @@ esp32h2 = [
     "esp-rom-sys/esp32h2",
 ]
 ##
-esp32h4 = [
-    "esp-hal/esp32h4",
-    "esp-alloc?/esp32h4",
-    "esp-metadata-generated/esp32h4",
-    "esp-rom-sys/esp32h4",
-]
-##
 esp32h21 = [
     "esp-hal/esp32h21",
     "esp-alloc?/esp32h21",
     "esp-metadata-generated/esp32h21",
     "esp-rom-sys/esp32h21",
+]
+##
+esp32h4 = [
+    "esp-hal/esp32h4",
+    "esp-alloc?/esp32h4",
+    "esp-metadata-generated/esp32h4",
+    "esp-rom-sys/esp32h4",
 ]
 ##
 esp32p4 = [

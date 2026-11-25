@@ -32,8 +32,8 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ESP32-C6 | [Datasheet][esp32c6-datasheet] [TRM][esp32c6-trm] | `riscv32imac-unknown-none-elf` |  |
 | ESP32-C61 | [Datasheet][esp32c61-datasheet] [TRM][esp32c61-trm] | `riscv32imac-unknown-none-elf` |  |
 | ESP32-H2 | [Datasheet][esp32h2-datasheet] [TRM][esp32h2-trm] | `riscv32imac-unknown-none-elf` |  |
-| ESP32-H4 | [Datasheet][esp32h4-datasheet] [TRM][esp32h4-trm] | `riscv32imafc-unknown-none-elf` | In early stages of development. |
 | ESP32-H21 | [Datasheet][esp32h21-datasheet] [TRM][esp32h21-trm] | `riscv32imac-unknown-none-elf` | In early stages of development. |
+| ESP32-H4 | [Datasheet][esp32h4-datasheet] [TRM][esp32h4-trm] | `riscv32imafc-unknown-none-elf` | In early stages of development. |
 | ESP32-P4 | [Datasheet][esp32p4-datasheet] [TRM][esp32p4-trm] | `riscv32imafc-unknown-none-elf` | Revisions below v3.0 are not supported. |
 | ESP32-S2 | [Datasheet][esp32s2-datasheet] [TRM][esp32s2-trm] | `xtensa-esp32s2-none-elf` |  |
 | ESP32-S3 | [Datasheet][esp32s3-datasheet] [TRM][esp32s3-trm] | `xtensa-esp32s3-none-elf` |  |
@@ -53,10 +53,10 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [esp32c61-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf
 [esp32h2-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-h2_datasheet_en.pdf
 [esp32h2-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf
-[esp32h4-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-h4_datasheet_en.pdf
-[esp32h4-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-h4_technical_reference_manual_en.pdf
 [esp32h21-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-h21_datasheet_en.pdf
 [esp32h21-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-h21_technical_reference_manual_en.pdf
+[esp32h4-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-h4_datasheet_en.pdf
+[esp32h4-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-h4_technical_reference_manual_en.pdf
 [esp32p4-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-p4_datasheet_en.pdf
 [esp32p4-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf
 [esp32s2-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf
