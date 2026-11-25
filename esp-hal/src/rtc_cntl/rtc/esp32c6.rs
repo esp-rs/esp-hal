@@ -600,7 +600,9 @@ impl HpSystemInit {
         let mut power = HpSysPower::default();
         power.dig_power.set_vdd_spi_pd_en(false);
         power.dig_power.set_wifi_pd_en(false);
-        power.dig_power.set_cpu_pd_en(true);
+        // ESP-IDF powers the CPU down here. A light sleep without CPU retention keeps the CPU state
+        // only if the CPU keeps its power in the modem state.
+        power.dig_power.set_cpu_pd_en(false);
         power.dig_power.set_aon_pd_en(false);
         power.dig_power.set_top_pd_en(false);
         power.dig_power.set_mem_pd_en(0);
@@ -615,8 +617,9 @@ impl HpSystemInit {
         power.xtal.set_xpd_xtal(true);
 
         let mut clock = SystemClockParam {
-            icg_func: 0,
-            icg_apb: 0,
+            // The PHY link powers the temperature sensor up in the modem state.
+            icg_func: 1 << 20,
+            icg_apb: 1 << 9,
             ..SystemClockParam::default()
         };
         clock.icg_modem.set_code(ICG_MODEM_CODE_MODEM);

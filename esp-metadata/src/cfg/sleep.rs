@@ -35,6 +35,12 @@ pub(crate) struct SleepRetentionProperties {
     /// transition, so software saves and restores them in the extra entry, while the PLL runs.
     #[serde(default)]
     regdma_bt_needs_pll: bool,
+    /// The bit of the reject mask that keeps the chip out of light sleep while the Wi-Fi modem
+    /// uses the PMU modem state.
+    ///
+    /// In the modem state, the CPU sleeps while the modem wakes up for the beacons of the access
+    /// point. The bit also drives the `supports_modem_state` cfg.
+    modem_state_reject_bit: Option<u32>,
     #[serde(default)]
     supports_top_power_down: bool,
     #[serde(default)]
@@ -73,6 +79,9 @@ impl GenericProperty for SleepRetentionProperties {
         }
         if self.regdma_bt_needs_pll {
             cfgs.push("regdma_bt_needs_pll".to_string());
+        }
+        if self.modem_state_reject_bit.is_some() {
+            cfgs.push("supports_modem_state".to_string());
         }
         if self.cpu_retention.is_some() {
             cfgs.push("supports_cpu_power_down".to_string());
@@ -127,6 +136,14 @@ impl GenericProperty for SleepRetentionProperties {
             branches.extend(quote! {
                 ("sleep.regdma_list_count") => {
                     #count
+                };
+            });
+        }
+        if let Some(bit) = self.modem_state_reject_bit {
+            let bit = number(bit);
+            branches.extend(quote! {
+                ("sleep.modem_state_reject_bit") => {
+                    #bit
                 };
             });
         }

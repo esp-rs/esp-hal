@@ -163,6 +163,23 @@ struct PhyState {
     #[cfg(esp32)]
     /// Callback to update the MAC time.
     mac_time_update_cb: Option<MacTimeUpdateCb>,
+
+    /// Hooks of a radio driver around the RF of the calibrated PHY.
+    rf_hooks: Option<RfHooks>,
+}
+
+/// Hooks of a radio driver that turn the RF of a calibrated PHY on and off instead of the PHY
+/// library.
+///
+/// A radio driver installs them with [set_rf_hooks], for example when the hardware can turn the RF
+/// on by itself.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug)]
+pub struct RfHooks {
+    /// Turns the RF on. Returns `false` if the PHY library must wake the PHY up instead.
+    pub turn_on: fn() -> bool,
+    /// Turns the RF off. Returns `false` if the PHY library must turn it off instead.
+    pub turn_off: fn() -> bool,
 }
 
 impl PhyState {
@@ -173,6 +190,7 @@ impl PhyState {
             calibration_data: None,
             calibrated: false,
             calibration_result: 0,
+            rf_hooks: None,
 
             #[cfg(phy_backed_up_digital_register_count_is_set)]
             phy_digital_register_backup: None,
@@ -289,8 +307,10 @@ impl PhyState {
             }
             phy_clocks::with_calibration_clocks(|| {
                 if self.calibrated {
-                    unsafe {
-                        sys::include::phy_wakeup_init();
+                    if !self.rf_hooks.is_some_and(|hooks| (hooks.turn_on)()) {
+                        unsafe {
+                            sys::include::phy_wakeup_init();
+                        }
                     }
                     #[cfg(phy_backed_up_digital_register_count_is_set)]
                     self.restore_digital_regs();
@@ -323,13 +343,15 @@ impl PhyState {
         if self.ref_count == 0 {
             #[cfg(phy_backed_up_digital_register_count_is_set)]
             self.backup_digital_regs();
-            unsafe {
-                // Disable PHY and RF.
-                sys::include::phy_close_rf();
+            if !self.rf_hooks.is_some_and(|hooks| (hooks.turn_off)()) {
+                unsafe {
+                    // Disable PHY and RF.
+                    sys::include::phy_close_rf();
 
-                // Power down PHY temperature sensor.
-                #[cfg(not(esp32))]
-                sys::include::phy_xpd_tsens();
+                    // Power down PHY temperature sensor.
+                    #[cfg(not(esp32))]
+                    sys::include::phy_xpd_tsens();
+                }
             }
             #[cfg(esp32)]
             {
@@ -466,6 +488,14 @@ pub fn enable_phy_clock<'d>() -> PhyClockGuard<'d> {
 #[cfg(esp32)]
 pub fn set_mac_time_update_cb(mac_time_update_cb: MacTimeUpdateCb) {
     PHY_STATE.with(|phy_state| phy_state.mac_time_update_cb = Some(mac_time_update_cb));
+}
+
+/// Installs or removes the [RfHooks].
+///
+/// The hooks run inside the lock of the PHY state, so they must not enable or disable the PHY.
+#[doc(hidden)]
+pub fn set_rf_hooks(rf_hooks: Option<RfHooks>) {
+    PHY_STATE.with(|phy_state| phy_state.rf_hooks = rf_hooks);
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]

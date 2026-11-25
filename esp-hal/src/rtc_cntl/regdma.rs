@@ -11,6 +11,11 @@
 //! The REGDMA has several entries, and a node belongs to the entries in its owner mask. The PMU
 //! runs [`SLEEP_ENTRY`] between the active and the sleep state. The list starts at a branch node,
 //! which has a `next` pointer for each entry.
+//!
+//! In the PMU modem state, the CPU sleeps while the Wi-Fi modem receives the beacons of the access
+//! point. The PMU runs `MODEM_ENTRY` between the sleep and the modem state, entry 2 from the modem
+//! to the active state, and the PHY link of `PHY_ENTRY` to turn the RF on and off.
+//! The PHY driver runs the PHY link too, with `run_phy_link`.
 
 use core::{cell::UnsafeCell, ptr::NonNull};
 
@@ -19,18 +24,34 @@ use portable_atomic::{AtomicBool, Ordering};
 
 use crate::peripherals::PMU;
 
-/// The number of REGDMA entries.
+/// The number of REGDMA entries that the head branches to.
 const ENTRIES: usize = property!("sleep.regdma_list_count");
 
 /// The entry that the PMU runs between the active and the sleep state.
 pub const SLEEP_ENTRY: u32 = 1 << 0;
 
+/// The entry that the PMU runs between the sleep and the modem state.
+#[cfg(supports_modem_state)]
+pub const MODEM_ENTRY: u32 = 1 << 1;
+
 /// The entry that software runs with [`run_extra_link`].
 #[cfg(regdma_bt_needs_pll)]
 pub const EXTRA_ENTRY: u32 = 1 << 3;
 
-/// The entries that [`create`] builds nodes for.
+/// The PHY link, which turns the RF on and off: in the modem state, and with [`run_phy_link`].
+///
+/// On chips with four entries, the PHY link is a list of its own, which the PAU starts from its
+/// Wi-Fi MAC link address.
+#[cfg(supports_modem_state)]
+pub const PHY_ENTRY: u32 = 1 << 4;
+
+/// The entries that [`create`] builds nodes for. With the modem state, entry 2 runs from the modem
+/// to the active state, for the nodes of the Wi-Fi blob.
 const USED_ENTRIES: u32 = cfg_select! {
+    all(supports_modem_state, regdma_bt_needs_pll) => {
+        SLEEP_ENTRY | MODEM_ENTRY | 1 << 2 | EXTRA_ENTRY | PHY_ENTRY
+    }
+    supports_modem_state => SLEEP_ENTRY | MODEM_ENTRY | 1 << 2 | PHY_ENTRY,
     regdma_bt_needs_pll => SLEEP_ENTRY | EXTRA_ENTRY,
     _ => SLEEP_ENTRY,
 };
@@ -76,6 +97,8 @@ impl LinkConfig {
     }
 
     /// Writes `value` to the bits in `mask` of the register at `address` after the sleep.
+    ///
+    /// [`Self::skip`] makes the write run before the sleep instead, or both times.
     pub const fn write(id: u16, address: u32, value: u32, mask: u32, owner: u32) -> Self {
         Self {
             head: MODE_WRITE | HEAD_SKIP_BACKUP,
@@ -85,7 +108,25 @@ impl LinkConfig {
         }
     }
 
-    /// Whether the node copies registers, to a buffer after its body.
+    /// Waits after the sleep until the bits in `mask` of the register at `address` equal `value`.
+    ///
+    /// [`Self::skip`] makes the wait run before the sleep instead, or both times.
+    pub const fn wait(id: u16, address: u32, value: u32, mask: u32, owner: u32) -> Self {
+        Self {
+            head: MODE_WAIT | HEAD_SKIP_BACKUP,
+            body: [0, address, value, mask, 0, 0, 0, 0],
+            id: id as u32,
+            owner,
+        }
+    }
+
+    /// Sets whether the REGDMA skips the node when it saves, and when it restores.
+    pub const fn skip(mut self, backup: bool, restore: bool) -> Self {
+        self.head = with_skip(self.head, backup, restore);
+        self
+    }
+
+    /// Whether the node copies registers, to a buffer.
     const fn copies(&self) -> bool {
         matches!(self.head & HEAD_MODE, MODE_CONTINUOUS | MODE_ADDR_MAP)
     }
@@ -99,16 +140,31 @@ impl LinkConfig {
         }
     }
 
-    /// The words of the node in memory: the statistics word, the head, the body, then the buffer
-    /// of a copy.
-    const fn words(&self) -> usize {
-        let buffer = if self.copies() {
+    /// The words of the node in memory: the statistics word, the head and the body.
+    const fn node_words(&self) -> usize {
+        2 + self.body_words()
+    }
+
+    /// The words of the buffer of a copy, which the nodes of every entry share.
+    const fn buffer_words(&self) -> usize {
+        if self.copies() {
             (self.head & HEAD_LENGTH) as usize
         } else {
             0
-        };
-        2 + self.body_words() + buffer
+        }
     }
+}
+
+/// Returns `head` with the skip flags for the save and the restore.
+const fn with_skip(head: u32, backup: bool, restore: bool) -> u32 {
+    let mut head = head & !(HEAD_SKIP_BACKUP | HEAD_SKIP_RESTORE);
+    if backup {
+        head |= HEAD_SKIP_BACKUP;
+    }
+    if restore {
+        head |= HEAD_SKIP_RESTORE;
+    }
+    head
 }
 
 /// Returns the bytes that [`create`] takes for the nodes of `configs`.
@@ -117,7 +173,9 @@ pub const fn links_size(configs: &[LinkConfig]) -> usize {
     let mut i = 0;
     while i < configs.len() {
         let entries = (configs[i].owner & USED_ENTRIES).count_ones() as usize;
-        words += configs[i].words() * entries;
+        if entries > 0 {
+            words += configs[i].node_words() * entries + configs[i].buffer_words();
+        }
         i += 1;
     }
     words * 4
@@ -130,6 +188,9 @@ pub const fn links_size(configs: &[LinkConfig]) -> usize {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 pub enum Module {
+    /// The system clocks that the modem needs in the PMU modem state.
+    #[cfg(supports_modem_state)]
+    ModemStateClock,
     /// The clock and reset registers of the modem.
     ClockModem,
     /// The Wi-Fi MAC.
@@ -142,9 +203,15 @@ pub enum Module {
     BtBb,
     /// The Bluetooth LE MAC.
     BleMac,
+    /// The PHY link, which turns the RF on and off.
+    #[cfg(supports_modem_state)]
+    PhyLink,
 }
 
-const MODULES: usize = Module::BleMac as usize + 1;
+const MODULES: usize = cfg_select! {
+    supports_modem_state => Module::PhyLink as usize + 1,
+    _ => Module::BleMac as usize + 1,
+};
 
 /// Memory that [`create`] builds nodes in.
 pub struct LinkMemory {
@@ -189,7 +256,7 @@ pub enum Error {
     /// The memory has no room for the nodes.
     OutOfMemory,
     /// The REGDMA raised its error flag before it ran every node.
-    #[cfg(regdma_bt_needs_pll)]
+    #[cfg(any(regdma_bt_needs_pll, supports_modem_state))]
     Transfer,
 }
 
@@ -201,7 +268,7 @@ impl core::fmt::Display for Error {
             Self::AlreadyCreated => write!(f, "the module has nodes already"),
             Self::NotCreated => write!(f, "the module has no nodes"),
             Self::OutOfMemory => write!(f, "the memory has no room for the nodes"),
-            #[cfg(regdma_bt_needs_pll)]
+            #[cfg(any(regdma_bt_needs_pll, supports_modem_state))]
             Self::Transfer => write!(f, "the REGDMA stopped on an error"),
         }
     }
@@ -218,17 +285,41 @@ struct Chain {
 // lock.
 unsafe impl Send for Chain {}
 
+impl Chain {
+    /// Returns the links of the nodes, in order.
+    fn links(self) -> impl Iterator<Item = *mut u32> {
+        let last = self.last.as_ptr();
+        let mut next = Some(self.first.as_ptr());
+        core::iter::from_fn(move || {
+            let link = next?;
+            next = (link != last).then(|| next_of(link));
+            Some(link)
+        })
+    }
+}
+
 /// The chains of a module, one for each of [`USED_ENTRIES`].
 type Links = [Option<Chain>; USED_ENTRIES.count_ones() as usize];
 
 /// Returns the index of each entry in [`USED_ENTRIES`], in order.
 fn used_entries() -> impl Iterator<Item = usize> {
-    (0..ENTRIES).filter(|entry| USED_ENTRIES & (1 << entry) != 0)
+    (0..u32::BITS as usize).filter(|entry| USED_ENTRIES & (1 << entry) != 0)
 }
 
 struct Registry {
     links: [Option<Links>; MODULES],
     attached: u8,
+}
+
+impl Registry {
+    /// Returns the links of every node, attached or not.
+    fn all_links(&self) -> impl Iterator<Item = *mut u32> {
+        self.links
+            .iter()
+            .flatten()
+            .flat_map(|links| links.iter().flatten())
+            .flat_map(|chain| chain.links())
+    }
 }
 
 static REGISTRY: NonReentrantMutex<Registry> = NonReentrantMutex::new(Registry {
@@ -270,6 +361,18 @@ static TAIL: StaticNode<6> = StaticNode(UnsafeCell::new([
     0,
 ]));
 
+/// The first node of the PHY link on chips where the head has no branch for it: a wait that the
+/// REGDMA skips.
+#[cfg(all(supports_modem_state, not(regdma_link_configurable)))]
+static PHY_HEAD: StaticNode<6> = StaticNode(UnsafeCell::new([
+    0,
+    MODE_WAIT | HEAD_SKIP_BACKUP | HEAD_SKIP_RESTORE,
+    0,
+    0,
+    0,
+    0,
+]));
+
 /// Whether the modem domain loses power in light sleep.
 static MODEM_POWER_DOWN: AtomicBool = AtomicBool::new(false);
 
@@ -299,13 +402,19 @@ pub unsafe fn create(
 
     // Nothing reads the nodes before the registry has them, so they are built without its lock.
     let mut links: Links = Default::default();
-    for (chain, entry) in links.iter_mut().zip(used_entries()) {
-        let owned = configs
-            .iter()
-            .flat_map(|configs| configs.iter())
-            .filter(|config| config.owner & (1 << entry) != 0);
-        for config in owned {
-            append(chain, build(config, &mut next));
+    for config in configs.iter().flat_map(|configs| configs.iter()) {
+        let owner = config.owner & USED_ENTRIES;
+        if owner == 0 {
+            continue;
+        }
+        // The nodes of every entry share the buffer, so that an entry restores what another
+        // entry saved.
+        let buffer = next;
+        next = unsafe { next.add(config.buffer_words()) };
+        for (chain, entry) in links.iter_mut().zip(used_entries()) {
+            if owner & (1 << entry) != 0 {
+                append(chain, build(config, buffer, &mut next));
+            }
         }
     }
 
@@ -322,13 +431,14 @@ pub unsafe fn create(
 }
 
 /// Builds one node at `next`, moves `next` past it, and returns its link, the address of its head.
+/// A copy keeps its registers in `buffer`.
 ///
 /// [`create`] takes the memory of every node of a module before the first call.
-fn build(config: &LinkConfig, next: &mut *mut u32) -> NonNull<u32> {
+fn build(config: &LinkConfig, buffer: *mut u32, next: &mut *mut u32) -> NonNull<u32> {
     let node = *next;
     let body_words = config.body_words();
     unsafe {
-        *next = node.add(config.words());
+        *next = node.add(config.node_words());
         node.write_volatile(config.id << 16);
         let link = node.add(1);
         link.write_volatile(config.head & !(HEAD_BRANCH | HEAD_EOF));
@@ -338,7 +448,7 @@ fn build(config: &LinkConfig, next: &mut *mut u32) -> NonNull<u32> {
         }
         if config.copies() {
             // `mem` points to the buffer.
-            body.add(3).write_volatile(body.add(body_words) as u32);
+            body.add(3).write_volatile(buffer as u32);
         }
         NonNull::new_unchecked(link)
     }
@@ -426,45 +536,77 @@ fn join(registry: &Registry) {
             set_next(chain.last.as_ptr(), next);
             next = chain.first.as_ptr();
         }
-        unsafe { head.add(1 + entry).write_volatile(next as u32) };
+        set_first(entry, next);
     }
+}
+
+/// Points the start of `entry` to `first`.
+fn set_first(entry: usize, first: *mut u32) {
+    #[cfg(all(supports_modem_state, not(regdma_link_configurable)))]
+    if entry == PHY_ENTRY.trailing_zeros() as usize {
+        set_next(PHY_HEAD.link(), first);
+        return;
+    }
+    unsafe { HEAD.link().add(1 + entry).write_volatile(first as u32) };
+}
+
+fn id_of(link: *mut u32) -> u32 {
+    unsafe { link.sub(1).read_volatile() >> 16 }
 }
 
 /// Returns the first node with `id`, from every module, attached or not.
 pub fn find_link_by_id(id: u16) -> Option<NonNull<u32>> {
     REGISTRY.with(|registry| {
-        for links in registry.links.iter().flatten() {
-            for chain in links.iter().flatten() {
-                let mut link = chain.first.as_ptr();
-                loop {
-                    let stat = unsafe { link.sub(1).read_volatile() };
-                    if stat >> 16 == id as u32 {
-                        return NonNull::new(link);
-                    }
-                    if link == chain.last.as_ptr() {
-                        break;
-                    }
-                    link = next_of(link);
-                }
-            }
-        }
-        None
+        registry
+            .all_links()
+            .find(|&link| id_of(link) == id as u32)
+            .and_then(NonNull::new)
     })
 }
 
-/// Changes the value and the mask of a write or wait node.
+/// Changes the value and the mask of a write or wait node, in every entry that the node belongs
+/// to.
 ///
 /// # Safety
 ///
 /// `link` must come from [`find_link_by_id`], and its module must still exist.
 pub unsafe fn set_write_wait_content(link: NonNull<u32>, value: u32, mask: u32) {
     let link = link.as_ptr();
-    unsafe {
-        if matches!(link.read_volatile() & HEAD_MODE, MODE_WRITE | MODE_WAIT) {
-            link.add(3).write_volatile(value);
-            link.add(4).write_volatile(mask);
-        }
+    let is_write_or_wait = |link: *mut u32| unsafe {
+        matches!(link.read_volatile() & HEAD_MODE, MODE_WRITE | MODE_WAIT)
+    };
+    if !is_write_or_wait(link) {
+        return;
     }
+    // The nodes of one config have the same ID and register.
+    let id = id_of(link);
+    let address = unsafe { link.add(2).read_volatile() };
+    REGISTRY.with(|registry| {
+        for node in registry.all_links() {
+            if id_of(node) == id
+                && is_write_or_wait(node)
+                && unsafe { node.add(2).read_volatile() } == address
+            {
+                unsafe {
+                    node.add(3).write_volatile(value);
+                    node.add(4).write_volatile(mask);
+                }
+            }
+        }
+    });
+}
+
+/// Sets whether the REGDMA skips the nodes of `module` with `id` when it saves, and when it
+/// restores.
+pub fn set_skip(module: Module, id: u16, backup: bool, restore: bool) {
+    REGISTRY.with(|registry| {
+        let chains = registry.links[module as usize].iter().flatten().flatten();
+        for link in chains.flat_map(|chain| chain.links()) {
+            if id_of(link) == id as u32 {
+                unsafe { link.write_volatile(with_skip(link.read_volatile(), backup, restore)) };
+            }
+        }
+    });
 }
 
 /// Lets light sleep power the modem domain down, with the REGDMA that saves and restores the
@@ -496,13 +638,21 @@ pub(crate) fn prepare_sleep(light: bool) {
     set_backup(light && modem_power_down());
 }
 
-/// Lets the PMU start the REGDMA between the active and the sleep state.
+/// Lets the PMU start the REGDMA on the transitions of light sleep.
 fn set_backup(enabled: bool) {
     let pmu = PMU::regs();
-    pmu.hp_active_backup()
-        .modify(|_, w| w.hp_sleep2active_backup_en().bit(enabled));
+    pmu.hp_active_backup().modify(|_, w| {
+        #[cfg(supports_modem_state)]
+        w.hp_modem2active_backup_en().bit(enabled);
+        w.hp_sleep2active_backup_en().bit(enabled)
+    });
+    // ESP-IDF leaves the backup off from the modem state to sleep. On that transition, the Wi-Fi
+    // MAC starts the REGDMA itself.
     pmu.hp_sleep_backup()
         .modify(|_, w| w.hp_active2sleep_backup_en().bit(enabled));
+    #[cfg(supports_modem_state)]
+    pmu.hp_modem_backup()
+        .modify(|_, w| w.hp_sleep2modem_backup_en().bit(enabled));
 }
 
 // A wait node reads its register up to `WAIT_RETRY_COUNT` times, `WAIT_READ_INTERVAL` apart.
@@ -586,6 +736,9 @@ fn init_regdma() {
             pau.regdma_link_1_addr().write(|w| unsafe { w.bits(head) });
             pau.regdma_link_2_addr().write(|w| unsafe { w.bits(head) });
             pau.regdma_link_3_addr().write(|w| unsafe { w.bits(head) });
+            #[cfg(supports_modem_state)]
+            pau.regdma_link_mac_addr()
+                .write(|w| unsafe { w.bits(PHY_HEAD.link() as u32) });
         }
     }
 }
@@ -605,17 +758,78 @@ pub fn run_extra_link(backup: bool) -> Result<(), Error> {
         return Ok(());
     }
     // See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_hal_pmu/esp32c6/pau_hal.c#L50-L71>.
+    run_entry(EXTRA_ENTRY, backup)
+}
+
+/// Runs the nodes of [`PHY_ENTRY`] in the attached [`Module::PhyLink`]. With `backup`, the nodes
+/// that turn the RF off run, otherwise the nodes that turn it on. Blocks until the REGDMA finishes.
+///
+/// With `wifi_mac`, the PAU starts the PHY link with its Wi-Fi MAC trigger, which also clears the
+/// modem sleep flag of the MAC. Chips where the head has no branch for the PHY link always use
+/// this trigger.
+///
+/// # Errors
+///
+/// - [`Error::NotCreated`] if [`Module::PhyLink`] is not in the list.
+/// - [`Error::Transfer`] if the REGDMA stopped before it ran every node.
+#[cfg(supports_modem_state)]
+pub fn run_phy_link(backup: bool, wifi_mac: bool) -> Result<(), Error> {
+    // The lock keeps the list as it is while the REGDMA walks it.
+    REGISTRY.with(|registry| {
+        if registry.attached & (1 << Module::PhyLink as u8) == 0 {
+            return Err(Error::NotCreated);
+        }
+        // Wi-Fi turns the RF off before light sleep sets the REGDMA up for the first time.
+        init_regdma();
+
+        // See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_hal_pmu/esp32c5/pau_hal.c#L23-L65>.
+        if !wifi_mac && cfg!(regdma_link_configurable) {
+            return run_entry(PHY_ENTRY, backup);
+        }
+        let pau = crate::peripherals::PAU::regs();
+        run_link(
+            || {
+                pau.regdma_conf()
+                    .modify(|_, w| w.sel_mac().set_bit().to_mem_mac().bit(backup));
+                pau.regdma_conf().modify(|_, w| w.start_mac().set_bit());
+            },
+            || {
+                pau.regdma_conf()
+                    .modify(|_, w| w.start_mac().clear_bit().sel_mac().clear_bit());
+            },
+        )
+    })
+}
+
+/// Runs the nodes of `entry` from software, and blocks until the REGDMA finishes.
+#[cfg(any(regdma_bt_needs_pll, supports_modem_state))]
+fn run_entry(entry: u32, backup: bool) -> Result<(), Error> {
+    let pau = crate::peripherals::PAU::regs();
+    run_link(
+        || {
+            pau.regdma_conf().modify(|_, w| unsafe {
+                w.link_sel().bits(entry.trailing_zeros() as u8);
+                w.to_mem().bit(backup)
+            });
+            pau.regdma_conf().modify(|_, w| w.start().set_bit());
+        },
+        || {
+            pau.regdma_conf()
+                .modify(|_, w| unsafe { w.start().clear_bit().link_sel().bits(0) });
+        },
+    )
+}
+
+/// Starts the REGDMA with `start`, blocks until it finishes, then stops it with `stop`.
+#[cfg(any(regdma_bt_needs_pll, supports_modem_state))]
+fn run_link(start: impl FnOnce(), stop: impl FnOnce()) -> Result<(), Error> {
     let pau = crate::peripherals::PAU::regs();
     let clear = || {
         pau.int_clr()
             .write(|w| w.done().clear_bit_by_one().error().clear_bit_by_one())
     };
     clear();
-    pau.regdma_conf().modify(|_, w| unsafe {
-        w.link_sel().bits(EXTRA_ENTRY.trailing_zeros() as u8);
-        w.to_mem().bit(backup)
-    });
-    pau.regdma_conf().modify(|_, w| w.start().set_bit());
+    start();
     // After an error, `done` never comes.
     let failed = loop {
         let raw = pau.int_raw().read();
@@ -626,8 +840,7 @@ pub fn run_extra_link(backup: bool) -> Result<(), Error> {
             break false;
         }
     };
-    pau.regdma_conf()
-        .modify(|_, w| unsafe { w.start().clear_bit().link_sel().bits(0) });
+    stop();
     clear();
     if failed { Err(Error::Transfer) } else { Ok(()) }
 }

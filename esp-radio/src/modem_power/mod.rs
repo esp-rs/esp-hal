@@ -6,6 +6,8 @@
 use enumset::{EnumSet, EnumSetType};
 use esp_sync::NonReentrantMutex;
 
+#[cfg(modem_retention = "regdma")]
+pub(crate) use self::method::RETENTION_ENTRIES;
 #[cfg(modem_retention = "backup_dma")]
 pub(crate) use self::method::{sleep, wake};
 

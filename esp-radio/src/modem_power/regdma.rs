@@ -12,8 +12,15 @@ use esp_hal::rtc_cntl::regdma::{self, LinkConfig, LinkMemory, Module, SLEEP_ENTR
 
 use crate::compat::malloc::InternalMemory;
 
+/// The entries that restore the modem domain: on the way out of light sleep, and in the PMU modem
+/// state where the chip has it.
+pub(crate) const RETENTION_ENTRIES: u32 = cfg_select! {
+    supports_modem_state => SLEEP_ENTRY | regdma::MODEM_ENTRY,
+    _ => SLEEP_ENTRY,
+};
+
 const fn registers(id: u16, address: u32, length: u16) -> LinkConfig {
-    LinkConfig::continuous(id, address, address, length, SLEEP_ENTRY)
+    LinkConfig::continuous(id, address, address, length, RETENTION_ENTRIES)
 }
 
 /// The clock and reset registers of the modem, `MODEM_SYSCON` and `MODEM_LPCON`.
@@ -33,9 +40,20 @@ const CLOCK_MODEM: &[LinkConfig] = cfg_select! {
     esp32s31 => &[
         // The PMU may not ungate the PLL in time for the restore. A dummy write to the date
         // register first keeps the next nodes from a bus timeout.
-        LinkConfig::write(0x0200, 0x2010_9c30, 0x0fff_ffff, 0x0fff_ffff, SLEEP_ENTRY),
+        LinkConfig::write(
+            0x0200,
+            0x2010_9c30,
+            0x0fff_ffff,
+            0x0fff_ffff,
+            RETENTION_ENTRIES,
+        ),
         registers(0x0201, 0x2010_9c00, 10),
         registers(0x0300, 0x2010_f000, 21),
+        // The modem state needs the clock gates of the modem bus open.
+        LinkConfig::write(0xfe00, 0x2058_7180, 0x100, 0x100, regdma::MODEM_ENTRY),
+        LinkConfig::write(0xfe01, 0x2058_71e0, 0x15, 0xff, regdma::MODEM_ENTRY),
+        LinkConfig::write(0xfe02, 0x2058_71e0, 0x1d, 0xff, regdma::MODEM_ENTRY),
+        LinkConfig::write(0xfe03, 0x2058_71e0, 0x3d, 0xff, regdma::MODEM_ENTRY),
     ],
 };
 

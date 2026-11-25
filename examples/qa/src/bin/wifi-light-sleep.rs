@@ -10,6 +10,9 @@
 //! On chips other than the ESP32, ESP32-C2 and ESP32-S2, the example installs Wi-Fi retention
 //! memory, so light sleep also powers the Wi-Fi MAC and baseband down.
 //!
+//! On chips with the PMU modem state, set the ENHANCED_LIGHT_SLEEP env variable to enable enhanced
+//! light sleep. The modem then receives beacons while the CPU sleeps.
+//!
 //! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
@@ -96,12 +99,12 @@ async fn main(spawner: Spawner) -> ! {
 
     install_wifi_retention_memory();
 
+    let config = ControllerConfig::default().with_initial_config(station_config);
+    #[cfg(supports_modem_state)]
+    let config = config.with_enhanced_light_sleep(option_env!("ENHANCED_LIGHT_SLEEP").is_some());
+
     let wifi_interface = Interface::station();
-    let mut controller = WifiController::new(
-        peripherals.WIFI,
-        ControllerConfig::default().with_initial_config(station_config),
-    )
-    .unwrap();
+    let mut controller = WifiController::new(peripherals.WIFI, config).unwrap();
     controller.set_power_saving(PowerSaveMode::Minimum).unwrap();
     enable_wifi_events(WifiEvent::StationBeaconTimeout.into());
 

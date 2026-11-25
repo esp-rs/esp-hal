@@ -159,6 +159,8 @@ mod internal;
 #[cfg(all(supports_modem_power_down, feature = "unstable"))]
 #[cfg_attr(modem_retention = "regdma", path = "mac_bb_regdma.rs")]
 mod mac_bb;
+#[cfg(all(supports_modem_state, feature = "unstable"))]
+mod modem_state;
 mod weak_overrides;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
@@ -1324,6 +1326,8 @@ fn wifi_deinit() -> Result<(), WifiError> {
     #[cfg(all(supports_modem_power_down, feature = "unstable"))]
     mac_bb::stop_power_down()?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+    #[cfg(all(supports_modem_state, feature = "unstable"))]
+    modem_state::deinit();
     #[cfg(all(supports_modem_power_down, feature = "unstable"))]
     mac_bb::deinit();
     #[cfg(soc_has_modem_syscon)]
@@ -2520,6 +2524,12 @@ pub(crate) mod xarxa {
 ///
 /// Power save increases the receive latency and decreases the throughput. For this reason, the
 /// default is [`PowerSaveMode::None`].
+#[cfg_attr(
+    supports_modem_state,
+    doc = "",
+    doc = "With [`ControllerConfig::with_enhanced_light_sleep`], the modem also receives beacons \
+           while the CPU stays in light sleep."
+)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -2795,6 +2805,22 @@ pub struct ControllerConfig {
     /// Initial Wi-Fi configuration.
     #[builder_lite(reference)]
     initial_config: Config,
+
+    /// Whether the Wi-Fi modem receives beacons while the CPU stays in light sleep.
+    ///
+    /// In power save, see [`PowerSaveMode`], the chip normally wakes up from light sleep for each
+    /// beacon. With this option, the PMU powers up only the modem for a beacon, and the CPU wakes
+    /// up only when the access point has frames for the station. This saves power when the access
+    /// point has little traffic for the station.
+    ///
+    /// The option needs the Wi-Fi retention memory, see
+    /// [`install_retention_memory`](crate::wifi::install_retention_memory), and has no effect
+    /// without it. It applies only when Wi-Fi is initialized, like the buffer settings.
+    ///
+    /// The default is `false`.
+    #[cfg(supports_modem_state)]
+    #[builder_lite(unstable)]
+    enhanced_light_sleep: bool,
 }
 
 impl Default for ControllerConfig {
@@ -2824,6 +2850,9 @@ impl Default for ControllerConfig {
             country_info: CountryInfo::from(*b"01"),
 
             initial_config: Config::Station(StationConfig::default()),
+
+            #[cfg(supports_modem_state)]
+            enhanced_light_sleep: false,
         }
     }
 }
@@ -3021,6 +3050,11 @@ impl<'d> WifiController<'d> {
                 sleep::claim_wake_source();
             }
 
+            #[cfg(all(supports_modem_state, feature = "unstable"))]
+            if config.enhanced_light_sleep {
+                modem_state::init();
+            }
+
             #[cfg(rng_trng_supported)]
             esp_hal::if_unstable_hal! {
                 unsafe {
@@ -3157,7 +3191,12 @@ impl WifiController<'_> {
     ///
     /// The different power saving options trade off power consumption and receive latency. See
     /// [`PowerSaveMode`] for more information.
-    ///
+    #[cfg_attr(
+        supports_modem_state,
+        doc = "",
+        doc = "To let the modem receive beacons while the CPU sleeps, see \
+               [`ControllerConfig::with_enhanced_light_sleep`]."
+    )]
     /// ## Example
     ///
     /// ```rust,no_run

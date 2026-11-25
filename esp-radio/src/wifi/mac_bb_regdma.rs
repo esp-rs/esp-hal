@@ -10,7 +10,7 @@ use core::{ffi::c_int, ptr};
 use esp_hal::rtc_cntl::{
     RetentionMemoryError,
     RetentionSlot,
-    regdma::{self, LinkConfig, LinkMemory, Module, SLEEP_ENTRY},
+    regdma::{self, LinkConfig, LinkMemory, Module},
 };
 use portable_atomic::{AtomicBool, Ordering};
 
@@ -28,7 +28,7 @@ unsafe extern "C" {
 }
 
 const fn bb(id: u16, address: u32, length: u16) -> LinkConfig {
-    LinkConfig::continuous(id, address, address, length, SLEEP_ENTRY)
+    LinkConfig::continuous(id, address, address, length, modem_power::RETENTION_ENTRIES)
 }
 
 /// The baseband: AGC, TX, NRX, BB, and BRX where it exists.
@@ -59,10 +59,10 @@ const BB: &[LinkConfig] = cfg_select! {
 
 /// The bytes that the nodes of the MAC table of the blob take.
 const MAC_SIZE: usize = cfg_select! {
-    esp32c6 => 4032,
-    esp32c61 => 4092,
-    esp32c5 => 4076,
-    esp32s31 => 4104,
+    esp32c6 => 4672,
+    esp32c61 => 4732,
+    esp32c5 => 4716,
+    esp32s31 => 4720,
 };
 
 const BUFFER_SIZE: usize = MAC_SIZE + regdma::links_size(BB);
@@ -146,6 +146,12 @@ pub(super) fn init() -> Result<(), WifiError> {
     }
     CREATED.store(true, Ordering::Relaxed);
     Ok(())
+}
+
+/// Returns whether the nodes of the MAC and baseband are in the retention memory.
+#[cfg(supports_modem_state)]
+pub(super) fn is_retained() -> bool {
+    CREATED.load(Ordering::Relaxed)
 }
 
 /// Stops the power-down, if stopping Wi-Fi did not stop it already.

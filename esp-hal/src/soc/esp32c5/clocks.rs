@@ -171,6 +171,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     // Digital part - nothing to do here, PLL always runs at 480MHz
 
     // Analog part
+    regi2c::enable_master_clock();
 
     // BBPLL CALIBRATION START
     I2C_ANA_MST::regs().ana_conf0().modify(|_, w| {

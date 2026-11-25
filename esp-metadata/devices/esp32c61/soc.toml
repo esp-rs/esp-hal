@@ -252,6 +252,7 @@ wakeup_sources = {
 cpu_retention = "software"
 modem_retention = "regdma"
 regdma_list_count = 4
+modem_state_reject_bit = 16
 cpu_retention_frame = "clic"
 supports_top_power_down = true
 

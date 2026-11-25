@@ -263,6 +263,7 @@ cpu_retention = "software"
 modem_retention = "regdma"
 regdma_list_count = 5
 regdma_link_configurable = true
+modem_state_reject_bit = 24
 cpu_retention_frame = "s31"
 supports_top_power_down = true
 

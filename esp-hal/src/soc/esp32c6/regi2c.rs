@@ -148,7 +148,9 @@ define_regi2c! {
     }
 }
 
-fn regi2c_enable_block(block: u8) -> usize {
+/// Enables the clock of the analog I2C master. The registers of `I2C_ANA_MST` need the clock, and
+/// the PHY link of the PMU modem state turns it off.
+pub(crate) fn enable_master_clock() {
     MODEM_LPCON::regs()
         .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_en().set_bit());
@@ -156,6 +158,10 @@ fn regi2c_enable_block(block: u8) -> usize {
     MODEM_LPCON::regs()
         .i2c_mst_clk_conf()
         .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+}
+
+fn regi2c_enable_block(block: u8) -> usize {
+    enable_master_clock();
 
     // Before config I2C register, enable corresponding slave.
     let i2c_sel_bits = I2C_ANA_MST::regs().ana_conf2().read();

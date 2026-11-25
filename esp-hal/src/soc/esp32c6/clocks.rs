@@ -165,6 +165,8 @@ fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
         return;
     }
 
+    regi2c::enable_master_clock();
+
     // BBPLL CALIBRATION START
     I2C_ANA_MST::regs().ana_conf0().modify(|_, w| {
         w.bbpll_stop_force_high().clear_bit();

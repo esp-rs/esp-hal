@@ -529,6 +529,9 @@ macro_rules! property {
     ("sleep.regdma_list_count") => {
         4
     };
+    ("sleep.modem_state_reject_bit") => {
+        16
+    };
     ("sleep.idle_frequency_scaling") => {
         true
     };
