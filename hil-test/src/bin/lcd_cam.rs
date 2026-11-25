@@ -423,6 +423,7 @@ mod camera_tests {
         use esp_hal::time::{Duration, Instant};
 
         let peripherals = ctx.peripherals;
+        hil_test::init_logger!(peripherals);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let dma_channel = cfg_select! {
             lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
@@ -446,13 +447,17 @@ mod camera_tests {
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
         unit.resume();
 
-        unit.clear();
-        let start = Instant::now();
-        while start.elapsed() < Duration::from_micros(1000) {}
-        let edges = unit.value() as u64;
-        let elapsed = start.elapsed().as_micros();
-
-        let khz = edges * 1000 / elapsed;
+        // The first pass loads this loop into the cache. A cache miss between `clear` and
+        // `Instant::now` adds uncounted time, so only the second pass counts.
+        let mut khz = 0;
+        for _ in 0..2 {
+            unit.clear();
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(1000) {}
+            let edges = unit.value() as u64;
+            let elapsed = start.elapsed().as_micros();
+            khz = edges * 1000 / elapsed;
+        }
         hil_test::assert!((9_900..=10_100).contains(&khz), "MCLK is {} kHz", khz);
     }
 
