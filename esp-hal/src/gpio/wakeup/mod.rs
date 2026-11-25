@@ -340,8 +340,7 @@ fn exit_hook() {
     for bank in GpioBank::ALL {
         let mut prepared = PREPARED_PADS.word(bank).swap(0, Ordering::Relaxed);
 
-        while prepared != 0 {
-            let pin = prepared.trailing_zeros();
+        while let Some(pin) = prepared.lowest_one() {
             prepared &= !(1 << pin);
 
             let Some(lp) = lp_number(bank.offset() + pin as u8) else {
@@ -372,8 +371,7 @@ fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
         digital |= listening != 0;
 
         let mut participants = listening & LOW_POWER_PADS.word(bank).load(Ordering::Relaxed);
-        while participants != 0 {
-            let pin = participants.trailing_zeros();
+        while let Some(pin) = participants.lowest_one() {
             participants &= !(1 << pin);
 
             // Only a pad that the low-power registers reach enters the mask, so it has a number.

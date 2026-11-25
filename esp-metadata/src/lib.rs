@@ -515,6 +515,7 @@ impl Config {
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
             dma.engines
                 .validate_mem2mem(dma.mem2mem_requires_peripheral)?;
+            dma.engines.validate_psram(dma.psram_max_burst)?;
         }
 
         if let Some(adc) = &self.device.peri_config.adc
@@ -933,6 +934,25 @@ This pin may be available with certain limitations. Check your hardware to make 
             for channel in 1..=dac.channel_count.count {
                 let name = format_ident!("DAC{channel}");
                 let singleton_doc = format!("{name} peripheral singleton");
+                let tokens = quote! {
+                    #[doc = #singleton_doc] #name <= virtual ()
+                };
+                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
+            }
+        }
+
+        if let Some(rmt) = self.device.peri_config.rmt.as_ref()
+            && rmt.support_status.is_supported()
+        {
+            for (channel, capability) in rmt.channels.0.iter().enumerate() {
+                let name = format_ident!("RMT_CH{channel}");
+                let direction = match capability {
+                    cfg::RmtChannelCapability::Tx => "Transmit only.",
+                    cfg::RmtChannelCapability::Rx => "Receive only.",
+                    cfg::RmtChannelCapability::RxTx => "Transmit or receive.",
+                };
+                let singleton_doc = format!("RMT channel {channel}. {direction}");
                 let tokens = quote! {
                     #[doc = #singleton_doc] #name <= virtual ()
                 };

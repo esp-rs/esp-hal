@@ -9,7 +9,7 @@
 //! millisecond.
 
 use core::{
-    mem::{size_of, transmute},
+    mem::{DropGuard, size_of, transmute},
     ptr::NonNull,
     sync::atomic::{AtomicU16, AtomicU32, Ordering},
 };
@@ -37,7 +37,6 @@ use crate::{
         semaphore,
     },
     counting_lock::CountingLock,
-    drop_guard::DropGuard,
     hal::ram,
     sys::{
         c_types::{c_char, c_void},
@@ -461,8 +460,8 @@ fn esp_bt_controller_enable(_mode: esp_bt_mode_t) -> esp_err_t {
         return ESP_FAIL as _;
     }
 
-    hci_fc.defuse();
-    ble_stack.defuse();
+    DropGuard::dismiss(hci_fc);
+    DropGuard::dismiss(ble_stack);
 
     set_controller_status(esp_bt_controller_status_t_ESP_BT_CONTROLLER_STATUS_ENABLED);
     0
@@ -890,6 +889,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     let res = esp_bt_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
     assert!(res == 0, "esp_bt_controller_enable returned {}", res);
 
+    #[cfg(modem_retention = "regdma")]
+    super::mac_bb::init(config.modem_sleep() && super::lp_clk::light_sleep_supported());
+
     if config.modem_sleep() {
         super::lp_clk::claim_wake_source();
     }
@@ -904,6 +906,8 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
 pub(crate) fn ble_deinit() {
     super::lp_clk::release_wake_source();
+    #[cfg(modem_retention = "regdma")]
+    super::mac_bb::deinit();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 

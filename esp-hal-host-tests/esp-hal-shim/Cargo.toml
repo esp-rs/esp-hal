@@ -1,0 +1,12 @@
+[package]
+name         = "esp-hal-host-shim"
+version      = "0.0.0"
+edition      = "2024"
+rust-version = "1.100.0"
+description  = "The esp-hal items that the code under host test uses"
+repository   = "https://github.com/esp-rs/esp-hal"
+license      = "MIT OR Apache-2.0"
+publish      = false
+
+[dependencies]
+esp-hal-procmacros = { path = "../../esp-hal-procmacros" }

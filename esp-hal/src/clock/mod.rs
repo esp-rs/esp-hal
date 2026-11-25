@@ -239,6 +239,10 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
         clocks::request_rc_fast_div_clk(clocks);
         #[cfg(soc_has_clock_node_rtc_slow_clk)]
         clocks::request_rtc_slow_clk(clocks);
+        // esp-println writes to UART0's FIFO without a driver, and the UARTs share this memory.
+        // TODO: remove once https://github.com/esp-rs/esp-hal/issues/4666 is resolved.
+        #[cfg(soc_has_clock_node_uart_mem_clk)]
+        clocks::request_uart_mem_clk(clocks);
     });
 
     calibrate_rtc_slow_clock();
@@ -373,11 +377,32 @@ impl RtcClock {
             });
         }
 
-        TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_max().bits(calibration_cycles as u16);
-            w.rtc_cali_start_cycling().clear_bit();
-            w.rtc_cali_start().set_bit()
-        });
+        let start_calibration = || {
+            TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
+                w.rtc_cali_max().bits(calibration_cycles as u16);
+                w.rtc_cali_start_cycling().clear_bit();
+                w.rtc_cali_start().set_bit()
+            })
+        };
+        start_calibration();
+
+        // After some resets the timeout flag is already set when the calibration starts, before
+        // any cycle could be counted. Restarting the calibration clears it.
+        #[cfg(not(esp32))]
+        for _ in 0..3 {
+            if TIMG0::regs()
+                .rtccalicfg2()
+                .read()
+                .rtc_cali_timeout()
+                .bit_is_clear()
+            {
+                break;
+            }
+            TIMG0::regs()
+                .rtccalicfg()
+                .modify(|_, w| w.rtc_cali_start().clear_bit());
+            start_calibration();
+        }
 
         // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
         // waiting.

@@ -8,7 +8,6 @@ use crate::{
 
 mod oct_hex;
 
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
 pub(crate) use oct_hex::low_speed;
 
 /// PSRAM configuration.

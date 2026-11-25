@@ -111,6 +111,7 @@ peripherals = [
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
     { name = "PSRAM", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },
@@ -165,6 +166,7 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 support_status = { status = "partial", issue = 6754 }
 gdma_version = 2
 separate_in_out_interrupts = true
+psram_max_burst = 32
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
@@ -213,6 +215,7 @@ zero_extend_writes = true
 support_status = { status = "partial", issue = 6777 }
 [device.usb_serial_jtag]
 support_status = { status = "partial", issue = 6787 }
+phy_pads = ["USJ"]
 
 [device.ledc]
 version = 3
@@ -248,6 +251,7 @@ wakeup_sources = {
 [device.sleep.retention]
 cpu_retention = "software"
 modem_retention = "regdma"
+regdma_list_count = 4
 cpu_retention_frame = "clic"
 supports_top_power_down = true
 
@@ -376,7 +380,10 @@ instances = [
 support_status = { status = "not_supported", issue = 5417 }
 
 [device.temp_sensor]
-support_status = { status = "not_supported", issue = 5421 }
+support_status = { status = "partial", issue = 6778 }
+register_block = "apb_saradc"
+# A range change takes up to 0.6 ms to settle.
+min_stabilization_time_us = 1000
 
 ## Radio
 [device.wifi]

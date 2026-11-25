@@ -1,10 +1,7 @@
 #![no_std]
 
-// By default, we don't want probe-rs to interfere with test timings by halting
-// cores and polling RTT. The tests don't produce output most of the time
-// anyway. The only cases where output can be interesting are: during
-// development, and when a test fails. In these cases, you can enable
-// the `defmt` feature to get the output.
+// The tests log through esp-println, on the serial port that probe-rs reads. Logging over the
+// serial port does not halt the cores, as RTT polling does.
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -22,8 +19,8 @@ unsafe impl defmt::Logger for Logger {
     unsafe fn write(_bytes: &[u8]) {}
 }
 
-#[cfg(feature = "defmt")]
-use defmt_rtt as _;
+#[cfg(feature = "log-serial")]
+use esp_println as _;
 
 #[cfg(feature = "defmt")]
 #[macro_export]
@@ -37,6 +34,17 @@ macro_rules! assert_eq {
     ($($t:tt)*) => { defmt::assert_eq!($($t)*) }
 }
 
+#[cfg(feature = "defmt")]
+#[macro_export]
+macro_rules! assert_matches {
+    ($left:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?))
+    };
+    ($left:expr, $pattern:pat $(if $guard:expr)?, $($arg:tt)+) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?), $($arg)+)
+    };
+}
+
 #[cfg(not(feature = "defmt"))]
 #[macro_export]
 macro_rules! assert {
@@ -47,6 +55,12 @@ macro_rules! assert {
 #[macro_export]
 macro_rules! assert_eq {
     ($($t:tt)*) => { ::core::assert_eq!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! assert_matches {
+    ($($t:tt)*) => { ::core::assert_matches!($($t)*) }
 }
 
 /// Signal to the radio HIL runner that harness firmware is ready.

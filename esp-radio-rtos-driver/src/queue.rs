@@ -10,7 +10,7 @@
 //!
 //! See the [`QueueImplementation`] documentation for more information.
 //!
-//! You may also choose to use the [`CompatQueue`] implementation provided by this crate.
+//! You may also choose to use the `CompatQueue` implementation provided by this crate.
 //!
 //! ## Usage
 //!

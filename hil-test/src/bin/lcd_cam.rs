@@ -414,6 +414,45 @@ mod camera_tests {
         hil_test::assert!(regs.cam_ctrl().read().cam_vs_eof_en().bit_is_set());
     }
 
+    #[test]
+    #[cfg(pcnt_driver_supported)]
+    fn test_camera_master_clock_frequency(ctx: Context) {
+        use esp_hal::time::{Duration, Instant};
+
+        let peripherals = ctx.peripherals;
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let dma_channel = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+        let (mclk_in, mclk_out) = unsafe { hil_test::unconnected_pin!(peripherals).split() };
+
+        // 10 MHz divides each CAM source clock. An off-by-one divider gives 8 MHz from a 40 MHz
+        // source.
+        let _camera = Camera::new(
+            lcd_cam.cam,
+            dma_channel,
+            cam::Config::default().with_frequency(Rate::from_mhz(10)),
+        )
+        .unwrap()
+        .with_master_clock(mclk_out);
+
+        let unit = Unit::new(peripherals.PCNT0_UNIT0);
+        unit.channel0.set_edge_signal(mclk_in);
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        unit.resume();
+
+        unit.clear();
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_micros(1000) {}
+        let edges = unit.value() as u64;
+        let elapsed = start.elapsed().as_micros();
+
+        let khz = edges * 1000 / elapsed;
+        hil_test::assert!((9_900..=10_100).contains(&khz), "MCLK is {} kHz", khz);
+    }
+
     fn loopback(
         ctx: Context,
     ) -> (
@@ -475,6 +514,22 @@ mod camera_tests {
                     peripherals.GPIO46.split(),
                     peripherals.GPIO45.split(),
                     peripherals.GPIO48.split(),
+                )
+            },
+            esp32p4 => unsafe {
+                (
+                    peripherals.GPIO7.split(),
+                    peripherals.GPIO9.split(),
+                    peripherals.GPIO10.split(),
+                    peripherals.GPIO13.split(),
+                    peripherals.GPIO14.split(),
+                    peripherals.GPIO15.split(),
+                    peripherals.GPIO18.split(),
+                    peripherals.GPIO19.split(),
+                    peripherals.GPIO21.split(),
+                    peripherals.GPIO22.split(),
+                    peripherals.GPIO23.split(),
+                    peripherals.GPIO28.split(),
                 )
             },
         };
@@ -662,10 +717,7 @@ mod camera_tests {
                 (dpi, sent) = send_frame(dpi, sent, &pclk);
                 // Cancel the wait after EOF, before observing its result.
             }
-            hil_test::assert!(matches!(
-                poll_once(transfer.wait_for_dma_eof()),
-                Poll::Ready(Ok(()))
-            ));
+            hil_test::assert_matches!(poll_once(transfer.wait_for_dma_eof()), Poll::Ready(Ok(())));
             (camera, received) = transfer.stop();
 
             hil_test::assert!(received.number_of_received_bytes() >= sent.len());
@@ -696,10 +748,10 @@ mod camera_tests {
                 rx_bytes
             );
             if expected.is_err() {
-                hil_test::assert!(matches!(
+                hil_test::assert_matches!(
                     poll_once(transfer.wait_for_dma_eof()),
                     Poll::Ready(result) if result == expected
-                ));
+                );
                 let (result, next_camera, next_received) = transfer.wait();
                 hil_test::assert_eq!(result, expected);
                 (camera, received) = (next_camera, next_received);

@@ -59,6 +59,52 @@ impl SleepCpuClock {
     }
 }
 
+/// The wakeup waits in `TIMER1` for the PLL, the XTL buffer, and CK8M.
+///
+/// `TIMER1` counts these waits in RTC slow clock cycles, so the XTL wait of a light sleep is set in
+/// time. With the 32 kHz crystal as the slow clock, the reset value of 80 cycles makes a light
+/// sleep wakeup about 2.4 ms long.
+/// See <https://github.com/espressif/esp-idf/blob/e4df0c12f70/components/esp_hw_support/port/esp32s3/rtc_sleep.c#L271-L277>.
+#[cfg(all(not(soc_has_pmu), feature = "rt"))]
+struct WakeupWaits {
+    pll: u8,
+    xtl: u16,
+    ck8m: u8,
+}
+
+#[cfg(all(not(soc_has_pmu), feature = "rt"))]
+impl WakeupWaits {
+    fn for_sleep(kind: SleepKind) -> Self {
+        let (pll, xtl, ck8m) = match kind {
+            SleepKind::Deep => (
+                sleep_impl::RTC_CNTL_PLL_BUF_WAIT_DEFAULT,
+                u64::from(sleep_impl::RTC_CNTL_XTL_BUF_WAIT_DEFAULT),
+                sleep_impl::RTC_CNTL_CK8M_WAIT_DEFAULT,
+            ),
+            SleepKind::Light => (
+                sleep_impl::RTC_CNTL_PLL_BUF_WAIT_SLP_CYCLES,
+                crate::clock::us_to_rtc_ticks(u64::from(sleep_impl::RTC_CNTL_XTL_BUF_WAIT_SLP_US)),
+                sleep_impl::RTC_CNTL_CK8M_WAIT_SLP_CYCLES,
+            ),
+        };
+        Self {
+            pll,
+            // The field has 10 bits, and `bits` drops the high bits of a longer wait.
+            xtl: xtl.min(0x3FF) as u16,
+            ck8m,
+        }
+    }
+
+    #[inline(always)]
+    fn write(self) {
+        LPWR::regs().timer1().modify(|_, w| unsafe {
+            w.pll_buf_wait().bits(self.pll);
+            w.xtl_buf_wait().bits(self.xtl);
+            w.ck8m_wait().bits(self.ck8m)
+        });
+    }
+}
+
 #[cfg(soc_has_pmu)]
 pub(crate) mod pmu_common;
 
@@ -98,7 +144,8 @@ pub enum LightSleep {
     /// catch. This result does not tell those apart from a sleep that a wakeup source ended.
     Ended,
 
-    /// A wakeup source refused the sleep, so the chip stayed awake.
+    /// A wakeup source or the check of [`LowPower::sleep_light_if`] refused the sleep, so the chip
+    /// stayed awake.
     ///
     /// The refusal holds until the state that caused it changes, so a second call refuses too.
     /// Wait for an interrupt instead.
@@ -107,42 +154,6 @@ pub enum LightSleep {
 
 #[cfg(supports_cpu_power_down)]
 use crate::rtc_cntl::cpu_retention;
-
-/// The handler that answers whether this core still agrees to a light sleep, or null.
-///
-/// Only the rendezvous of the software retention path reads this, which is why the read lives
-/// there.
-#[cfg(all(multi_core, sleep_driver_supported))]
-pub(crate) static CAN_SLEEP_HANDLER: portable_atomic::AtomicPtr<()> =
-    portable_atomic::AtomicPtr::new(core::ptr::null_mut());
-
-/// The parts of the sleep path that an RTOS fills in.
-#[cfg(all(multi_core, sleep_driver_supported))]
-#[doc(hidden)]
-#[instability::unstable]
-pub mod __rtos_implementation {
-    use portable_atomic::Ordering;
-
-    /// Registers the function that answers whether the core that runs it agrees to a light sleep.
-    ///
-    /// A light sleep that powers the CPU domain down needs every running core to save itself, so
-    /// the core that calls the sleep function asks the other core to join it. The core that calls
-    /// decides for itself. The other core answers this function, and a `false` answer stops the
-    /// sleep. Either core can be the one that answers.
-    ///
-    /// The answer holds for the whole sleep. The core that gives it has its interrupts disabled
-    /// already, so nothing can give that core work while the sleep runs.
-    ///
-    /// # Safety
-    ///
-    /// The handler runs in an interrupt handler, with interrupts disabled and with the caches of
-    /// the sleep path. It must return, it must take no lock that a core can hold across a sleep,
-    /// and it must stay callable for the life of the program.
-    pub unsafe fn set_can_sleep_handler(handler: fn() -> bool) {
-        super::CAN_SLEEP_HANDLER.store(handler as *mut (), Ordering::Release);
-    }
-}
-
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
 /// The wakeup-enable mask survives a deep-sleep wake, so here it still holds the request of the run
@@ -239,7 +250,7 @@ impl<'d> LowPower<'d> {
             );
         }
 
-        self.sleep(config, SleepKind::Deep, false);
+        self.sleep(config, SleepKind::Deep, false, None);
 
         unreachable!("deep sleep without rejection cannot return")
     }
@@ -270,7 +281,7 @@ impl<'d> LowPower<'d> {
     #[cfg(sleep_deep_sleep)]
     #[cfg(feature = "rt")]
     pub fn sleep_deep_with_rejection(&mut self, config: RtcSleepConfig) {
-        self.sleep(config, SleepKind::Deep, true);
+        self.sleep(config, SleepKind::Deep, true, None);
     }
 
     /// Enters light sleep, and returns when a wakeup source ends it.
@@ -300,7 +311,42 @@ impl<'d> LowPower<'d> {
     #[cfg(sleep_light_sleep)]
     #[cfg(feature = "rt")]
     pub fn sleep_light(&mut self, config: RtcSleepConfig) -> LightSleep {
-        if self.sleep(config, SleepKind::Light, true) {
+        self.sleep_light_checked(config, None)
+    }
+
+    /// Enters light sleep if `may_sleep` agrees, and returns when a wakeup source ends it.
+    ///
+    /// The documentation of [`Self::sleep_light`] applies. Before the sleep starts, this function
+    /// parks the other cores, and then calls `may_sleep`. A `false` answer refuses the sleep, and
+    /// the result is [`LightSleep::Refused`]. No other core runs until `may_sleep` returns, so the
+    /// answer holds for the whole sleep. A light sleep that the APP core starts can run on the PRO
+    /// core, and `may_sleep` then runs on the PRO core too.
+    ///
+    /// `may_sleep` runs with interrupts disabled. It must not take a lock that a core holds while
+    /// it parks another core.
+    #[cfg_attr(
+        cpu_retention = "software",
+        doc = "\n\nLight sleep suspends the caches. See [Optimization \
+               level](crate#optimization-level) for the build requirement."
+    )]
+    #[cfg(sleep_light_sleep)]
+    #[cfg(feature = "rt")]
+    pub fn sleep_light_if(
+        &mut self,
+        config: RtcSleepConfig,
+        may_sleep: fn() -> bool,
+    ) -> LightSleep {
+        self.sleep_light_checked(config, Some(may_sleep))
+    }
+
+    #[cfg(sleep_light_sleep)]
+    #[cfg(feature = "rt")]
+    fn sleep_light_checked(
+        &mut self,
+        config: RtcSleepConfig,
+        may_sleep: Option<fn() -> bool>,
+    ) -> LightSleep {
+        if self.sleep(config, SleepKind::Light, true, may_sleep) {
             LightSleep::Refused
         } else {
             LightSleep::Ended
@@ -309,20 +355,23 @@ impl<'d> LowPower<'d> {
 
     /// Calculates the sleep configuration from the wakeup-enable mask, and enters the sleep.
     ///
-    /// Returns whether a wakeup source refused a light sleep. A deep sleep ignores a refusal,
-    /// so this function does not return `true` for a deep sleep.
+    /// Returns whether a wakeup source or `may_sleep` refused a light sleep. A deep sleep ignores
+    /// a refusal, so this function does not return `true` for a deep sleep.
     ///
     /// A sleep limit can end the call before the sleep starts. That result is `false`. It is not a
     /// refusal. A deep sleep whose limit the transition cannot catch panics when the caller cannot
     /// accept a rejection.
+    ///
+    /// A light sleep parks the other cores, and then calls `may_sleep`, as
+    /// [`Self::sleep_light_if`] describes.
     #[cfg(sleep_driver_supported)]
-    #[crate::ram]
     #[cfg(feature = "rt")]
     pub(crate) fn sleep(
         &mut self,
         config: RtcSleepConfig,
         kind: SleepKind,
         allow_reject: bool,
+        may_sleep: Option<fn() -> bool>,
     ) -> bool {
         // ESP-IDF runs `esp_light_sleep_start` inside `portENTER_CRITICAL(&light_sleep_lock)`.
         // A sleep ends when `wait_for_sleep_result` sees a wakeup or reject bit, so nothing in
@@ -333,40 +382,58 @@ impl<'d> LowPower<'d> {
                 // The PRO CPU requests every light sleep, because the wake releases the APP CPU
                 // from the PRO CPU.
                 match (kind, crate::system::Cpu::current()) {
+                    (SleepKind::Light, crate::system::Cpu::AppCpu) => {
+                        cpu_retention::rendezvous::sleep_from_app_cpu(
+                            config,
+                            allow_reject,
+                            may_sleep,
+                        )
+                    }
                     (SleepKind::Light, crate::system::Cpu::ProCpu) => {
-                        cpu_retention::rendezvous::take_request();
-                        let refused =
-                            self.sleep_with_interrupts_disabled(config, kind, allow_reject);
-                        cpu_retention::rendezvous::release_app_cpu();
+                        let refused = self.sleep_with_interrupts_disabled(
+                            config,
+                            kind,
+                            allow_reject,
+                            may_sleep,
+                        );
+                        if !refused {
+                            cpu_retention::rendezvous::answer_app_cpu();
+                        }
                         refused
                     }
-                    // The APP CPU does not learn whether a wakeup source refused the sleep.
-                    (SleepKind::Light, _) => {
-                        cpu_retention::rendezvous::sleep_from_app_cpu(config);
-                        false
-                    }
-                    _ => self.sleep_with_interrupts_disabled(config, kind, allow_reject),
+                    _ => self.sleep_with_interrupts_disabled(config, kind, allow_reject, may_sleep),
                 }
             }
-            _ => self.sleep_with_interrupts_disabled(config, kind, allow_reject),
+            _ => self.sleep_with_interrupts_disabled(config, kind, allow_reject, may_sleep),
         };
         unsafe { SingleCoreInterruptLock.exit(irq_token) };
         refused
     }
 
     #[cfg(sleep_driver_supported)]
-    #[crate::ram]
     #[cfg(feature = "rt")]
     fn sleep_with_interrupts_disabled(
         &mut self,
         config: RtcSleepConfig,
         kind: SleepKind,
         allow_reject: bool,
+        may_sleep: Option<fn() -> bool>,
     ) -> bool {
+        // First, so that no other core changes what the check and the hooks read. Dropped last, so
+        // that the other cores run again with the time base and the wakeup cause of this sleep.
+        #[cfg(multi_core)]
+        let _parked = ParkedCores::new(kind);
+
+        if kind == SleepKind::Light && may_sleep.is_some_and(|may_sleep| !may_sleep()) {
+            return true;
+        }
+
         let rtc = Rtc::new(unsafe { crate::peripherals::RTC_TIMER::steal() });
 
         let mut config = config;
         config.set_sleep_kind(kind);
+        #[cfg(modem_retention = "regdma")]
+        crate::rtc_cntl::regdma::prepare_sleep(kind == SleepKind::Light);
 
         // The slow clock drifts after the calibration at boot, and a deep sleep can be long. The
         // calibration comes before the entry hooks, because a wakeup source that limits the sleep
@@ -383,21 +450,13 @@ impl<'d> LowPower<'d> {
         // bring back, and an armed descriptor would outlive the sleep in the RTC domain. esp-idf
         // arms retention from its light sleep path alone.
         //
-        // The buffer is read once, because the rendezvous and the power-down must agree on it. A
-        // buffer that another core installs during this sleep serves the next one.
+        // The buffer is read once, because the save of the APP CPU and the power-down must agree on
+        // it. A buffer that another core installs during this sleep serves the next one.
         #[cfg(supports_cpu_power_down)]
         let retention_buffer = match kind {
             SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
             SleepKind::Deep => None,
         };
-
-        // A chip that retains the CPU in software needs every running core to save itself, so the
-        // rendezvous comes first, before any step that a refusal would have to undo. A return
-        // after it must call `rendezvous::finish`.
-        #[cfg(all(cpu_retention = "software", multi_core))]
-        if retention_buffer.is_some() && !cpu_retention::rendezvous::engage() {
-            return false;
-        }
 
         // The hooks run before `apply`, so that a request to keep a power domain powered reaches
         // the hardware. They also run before the last read of the mask, because a hook can
@@ -415,8 +474,6 @@ impl<'d> LowPower<'d> {
                 timer::restore_after_limit(clamp);
             }
             run_exit_hooks();
-            #[cfg(all(cpu_retention = "software", multi_core))]
-            cpu_retention::rendezvous::finish();
             return true;
         }
 
@@ -426,8 +483,6 @@ impl<'d> LowPower<'d> {
         #[cfg(sleep_has_wakeup_source_timer)]
         if matches!(&entry.clamp, Some(timer::LimitClamp::TooShort)) {
             run_exit_hooks();
-            #[cfg(all(cpu_retention = "software", multi_core))]
-            cpu_retention::rendezvous::finish();
             if kind == SleepKind::Deep && !allow_reject {
                 panic!("the wakeup deadline is too near to be caught by the sleep transition");
             }
@@ -453,8 +508,6 @@ impl<'d> LowPower<'d> {
             if let Some(clamp) = entry.clamp {
                 timer::restore_after_limit(clamp);
             }
-            #[cfg(all(cpu_retention = "software", multi_core))]
-            cpu_retention::rendezvous::finish();
 
             match kind {
                 // Not a software refusal. Light sleep does not report a missing wakeup source.
@@ -467,6 +520,10 @@ impl<'d> LowPower<'d> {
 
         let reject_mask = if allow_reject { reject_mask() } else { 0 };
 
+        // Each core saves itself, and a parked core saves nothing on its own.
+        #[cfg(all(cpu_retention = "software", multi_core))]
+        let app_cpu_saved = retention_buffer.is_some_and(cpu_retention::rendezvous::save_app_cpu);
+
         let suspended_uarts = sleep_uart_prepare();
 
         // Latch the systimer value *before* sleeping. The systimer keeps running during
@@ -478,83 +535,18 @@ impl<'d> LowPower<'d> {
 
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
 
-        #[cfg(multi_core)]
-        let parked = match kind {
-            SleepKind::Light => park_other_cores(),
-            // A deep sleep resets the chip, so the other core needs no stall, and nothing thaws
-            // it afterwards.
-            SleepKind::Deep => 0,
-        };
-
-        // After the light-sleep stall, so that the other core cannot force the SAR on again.
-        let sar_power = SarPower::for_sleep(kind).replace();
-
-        let rejected = {
-            // ESP-IDF arms RTC_CNTL retention in `misc_modules_sleep_prepare`, before it arms the
-            // wakeup sources.
-
-            #[cfg(cpu_retention = "rtc_cntl")]
-            cpu_retention::prepare_cpu_retention(retention_buffer);
-
-            let saved = config.start_sleep(wakeup_mask, reject_mask);
-
-            // Last, because this step takes the pads away from the peripherals that drove them. The
-            // wakeup sources have their holds now, and no later step needs a pad.
-            #[cfg(any(
-                sleep_deep_sleep_needs_gpio_isolation,
-                gpio_need_soft_isolate_during_pd
-            ))]
-            if kind == SleepKind::Deep {
-                gpio::wakeup::isolate_pads_for_deep_sleep();
-            }
-
-            // A CPU power-down loses the dirty cache lines, and with them the writes to PSRAM.
-            // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L55-L72>.
-            #[cfg(soc_cpu_powers_down_cache)]
-            if retention_buffer.is_some()
-                && config.pd_flags.pd_cpu()
-                && !crate::psram::psram_range().is_empty()
-            {
-                crate::soc::cache_writeback_all();
-            }
-
-            let rejected = cfg_select! {
-                cpu_retention = "software" => {
-                    // The software chips save the CPU inside the request, so the request belongs to
-                    // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
-                    cpu_retention::enter_sleep_with_retention(&config, retention_buffer)
-                }
-                _ => config.enter_sleep(),
-            };
-
-            if config.is_deep_sleep() && !rejected {
-                // The chip is entering deep sleep, and the wake resets it. Because RTC is in a
-                // slower clock domain than the CPU, the power-down can take several CPU cycles.
-                loop {
-                    core::hint::spin_loop();
-                }
-            }
-
-            config.finish_sleep();
-            saved.restore();
-
-            rejected
-        };
-
-        #[cfg(supports_cpu_power_down)]
-        if kind == SleepKind::Light && retention_buffer.is_some() {
-            // First, because the other core comes back through the wake stub that the next call
-            // disarms.
+        let rejected = sleep_transition(
+            &config,
+            kind,
+            wakeup_mask,
+            reject_mask,
+            #[cfg(not(soc_has_pmu))]
+            WakeupWaits::for_sleep(kind),
+            #[cfg(supports_cpu_power_down)]
+            retention_buffer,
             #[cfg(all(cpu_retention = "software", multi_core))]
-            cpu_retention::rendezvous::finish();
-
-            cpu_retention::finish_cpu_retention(rejected);
-        }
-
-        sar_power.replace();
-
-        #[cfg(multi_core)]
-        unpark_cores(parked);
+            app_cpu_saved,
+        );
 
         let after = rtc.time_since_boot_raw();
 
@@ -589,61 +581,147 @@ impl<'d> LowPower<'d> {
     }
 }
 
-/// Hardware-stalls the other running cores for the length of a light sleep, or thaws them.
+/// Requests the sleep, and returns whether the hardware rejected the request.
 ///
-/// A stall is enough where the retention DMA saves the CPU domain, because the domain holds every
-/// core and the hardware brings the stalled core back with this one. esp-idf stalls the other core
-/// the same way and adds nothing more (`sleep_modes.c`, where the SMP retention work is gated on
-/// `SOC_PM_CPU_RETENTION_BY_SW`).
-///
-/// FIXME: a stall freezes the other core wherever it stands, which can be inside an interrupt
-/// handler that holds a cross-core lock, such as the clock tree, the peripheral reference counts,
-/// or the UART locks that this path takes. This core then spins for that lock for ever, because the
-/// frozen core cannot release it.
-///
-/// A chip that retains the CPU in software needs more than a stall, because each core saves
-/// itself, and a frozen core saves nothing. The rendezvous of that path keeps the other core
-/// running, so this function stalls nothing while that core waits in the rendezvous.
-///
-/// Returns the cores that it stalled, as a bit for each [`Cpu`], for [`unpark_cores`]. A core that
-/// the program stalled before the sleep stays stalled after it.
-#[cfg(all(multi_core, sleep_driver_supported))]
+/// This part switches the CPU clock, and it can suspend the caches or power down the CPU. The code
+/// before and after it can run from flash.
+#[cfg(all(sleep_driver_supported, feature = "rt"))]
 #[crate::ram]
-fn park_other_cores() -> u8 {
-    // A core that saves itself in the rendezvous must keep running, because a stalled core saves
-    // nothing.
-    #[cfg(all(cpu_retention = "software", multi_core, feature = "rt"))]
-    if cpu_retention::rendezvous::helper_saved() {
-        return 0;
-    }
+fn sleep_transition(
+    config: &RtcSleepConfig,
+    kind: SleepKind,
+    wakeup_mask: u32,
+    reject_mask: u32,
+    #[cfg(not(soc_has_pmu))] wakeup_waits: WakeupWaits,
+    #[cfg(supports_cpu_power_down)] retention_buffer: Option<core::ptr::NonNull<u8>>,
+    #[cfg(all(cpu_retention = "software", multi_core))] app_cpu_saved: bool,
+) -> bool {
+    // After the light-sleep park, so that the other core cannot force the SAR on again.
+    let sar_power = SarPower::for_sleep(kind).replace();
 
-    // The handler of the workaround waits for the stalled core.
-    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
-    crate::soc::cache_livelock::pause();
+    let rejected = {
+        // ESP-IDF arms RTC_CNTL retention in `misc_modules_sleep_prepare`, before it arms the
+        // wakeup sources.
 
-    let mut parked = 0;
-    for cpu in crate::system::Cpu::other() {
-        if crate::soc::cpu_control::is_running(cpu) {
-            // SAFETY: [`unpark_cores`] runs before this function returns to its caller.
-            unsafe { crate::soc::cpu_control::internal_park_core(cpu, true) };
-            parked |= 1 << cpu as u8;
+        #[cfg(cpu_retention = "rtc_cntl")]
+        cpu_retention::prepare_cpu_retention(retention_buffer);
+
+        let saved = config.start_sleep(wakeup_mask, reject_mask);
+        // After the CPU clock switch, because the RC_FAST disable path writes `CK8M_WAIT`.
+        #[cfg(not(soc_has_pmu))]
+        wakeup_waits.write();
+
+        // Last, because this step takes the pads away from the peripherals that drove them. The
+        // wakeup sources have their holds now, and no later step needs a pad.
+        #[cfg(any(
+            sleep_deep_sleep_needs_gpio_isolation,
+            gpio_need_soft_isolate_during_pd
+        ))]
+        if kind == SleepKind::Deep {
+            gpio::wakeup::isolate_pads_for_deep_sleep();
         }
+
+        // A CPU power-down loses the dirty cache lines, and with them the writes to PSRAM.
+        // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L55-L72>.
+        #[cfg(soc_cpu_powers_down_cache)]
+        if retention_buffer.is_some()
+            && config.pd_flags.pd_cpu()
+            && !crate::psram::psram_range().is_empty()
+        {
+            crate::soc::cache_writeback_all();
+        }
+
+        let rejected = cfg_select! {
+            cpu_retention = "software" => {
+                // The software chips save the CPU inside the request, so the request belongs to
+                // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
+                cpu_retention::enter_sleep_with_retention(config, &saved, retention_buffer)
+            }
+            _ => config.enter_sleep(),
+        };
+
+        if config.is_deep_sleep() && !rejected {
+            // The chip is entering deep sleep, and the wake resets it. Because RTC is in a
+            // slower clock domain than the CPU, the power-down can take several CPU cycles.
+            loop {
+                core::hint::spin_loop();
+            }
+        }
+
+        config.finish_sleep();
+        saved.restore();
+
+        rejected
+    };
+
+    #[cfg(supports_cpu_power_down)]
+    if kind == SleepKind::Light && retention_buffer.is_some() {
+        // First, because the other core comes back through the wake stub that the next call
+        // disarms.
+        #[cfg(all(cpu_retention = "software", multi_core))]
+        if app_cpu_saved {
+            cpu_retention::rendezvous::resume_app_cpu();
+        }
+
+        cpu_retention::finish_cpu_retention(rejected);
     }
-    parked
+
+    sar_power.replace();
+
+    rejected
 }
 
-/// Thaws the cores that [`park_other_cores`] stalled.
-#[cfg(all(multi_core, sleep_driver_supported))]
-#[crate::ram]
-fn unpark_cores(parked: u8) {
-    for cpu in crate::system::Cpu::other() {
-        if parked & (1 << cpu as u8) != 0 {
-            // SAFETY: this core stalled that core for the sleep, and the sleep is over.
-            unsafe { crate::soc::cpu_control::internal_park_core(cpu, false) };
+/// The parks of the other running cores for the length of a light sleep, as a bit for each
+/// [`Cpu`](crate::system::Cpu). The drop releases them.
+///
+/// A parked core holds no lock. Where the retention DMA saves the CPU domain, the hardware brings
+/// the parked core back with this one. Where each core saves itself, the parked core saves itself
+/// later in the sleep path.
+#[cfg(all(multi_core, sleep_driver_supported, feature = "rt"))]
+struct ParkedCores(u8);
+
+#[cfg(all(multi_core, sleep_driver_supported, feature = "rt"))]
+impl ParkedCores {
+    /// Parks the other running cores for a light sleep. A deep sleep resets the chip, so it parks
+    /// no core.
+    #[inline(always)]
+    fn new(kind: SleepKind) -> Self {
+        let mut parked = 0;
+        if kind == SleepKind::Light {
+            // The handler of the workaround waits for the parked core.
+            #[cfg(cache_livelock_workaround)]
+            crate::soc::cache_livelock::pause();
+
+            for cpu in crate::system::Cpu::other() {
+                if crate::system::multi_core::park(cpu) {
+                    parked |= 1 << cpu as u8;
+                }
+            }
+
+            #[cfg(cache_livelock_workaround)]
+            if parked == 0 {
+                crate::soc::cache_livelock::resume();
+            }
         }
+        Self(parked)
     }
-    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
-    crate::soc::cache_livelock::resume();
+}
+
+#[cfg(all(multi_core, sleep_driver_supported, feature = "rt"))]
+impl Drop for ParkedCores {
+    #[inline(always)]
+    fn drop(&mut self) {
+        if self.0 == 0 {
+            return;
+        }
+        for cpu in crate::system::Cpu::other() {
+            if self.0 & (1 << cpu as u8) != 0 {
+                crate::system::multi_core::unpark(cpu);
+            }
+        }
+        #[cfg(cache_livelock_workaround)]
+        crate::soc::cache_livelock::resume();
+    }
 }
 
 /// Waits for the hardware to report the result of the sleep request, and returns whether the
@@ -682,16 +760,18 @@ pub(crate) fn wait_for_sleep_result() -> bool {
 /// See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_sleep/sleep_uart.c#L95-L131>.
 #[cfg(sleep_driver_supported)]
 fn sleep_uart_prepare() -> u32 {
-    use crate::uart::Instance;
-    let mut suspended = 0;
-    for_each_uart! {
-        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
-            if unsafe { crate::peripherals::$inst::steal() }.info().suspend_for_sleep() {
-                suspended |= 1 << $id;
-            }
-        };
-    }
-    suspended
+    use crate::{soc::clocks::ClockTree, uart::Instance};
+    ClockTree::with(|clocks| {
+        let mut suspended = 0;
+        for_each_uart! {
+            ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
+                if unsafe { crate::peripherals::$inst::steal() }.info().suspend_for_sleep(clocks) {
+                    suspended |= 1 << $id;
+                }
+            };
+        }
+        suspended
+    })
 }
 
 /// The SAR ADC power override, as one 2-bit `force_xpd_sar` mode per SAR unit.
@@ -812,12 +892,14 @@ impl SarPower {
 /// Resumes the UARTs that [`sleep_uart_prepare`] suspended.
 #[cfg(sleep_driver_supported)]
 fn sleep_uart_resume(suspended: u32) {
-    use crate::uart::Instance;
-    for_each_uart! {
-        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
-            if suspended & (1 << $id) != 0 {
-                unsafe { crate::peripherals::$inst::steal() }.info().resume_from_sleep();
-            }
-        };
-    }
+    use crate::{soc::clocks::ClockTree, uart::Instance};
+    ClockTree::with(|clocks| {
+        for_each_uart! {
+            ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
+                if suspended & (1 << $id) != 0 {
+                    unsafe { crate::peripherals::$inst::steal() }.info().resume_from_sleep(clocks);
+                }
+            };
+        }
+    });
 }

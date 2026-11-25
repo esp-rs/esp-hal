@@ -454,6 +454,11 @@ pub(crate) struct WorkItem<T: Sync + Send> {
     waker: WakerRegistration,
 }
 
+// Safety: `next` is only read and written by the queue, under its lock, while the item is in the
+// queue. A handle borrows the item mutably for that time, so no other thread can reach it.
+unsafe impl<T: Sync + Send> Send for WorkItem<T> {}
+unsafe impl<T: Sync + Send> Sync for WorkItem<T> {}
+
 impl<T: Sync + Send + Clone> Clone for WorkItem<T> {
     fn clone(&self) -> Self {
         Self {

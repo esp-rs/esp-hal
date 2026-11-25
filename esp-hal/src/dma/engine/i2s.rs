@@ -18,7 +18,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     peripherals::Interrupt,
-    system::PeripheralGuard,
+    system::{Peripheral, PeripheralGuard},
 };
 
 /// Immutable per-channel metadata.
@@ -80,7 +80,7 @@ impl DmaTxChannel for I2sDmaTxChannel<'_> {}
 impl RegisterAccess for I2sDmaTxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
-        None
+        Some(PeripheralGuard::new(self.0.peripheral()))
     }
 
     fn reset(&self) {
@@ -265,7 +265,7 @@ impl InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannel<'_> {
 impl RegisterAccess for I2sDmaRxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
-        None
+        Some(PeripheralGuard::new(self.0.peripheral()))
     }
 
     fn reset(&self) {
@@ -470,6 +470,16 @@ impl I2sDmaChannel<'_> {
             fn register_block(&self) -> &I2sRegisterBlock;
             fn info(&self) -> &'static ChannelInfo;
             fn state(&self) -> &'static ChannelState;
+        }
+    }
+
+    // The DMA registers are in the I2S peripheral.
+    fn peripheral(&self) -> Peripheral {
+        match &self.0 {
+            #[cfg(soc_has_i2s0)]
+            any::Inner::I2s0(_) => Peripheral::I2s0,
+            #[cfg(soc_has_i2s1)]
+            any::Inner::I2s1(_) => Peripheral::I2s1,
         }
     }
 }

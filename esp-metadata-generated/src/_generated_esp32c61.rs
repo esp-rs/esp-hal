@@ -337,6 +337,12 @@ macro_rules! property {
     ("adc.sar_power_override") => {
         true
     };
+    ("temp_sensor.min_stabilization_time_us") => {
+        1000
+    };
+    ("temp_sensor.min_stabilization_time_us", str) => {
+        stringify!(1000)
+    };
     ("timergroup.timg_has_timer1") => {
         false
     };
@@ -406,6 +412,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.regdma_list_count") => {
+        4
+    };
     ("sleep.idle_frequency_scaling") => {
         true
     };
@@ -429,6 +438,9 @@ macro_rules! property {
     };
     ("dma.gdma_version", str) => {
         stringify!(2)
+    };
+    ("dma.psram_max_burst") => {
+        32
     };
     ("interrupts.status_registers") => {
         3
@@ -571,6 +583,10 @@ macro_rules! property {
         ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, crate
         ::soc::clocks::TimgCalibrationClockConfig::RcFastDivClk, #[cfg(use_xtal32k)]
         crate ::soc::clocks::TimgCalibrationClockConfig::Xtal32kClk]
+    };
+    ("clock_tree.tsens.sclk") => {
+        [crate ::soc::clocks::TsensSclkConfig::RcFast, crate
+        ::soc::clocks::TsensSclkConfig::Xtal]
     };
     ("clock_tree.uart.function_clock.sclk") => {
         [crate ::soc::clocks::UartFunctionClockSclk::Xtal, crate
@@ -767,6 +783,8 @@ macro_rules! for_each_dma_channel {
         interrupt_out = DMA_OUT_CH0, compatible = [SPI2, I2S0, SHA]));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1, interrupt_in = DMA_IN_CH1,
         interrupt_out = DMA_OUT_CH1, compatible = [SPI2, I2S0, SHA]));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, can_access_psram = true));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, can_access_psram = true));
         _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA",
         DMA_CH1))); _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA",
         any_channel = AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
@@ -775,6 +793,8 @@ macro_rules! for_each_dma_channel {
         ("AHB_GDMA", DMA_CH1, 1, interrupt_in = DMA_IN_CH1, interrupt_out = DMA_OUT_CH1,
         compatible = [SPI2, I2S0, SHA])));
         _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("AHB_GDMA", DMA_CH0, can_access_psram =
+        true), ("AHB_GDMA", DMA_CH1, can_access_psram = true)));
     };
 }
 #[macro_export]
@@ -1360,6 +1380,22 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 /// }
+/// impl TsensInstance {
+///     // TSENS_SCLK
+///
+///     fn enable_sclk_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_sclk_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<TsensSclkConfig>,
+///         _new_config: TsensSclkConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
@@ -1395,6 +1431,11 @@ macro_rules! define_clock_tree_types {
             Uart0 = 0,
             Uart1 = 1,
             Uart2 = 2,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TsensInstance {
+            Tsens = 0,
         }
         /// Selects the output frequency of `XTAL_CLK`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1806,6 +1847,16 @@ macro_rules! define_clock_tree_types {
                 self.integral as u32
             }
         }
+        /// The list of clock signals that the `TSENS_SCLK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TsensSclkConfig {
+            /// Selects `RC_FAST_CLK`.
+            RcFast,
+            #[default]
+            /// Selects `XTAL_CLK`.
+            Xtal,
+        }
         /// Represents the device's clock tree.
         pub struct ClockTree {
             xtal_clk: Option<XtalClkConfig>,
@@ -1828,6 +1879,7 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 3],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 3],
+            tsens_sclk: [Option<TsensSclkConfig>; 1],
             pub(crate) rc_fast_clk_refcount: u32,
             pub(crate) pll_clk_refcount: u32,
             #[cfg(use_xtal32k)]
@@ -1858,6 +1910,7 @@ macro_rules! define_clock_tree_types {
             pub(crate) timg_wdt_clock_refcount: [u32; 2],
             pub(crate) uart_function_clock_refcount: [u32; 3],
             pub(crate) uart_baud_rate_generator_refcount: [u32; 3],
+            pub(crate) tsens_sclk_refcount: [u32; 1],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.
@@ -1968,6 +2021,10 @@ macro_rules! define_clock_tree_types {
             pub fn uart2_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart2 as usize]
             }
+            /// Returns the current configuration of the TSENS_SCLK clock tree node
+            pub fn tsens_sclk(&self) -> Option<TsensSclkConfig> {
+                self.tsens_sclk[TsensInstance::Tsens as usize]
+            }
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
@@ -1991,6 +2048,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock: [None; 2],
                 uart_function_clock: [None; 3],
                 uart_baud_rate_generator: [None; 3],
+                tsens_sclk: [None; 1],
                 rc_fast_clk_refcount: 0,
                 pll_clk_refcount: 0,
                 #[cfg(use_xtal32k)]
@@ -2021,6 +2079,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock_refcount: [0; 2],
                 uart_function_clock_refcount: [0; 3],
                 uart_baud_rate_generator_refcount: [0; 3],
+                tsens_sclk_refcount: [0; 1],
             });
         static XTAL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -2062,6 +2121,8 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 3];
         static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 3];
+        static TSENS_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         /// The clock sources of the device.
         ///
         /// A clock source is a node of the clock tree that other nodes derive their output
@@ -3725,6 +3786,63 @@ macro_rules! define_clock_tree_types {
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
         }
+        impl TsensInstance {
+            pub fn configure_sclk(self, clocks: &mut ClockTree, new_selector: TsensSclkConfig) {
+                let old_selector = clocks.tsens_sclk[self as usize].replace(new_selector);
+                refresh_tsens_sclk_downstream(clocks, self);
+                let active = clocks.tsens_sclk_refcount[self as usize] > 0;
+                if active {
+                    match new_selector {
+                        TsensSclkConfig::RcFast => request_rc_fast_clk(clocks),
+                        TsensSclkConfig::Xtal => request_xtal_clk(clocks),
+                    }
+                }
+                self.configure_sclk_impl(clocks, old_selector, new_selector);
+                if active && let Some(old_selector) = old_selector {
+                    match old_selector {
+                        TsensSclkConfig::RcFast => release_rc_fast_clk(clocks),
+                        TsensSclkConfig::Xtal => release_xtal_clk(clocks),
+                    }
+                }
+            }
+            pub fn sclk_config(self, clocks: &mut ClockTree) -> Option<TsensSclkConfig> {
+                clocks.tsens_sclk[self as usize]
+            }
+            pub fn request_sclk(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::SCLK", self);
+                if increment_reference_count(&mut clocks.tsens_sclk_refcount[self as usize]) {
+                    trace!("Enabling {:?}::SCLK", self);
+                    match unwrap!(clocks.tsens_sclk[self as usize]) {
+                        TsensSclkConfig::RcFast => request_rc_fast_clk(clocks),
+                        TsensSclkConfig::Xtal => request_xtal_clk(clocks),
+                    }
+                    self.enable_sclk_impl(clocks, true);
+                }
+            }
+            pub fn release_sclk(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::SCLK", self);
+                if decrement_reference_count(&mut clocks.tsens_sclk_refcount[self as usize]) {
+                    trace!("Disabling {:?}::SCLK", self);
+                    self.enable_sclk_impl(clocks, false);
+                    match unwrap!(clocks.tsens_sclk[self as usize]) {
+                        TsensSclkConfig::RcFast => release_rc_fast_clk(clocks),
+                        TsensSclkConfig::Xtal => release_xtal_clk(clocks),
+                    }
+                }
+            }
+            pub fn sclk_config_frequency(config: TsensSclkConfig) -> u32 {
+                match config {
+                    TsensSclkConfig::RcFast => rc_fast_clk_frequency(),
+                    TsensSclkConfig::Xtal => xtal_clk_frequency(),
+                }
+            }
+            pub fn sclk_frequency(self) -> u32 {
+                TSENS_SCLK_FREQ_CACHE[self as usize].load(::core::sync::atomic::Ordering::Acquire)
+            }
+            pub fn sclk_source_frequency(source: TsensSclkConfig) -> u32 {
+                Self::sclk_config_frequency(source)
+            }
+        }
         /// Clock tree configuration.
         ///
         /// The fields of this struct are optional, with the following caveats:
@@ -3836,6 +3954,9 @@ macro_rules! define_clock_tree_types {
             ] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
             }
+            for child_instance in [TsensInstance::Tsens] {
+                refresh_tsens_sclk_downstream(clocks, child_instance);
+            }
         }
         fn refresh_rc_fast_clk_downstream(clocks: &mut ClockTree) {
             refresh_hp_root_clk_downstream(clocks);
@@ -3861,6 +3982,9 @@ macro_rules! define_clock_tree_types {
                 UartInstance::Uart2,
             ] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [TsensInstance::Tsens] {
+                refresh_tsens_sclk_downstream(clocks, child_instance);
             }
         }
         fn refresh_rc_slow_clk_downstream(clocks: &mut ClockTree) {
@@ -4029,6 +4153,14 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
+        fn refresh_tsens_sclk_downstream(clocks: &mut ClockTree, instance: TsensInstance) {
+            if let Some(config) = clocks.tsens_sclk[instance as usize] {
+                TSENS_SCLK_FREQ_CACHE[instance as usize].store(
+                    TsensInstance::sclk_config_frequency(config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
     };
 }
 /// Implement the `Peripheral` enum and enable/disable/reset functions.
@@ -4063,6 +4195,8 @@ macro_rules! implement_peripheral_clocks {
             Timg0,
             /// TIMG1 peripheral clock signal
             Timg1,
+            /// TSENS peripheral clock signal
+            Tsens,
             /// UART0 peripheral clock signal
             Uart0,
             /// UART1 peripheral clock signal
@@ -4073,8 +4207,14 @@ macro_rules! implement_peripheral_clocks {
             UsbDevice,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] =
-                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UsbDevice];
+            const KEEP_ENABLED: &[Peripheral] = &[
+                Self::Systimer,
+                Self::Timg0,
+                #[cfg(keep_uart0_enabled)]
+                Self::Uart0,
+                #[cfg(keep_usb_serial_jtag_enabled)]
+                Self::UsbDevice,
+            ];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::AhbGdma,
@@ -4087,6 +4227,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Systimer,
                 Self::Timg0,
                 Self::Timg1,
+                Self::Tsens,
                 Self::Uart0,
                 Self::Uart1,
                 Self::Uart2,
@@ -4146,6 +4287,11 @@ macro_rules! implement_peripheral_clocks {
                         .timergroup(1)
                         .conf()
                         .modify(|_, w| w.clk_en().bit(enable));
+                }
+                Peripheral::Tsens => {
+                    crate::peripherals::SYSTEM::regs()
+                        .tsens_clk_conf()
+                        .modify(|_, w| w.tsens_clk_en().bit(enable));
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::SYSTEM::regs()
@@ -4225,6 +4371,11 @@ macro_rules! implement_peripheral_clocks {
                         .timergroup(1)
                         .conf()
                         .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::Tsens => {
+                    crate::peripherals::SYSTEM::regs()
+                        .tsens_clk_conf()
+                        .modify(|_, w| w.tsens_rst_en().bit(reset));
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::SYSTEM::regs()
@@ -4717,12 +4868,13 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
         FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "WIFI peripheral singleton"]
-        WIFI <= virtual(WIFI_BB : { bind_bb_interrupt, enable_bb_interrupt,
-        disable_bb_interrupt }, WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt,
-        disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt,
-        disable_pwr_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TSENS peripheral singleton"]
+        TSENS <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "WIFI peripheral singleton"] WIFI <= virtual(WIFI_BB : { bind_bb_interrupt,
+        enable_bb_interrupt, disable_bb_interrupt }, WIFI_MAC : { bind_mac_interrupt,
+        enable_mac_interrupt, disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt,
+        enable_pwr_interrupt, disable_pwr_interrupt }))); _for_each_inner_peripheral!((@
+        peri_type #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -4803,6 +4955,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((BT(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
+        _for_each_inner_peripheral!((TSENS(unstable)));
         _for_each_inner_peripheral!((WIFI));
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR0(unstable)));
@@ -5029,13 +5182,14 @@ macro_rules! for_each_peripheral {
         enable_mac_interrupt, disable_mac_interrupt }) (unstable)), (@ peri_type #[doc =
         "FLASH peripheral singleton"] FLASH <= virtual() (unstable)), (@ peri_type #[doc
         = "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)),
-        (@ peri_type #[doc = "WIFI peripheral singleton"] WIFI <= virtual(WIFI_BB : {
-        bind_bb_interrupt, enable_bb_interrupt, disable_bb_interrupt }, WIFI_MAC : {
-        bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }, WIFI_PWR : {
-        bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt })), (@ peri_type
-        #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)), (@
-        peri_type #[doc = "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <=
-        virtual() (unstable)), (@ peri_type #[doc =
+        (@ peri_type #[doc = "TSENS peripheral singleton"] TSENS <= virtual()
+        (unstable)), (@ peri_type #[doc = "WIFI peripheral singleton"] WIFI <=
+        virtual(WIFI_BB : { bind_bb_interrupt, enable_bb_interrupt, disable_bb_interrupt
+        }, WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt
+        }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt
+        })), (@ peri_type #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual()
+        (unstable)), (@ peri_type #[doc = "FROM_CPU_INTR0 peripheral singleton"]
+        FROM_CPU_INTR0 <= virtual() (unstable)), (@ peri_type #[doc =
         "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <= virtual() (unstable)),
         (@ peri_type #[doc = "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <=
         virtual() (unstable)), (@ peri_type #[doc =
@@ -5059,11 +5213,12 @@ macro_rules! for_each_peripheral {
         (SLC(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
         (UART0), (UART1), (UART2), (USB_DEVICE(unstable)), (ADC1(unstable)),
-        (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (WIFI),
-        (PSRAM(unstable)), (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
-        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AhbGdmaChannel), (I2S0,
-        I2s0, 3, AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel)));
+        (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (TSENS(unstable)),
+        (WIFI), (PSRAM(unstable)), (FROM_CPU_INTR0(unstable)),
+        (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
+        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
+        Spi2, 1, AhbGdmaChannel), (I2S0, I2s0, 3, AhbGdmaChannel), (SHA, Sha, 7,
+        AhbGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

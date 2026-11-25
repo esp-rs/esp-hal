@@ -30,6 +30,10 @@ pub const RTC_CNTL_DBIAS_1V30: u8 = 31;
 pub const RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT: u8 = 0;
 /// Light sleep debug attenuation setting that keeps the voltage up.
 const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP: u8 = 0;
+/// Default light sleep debug attenuation setting.
+const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_DEFAULT: u8 = 5;
+/// Digital bias setting for light sleep with RC_FAST and XTAL powered down.
+const RTC_CNTL_DBIAS_SLP: u8 = 5;
 /// ULP co-processor touch start wait time during sleep, set to maximum.
 pub const RTC_CNTL_ULPCP_TOUCH_START_WAIT_IN_SLEEP: u16 = 0xFF;
 /// ULP co-processor touch start wait time default value.
@@ -38,10 +42,20 @@ pub const RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT: u16 = 0x10;
 pub const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
 /// Default wait time for CK8M during startup.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
+/// Default wait for the XTL buffer, in RTC slow clock cycles.
+pub(super) const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u8 = 100;
+/// Wait time for the XTL buffer on a light sleep wakeup, in microseconds.
+pub(super) const RTC_CNTL_XTL_BUF_WAIT_SLP_US: u32 = 250;
+/// Wait time for the PLL buffer on a light sleep wakeup, in RTC slow clock cycles.
+pub(super) const RTC_CNTL_PLL_BUF_WAIT_SLP_CYCLES: u8 = 1;
+/// Wait time for CK8M on a light sleep wakeup, in RTC slow clock cycles.
+pub(super) const RTC_CNTL_CK8M_WAIT_SLP_CYCLES: u8 = 4;
 /// Minimum sleep value.
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 /// Deep sleep debug attenuation setting for ultra-low power mode.
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_ULTRA_LOW: u8 = 15;
+/// Deep sleep debug attenuation setting that keeps the voltage up.
+const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_NODROP: u8 = 0;
 /// Power-up setting for other blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
 /// Waits cycles for other blocks.
@@ -137,7 +151,12 @@ impl Default for RtcSleepConfig {
         cfg.set_deep_slp_reject(true);
         cfg.set_light_slp_reject(true);
         cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
-        cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_1V10);
+        // Powering RC_FAST down allows the lowest light-sleep voltage. `apply` raises the voltage
+        // when a hook keeps XTAL or RC_FAST running.
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32s3/rtc_sleep.c#L145-L156
+        cfg.set_int_8m_pd_en(true);
+        cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_SLP);
+        cfg.set_dbg_atten_slp(RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_DEFAULT);
 
         // This is the light-sleep config. The main XTAL is powered down in sleep
         // (`xtal_fpu` stays false), so the analog regulator/bias must use the
@@ -555,20 +574,27 @@ impl RtcSleepConfig {
             rtc_cntl.pwc().modify(|_, w| w.pd_en().clear_bit());
         }
 
-        // Like `rtc_sleep_get_default_config`: a crystal that stays on through a light sleep needs
-        // the bias current and the voltage of the active mode.
+        // A crystal that stays on through a light sleep needs the bias current of the active mode,
+        // and digital logic clocked from XTAL or RC_FAST needs the active voltage.
         let xtal_on = self.xtal_fpu() && !self.deep_slp();
+        let bias_sleep_monitor = self.bias_sleep_monitor() && !xtal_on;
+        let pd_cur_monitor = self.pd_cur_monitor() && !xtal_on;
         let bias_sleep_slp = self.bias_sleep_slp() && !xtal_on;
         let pd_cur_slp = self.pd_cur_slp() && !xtal_on;
-        let dbg_atten_slp = if xtal_on {
-            RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP
+        // RC_FAST needs the RTC regulator and no voltage drop in a deep sleep.
+        let rc_fast_on = !self.int_8m_pd_en();
+        let rtc_regulator_fpu = self.rtc_regulator_fpu() || (self.deep_slp() && rc_fast_on);
+        let (dig_dbias_slp, dbg_atten_slp) = if self.deep_slp() && rc_fast_on {
+            (self.dig_dbias_slp(), RTC_CNTL_DBG_ATTEN_DEEPSLEEP_NODROP)
+        } else if xtal_on || rc_fast_on {
+            (RTC_CNTL_DBIAS_1V10, RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP)
         } else {
-            self.dbg_atten_slp()
+            (self.dig_dbias_slp(), self.dbg_atten_slp())
         };
 
         unsafe {
             regi2c::I2C_DIG_REG_EXT_RTC_DREG_SLEEP.write_field(self.rtc_dbias_slp());
-            regi2c::I2C_DIG_REG_EXT_DIG_DREG_SLEEP.write_field(self.dig_dbias_slp());
+            regi2c::I2C_DIG_REG_EXT_DIG_DREG_SLEEP.write_field(dig_dbias_slp);
 
             rtc_cntl.bias_conf().modify(|_, w| {
                 w.dbg_atten_deep_slp().bits(dbg_atten_slp);
@@ -576,8 +602,8 @@ impl RtcSleepConfig {
                 w.pd_cur_deep_slp().bit(pd_cur_slp);
                 w.dbg_atten_monitor()
                     .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT);
-                w.bias_sleep_monitor().bit(self.bias_sleep_monitor());
-                w.pd_cur_monitor().bit(self.pd_cur_monitor())
+                w.bias_sleep_monitor().bit(bias_sleep_monitor);
+                w.pd_cur_monitor().bit(pd_cur_monitor)
             });
 
             if self.deep_slp() {
@@ -613,7 +639,7 @@ impl RtcSleepConfig {
 
             rtc_cntl
                 .rtc()
-                .modify(|_, w| w.regulator_force_pu().bit(self.rtc_regulator_fpu()));
+                .modify(|_, w| w.regulator_force_pu().bit(rtc_regulator_fpu));
 
             rtc_cntl
                 .clk_conf()

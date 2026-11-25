@@ -14,6 +14,14 @@ cfg_select! {
     }
 }
 
+// `*_data_burst_mode_sel`: 0 single, 1 INCR4 (16 B), 2 INCR8 (32 B), 3 INCR16 (64 B).
+// The field selects the burst for internal memory and for PSRAM.
+// The C5 and C61 PSRAM controllers accept bursts of at most 32 B.
+// Only the P4 has a `*_data_burst_en` bit.
+const fn data_burst_mode_sel(enabled: bool) -> u8 {
+    if enabled { 2 } else { 0 }
+}
+
 impl AhbGdmaTxChannel<'_> {
     #[inline(always)]
     pub(super) fn ch(&self) -> &gdma_pac::ch::CH {
@@ -40,9 +48,15 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
     }
 
     fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        self.ch()
-            .out_conf0()
-            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+        let enabled = burst_mode.is_burst_enabled();
+        self.ch().out_conf0().modify(|_, w| {
+            #[cfg(esp32p4)]
+            w.out_data_burst_en().bit(enabled);
+            unsafe {
+                w.out_data_burst_mode_sel()
+                    .bits(data_burst_mode_sel(enabled))
+            }
+        });
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
@@ -242,9 +256,15 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
     }
 
     fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        self.ch()
-            .in_conf0()
-            .modify(|_, w| w.in_data_burst_en().bit(burst_mode.is_burst_enabled()));
+        let enabled = burst_mode.is_burst_enabled();
+        self.ch().in_conf0().modify(|_, w| {
+            #[cfg(esp32p4)]
+            w.in_data_burst_en().bit(enabled);
+            unsafe {
+                w.in_data_burst_mode_sel()
+                    .bits(data_burst_mode_sel(enabled))
+            }
+        });
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {

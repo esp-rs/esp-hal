@@ -2,28 +2,10 @@
 
 use crate::pac;
 
-pub(super) fn set_lcd_conv_bypass(regs: &pac::lcd_cam::RegisterBlock) {
-    regs.lcd_rgb_yuv().write(|w| {
-        cfg_select! {
-            esp32s31 => w.lcd_conv_enable().clear_bit(),
-            _ => w.lcd_conv_bypass().clear_bit(),
-        }
-    });
-}
-
-pub(super) fn set_cam_conv_bypass(regs: &pac::lcd_cam::RegisterBlock) {
-    regs.cam_rgb_yuv().write(|w| {
-        cfg_select! {
-            esp32s31 => w.cam_conv_enable().clear_bit(),
-            _ => w.cam_conv_bypass().clear_bit(),
-        }
-    });
-}
-
 pub(super) fn set_rgb_mode_en(regs: &pac::lcd_cam::RegisterBlock, enable: bool) {
     let reg = cfg_select! {
-        esp32s3 => regs.lcd_ctrl(),
-        esp32s31 => regs.lcd_misc(),
+        rgb_display_has_rgb_timing_registers => regs.lcd_misc(),
+        _ => regs.lcd_ctrl(),
     };
     reg.modify(|_, w| w.lcd_rgb_mode_en().bit(enable));
 }
@@ -31,8 +13,8 @@ pub(super) fn set_rgb_mode_en(regs: &pac::lcd_cam::RegisterBlock, enable: bool) 
 pub(super) fn set_2byte_mode(regs: &pac::lcd_cam::RegisterBlock, enable: bool) {
     regs.lcd_user().modify(|_, w| {
         cfg_select! {
-            esp32s31 => unsafe { w.lcd_byte_mode().bits(if enable { 1 } else { 0 }) },
-            _ => w.lcd_2byte_en().bit(enable),
+            esp32s3 => w.lcd_2byte_en().bit(enable),
+            _ => unsafe { w.lcd_byte_mode().bits(if enable { 1 } else { 0 }) },
         }
     });
 }
@@ -40,27 +22,27 @@ pub(super) fn set_2byte_mode(regs: &pac::lcd_cam::RegisterBlock, enable: bool) {
 pub(super) fn set_8bits_order(regs: &pac::lcd_cam::RegisterBlock, inverted: bool) {
     regs.lcd_user().modify(|_, w| {
         cfg_select! {
-            esp32s31 => unsafe {
+            esp32s3 => w.lcd_8bits_order().bit(inverted),
+            _ => unsafe {
                 w.lcd_dout_byte_swizzle_enable().bit(inverted);
                 w.lcd_dout_byte_swizzle_mode().bits(0)
             },
-            _ => w.lcd_8bits_order().bit(inverted),
         }
     });
 }
 
 pub(super) fn set_cd_delay(regs: &pac::lcd_cam::RegisterBlock, mode: u8) {
     let reg = cfg_select! {
-        esp32s31 => regs.lcd_dly_mode_cfg1(),
-        _ => regs.lcd_dly_mode(),
+        esp32s3 => regs.lcd_dly_mode(),
+        _ => regs.lcd_dly_mode_cfg1(),
     };
     reg.write(|w| unsafe { w.lcd_cd_mode().bits(mode) });
 }
 
 pub(super) fn set_data_bit_delay(regs: &pac::lcd_cam::RegisterBlock, mode: u8) {
     let dout_0_15 = cfg_select! {
-        esp32s31 => regs.lcd_dly_mode_cfg2(),
-        _ => regs.lcd_data_dout_mode(),
+        esp32s3 => regs.lcd_data_dout_mode(),
+        _ => regs.lcd_dly_mode_cfg2(),
     };
 
     dout_0_15.write(|w| unsafe {
@@ -102,8 +84,8 @@ pub(super) fn set_sync_delay(
     vsync_mode: u8,
 ) {
     let reg = cfg_select! {
-        esp32s31 => regs.lcd_dly_mode_cfg1(),
-        _ => regs.lcd_dly_mode(),
+        esp32s3 => regs.lcd_dly_mode(),
+        _ => regs.lcd_dly_mode_cfg1(),
     };
 
     reg.modify(|_, w| unsafe {
@@ -152,29 +134,7 @@ pub(super) fn configure_rgb_timing(
     hsync_position: u8,
 ) {
     cfg_select! {
-        esp32s3 => {
-            regs.lcd_ctrl().modify(|_, w| unsafe {
-                w.lcd_rgb_mode_en().set_bit();
-                w.lcd_hb_front().bits(hb_front);
-                w.lcd_va_height().bits(va_height);
-                w.lcd_vt_height().bits(vt_height)
-            });
-            regs.lcd_ctrl1().modify(|_, w| unsafe {
-                w.lcd_vb_front().bits(vb_front as u8);
-                w.lcd_ha_width().bits(ha_width);
-                w.lcd_ht_width().bits(ht_width)
-            });
-            regs.lcd_ctrl2().modify(|_, w| unsafe {
-                w.lcd_vsync_width().bits(vsync_width as u8);
-                w.lcd_vsync_idle_pol().bit(vsync_idle_high);
-                w.lcd_de_idle_pol().bit(de_idle_high);
-                w.lcd_hs_blank_en().bit(hs_blank_en);
-                w.lcd_hsync_width().bits(hsync_width);
-                w.lcd_hsync_idle_pol().bit(hsync_idle_high);
-                w.lcd_hsync_position().bits(hsync_position)
-            });
-        }
-        _ => {
+        rgb_display_has_rgb_timing_registers => {
             regs.lcd_misc().modify(|_, w| w.lcd_rgb_mode_en().set_bit());
             regs.lcd_rgb_blank().write(|w| unsafe {
                 w.lcd_hb_front().bits(hb_front);
@@ -190,6 +150,28 @@ pub(super) fn configure_rgb_timing(
             });
             regs.lcd_rgb_ctrl().write(|w| unsafe {
                 w.lcd_vsync_width().bits(vsync_width);
+                w.lcd_vsync_idle_pol().bit(vsync_idle_high);
+                w.lcd_de_idle_pol().bit(de_idle_high);
+                w.lcd_hs_blank_en().bit(hs_blank_en);
+                w.lcd_hsync_width().bits(hsync_width);
+                w.lcd_hsync_idle_pol().bit(hsync_idle_high);
+                w.lcd_hsync_position().bits(hsync_position)
+            });
+        }
+        _ => {
+            regs.lcd_ctrl().modify(|_, w| unsafe {
+                w.lcd_rgb_mode_en().set_bit();
+                w.lcd_hb_front().bits(hb_front);
+                w.lcd_va_height().bits(va_height);
+                w.lcd_vt_height().bits(vt_height)
+            });
+            regs.lcd_ctrl1().modify(|_, w| unsafe {
+                w.lcd_vb_front().bits(vb_front as u8);
+                w.lcd_ha_width().bits(ha_width);
+                w.lcd_ht_width().bits(ht_width)
+            });
+            regs.lcd_ctrl2().modify(|_, w| unsafe {
+                w.lcd_vsync_width().bits(vsync_width as u8);
                 w.lcd_vsync_idle_pol().bit(vsync_idle_high);
                 w.lcd_de_idle_pol().bit(de_idle_high);
                 w.lcd_hs_blank_en().bit(hs_blank_en);

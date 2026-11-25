@@ -345,6 +345,21 @@ pub(crate) fn rtc_calib_reading_inner(
         .unwrap_or(0)
 }
 
+/// Returns the factory temperature offset to subtract, in tenths of a degree Celsius.
+///
+/// Returns `None` if the eFuse block does not contain calibration data.
+///
+/// See <https://github.com/espressif/esp-idf/blob/d445e947156f276dfe0db5804e4edf6ae90fe6fb/components/esp_hal_ana_conv/esp32s2/include/hal/temperature_sensor_ll.h#L155-L164>.
+#[instability::unstable]
+pub fn temperature_sensor_calibration() -> Option<i16> {
+    if super::read_field_le::<u8>(BLK_VERSION_MAJOR) == 0 {
+        return None;
+    }
+
+    let value = super::read_field_le::<u16>(TEMP_CALIB);
+    Some(super::sign_magnitude(u32::from(value), 8) as i16)
+}
+
 /// Returns the version of RTC calibration block.
 ///
 /// See <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32s2/esp_efuse_rtc_table.c#L92>

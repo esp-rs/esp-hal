@@ -143,7 +143,7 @@ pub(super) fn set_bus_clock(clock: u32) -> bool {
 
     write_bus_clock_divider((source_mhz / clock) as u8);
 
-    #[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+    #[cfg(psram_idle_low_speed_switch)]
     low_speed::set_divider(source_mhz, clock);
 
     true
@@ -175,7 +175,7 @@ fn write_bus_clock_divider(div: u8) {
 /// A PSRAM clock that is too fast for the AXI bus clock lets writes overflow the MSPI FIFO. Only
 /// the bus clock changes: the latency and dummy settings count cycles, so the values for the
 /// configured speed are also correct at the lower speed.
-#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+#[cfg(psram_idle_low_speed_switch)]
 pub(crate) mod low_speed {
     use core::sync::atomic::{AtomicU32, Ordering};
 

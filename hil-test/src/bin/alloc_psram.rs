@@ -3,6 +3,8 @@
 //% CHIP_FILTER(llff, tlsf): psram_driver_supported
 //% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
+// Just below 512 KiB, so that only the second-level rounding of TLSF needs the next size class.
+//% ENV(tlsf): ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION=524256
 // The default 64KB leaves nothing to reclaim, see the dcache_reclaimed tests below.
 //% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
 //% FEATURES: unstable esp-alloc/nightly
@@ -64,6 +66,23 @@ mod tests {
             for i in 0..free {
                 assert_eq!(vec[i], crate::pattern(i));
             }
+        }
+    }
+
+    #[test]
+    fn tlsf_max_allocation_is_applied() {
+        if option_env!("ESP_ALLOC_CONFIG_HEAP_ALGORITHM") == Some("TLSF") {
+            // The configured maximum needs `FLLEN = 16`. Its largest size class starts at
+            // `2^19 + 31 * 2^14` bytes, which must also hold the 8 byte block header.
+            const TOO_LARGE: usize = (1 << 19) + 31 * (1 << 14) - 8 + 1;
+
+            // The heap splits a region into pools of `GRANULARITY << FLLEN` (1 MiB) bytes. With
+            // this much free memory, one pool is complete, and its free block can hold `TOO_LARGE`.
+            assert!(esp_alloc::HEAP.free() >= 1024 * 1024);
+
+            let mut vec = AllocVec::<u8>::new();
+            assert!(vec.try_reserve_exact(TOO_LARGE).is_err());
+            assert!(vec.try_reserve_exact(524256).is_ok());
         }
     }
 
@@ -266,7 +285,9 @@ mod multi_core_cache_tests {
         cpu_ctrl: CPU_CTRL<'static>,
         mut line: DmaAlignedMut<'static, [u32]>,
     ) {
-        const BIG_LINES: usize = 1024 * 1024 / size_of::<PsramLine>();
+        // Stays below the 524256 byte `ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION` of the `tlsf`
+        // configuration. A 1 MiB buffer cannot be allocated there.
+        const BIG_LINES: usize = 384 * 1024 / size_of::<PsramLine>();
         static STOP: AtomicBool = AtomicBool::new(false);
         static STOPPED: AtomicBool = AtomicBool::new(false);
         static ROUNDS: AtomicU32 = AtomicU32::new(0);
@@ -421,6 +442,94 @@ mod flash_tests {
                 assert_eq!(buf[i], heap_buf[i], "buf != heap_buf at index {}", i);
             }
         }
+    }
+}
+
+/// In `PsramVaddrMode::Normal`, each core caches PSRAM in its own cache.
+#[cfg(feature = "esp32")]
+#[embedded_test::tests(default_timeout = 10)]
+mod normal_vaddr_mode_tests {
+    use core::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+
+    use esp_hal::{
+        clock::CpuClock,
+        flash::{Config, Flash},
+        peripherals::{CPU_CTRL, FLASH},
+        psram::{Psram, PsramConfig, PsramVaddrMode},
+        system::{CpuControl, Stack},
+    };
+    use hil_test::mk_static;
+
+    struct Context {
+        cpu_ctrl: CPU_CTRL<'static>,
+        flash: FLASH<'static>,
+        psram: Psram,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let p = esp_hal::init(config);
+        let psram = Psram::new(
+            p.PSRAM,
+            PsramConfig {
+                psram_vaddr_mode: PsramVaddrMode::Normal,
+                ..Default::default()
+            },
+        );
+
+        Context {
+            cpu_ctrl: p.CPU_CTRL,
+            flash: p.FLASH,
+            psram,
+        }
+    }
+
+    #[test]
+    fn flash_write_keeps_psram_writes_of_the_other_core(ctx: Context) {
+        const NVS_PART_FLASH_ADDR: u32 = 0x9000;
+        const LEN: usize = 1024;
+        const WRITTEN: u8 = 1;
+        const FLASHED: u8 = 2;
+        const CHECKED: u8 = 3;
+        static STATE: AtomicU8 = AtomicU8::new(0);
+        static LOST: AtomicUsize = AtomicUsize::new(0);
+
+        let value = |i: usize| (i as u8) ^ 0x5A;
+
+        // This core does not access the buffer, so only the cache of the other core holds it.
+        let (start, size) = ctx.psram.raw_parts();
+        assert!(size >= LEN);
+        let buf = start as usize;
+
+        let mut cpu_control = CpuControl::new(ctx.cpu_ctrl);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, move || {
+                let buf = buf as *mut u8;
+                for i in 0..LEN {
+                    unsafe { buf.add(i).write_volatile(value(i)) };
+                }
+                STATE.store(WRITTEN, Ordering::Release);
+                while STATE.load(Ordering::Acquire) != FLASHED {}
+                let lost = (0..LEN)
+                    .filter(|&i| unsafe { buf.add(i).read_volatile() } != value(i))
+                    .count();
+                LOST.store(lost, Ordering::Relaxed);
+                STATE.store(CHECKED, Ordering::Release);
+                loop {}
+            })
+            .unwrap();
+
+        while STATE.load(Ordering::Acquire) != WRITTEN {}
+        let mut flash = Flash::new(ctx.flash, Config::default()).unwrap();
+        let flash_buf = [0u32; 256];
+        // SAFETY: the NVS partition is not mapped.
+        unsafe { flash.write(NVS_PART_FLASH_ADDR, &flash_buf) }.unwrap();
+        STATE.store(FLASHED, Ordering::Release);
+
+        while STATE.load(Ordering::Acquire) != CHECKED {}
+        assert_eq!(LOST.load(Ordering::Relaxed), 0);
     }
 }
 

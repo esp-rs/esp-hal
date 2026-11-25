@@ -66,17 +66,6 @@ jobs:
           echo "GITHUB_REPOSITORY=$TARGET_REPO" >> $GITHUB_ENV
           echo "Target repository for baselines: $TARGET_REPO"
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: rust-src
-
-      - name: Install xtensa toolchain
-        uses: esp-rs/xtensa-toolchain@v1.6
-        with:
-          version: 1.100.0.0
-
       - name: Check if baseline generation is needed
         id: check-generation
         shell: bash
@@ -150,6 +139,19 @@ jobs:
             echo "should_generate=false" >> "$GITHUB_OUTPUT"
             echo "trigger_reason=no_pr" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Install Rust toolchain
+        if: steps.check-generation.outputs.should_generate == 'true'
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rust-src
+
+      - name: Install xtensa toolchain
+        if: steps.check-generation.outputs.should_generate == 'true'
+        uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.100.0.0
 
       - name: Generate API baselines
         if: steps.check-generation.outputs.should_generate == 'true'

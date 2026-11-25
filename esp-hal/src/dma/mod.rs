@@ -961,7 +961,7 @@ impl From<ExternalBurstConfig> for DmaExtMemBKSize {
         match size {
             ExternalBurstConfig::Size16 => DmaExtMemBKSize::Size16,
             ExternalBurstConfig::Size32 => DmaExtMemBKSize::Size32,
-            // TODO: investigate why ext_mem_bk_size = 2 causes corruption on S2
+            // The S2 EDMA only transfers the first 32 bytes of each 64-byte block.
             #[cfg(not(esp32s2))]
             ExternalBurstConfig::Size64 => DmaExtMemBKSize::Size64,
         }
@@ -994,6 +994,8 @@ where
         // channel was previously used for a mem2mem transfer.
         #[cfg(dma_supports_mem2mem)]
         rx_impl.set_mem2mem_mode(false);
+
+        rx_impl.set_descr_burst_mode(true);
 
         if let Some(interrupt) = rx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
@@ -1067,11 +1069,7 @@ where
         self.rx_impl.set_priority(priority);
     }
 
-    fn do_prepare(
-        &mut self,
-        preparation: Preparation,
-        peri: DmaPeripheral,
-    ) -> Result<(), DmaError> {
+    fn do_prepare(&mut self, preparation: Preparation) -> Result<(), DmaError> {
         debug!("Preparing RX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
@@ -1084,7 +1082,6 @@ where
         self.rx_impl
             .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
         self.rx_impl.set_burst_mode(preparation.burst_transfer);
-        self.rx_impl.set_descr_burst_mode(true);
         self.rx_impl.set_check_owner(preparation.check_owner);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
@@ -1092,7 +1089,6 @@ where
         self.rx_impl.clear_all();
         self.rx_impl.reset();
         self.rx_impl.set_link_addr(preparation.start as u32);
-        self.rx_impl.set_peripheral(peri.0);
 
         Ok(())
     }
@@ -1117,13 +1113,22 @@ where
         self.rx_impl.runtime_ensure_compatible(peripheral);
     }
 
+    pub(crate) fn set_peripheral(&mut self, peripheral: DmaPeripheral) {
+        self.rx_impl.set_peripheral(peripheral.0);
+    }
+
+    /// Asserts that the channel is compatible with the given peripheral, and selects it.
+    pub(crate) fn connect(&mut self, peripheral: DmaPeripheral) {
+        self.runtime_ensure_compatible(peripheral);
+        self.set_peripheral(peripheral);
+    }
+
     pub(crate) unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
-        peri: DmaPeripheral,
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
-        self.do_prepare(preparation, peri)
+        self.do_prepare(preparation)
     }
 
     pub(crate) fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1226,6 +1231,8 @@ where
     pub fn new(tx_impl: CH) -> Self {
         let _guard = tx_impl.enable();
 
+        tx_impl.set_descr_burst_mode(true);
+
         if let Some(interrupt) = tx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
                 crate::interrupt::disable(cpu, interrupt);
@@ -1297,17 +1304,23 @@ where
         self.tx_impl.runtime_ensure_compatible(peripheral);
     }
 
+    pub(crate) fn set_peripheral(&mut self, peripheral: DmaPeripheral) {
+        self.tx_impl.set_peripheral(peripheral.0);
+    }
+
+    /// Asserts that the channel is compatible with the given peripheral, and selects it.
+    pub(crate) fn connect(&mut self, peripheral: DmaPeripheral) {
+        self.runtime_ensure_compatible(peripheral);
+        self.set_peripheral(peripheral);
+    }
+
     /// Configures the channel priority.
     #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx_impl.set_priority(priority);
     }
 
-    fn do_prepare(
-        &mut self,
-        preparation: Preparation,
-        peri: DmaPeripheral,
-    ) -> Result<(), DmaError> {
+    fn do_prepare(&mut self, preparation: Preparation) -> Result<(), DmaError> {
         debug!("Preparing TX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
@@ -1320,7 +1333,6 @@ where
         self.tx_impl
             .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
         self.tx_impl.set_burst_mode(preparation.burst_transfer);
-        self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);
         self.tx_impl
             .set_auto_write_back(preparation.auto_write_back);
@@ -1330,7 +1342,6 @@ where
         self.tx_impl.clear_all();
         self.tx_impl.reset();
         self.tx_impl.set_link_addr(preparation.start as u32);
-        self.tx_impl.set_peripheral(peri.0);
 
         Ok(())
     }
@@ -1351,12 +1362,11 @@ where
 {
     pub(crate) unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
         &mut self,
-        peri: DmaPeripheral,
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
 
-        self.do_prepare(preparation, peri)
+        self.do_prepare(preparation)
     }
 
     pub(crate) fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1531,6 +1541,12 @@ where
     #[instability::unstable]
     pub fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
         self.rx.runtime_ensure_compatible(peripheral);
+    }
+
+    /// Asserts that the channel is compatible with the given peripheral, and selects it.
+    pub(crate) fn connect(&mut self, peripheral: DmaPeripheral) {
+        self.rx.connect(peripheral);
+        self.tx.connect(peripheral);
     }
 }
 

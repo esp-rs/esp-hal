@@ -390,20 +390,21 @@ pub struct Config {
 
     /// Function clock source.
     ///
-    /// The TRM recommends [`ClockSource::Xtal`] up to 5 Mbit/s and
-    /// [`ClockSource::PllF80m`] above that.
+    /// The TRM recommends [`ClockSource::Xtal`] up to 5 Mbit/s and the PLL
+    /// clock above that.
     ///
-    /// Default value: [`ClockSource::PllF80m`].
+    /// Default value: the PLL clock, 80 MHz on the ESP32-C5 and ESP32-S31, and
+    /// 96 MHz on the ESP32-H4.
     clock_source: ClockSource,
 
     /// Bit timing of the arbitration phase.
     ///
-    /// Default value: 500 kbit/s from an 80 MHz function clock.
+    /// Default value: 500 kbit/s from the default function clock.
     nominal_timing: Timing,
 
     /// Bit timing of the data phase, used by bit-rate-switched frames.
     ///
-    /// Default value: 2 Mbit/s from an 80 MHz function clock.
+    /// Default value: 2 Mbit/s from the default function clock.
     fd_timing: Timing,
 
     /// Number of retransmission attempts, or `None` to retry forever.
@@ -440,20 +441,24 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        // 500 kbit/s nominal and 2 Mbit/s data from 80 MHz, sampling at 81.2%
-        // and 75%.
+        // 500 kbit/s nominal and 2 Mbit/s data, 16 and 4 time quanta per bit,
+        // sampling at 81.2% and 75%.
+        let (clock_source, baud_rate_prescaler) = cfg_select! {
+            any(esp32c5, esp32s31) => (ClockSource::PllF80m, 10),
+            esp32h4 => (ClockSource::PllF96m, 12),
+        };
         Self {
             mode: Mode::Normal,
-            clock_source: ClockSource::PllF80m,
+            clock_source,
             nominal_timing: Timing {
-                baud_rate_prescaler: 10,
+                baud_rate_prescaler,
                 propagation_segment: 7,
                 phase_segment_1: 5,
                 phase_segment_2: 3,
                 sync_jump_width: 3,
             },
             fd_timing: Timing {
-                baud_rate_prescaler: 10,
+                baud_rate_prescaler,
                 propagation_segment: 1,
                 phase_segment_1: 1,
                 phase_segment_2: 1,
@@ -2154,6 +2159,7 @@ crate::any_peripheral! {
     /// Any CAN FD peripheral.
     pub peripheral AnyCanFd<'d> {
         Twai0(crate::peripherals::TWAI0<'d>),
+        #[cfg(soc_has_twai1)]
         Twai1(crate::peripherals::TWAI1<'d>),
     }
 }

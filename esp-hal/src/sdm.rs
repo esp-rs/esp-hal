@@ -370,11 +370,9 @@ fn prescaler_from_frequency(frequency: Rate) -> Result<u16, Error> {
 }
 
 fn check_prescaler(prescaler: u16) -> Result<(), Error> {
-    if (1..=256).contains(&prescaler) {
-        Ok(())
-    } else {
-        Err(Error::PrescalerOutOfRange)
-    }
+    (1..=256)
+        .contains(&prescaler)
+        .ok_or(Error::PrescalerOutOfRange)
 }
 
 fn raw_prescaler(prescaler: u16) -> u8 {

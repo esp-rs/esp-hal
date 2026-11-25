@@ -180,8 +180,7 @@ pub(crate) fn wakeup_status() -> u32 {
 pub(crate) fn wakeup_enabled_mask() -> u32 {
     let mut mask = 0;
     let mut pads = ALL_PADS;
-    while pads != 0 {
-        let lp = pads.trailing_zeros();
+    while let Some(lp) = pads.lowest_one() {
         pads &= !(1 << lp);
 
         if RTC_IO::regs()

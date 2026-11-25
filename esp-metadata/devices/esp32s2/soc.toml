@@ -87,6 +87,7 @@ peripherals = [
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "PSRAM", virtual = true },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "ULP_RISCV_CORE", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },
     { name = "FROM_CPU_INTR1", virtual = true },
@@ -128,6 +129,8 @@ resolution = 8
 [device.dma]
 support_status = "partial"
 ext_mem_configurable_block_size = true
+# With 64 B blocks, the DMA moves only the first 32 bytes of each block.
+psram_max_burst = 32
 engines = [
     {
         name = "SPI_DMA",
@@ -140,7 +143,7 @@ engines = [
         ],
         channels = [
             { name = "DMA_SPI2", pac = "SPI2", interrupt = "SPI2_DMA", compatible_with = ["SPI2"] },
-            { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA", compatible_with = ["SPI3"] },
+            { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA", compatible_with = ["SPI3"], can_access_psram = false },
         ]
     },
     {
@@ -418,7 +421,8 @@ extmem_origin = 0x3f500000
 
 [device.systimer]
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6778 }
+register_block = "sens"
 [device.ulp_fsm]
 support_status = { status = "not_supported", issue = 376 }
 [device.ulp_riscv]

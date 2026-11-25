@@ -527,6 +527,8 @@ __default_naked_exception:
 
     call4   __level_1_interrupt       // call handler <= actual call!
 
+    call0   __level_1_interrupt_exit  // can move sp to the context to return to
+
 .RestoreContext:
     RESTORE_CONTEXT 1
 
@@ -544,6 +546,15 @@ __default_naked_exception:
 
 .Ldefault_naked_exception_end:
     .size .Ldefault_naked_exception_start, .Ldefault_naked_exception_end
+
+    // The default `__level_1_interrupt_exit` returns to the interrupted context.
+    .section .rwtext,\"ax\",@progbits
+    .global __default_level_1_interrupt_exit
+    .p2align 2
+    .type __default_level_1_interrupt_exit,@function
+__default_level_1_interrupt_exit:
+    ret
+    .size __default_level_1_interrupt_exit, . - __default_level_1_interrupt_exit
 
     // Handle Double Exceptions by storing full context and then calling regular
     // function Double exceptions are not a normal occurrence. They indicate a bug

@@ -687,7 +687,11 @@ driver_configs![
         UsbSerialJtagProperties {
             driver: usb_serial_jtag,
             name: "USB Serial/JTAG",
-            properties: {}
+            properties: {
+                /// The analog pad groups that the USB Serial/JTAG controller can use, for example
+                /// `USJ` for the `USJ_DM`/`USJ_DP` pins.
+                phy_pads: Vec<String>,
+            }
         },
     ]
 
@@ -801,6 +805,12 @@ driver_configs![
             name: "RGB display", // LCD_CAM, ESP32 I2S, S2 I2S
             properties: {
                 output_lines: u32,
+                /// `LCD_RGB_VERTICAL`, `LCD_RGB_HORIZONTAL`, `LCD_RGB_BLANK` and `LCD_RGB_CTRL`
+                /// hold the timing, and `LCD_RGB_MODE_EN` is in `LCD_MISC`. The other layout
+                /// stores the timing in `LCD_CTRL`, `LCD_CTRL1` and `LCD_CTRL2`, and
+                /// `LCD_RGB_MODE_EN` in `LCD_CTRL`.
+                #[serde(default)]
+                has_rgb_timing_registers: bool,
             }
         },
         SpiLcdProperties {
@@ -909,6 +919,10 @@ driver_configs![
             properties: {
                 #[serde(default)]
                 register_block: TempSensorRegisterBlock,
+                /// Shortest settle time after power-up or a range change, in microseconds.
+                /// The sensor needs this time at every clock frequency.
+                #[serde(default)]
+                min_stabilization_time_us: u32,
             }
         },
         TouchProperties {
@@ -1144,6 +1158,10 @@ driver_configs![
                 separate_in_out_interrupts: bool,
                 #[serde(default)]
                 gdma_version: Option<u32>,
+                /// Not `Option<PsramMaxBurst>`: an optional property also emits
+                /// `dma_psram_max_burst_is_set` when the value is absent.
+                #[serde(default)]
+                psram_max_burst: PsramMaxBurst,
                 #[serde(default)]
                 engines: DmaEngines,
             }

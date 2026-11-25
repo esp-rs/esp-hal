@@ -47,6 +47,28 @@ mod tests {
     }
 
     #[test]
+    fn test_mem2mem_transfers_after_invalid_alignment(ctx: Context) {
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
+
+        let mut mem2mem = ctx
+            .mem2mem
+            .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
+            .unwrap();
+
+        assert!(matches!(
+            mem2mem.start_transfer(&mut rx_buffer[1..], &tx_buffer[1..]),
+            Err(DmaError::InvalidAlignment(_))
+        ));
+
+        for (i, byte) in tx_buffer.iter_mut().enumerate() {
+            *byte = (i % 256) as u8;
+        }
+        let dma_wait = mem2mem.start_transfer(rx_buffer, tx_buffer).unwrap();
+        dma_wait.wait().unwrap();
+        assert_eq!(rx_buffer, tx_buffer);
+    }
+
+    #[test]
     fn test_mem2mem_errors_zero_tx(ctx: Context) {
         let (rx_descriptors, tx_descriptors) = dma_descriptors!(1024, 0);
         match ctx
