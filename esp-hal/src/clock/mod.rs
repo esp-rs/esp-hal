@@ -21,10 +21,10 @@
 //! The `CPU clock` is responsible for defining the speed at which the central
 //! processing unit (CPU) operates. This driver provides predefined options for
 //! different CPU clock speeds, such as
-#![cfg_attr(not(esp32h2), doc = "* 80 MHz")]
-#![cfg_attr(esp32h2, doc = "* 96 MHz")]
+#![cfg_attr(not(any(esp32h2, esp32h21)), doc = "* 80 MHz")]
+#![cfg_attr(any(esp32h2, esp32h21), doc = "* 96 MHz")]
 #![cfg_attr(esp32c2, doc = "* 120 MHz")]
-#![cfg_attr(not(any(esp32c2, esp32h2)), doc = "* 160 MHz")]
+#![cfg_attr(not(any(esp32c2, esp32h2, esp32h21)), doc = "* 160 MHz")]
 #![cfg_attr(any(esp32c5, xtensa), doc = "* 240 MHz")]
 //! ### Frozen Clock Frequencies
 //!
@@ -119,7 +119,7 @@ impl CpuClock {
         cfg_select! {
             esp32c2 => Self::_120MHz,
             any(esp32c3, esp32c6, esp32c61) => Self::_160MHz,
-            any(esp32h2, esp32h4) => Self::_96MHz,
+            any(esp32h2, esp32h4, esp32h21) => Self::_96MHz,
             esp32p4 => Self::_400MHz,
             esp32s31 => Self::_320MHz,
             _ => Self::_240MHz,
@@ -445,7 +445,7 @@ impl RtcClock {
             }
         };
 
-        #[cfg(esp32h4)]
+        #[cfg(timergroup_rc_slow_calibration_multiplier)]
         let cali_value = if rtc_clock == TimgCalibrationClockConfig::RcSlowClk {
             cali_value * property!("timergroup.rc_slow_calibration_multiplier")
         } else {

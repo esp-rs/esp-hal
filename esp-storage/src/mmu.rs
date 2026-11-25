@@ -21,6 +21,8 @@ use esp32c61 as pac;
 use esp32h2 as pac;
 #[cfg(esp32h4)]
 use esp32h4 as pac;
+#[cfg(esp32h21)]
+use esp32h21 as pac;
 #[cfg(esp32p4)]
 use esp32p4 as pac;
 #[cfg(esp32s2)]
@@ -284,7 +286,9 @@ mod indexed {
     fn mmu_page_size_code() -> u32 {
         let ctrl = spi0().mmu_power_ctrl().read();
         cfg_select! {
-            any(esp32c5, esp32c61, esp32h4, esp32s31) => ctrl.mmu_page_size().bits() as u32,
+            any(esp32c5, esp32c61, esp32h4, esp32h21, esp32s31) => {
+                ctrl.mmu_page_size().bits() as u32
+            }
             _ => ctrl.spi_mmu_page_size().bits() as u32,
         }
     }

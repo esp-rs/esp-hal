@@ -1,0 +1,102 @@
+system_clocks = { clock_tree = [
+    # High-speed clock sources.
+    { name = "XTAL_CLK",     type = "source",                     output = "32 * 1_000_000",    always_on = true },
+    { name = "PLL_F96M_CLK", type = "derived", from = "XTAL_CLK", output = "96_000_000" },
+    { name = "PLL_F48M_CLK", type = "generic",                    output = "PLL_F96M_CLK / 2" },
+    { name = "XTAL_X2_CLK",  type = "derived", from = "XTAL_CLK", output = "64_000_000" },
+    { name = "RC_FAST_CLK",  type = "source",                     output = "20_000_000", adjustable = "10_000_000..=30_000_000" },
+
+    # PCR.iomux_clk_conf.iomux_func_clk_sel: 0 = XTAL, 1 = RC_FAST, 2 = PLL_F48M, see
+    # gpio_ll_iomux_set_clk_src().
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", always_on = true, variants = [
+        { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        { name = "PLL_F48M",    outputs = "PLL_F48M_CLK", default = true },
+    ] },
+
+    # Low-speed clocks
+    { name = "XTAL32K_CLK",    type = "source",  output = "32768", cfg = "use_xtal32k" },
+    { name = "OSC_SLOW_CLK",   type = "source",  output = "32768" },
+    { name = "RC_SLOW_CLK",    type = "source",  output = "600_000", adjustable = "300_000..=900_000" },
+    # Fixed divider, see rtc_clk_slow_freq_get_hz().
+    { name = "RC_SLOW_D4_CLK", type = "generic", output = "RC_SLOW_CLK / 4" },
+
+    # see soc_cpu_clk_src_t in clk_tree_defs.h.
+    { name = "HP_ROOT_CLK", type = "mux", variants = [
+        { name = "XTAL",    outputs = "XTAL_CLK"     },
+        { name = "PLL",     outputs = "PLL_F96M_CLK" },
+        { name = "RC_FAST", outputs = "RC_FAST_CLK"  },
+        { name = "XTAL_X2", outputs = "XTAL_X2_CLK"  },
+    ] },
+
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..=255" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true }, # AHB_CLK * integer
+    # AHB_CLK divides HP_ROOT_CLK and must not exceed 32 MHz, see rtc_clk_cpu_freq_to_pll_mhz()
+    # and rtc_clk_ahb_freq_get().
+    { name = "AHB_CLK", type = "generic", params = { divisor = "0..=255" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
+    # PCR_APB_DIV_NUM - Set as one within (0,1,3), see clk_ll_apb_set_divider().
+    # The hardware lowers APB_CLK while the APB bus is idle. Consumers stop the reduction.
+    { name = "APB_CLK", type = "generic", params = { divisor = "0, 1, 3" }, output = "AHB_CLK / (divisor + 1)", always_on = true, refcounted = true },
+
+    # LP clocks
+    { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
+    # soc_rtc_fast_clk_src_t: 0 = RC_FAST, 1 = XTAL_D2 (the default).
+    { name = "LP_FAST_CLK", type = "mux", variants = [
+        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        { name = "XTAL_D2_CLK", outputs = "XTAL_D2_CLK" },
+    ] },
+    # soc_rtc_slow_clk_src_t: 0 = RC_SLOW_D4 (the default), 1 = XTAL32K, 3 = OSC_SLOW.
+    { name = "LP_SLOW_CLK", type = "mux", variants = [
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
+        # The mux input is RC_SLOW/4, see rtc_clk_slow_freq_get_hz().
+        { name = "RC_SLOW",  outputs = "RC_SLOW_D4_CLK" },
+        { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
+    ] },
+
+    # TIMG0.rtccalicfg.rtc_cali_clk_sel: 0 = RC_SLOW, 1 = RC_FAST (behind a /32 tick divider),
+    # 2 = 32K (XTAL32K or OSC_SLOW, selected by PCR.ctrl_32k_conf), see
+    # clk_ll_freq_calulation_set_target().
+    # The RC_SLOW input is tapped before the /4 divider, so the mux measures RC_SLOW_D4_CLK four
+    # cycles at a time. `timergroup.rc_slow_calibration` scales the result accordingly.
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
+        { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_D4_CLK" },
+        { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
+    ] },
+], template_groups = [
+    # Sources: SOC_GPTIMER_CLKS and SOC_MWDT_CLKS. Like the other chips we default
+    # to XTAL
+    { group = "TIMG", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F48M",    outputs = "PLL_F48M_CLK" },
+        ] },
+        { name = "WDT_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F48M",    outputs = "PLL_F48M_CLK" },
+        ] },
+    ] },
+] }
+
+peripheral_clocks = { templates = [
+    # templates
+    { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "clk_en_template", value = "{{default_clk_en_template}}" },
+    { name = "rst_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    # substitutions
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "conf_register", value = "{{peripheral}}_conf" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_field", value = "{{peripheral}}_rst_en" },
+    # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
+], peripheral_clocks = [
+    # The PCR register layout is the same as on the ESP32-H2.
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "Systimer", keep_enabled = true },
+    { name = "UsbDevice", keep_enabled = true },
+    { name = "Trace0", template_params = { peripheral = "trace" } },
+] }
