@@ -250,8 +250,9 @@ macro_rules! critical_regs_asm {
         unsafe extern "C" fn critical_regs_save(
             _frame: *mut CriticalSleepFrame,
         ) -> *mut CriticalSleepFrame {
+            // The save must not write `mscratch`. An IPC request can run the sleep, and the IPC
+            // handler holds the interrupted `t0` there. A rejected sleep restores no CSR.
             core::arch::naked_asm!(
-                "csrw mscratch, t0",
                 "mv t0, a0",
                 "sw ra, {ra}(t0)",
                 "sw sp, {sp}(t0)",
@@ -304,11 +305,6 @@ macro_rules! critical_regs_asm {
                 "and t2, t1, t2",
                 "ori t2, t2, {going_to_sleep}",
                 "sw t2, {pmufunc}(t0)",
-                "mv t3, t0",
-                "csrr t0, mscratch",
-                "lw t1, {t1}(t3)",
-                "lw t2, {t2}(t3)",
-                "lw t3, {t3}(t3)",
                 "ret",
                 going_to_sleep = const PMUFUNC_GOING_TO_SLEEP,
                 $($common)*
