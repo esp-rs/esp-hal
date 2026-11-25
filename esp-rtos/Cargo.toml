@@ -18,6 +18,7 @@ check-configs = [
     { features = ["esp-hal/unstable", "alloc"] },
     { features = ["esp-hal/unstable", "esp-alloc"] },
     { features = ["esp-hal/unstable", "esp-radio"] },
+    { features = ["esp-hal/unstable", "rtos-trace"] },
     { features = ["esp-hal/unstable", "esp-radio", "embassy"] },
     { features = ["esp-hal/unstable", "esp-alloc", "embassy"] },
     { features = ["esp-hal/unstable", "esp-radio", "embassy"], env = { ESP_RTOS_CONFIG_STACK_POINTER_RANGE_CHECK = "false" } },
