@@ -493,12 +493,14 @@ impl SchedulerState {
                         self.mark_for_deletion(cpu, task_to_delete);
                         task::schedule_other_core();
                     } else {
+                        task_to_delete.set_state(TaskState::Deleted);
                         self.delete_task(task_to_delete);
                     }
                 }
                 _ => {
                     // On a single CPU, a task that is not the current task does not run, so its
                     // stack is not in use.
+                    task_to_delete.set_state(TaskState::Deleted);
                     self.delete_task(task_to_delete);
                 }
             }
