@@ -7,8 +7,7 @@
 #![doc = concat!("- Station mode (aka STA mode or Wi-Fi client mode). ", chip_pretty!(), " connects to an access point.")]
 #![doc = concat!("- AP mode (aka Soft-AP mode or Access Point mode). Stations connect to the ", chip_pretty!(),".")]
 #![doc = concat!("- Station/AP-coexistence mode (", chip_pretty!(), " is concurrently an access point and a station connected to another access point).")]
-//! - Various security modes for the above (WPA, WPA2, ... Please note that WPA3 is currently not
-//!   supported)
+//! - Various security modes for the above (WPA, WPA2, and WPA3 Personal for station)
 //! - Scanning for access points (active & passive scanning).
 //! - Promiscuous mode for monitoring of IEEE802.11 Wi-Fi packets.
 //!
@@ -933,6 +932,16 @@ pub enum AuthenticationMethodConfig {
 
     /// WPA/WPA2 Personal authentication and password (supports both).
     WpaWpa2Personal(Password),
+
+    /// WPA3 Personal (SAE) authentication and password.
+    ///
+    /// Station only. Access-point configuration rejects this variant.
+    Wpa3Personal(Password),
+
+    /// WPA2/WPA3 Personal transition authentication and password.
+    ///
+    /// Station only. Access-point configuration rejects this variant.
+    Wpa2Wpa3Personal(Password),
 }
 
 impl AuthenticationMethodConfig {
@@ -943,6 +952,10 @@ impl AuthenticationMethodConfig {
             AuthenticationMethodConfig::Wpa(_) => AuthenticationMethod::Wpa,
             AuthenticationMethodConfig::Wpa2Personal(_) => AuthenticationMethod::Wpa2Personal,
             AuthenticationMethodConfig::WpaWpa2Personal(_) => AuthenticationMethod::WpaWpa2Personal,
+            AuthenticationMethodConfig::Wpa3Personal(_) => AuthenticationMethod::Wpa3Personal,
+            AuthenticationMethodConfig::Wpa2Wpa3Personal(_) => {
+                AuthenticationMethod::Wpa2Wpa3Personal
+            }
         }
     }
 
@@ -952,7 +965,9 @@ impl AuthenticationMethodConfig {
             AuthenticationMethodConfig::Wep(password)
             | AuthenticationMethodConfig::Wpa(password)
             | AuthenticationMethodConfig::Wpa2Personal(password)
-            | AuthenticationMethodConfig::WpaWpa2Personal(password) => Some(password.as_bytes()),
+            | AuthenticationMethodConfig::WpaWpa2Personal(password)
+            | AuthenticationMethodConfig::Wpa3Personal(password)
+            | AuthenticationMethodConfig::Wpa2Wpa3Personal(password) => Some(password.as_bytes()),
         }
     }
 }
