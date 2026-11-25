@@ -215,9 +215,8 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     // changes a path.
     gpio::wakeup::record_wakeup();
 
-    // Release the pads after a deep-sleep wake, and only if the previous run armed an IO wake
-    // source. A USB reset that ended a light sleep has the same reset reason and keeps the light
-    // sleep's pad holds, so it needs the release too.
+    // Release the pads after a deep-sleep wake if the previous run armed an IO wake source. A USB
+    // reset during light sleep has the same reset reason and also needs the release.
     if super::reset_reason(crate::system::Cpu::ProCpu) == Some(super::SocResetReason::CoreDeepSleep)
         && gpio::wakeup::wake_enabled()
     {
@@ -506,6 +505,12 @@ impl<'d> LowPower<'d> {
         let rtc = Rtc::new(unsafe { crate::peripherals::RTC_TIMER::steal() });
 
         let mut config = config;
+        // Before `set_sleep_kind`, which picks the power-down flags from it.
+        #[cfg(sleep_keeps_usb_serial_jtag)]
+        {
+            config.keep_usb_serial_jtag =
+                kind == SleepKind::Light && usb_serial_jtag::keep_in_light_sleep();
+        }
         config.set_sleep_kind(kind);
         #[cfg(modem_retention = "regdma")]
         crate::rtc_cntl::regdma::prepare_sleep(kind == SleepKind::Light);
@@ -703,6 +708,8 @@ fn sleep_transition(
         cpu_retention::prepare_cpu_retention(retention_buffer);
 
         let saved = config.start_sleep(wakeup_mask, reject_mask);
+        #[cfg(soc_has_usb_device)]
+        let usb_serial_jtag = usb_serial_jtag::disconnect_for_sleep(config, kind);
         // After the CPU clock switch, because the RC_FAST disable path writes `CK8M_WAIT`.
         #[cfg(not(soc_has_pmu))]
         wakeup_waits.write();
@@ -745,6 +752,10 @@ fn sleep_transition(
         }
 
         config.finish_sleep();
+        #[cfg(soc_has_usb_device)]
+        if let Some(usb_serial_jtag) = usb_serial_jtag {
+            usb_serial_jtag.reconnect();
+        }
         saved.restore();
 
         rejected

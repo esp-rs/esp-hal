@@ -8,6 +8,7 @@
 //! chip stays awake for longer than the 100 ms attach debounce. A kept pull-up does not help,
 //! because the host then finds a device that does not respond.
 
+use super::{RtcSleepConfig, SleepKind};
 use crate::{
     peripherals::USB_DEVICE,
     soc::usb_phy::{self, PhyPads},
@@ -122,10 +123,28 @@ pub(super) struct Disconnected {
     pad_pullups: Option<[bool; 2]>,
 }
 
+/// Disconnects USB Serial/JTAG from the host if the coming sleep stops it.
+///
+/// A deep sleep powers USB Serial/JTAG down on its own.
+#[inline(always)]
+pub(super) fn disconnect_for_sleep(
+    config: &RtcSleepConfig,
+    kind: SleepKind,
+) -> Option<Disconnected> {
+    let light = kind == SleepKind::Light;
+    cfg_select! {
+        sleep_keeps_usb_serial_jtag => (light && !config.keep_usb_serial_jtag).then(disconnect),
+        _ => {
+            let _ = config;
+            light.then(disconnect)
+        }
+    }
+}
+
 /// Disconnects USB Serial/JTAG from the host on light-sleep entry.
 ///
 /// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/esp_hw_support/sleep_console.c#L17-L36>.
-pub(super) fn disconnect() -> Disconnected {
+fn disconnect() -> Disconnected {
     let module_was_enabled = module_is_enabled();
     if !module_was_enabled {
         // The pad enable needs the register block clocked and out of reset.
@@ -190,9 +209,8 @@ impl Disconnected {
 /// calls within a millisecond see the same index. The SOF interrupt flag stays untouched, because
 /// esp-println reads it to pick its output.
 ///
-/// The first call has no earlier index to compare with, so it waits for one more frame. The 11-bit
-/// frame index wraps every 2048 ms, so a call that follows the previous one by a multiple of
-/// 2048 ms misses a connected host. This error affects one sleep only.
+/// The first call waits for one more frame. The 11-bit index wraps every 2048 ms, so a call
+/// exactly a multiple of that after the previous one misses a host, for one sleep.
 pub(super) fn host_connected() -> bool {
     use portable_atomic::{AtomicU32, Ordering};
 

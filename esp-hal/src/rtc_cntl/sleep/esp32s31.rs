@@ -646,8 +646,6 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
-        self.keep_usb_serial_jtag = !self.deep && super::usb_serial_jtag::keep_in_light_sleep();
-
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
                 matches!(
@@ -762,11 +760,7 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl0()
             .write(|w| w.slp_reject_en().bit(reject_mask != 0));
 
-        let usb_serial_jtag =
-            (!self.deep && !self.keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
-
         SavedState {
-            usb_serial_jtag,
             cpu_root_clk,
             keep_usb_serial_jtag: self.keep_usb_serial_jtag,
             psram_slowed,
@@ -797,7 +791,6 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
-    usb_serial_jtag: Option<super::usb_serial_jtag::Disconnected>,
     cpu_root_clk: Option<CpuRootClkConfig>,
     keep_usb_serial_jtag: bool,
     psram_slowed: bool,
@@ -810,9 +803,6 @@ pub(crate) struct SavedState {
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
-        if let Some(usb_serial_jtag) = self.usb_serial_jtag {
-            usb_serial_jtag.reconnect();
-        }
         ClockTree::with(|clocks| {
             // Light sleep powers XTAL_CLK down, so the CPLL loses its calibration. The CPLL must
             // be calibrated again before the CPU or the flash controller runs from it.

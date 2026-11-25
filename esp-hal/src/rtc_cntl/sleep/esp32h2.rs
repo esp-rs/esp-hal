@@ -551,8 +551,6 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
-        self.keep_usb_serial_jtag = !self.deep && super::usb_serial_jtag::keep_in_light_sleep();
-
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
                 matches!(
@@ -664,11 +662,7 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
-        let usb_serial_jtag =
-            (!self.deep && !self.keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
-
         SavedState {
-            usb_serial_jtag,
             hp_root_clk,
             cpu_clk,
             keep_usb_serial_jtag: self.keep_usb_serial_jtag,
@@ -697,7 +691,6 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
-    usb_serial_jtag: Option<super::usb_serial_jtag::Disconnected>,
     hp_root_clk: Option<HpRootClkConfig>,
     cpu_clk: Option<CpuClkConfig>,
     keep_usb_serial_jtag: bool,
@@ -706,9 +699,6 @@ pub(crate) struct SavedState {
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
-        if let Some(usb_serial_jtag) = self.usb_serial_jtag {
-            usb_serial_jtag.reconnect();
-        }
         ClockTree::with(|clocks| {
             if !self.keep_usb_serial_jtag {
                 clocks::reconfigure_pll(clocks);

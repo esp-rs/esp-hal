@@ -421,8 +421,7 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
         self.hp_sys.dig_power.set_mem_pd_en(pd_flags.pd_mem());
 
-        // USB Serial/JTAG needs the SPLL to keep answering the host. The PAC does not document
-        // which `xpd_pll` bit is the SPLL, so such a sleep keeps all PLLs powered, as in HP_ACTIVE.
+        // USB Serial/JTAG needs the SPLL, and the PAC does not say which `xpd_pll` bit it is.
         let xpd_pll = if keep_usb_serial_jtag { 0xf } else { 0 };
         self.hp_sys.clk.set_i2c_iso_en(!keep_usb_serial_jtag);
         self.hp_sys.clk.set_i2c_retention(!keep_usb_serial_jtag);
@@ -799,8 +798,6 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
-        self.keep_usb_serial_jtag = !self.deep && super::usb_serial_jtag::keep_in_light_sleep();
-
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
                 matches!(
@@ -853,8 +850,7 @@ impl RtcSleepConfig {
         let power = PowerSleepConfig::defaults(self.pd_flags, self.keep_usb_serial_jtag);
         power.apply();
 
-        // USB Serial/JTAG sits behind HP_SLEEP clock gates that neither the PAC nor the ESP-IDF
-        // map names, so the sleep opens all of them.
+        // Neither the PAC nor ESP-IDF names the gates USB Serial/JTAG needs, so open all of them.
         // See <https://github.com/espressif/esp-idf/blob/4dbfecac7e/components/soc/esp32p4/include/soc/pmu_icg_mapping.h>.
         let icg = if self.keep_usb_serial_jtag {
             u32::MAX
@@ -946,9 +942,6 @@ impl RtcSleepConfig {
             pmu_sleep_dcdc_to_ldo_handover();
         }
 
-        let usb_serial_jtag =
-            (!self.deep && !self.keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
-
         // The PMU FSM switches the pads to their sleep setting and holds IOs
         // at the same stage; trigger the pad sleep selection first so the IOs
         // do not get held in an indeterminate state.
@@ -962,7 +955,6 @@ impl RtcSleepConfig {
         // Start entry into sleep mode.
 
         SavedState {
-            usb_serial_jtag,
             cpu_root_clk,
             boot_from_lp_ram,
         }
@@ -1018,7 +1010,6 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
-    usb_serial_jtag: Option<super::usb_serial_jtag::Disconnected>,
     cpu_root_clk: Option<CpuRootClkConfig>,
     boot_from_lp_ram: bool,
 }
@@ -1026,9 +1017,6 @@ pub(crate) struct SavedState {
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
-        if let Some(usb_serial_jtag) = self.usb_serial_jtag {
-            usb_serial_jtag.reconnect();
-        }
         ClockTree::with(|clocks| {
             if let Some(cpu_root_clk) = self.cpu_root_clk {
                 clocks::configure_cpu_root_clk(clocks, cpu_root_clk);

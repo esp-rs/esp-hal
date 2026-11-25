@@ -676,8 +676,6 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
-        self.keep_usb_serial_jtag = !self.deep && super::usb_serial_jtag::keep_in_light_sleep();
-
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
                 matches!(
@@ -726,8 +724,8 @@ impl RtcSleepConfig {
         // rtc_clk_cpu_freq_set_xtal_for_sleep: XTAL as the root clock, without dividers.
         let (hp_root_clk, cpu_clk, ahb_clk) = ClockTree::with(|clocks| {
             let old = (clocks.hp_root_clk(), clocks.cpu_clk(), clocks.ahb_clk());
-            // A sleep that keeps USB Serial/JTAG running clocks the system from the PLL, and
-            // AHB_CLK may not exceed 32 MHz.
+            // Keeping USB Serial/JTAG clocks the system from the PLL, and AHB_CLK may not exceed
+            // 32 MHz.
             let ahb_divisor = if self.keep_usb_serial_jtag {
                 clocks::request_pll_f96m_clk(clocks);
                 2
@@ -768,8 +766,7 @@ impl RtcSleepConfig {
             AnalogSleepConfig::defaults_light_sleep(self.pd_flags).apply();
         }
 
-        // JTAG reaches the debug module only while the HP core clock runs. The clock costs current,
-        // so the sleep keeps it only for an attached debugger.
+        // JTAG needs the HP core clock, which costs current, so only an attached debugger keeps it.
         let icg_func = if self.keep_usb_serial_jtag && crate::debugger::debugger_connected() {
             ICG_FUNC_ENA_HPCORE
         } else {
@@ -807,11 +804,7 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl4()
             .write(|w| w.slp_reject_cause_clr().bit(true));
 
-        let usb_serial_jtag =
-            (!self.deep && !self.keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
-
         SavedState {
-            usb_serial_jtag,
             hp_root_clk,
             cpu_clk,
             ahb_clk,
@@ -845,7 +838,6 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
-    usb_serial_jtag: Option<super::usb_serial_jtag::Disconnected>,
     hp_root_clk: Option<HpRootClkConfig>,
     cpu_clk: Option<CpuClkConfig>,
     ahb_clk: Option<AhbClkConfig>,
@@ -855,9 +847,6 @@ pub(crate) struct SavedState {
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
-        if let Some(usb_serial_jtag) = self.usb_serial_jtag {
-            usb_serial_jtag.reconnect();
-        }
         ClockTree::with(|clocks| {
             if !self.keep_usb_serial_jtag {
                 clocks::reconfigure_pll(clocks);
@@ -873,8 +862,7 @@ impl SavedState {
                 clocks::configure_hp_root_clk(clocks, hp_root_clk);
             }
             if self.keep_usb_serial_jtag {
-                // A sleep with the PLL as the system clock leaves the PMU in control of the root
-                // clock selection until this release, like `rtc_clk_modem_pll_lock_release`.
+                // A sleep on the PLL locks the root clock selection until this release.
                 PMU::regs()
                     .imm_sleep_sysclk()
                     .write(|w| w.update_dig_sys_clk_sel().set_bit());

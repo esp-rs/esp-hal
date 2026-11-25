@@ -701,8 +701,6 @@ impl RtcSleepConfig {
     pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
         self.deep = kind == SleepKind::Deep;
 
-        self.keep_usb_serial_jtag = !self.deep && super::usb_serial_jtag::keep_in_light_sleep();
-
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
                 matches!(
@@ -791,8 +789,7 @@ impl RtcSleepConfig {
         // https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/port/esp32c6/pmu_sleep.c#L299-L302
         let mut icg_func = HpBackupClk::default();
         icg_func.set_retention(!self.deep && clocks::wifi_pwr_clk_runs_in_sleep());
-        // JTAG reaches the debug module only while the HP core clock runs. The clock costs current,
-        // so the sleep keeps it only for an attached debugger.
+        // JTAG needs the HP core clock, which costs current, so only an attached debugger keeps it.
         icg_func.set_hpcore(self.keep_usb_serial_jtag && crate::debugger::debugger_connected());
         super::pmu_common::configure_hp_sleep_clocks(icg_func.0, self.keep_usb_serial_jtag);
 
@@ -832,11 +829,7 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
-        let usb_serial_jtag =
-            (!self.deep && !self.keep_usb_serial_jtag).then(super::usb_serial_jtag::disconnect);
-
         SavedState {
-            usb_serial_jtag,
             soc_root_clk,
             keep_usb_serial_jtag: self.keep_usb_serial_jtag,
         }
@@ -863,7 +856,6 @@ impl RtcSleepConfig {
 /// The state that [`RtcSleepConfig::start_sleep`] changes for the length of the sleep.
 #[must_use]
 pub(crate) struct SavedState {
-    usb_serial_jtag: Option<super::usb_serial_jtag::Disconnected>,
     soc_root_clk: Option<SocRootClkConfig>,
     keep_usb_serial_jtag: bool,
 }
@@ -871,9 +863,6 @@ pub(crate) struct SavedState {
 impl SavedState {
     /// Restores the state. Runs after a wakeup and after a rejected sleep.
     pub(crate) fn restore(self) {
-        if let Some(usb_serial_jtag) = self.usb_serial_jtag {
-            usb_serial_jtag.reconnect();
-        }
         ClockTree::with(|clocks| {
             if !self.keep_usb_serial_jtag {
                 clocks::reconfigure_pll(clocks);
