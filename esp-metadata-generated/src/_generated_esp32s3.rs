@@ -511,6 +511,9 @@ macro_rules! property {
     ("sleep.keeps_cpu_powered_for_usb_serial_jtag") => {
         false
     };
+    ("sleep.keeps_jtag_clocks_for_debugger") => {
+        false
+    };
     ("sleep.cpu_retention_mem_size") => {
         8800
     };

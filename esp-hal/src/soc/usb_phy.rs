@@ -36,6 +36,7 @@ impl PhyPads {
                 }
             };
         }
+        debug_assert!(gpios != [0; 2], "the metadata lists no D- and D+ pads");
         gpios
     }
 }

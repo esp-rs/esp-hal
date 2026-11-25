@@ -450,6 +450,7 @@ light_sleep = true
 idle_frequency_scaling = true
 deep_sleep = true
 keeps_usb_serial_jtag = true
+keeps_jtag_clocks_for_debugger = true
 ext1_version = 2
 pin_wakeup_version = 3
 wakeup_sources = {

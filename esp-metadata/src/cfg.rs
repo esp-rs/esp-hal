@@ -1117,6 +1117,10 @@ driver_configs![
                 /// powered, because a powered-down CPU does not reliably come back from it.
                 #[serde(default)]
                 keeps_cpu_powered_for_usb_serial_jtag: bool,
+                /// Whether a light sleep that keeps USB Serial/JTAG running also keeps the clocks
+                /// that JTAG needs while a debugger is attached.
+                #[serde(default)]
+                keeps_jtag_clocks_for_debugger: bool,
                 /// CPU retention capabilities and reachable retention-memory bounds.
                 ///
                 /// Not `Option`: an absent table must emit no symbols at all, and an optional

@@ -252,7 +252,7 @@ options:
       - value: true
 
   - name: keep-usb-serial-jtag-enabled
-    description: "Keeps USB-Serial-JTAG connected at startup. Disable to save power if neither
+    description: "Keeps USB-Serial-JTAG enabled at startup. Disable to save power if neither
       the application nor a debugger uses it."
     default:
       - value: true
@@ -289,10 +289,11 @@ options:
     active: "soc_has_apb_frequency_reduction"
 
   - name: keep-usb-serial-jtag-connected
-    description: "Keeps USB Serial/JTAG connected to a USB host across light sleep, which can
-      increase the light-sleep current. The `rtc_cntl::sleep` module documentation describes the
-      behavior of each chip. When disabled, every light sleep disconnects USB Serial/JTAG from the
-      host."
+    description: "Keeps USB Serial/JTAG connected to a USB host across light sleep. Most chips
+      keep USB Serial/JTAG running in light sleep, which increases the light-sleep current. The
+      ESP32-C3 and ESP32-S3 refuse light sleep while a host is connected instead. When disabled,
+      every light sleep disconnects USB Serial/JTAG from the host. The `rtc_cntl::sleep` module
+      documentation describes the behavior of each chip."
     default:
       - value: true
     active: "soc_has_usb_device && sleep_driver_supported"

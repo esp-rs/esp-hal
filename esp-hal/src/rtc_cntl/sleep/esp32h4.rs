@@ -724,8 +724,7 @@ impl RtcSleepConfig {
         // rtc_clk_cpu_freq_set_xtal_for_sleep: XTAL as the root clock, without dividers.
         let (hp_root_clk, cpu_clk, ahb_clk) = ClockTree::with(|clocks| {
             let old = (clocks.hp_root_clk(), clocks.cpu_clk(), clocks.ahb_clk());
-            // Keeping USB Serial/JTAG clocks the system from the PLL, and AHB_CLK may not exceed
-            // 32 MHz.
+            // A sleep that keeps USB Serial/JTAG runs the system clock from the 96 MHz PLL.
             let ahb_divisor = if self.keep_usb_serial_jtag {
                 clocks::request_pll_f96m_clk(clocks);
                 2

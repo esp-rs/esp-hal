@@ -780,6 +780,10 @@ pub(crate) fn time_since_boot_raw() -> u64 {
 }
 
 /// Returns reset reason.
+#[cfg_attr(
+    sleep_keeps_usb_serial_jtag,
+    doc = "\n\nA USB reset from the host during a light sleep that keeps USB Serial/JTAG running also returns [`SocResetReason::CoreDeepSleep`]. With the `ESP_PHY_CONFIG_PHY_SKIP_CALIBRATION_AFTER_DEEP_SLEEP` option, esp-phy then skips the RF calibration, as after a deep-sleep wake."
+)]
 pub fn reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     let reason = crate::rom::rtc_get_reset_reason(cpu as u32);
 

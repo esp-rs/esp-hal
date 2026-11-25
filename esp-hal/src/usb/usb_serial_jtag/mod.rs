@@ -712,9 +712,12 @@ impl UsbSerialJtagTx<'_, Async> {
     /// Cancellation safe.
     #[instability::unstable]
     pub async fn wait_for_write_ready(&mut self) {
-        let _wake_lock = WakeLock::new();
-        while !self.write_ready() {
-            UsbSerialJtagFuture::new(self.peripheral.reborrow(), Event::TxPacketSent).await;
+        if !self.write_ready() {
+            // The interrupt that ends this wait cannot end a light sleep.
+            let _wake_lock = WakeLock::new();
+            while !self.write_ready() {
+                UsbSerialJtagFuture::new(self.peripheral.reborrow(), Event::TxPacketSent).await;
+            }
         }
         self.timed_out = false;
     }

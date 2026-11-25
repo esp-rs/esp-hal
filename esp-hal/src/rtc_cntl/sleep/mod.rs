@@ -32,25 +32,23 @@ keep working. When the option is disabled, light sleep also starts while a host 
     _ => "",
 }]
 #![doc = cfg_select! {
-    esp32c6 => r#"
-While a host is connected, light sleep keeps USB Serial/JTAG running and the CPU powered, even if
-CPU power-down is enabled, which increases the light-sleep current. While a debugger is attached,
-such a light sleep also keeps the clocks that JTAG needs. The debug module stays active after the
-debugger disconnects, so the higher current remains until the next chip reset.
-"#,
     sleep_keeps_cpu_powered_for_usb_serial_jtag => r#"
 While a host is connected, light sleep keeps USB Serial/JTAG running and the CPU powered, even if
 CPU power-down is enabled, which increases the light-sleep current.
 "#,
-    any(esp32c5, esp32c61, esp32h4) => r#"
-While a host is connected, light sleep keeps USB Serial/JTAG running, which increases the
-light-sleep current. While a debugger is attached, such a light sleep also keeps the CPU powered
-and the clocks that JTAG needs. The debug module stays active after the debugger disconnects, so
-the higher current remains until the next chip reset.
-"#,
     sleep_keeps_usb_serial_jtag => r#"
 While a host is connected, light sleep keeps USB Serial/JTAG running, which increases the
 light-sleep current. While a debugger is attached, such a light sleep also keeps the CPU powered.
+"#,
+    _ => "",
+}]
+#![doc = cfg_select! {
+    sleep_keeps_jtag_clocks_for_debugger => r#"
+While a debugger is attached, such a light sleep also keeps the clocks that JTAG needs. The debug
+module stays active after the debugger disconnects, so the higher current remains until the next
+chip reset.
+"#,
+    all(sleep_keeps_usb_serial_jtag, not(sleep_keeps_cpu_powered_for_usb_serial_jtag)) => r#"
 The debug module stays active after the debugger disconnects, so the higher current remains until
 the next chip reset.
 "#,
@@ -196,7 +194,7 @@ pub enum LightSleep {
     /// Wait for an interrupt instead.
     #[cfg_attr(
         all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)),
-        doc = "\n\nA USB host connected to USB Serial/JTAG also refuses the sleep, unless the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option is disabled. The disconnect of the host raises no interrupt, so try the sleep again after a delay."
+        doc = "\n\nA USB host connected to USB Serial/JTAG also refuses the sleep, unless the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option is disabled. The disconnect of the host raises no interrupt, so a caller must try the sleep again after a delay."
     )]
     Refused,
 }
@@ -226,6 +224,9 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     RtcSleepConfig::base_settings(rtc);
 
     set_mask(0);
+
+    #[cfg(soc_has_usb_device)]
+    usb_serial_jtag::init();
 }
 
 /// Returns whether the last reset was a wakeup from deep sleep.
