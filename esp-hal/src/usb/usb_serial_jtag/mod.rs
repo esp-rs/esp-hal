@@ -67,6 +67,12 @@
 //! for data for at most [`RxConfig::timeout`], then return [`RxError::Timeout`]. The async
 //! functions do not time out. Use a timer to cancel them.
 //!
+//! ### Light Sleep
+//!
+//! [`UsbSerialJtagRx`] holds a [`WakeLock`] while it exists, which prevents automatic light sleep.
+//! [`UsbSerialJtagTx`] holds one only while an async function waits for room in the output FIFO,
+//! so a transmitter on its own, for example a logger's, lets the chip sleep.
+//!
 //! ## Examples
 //!
 //! ### Sending Data
@@ -369,7 +375,6 @@ pub struct UsbSerialJtag<'d, Dm: DriverMode> {
 pub struct UsbSerialJtagTx<'d, Dm: DriverMode> {
     peripheral: USB_DEVICE<'d>,
     phantom: PhantomData<Dm>,
-    wake_lock: WakeLock,
     /// The host has not seen the end of the transfer: the FIFO holds bytes, or the last packet
     /// had 64 bytes.
     transfer_open: bool,
@@ -707,6 +712,7 @@ impl UsbSerialJtagTx<'_, Async> {
     /// Cancellation safe.
     #[instability::unstable]
     pub async fn wait_for_write_ready(&mut self) {
+        let _wake_lock = WakeLock::new();
         while !self.write_ready() {
             UsbSerialJtagFuture::new(self.peripheral.reborrow(), Event::TxPacketSent).await;
         }
@@ -766,7 +772,6 @@ where
         Self {
             peripheral,
             phantom: PhantomData,
-            wake_lock: WakeLock::new(),
             transfer_open: false,
             tx_timeout: None,
             timed_out: false,
@@ -777,7 +782,6 @@ where
         UsbSerialJtagTx {
             peripheral: self.peripheral,
             phantom: PhantomData,
-            wake_lock: self.wake_lock,
             transfer_open: self.transfer_open,
             tx_timeout: self.tx_timeout,
             timed_out: self.timed_out,

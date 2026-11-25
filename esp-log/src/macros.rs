@@ -92,9 +92,9 @@ macro_rules! init_uart_split {
 ///
 /// Use [`init_usb_split!`](crate::init_usb_split) to also get the receiver.
 ///
-/// The driver holds a `WakeLock`, and the logger keeps the driver forever, so the chip never
-/// enters light sleep after this call. Use [`init_uart!`](crate::init_uart) in an application
-/// that uses light sleep.
+/// The logger keeps only the transmitter, so the chip can enter light sleep. The receiver that
+/// [`init_usb_split!`](crate::init_usb_split) returns prevents automatic light sleep while it
+/// exists.
 ///
 /// The macro uses the pins of the default USB PHY. On the ESP32-H4 and the ESP32-P4, the
 /// `USB_PHY_SEL` eFuse can move USB-Serial-JTAG to the other PHY. On such a chip, the driver
