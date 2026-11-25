@@ -13,9 +13,6 @@ use esp_hal::{
     time::{Duration, Instant},
 };
 //%if option("defmt")
-//%if !option("probe-rs")
-//+use esp_println as _;
-//%endif
 //+use defmt::info;
 //%if !group_selected("panic-handler")
 //+use defmt::error;
@@ -99,15 +96,23 @@ fn main() -> ! {
     //%else
     rtt_target::rtt_init_print!();
     //%endif
-    //%else if option("log")
-    esp_println::logger::init_logger_from_env();
     //%endif
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-    //%if has_reserved_pins
+    //%if has_reserved_pins || (!option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace")))
     let peripherals = esp_hal::init(config);
     //%else
     //+    let _peripherals = esp_hal::init(config);
+    //%endif
+
+    //%if !option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace"))
+    //%if chip.soc_has_usb_device
+    // Logs on USB-Serial-JTAG. `esp_log::init_uart!` logs on UART0 instead.
+    esp_log::init_usb!(peripherals);
+    //%else
+    //+    // Logs on UART0's default TX pin.
+    //+    esp_log::init_uart!(peripherals);
+    //%endif
     //%endif
 
     {{ reserved_gpio_code }}

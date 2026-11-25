@@ -1,6 +1,7 @@
 //! This shows how to read and write text via USB Serial/JTAG using embassy.
 //! You need to connect via the Serial/JTAG interface to see any output.
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
+//! The example's log messages go to UART0's default TX pin.
 
 //% CHIP_FILTER: usb_serial_jtag_driver_supported
 
@@ -57,17 +58,19 @@ async fn reader(
                 signal.signal(heapless::String::from_utf8(string_buffer).unwrap());
             }
             #[allow(unreachable_patterns)]
-            Err(e) => esp_println::println!("RX Error: {:?}", e),
+            Err(e) => log::info!("RX Error: {:?}", e),
         }
     }
 }
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
-    esp_println::println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // This example drives USB-Serial-JTAG, so it logs on UART0's default TX pin.
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);

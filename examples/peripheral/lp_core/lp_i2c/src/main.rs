@@ -22,8 +22,6 @@ use esp_hal::{
     main,
     time::Rate,
 };
-use esp_println::{print, println};
-
 esp_bootloader_esp_idf::esp_app_desc!();
 
 // Shared-memory locations used for communication with the LP core firmware.
@@ -40,8 +38,9 @@ const HUMID_ADDRESS: u32 = 0x5000_2004;
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     // configure LP I2C
     let i2c = LpI2c::new(
@@ -54,7 +53,7 @@ fn main() -> ! {
 
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
     lp_core.stop();
-    println!("lp core stopped");
+    log::info!("lp core stopped");
 
     // load code to LP core
     let lp_core_code = load_lp_code!(
@@ -63,15 +62,16 @@ fn main() -> ! {
 
     // start LP core
     lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, i2c);
-    println!("lp core run");
+    log::info!("lp core run");
 
     let temp = TEMP_ADDRESS as *mut f32;
     let humid = HUMID_ADDRESS as *mut f32;
+    let mut last = None;
     loop {
-        print!(
-            "Current {:.2} C {:.2} %           \u{000d}",
-            unsafe { temp.read_volatile() },
-            unsafe { humid.read_volatile() }
-        );
+        let current = unsafe { (temp.read_volatile(), humid.read_volatile()) };
+        if last != Some(current) {
+            log::info!("Current {:.2} C {:.2} %", current.0, current.1);
+            last = Some(current);
+        }
     }
 }

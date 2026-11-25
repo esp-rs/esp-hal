@@ -15,6 +15,7 @@ mod tests {
 
     #[test]
     fn different_priority_levels_can_interrupt_each_other(p: Peripherals) {
+        hil_test::init_logger!(p);
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         #[handler(priority = Priority::min())]
@@ -56,6 +57,7 @@ mod tests {
     #[should_panic]
     #[cfg(riscv)]
     fn stack_guard_is_monitored_after_nested_interrupts(p: Peripherals) {
+        hil_test::init_logger!(p);
         unsafe extern "C" {
             static mut __stack_chk_guard: u32;
         }

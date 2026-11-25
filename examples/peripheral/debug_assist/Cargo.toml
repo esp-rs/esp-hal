@@ -8,49 +8,58 @@ publish = false
 critical-section = "1"
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
-    "println",
+    "log-04",
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
-esp-println = { path = "../../../esp-println", features = ["log-04"] }
+esp-log = { path = "../../../esp-log", features = ["log-04"] }
+log = "0.4"
 
 [features]
 esp32c2 = [
+    "esp-log/esp32c2",
     "esp-backtrace/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-hal/esp32c2",
 ]
 esp32c3 = [
+    "esp-log/esp32c3",
     "esp-backtrace/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-hal/esp32c3",
 ]
 esp32c5 = [
+    "esp-log/esp32c5",
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-hal/esp32c5",
 ]
 esp32c6 = [
+    "esp-log/esp32c6",
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
 ]
 esp32c61 = [
+    "esp-log/esp32c61",
     "esp-backtrace/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-hal/esp32c61",
 ]
 esp32h2 = [
+    "esp-log/esp32h2",
     "esp-backtrace/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-hal/esp32h2",
 ]
 esp32s3 = [
+    "esp-log/esp32s3",
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",
 ]
 esp32s31 = [
+    "esp-log/esp32s31",
     "esp-backtrace/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",
     "esp-hal/esp32s31",

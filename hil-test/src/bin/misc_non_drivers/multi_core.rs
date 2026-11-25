@@ -75,6 +75,7 @@ mod tests {
 
     #[test]
     fn app_core_starts_again(p: Peripherals) {
+        hil_test::init_logger!(p);
         static STARTED: AtomicU32 = AtomicU32::new(0);
 
         let mut cpu_control = CpuControl::new(p.CPU_CTRL);
@@ -109,6 +110,7 @@ mod tests {
 
     #[test]
     fn ipc_post_runs_on_the_other_core(p: Peripherals) {
+        hil_test::init_logger!(p);
         static CORE: AtomicUsize = AtomicUsize::new(usize::MAX);
         extern "C" fn record() {
             CORE.store(Cpu::current() as usize, Ordering::Release);
@@ -124,6 +126,7 @@ mod tests {
 
     #[test]
     fn ipc_post_from_interrupt_handlers(p: Peripherals) {
+        hil_test::init_logger!(p);
         static RUNS: AtomicU32 = AtomicU32::new(0);
         static PRIORITY: AtomicUsize = AtomicUsize::new(0);
         static RESULT: AtomicUsize = AtomicUsize::new(0);
@@ -176,6 +179,7 @@ mod tests {
 
     #[test]
     fn ipc_self_post_runs_before_wait_returns(p: Peripherals) {
+        hil_test::init_logger!(p);
         static RUNS: AtomicU32 = AtomicU32::new(0);
         extern "C" fn count() {
             RUNS.fetch_add(1, Ordering::Relaxed);
@@ -189,6 +193,7 @@ mod tests {
 
     #[test]
     fn ipc_masked_self_wait_would_deadlock(p: Peripherals) {
+        hil_test::init_logger!(p);
         static RUNS: AtomicU32 = AtomicU32::new(0);
         extern "C" fn count() {
             RUNS.fetch_add(1, Ordering::Relaxed);
@@ -209,6 +214,7 @@ mod tests {
 
     #[test]
     fn ipc_wait_inside_func_would_deadlock(p: Peripherals) {
+        hil_test::init_logger!(p);
         static INNER_RUNS: AtomicU32 = AtomicU32::new(0);
         static INNER_RUNS_IN_OUTER: AtomicU32 = AtomicU32::new(u32::MAX);
         static OUTER_GOT_WOULD_DEADLOCK: AtomicBool = AtomicBool::new(false);
@@ -244,6 +250,7 @@ mod tests {
 
     #[test]
     fn ipc_masked_target_times_out(p: Peripherals) {
+        hil_test::init_logger!(p);
         static RUNS: AtomicU32 = AtomicU32::new(0);
         extern "C" fn count() {
             RUNS.fetch_add(1, Ordering::Relaxed);
@@ -265,6 +272,7 @@ mod tests {
 
     #[test]
     fn ipc_post_does_not_wait_for_a_busy_core(p: Peripherals) {
+        hil_test::init_logger!(p);
         static RELEASE: AtomicBool = AtomicBool::new(false);
         static LONG_STARTED: AtomicBool = AtomicBool::new(false);
         static OTHER_RUNS: AtomicU32 = AtomicU32::new(0);
@@ -315,6 +323,7 @@ mod tests {
 
     #[test]
     fn parks_add_up(p: Peripherals) {
+        hil_test::init_logger!(p);
         static TICKS: AtomicU32 = AtomicU32::new(0);
 
         let mut cpu_control = CpuControl::new(p.CPU_CTRL);
@@ -348,6 +357,7 @@ mod tests {
 
     #[test]
     fn interrupts_run_while_park_waits(p: Peripherals) {
+        hil_test::init_logger!(p);
         static IN_SECTION: AtomicBool = AtomicBool::new(false);
         static PARKING: AtomicBool = AtomicBool::new(false);
         static RELEASE: AtomicBool = AtomicBool::new(false);
@@ -388,6 +398,7 @@ mod tests {
 
     #[test]
     fn cores_can_park_each_other_at_the_same_time(p: Peripherals) {
+        hil_test::init_logger!(p);
         static START: AtomicBool = AtomicBool::new(false);
         static DONE: AtomicBool = AtomicBool::new(false);
 
@@ -416,6 +427,7 @@ mod tests {
 
     #[test]
     fn ipc_post_after_app_core_stops_is_offline(p: Peripherals) {
+        hil_test::init_logger!(p);
         extern "C" fn nothing() {}
         static REQUEST: IpcRequest = IpcRequest::new(nothing);
 
@@ -430,6 +442,7 @@ mod tests {
 
     #[test]
     fn ipc_run_pending_at_app_core_stop_ends_offline(p: Peripherals) {
+        hil_test::init_logger!(p);
         static RUNS: AtomicU32 = AtomicU32::new(0);
         extern "C" fn count() {
             RUNS.fetch_add(1, Ordering::Relaxed);
@@ -457,6 +470,7 @@ mod tests {
 
     #[test]
     fn a_stopped_app_core_failed_its_requests(p: Peripherals) {
+        hil_test::init_logger!(p);
         const COUNT: usize = 64;
         extern "C" fn nothing() {}
         static REQUESTS: [IpcRequest; COUNT] = [const { IpcRequest::new(nothing) }; COUNT];
@@ -490,6 +504,7 @@ mod tests {
 
     #[test]
     fn a_park_ends_when_an_interrupt_handler_restarts_the_app_core(p: Peripherals) {
+        hil_test::init_logger!(p);
         use core::cell::RefCell;
 
         use esp_hal::{
@@ -568,6 +583,7 @@ mod tests {
 
     #[test]
     fn a_second_start_fails_while_the_app_core_runs(p: Peripherals) {
+        hil_test::init_logger!(p);
         let mut cpu_control = CpuControl::new(p.CPU_CTRL);
         let _guard = cpu_control
             .start_app_core(app_core_stack(), || loop {})

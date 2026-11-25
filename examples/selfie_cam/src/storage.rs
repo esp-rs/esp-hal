@@ -19,7 +19,6 @@ use esp_hal::{
     gpio::{Level, Output, OutputConfig},
     sdmmc::{Config, SdHostController, Slot, SlotConfig},
 };
-use esp_println::println;
 use sdio::{BlockDevice, sd::Card as SdCard};
 use static_cell::StaticCell;
 
@@ -170,10 +169,10 @@ impl Storage {
             State::Unmounted(card) => card,
         };
         if let Err(error) = card.blocks.reacquire(CARD_HZ).await {
-            println!("No SD card: {error:?}");
+            log::info!("No SD card: {error:?}");
             return Err(Error::NoCard);
         }
-        println!(
+        log::info!(
             "SD card at {} MHz: {:?}",
             card.blocks.freq() / 1_000_000,
             card.blocks.card()
@@ -278,18 +277,18 @@ async fn open_volume(mut card: Card) -> Option<Fs> {
         }
         Ok(Scheme::Superfloppy(io)) => StreamSlice::new(io, 0, size).await.ok()?,
         Ok(Scheme::Unknown(_)) => {
-            println!("The SD card has no FAT volume");
+            log::info!("The SD card has no FAT volume");
             return None;
         }
         Err(error) => {
-            println!("Cannot read the SD card: {error:?}");
+            log::info!("Cannot read the SD card: {error:?}");
             return None;
         }
     };
     match FileSystem::new(volume, FsOptions::new()).await {
         Ok(fs) => Some(fs),
         Err(error) => {
-            println!("Cannot open the FAT volume: {error:?}");
+            log::info!("Cannot open the FAT volume: {error:?}");
             None
         }
     }
@@ -320,6 +319,6 @@ fn photo_number(name: &[u8]) -> Option<u32> {
 }
 
 fn io_error(error: impl core::fmt::Debug) -> Error {
-    println!("SD card error: {error:?}");
+    log::info!("SD card error: {error:?}");
     Error::Io
 }

@@ -18,6 +18,7 @@ mod tests {
     /// controller splits the received ACL packets over a chain of mbufs.
     #[test]
     async fn ble_central_receives_l2cap_data(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 

@@ -12,13 +12,14 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
-    let _peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    esp_println::println!("Init!");
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     loop {
-        esp_println::println!("Bing!");
+        log::info!("Bing!");
 
         let now = Instant::now();
         while now.elapsed().as_millis() < 5000 {}

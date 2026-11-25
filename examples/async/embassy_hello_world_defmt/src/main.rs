@@ -10,7 +10,6 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::timer::timg::TimerGroup;
-use esp_println as _;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -25,6 +24,8 @@ async fn run() {
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     defmt::info!("Init!");
 

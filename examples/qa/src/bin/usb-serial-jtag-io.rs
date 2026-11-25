@@ -124,6 +124,7 @@ fn receive<Dm: DriverMode>(rx: &mut UsbSerialJtagRx<'_, Dm>) -> usize {
 #[main]
 fn main() -> ! {
     let mut peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
     let mut checks = Checks::default();
     let delay = Delay::new();
 

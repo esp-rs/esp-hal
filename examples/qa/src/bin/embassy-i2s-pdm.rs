@@ -20,7 +20,6 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -76,7 +75,7 @@ impl TwinklePlayer {
             tone_buf: [0; MAX_TONE_POINT],
             phase: PlayerPhase::Gap { samples_left: 0 },
         };
-        println!(
+        log::info!(
             "Playing {} `twinkle twinkle little star`",
             TONE_NAME[player.tone_select]
         );
@@ -103,7 +102,7 @@ impl TwinklePlayer {
         if self.song_idx >= SONG.len() {
             self.song_idx = 0;
             self.tone_select = (self.tone_select + 1) % 3;
-            println!(
+            log::info!(
                 "Playing {} `twinkle twinkle little star`",
                 TONE_NAME[self.tone_select]
             );
@@ -161,9 +160,10 @@ impl TwinklePlayer {
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    println!("embassy_i2s_pdm: init");
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
+
+    log::info!("embassy_i2s_pdm: init");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -178,7 +178,7 @@ async fn main(_spawner: Spawner) {
     let i2s = match I2s::new_pdm(peripherals.I2S0, dma_channel, pdm_cfg) {
         Ok(i2s) => i2s.into_async(),
         Err(err) => {
-            println!("I2S PDM init failed: {err:?}");
+            log::info!("I2S PDM init failed: {err:?}");
             loop {
                 core::hint::spin_loop();
             }
@@ -192,10 +192,10 @@ async fn main(_spawner: Spawner) {
     let i2s_tx = i2s.i2s_tx.with_dout(dout).build();
     cfg_select! {
         feature = "esp32" => {
-            println!("embassy_i2s_pdm: PDM TX on GPIO4 @ {} Hz", SAMPLE_RATE_HZ);
+            log::info!("embassy_i2s_pdm: PDM TX on GPIO4 @ {} Hz", SAMPLE_RATE_HZ);
         }
         _ => {
-            println!("embassy_i2s_pdm: PDM TX on GPIO3 @ {} Hz", SAMPLE_RATE_HZ);
+            log::info!("embassy_i2s_pdm: PDM TX on GPIO3 @ {} Hz", SAMPLE_RATE_HZ);
         }
     }
 
@@ -206,7 +206,7 @@ async fn main(_spawner: Spawner) {
     let mut transaction = match i2s_tx.write(buffer) {
         Ok(tx) => tx,
         Err((err, _, _)) => {
-            println!("I2S DMA write failed: {err:?}");
+            log::info!("I2S DMA write failed: {err:?}");
             loop {
                 core::hint::spin_loop();
             }

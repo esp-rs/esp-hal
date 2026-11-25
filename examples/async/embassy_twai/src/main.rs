@@ -42,14 +42,14 @@ use esp_hal::{
     timer::timg::TimerGroup,
     twai::{self, EspTwaiFrame, StandardId, TwaiMode, filter::SingleStandardFilter},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
@@ -98,17 +98,17 @@ async fn main(_spawner: Spawner) {
         // Use `new_self_reception` if you want to use self-testing.
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         match twai.transmit_async(&frame).await {
-            Ok(()) => println!("Sent a frame"),
-            Err(e) => println!("Error sending a frame: {e:?}"),
+            Ok(()) => log::info!("Sent a frame"),
+            Err(e) => log::info!("Error sending a frame: {e:?}"),
         }
     }
 
     loop {
         // Wait for a frame to be received.
         match twai.receive_async().await {
-            Ok(frame) => println!("Received a frame: {frame:?}"),
+            Ok(frame) => log::info!("Received a frame: {frame:?}"),
             Err(e) => {
-                println!("Error receiving a frame: {e:?}");
+                log::info!("Error receiving a frame: {e:?}");
                 continue;
             }
         }
@@ -118,8 +118,8 @@ async fn main(_spawner: Spawner) {
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         // Transmit a new frame back to the other ESP
         match twai.transmit_async(&frame).await {
-            Ok(()) => println!("Sent a frame"),
-            Err(e) => println!("Error sending a frame: {e:?}"),
+            Ok(()) => log::info!("Sent a frame"),
+            Err(e) => log::info!("Error sending a frame: {e:?}"),
         }
     }
 }

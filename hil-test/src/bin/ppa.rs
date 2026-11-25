@@ -169,6 +169,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
         static SOURCE: ConstStaticCell<Buffer<SOURCE_BYTES>> =
             ConstStaticCell::new(Buffer([0; SOURCE_BYTES]));

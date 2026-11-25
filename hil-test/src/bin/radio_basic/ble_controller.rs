@@ -29,6 +29,7 @@ mod tests {
     // Compile-time test to check that esp-radio can be reinitialized.
     fn _esp_radio_can_be_reinited() {
         let mut p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
 
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
@@ -56,6 +57,7 @@ mod tests {
 
     #[test]
     fn test_controller_comms(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -105,6 +107,7 @@ mod tests {
     // reset does not generate an exception.
     #[test]
     fn test_dropping_controller_during_reset(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -133,6 +136,7 @@ mod tests {
 
     #[test]
     async fn test_trouble_starts_advertising(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 

@@ -10,6 +10,7 @@ mod tests {
     use portable_atomic::{AtomicU32, Ordering};
 
     fn test_access_at_priority(p: Peripherals, priority: Priority) {
+        hil_test::init_logger!(p);
         static LOCK: RawPriorityLimitedMutex = RawPriorityLimitedMutex::new(Priority::Priority1);
 
         extern "C" fn access() {
@@ -27,6 +28,7 @@ mod tests {
     }
 
     fn software_interrupt_fires_before_returning(p: Peripherals) {
+        hil_test::init_logger!(p);
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         extern "C" fn increment() {
@@ -57,7 +59,8 @@ mod tests {
     }
 
     #[test]
-    fn critical_section_is_reentrant() {
+    fn critical_section_is_reentrant(p: Peripherals) {
+        hil_test::init_logger!(p);
         let mut flag = false;
 
         critical_section::with(|_| {
@@ -70,7 +73,8 @@ mod tests {
     }
 
     #[test]
-    fn non_reentrant_mutex_can_provide_mutable_access() {
+    fn non_reentrant_mutex_can_provide_mutable_access(p: Peripherals) {
+        hil_test::init_logger!(p);
         let flag = NonReentrantMutex::new(false);
 
         flag.with(|f| {
@@ -83,7 +87,8 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn non_reentrant_mutex_is_not_reentrant() {
+    fn non_reentrant_mutex_is_not_reentrant(p: Peripherals) {
+        hil_test::init_logger!(p);
         let flag = NonReentrantMutex::new(false);
 
         flag.with(|_f| {
@@ -95,6 +100,7 @@ mod tests {
 
     #[test]
     fn priority_lock_tests(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         extern "C" fn increment<const INT: u8>() {
@@ -148,6 +154,7 @@ mod tests {
 
     #[test]
     fn max_priority_lock_is_masking_interrupt(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         extern "C" fn increment<const INT: u8>() {
@@ -177,6 +184,7 @@ mod tests {
     #[test]
     #[cfg(all(multi_core, soc_has_cpu_ctrl))]
     fn critical_section_on_multi_core(p: Peripherals) {
+        hil_test::init_logger!(p);
         // TODO: test other locks, too
         use core::{cell::Cell, sync::atomic::AtomicBool};
 
@@ -226,6 +234,7 @@ mod tests {
     #[test]
     #[cfg(all(multi_core, soc_has_cpu_ctrl))]
     fn park_does_not_stop_a_core_in_a_critical_section(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_hal::system::{Cpu, CpuControl, Stack};
         use hil_test::mk_static;
 

@@ -29,7 +29,6 @@ use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
-use esp_println::{print, println};
 use esp_radio::wifi::{Config, ControllerConfig, Interface, WifiController, ap::AccessPointConfig};
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -53,9 +52,10 @@ const GW_IP_ADDR_ENV: Option<&'static str> = option_env!("GATEWAY_IP");
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
@@ -67,14 +67,14 @@ async fn main(spawner: Spawner) -> ! {
         AccessPointConfig::default().with_ssid("esp-radio".try_into().unwrap()),
     );
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
     let device = esp_radio::wifi::Interface::access_point();
     let controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(access_point_config),
     )
     .unwrap();
-    println!("Wifi started!");
+    log::info!("Wifi started!");
 
     let gw_ip_addr_str = GW_IP_ADDR_ENV.unwrap_or("192.168.2.1");
     let gw_ip_addr = Ipv4Addr::from_str(gw_ip_addr_str).expect("failed to parse gateway ip");
@@ -103,31 +103,31 @@ async fn main(spawner: Spawner) -> ! {
     let mut rx_buffer = [0; 1536];
     let mut tx_buffer = [0; 1536];
 
-    println!(
+    log::info!(
         "Connect to the AP `esp-radio` and point your browser to http://{gw_ip_addr_str}:8080/"
     );
-    println!("DHCP is enabled so there's no need to configure a static IP, just in case:");
+    log::info!("DHCP is enabled so there's no need to configure a static IP, just in case:");
 
     stack.wait_config_up().await;
 
     stack
         .config_v4()
-        .inspect(|c| println!("ipv4 config: {c:?}"));
+        .inspect(|c| log::info!("ipv4 config: {c:?}"));
 
     let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
     socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
     loop {
-        println!("Wait for connection...");
+        log::info!("Wait for connection...");
         let r = socket
             .accept(IpListenEndpoint {
                 addr: None,
                 port: 8080,
             })
             .await;
-        println!("Connected...");
+        log::info!("Connected...");
 
         if let Err(e) = r {
-            println!("connect error: {:?}", e);
+            log::info!("connect error: {:?}", e);
             continue;
         }
 
@@ -138,7 +138,7 @@ async fn main(spawner: Spawner) -> ! {
         loop {
             match socket.read(&mut buffer).await {
                 Ok(0) => {
-                    println!("read EOF");
+                    log::info!("read EOF");
                     break;
                 }
                 Ok(len) => {
@@ -146,15 +146,14 @@ async fn main(spawner: Spawner) -> ! {
                         unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
 
                     if to_print.contains("\r\n\r\n") {
-                        print!("{}", to_print);
-                        println!();
+                        log::info!("{}", to_print);
                         break;
                     }
 
                     pos += len;
                 }
                 Err(e) => {
-                    println!("read error: {:?}", e);
+                    log::info!("read error: {:?}", e);
                     break;
                 }
             };
@@ -172,12 +171,12 @@ async fn main(spawner: Spawner) -> ! {
             )
             .await;
         if let Err(e) = r {
-            println!("write error: {:?}", e);
+            log::info!("write error: {:?}", e);
         }
 
         let r = socket.flush().await;
         if let Err(e) = r {
-            println!("flush error: {:?}", e);
+            log::info!("flush error: {:?}", e);
         }
         Timer::after(Duration::from_millis(1000)).await;
 
@@ -230,17 +229,17 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
 
 #[embassy_executor::task]
 async fn connection(controller: WifiController<'static>) {
-    println!("start connection task");
+    log::info!("start connection task");
     loop {
         let ev = controller
             .wait_for_access_point_connected_event_async()
             .await;
         match ev {
             Ok(esp_radio::wifi::ap::EventInfo::Connected(info)) => {
-                println!("Station connected: {:?}", info);
+                log::info!("Station connected: {:?}", info);
             }
             Ok(esp_radio::wifi::ap::EventInfo::Disconnected(info)) => {
-                println!("Station disconnected: {:?}", info);
+                log::info!("Station disconnected: {:?}", info);
             }
             _ => (),
         }

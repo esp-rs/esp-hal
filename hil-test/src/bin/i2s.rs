@@ -32,6 +32,7 @@ macro_rules! i2s_instance_resources {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s: esp_hal::i2s::AnyI2s<'static> = peripherals.$i2s.into();
         let dma_channel = i2s_test_dma_channel!(peripherals, $i2s);
 
@@ -1372,6 +1373,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s = peripherals.I2S0.into();
         let dma_channel: I2sDmaChannel<'static> = peripherals.DMA_I2S0.into();
         run_i2s_parallel_interrupt(i2s, dma_channel);
@@ -1383,6 +1385,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s = peripherals.I2S1.into();
         let dma_channel: I2sDmaChannel<'static> = peripherals.DMA_I2S1.into();
         run_i2s_parallel_interrupt(i2s, dma_channel);
@@ -1424,6 +1427,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s = peripherals.I2S0.into();
         let dma_channel: esp_hal::dma::I2sDmaChannel<'static> = peripherals.DMA_I2S0.into();
         run_driver_does_not_hang_when_async(i2s, dma_channel).await;
@@ -1435,6 +1439,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s = peripherals.I2S1.into();
         let dma_channel: esp_hal::dma::I2sDmaChannel<'static> = peripherals.DMA_I2S1.into();
         run_driver_does_not_hang_when_async(i2s, dma_channel).await;
@@ -1469,6 +1474,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let (_, dout) = hil_test::common_test_pins!(peripherals);
         let (clock_in, clock_out) = unsafe { dout.split() };
         let counter = super::EdgeCounter::new(clock_in);
@@ -1571,6 +1577,7 @@ macro_rules! pdm_instance_resources {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let (clk, dout) = hil_test::common_test_pins!(peripherals);
         (
             peripherals.$i2s,
@@ -1642,6 +1649,7 @@ mod pdm_tx_tests {
     #[cfg(soc_has_i2s0)]
     fn pdm_tx_config_validate_i2s0() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_tx_config_validate(&peripherals.I2S0);
     }
 
@@ -1656,6 +1664,7 @@ mod pdm_tx_tests {
     #[cfg(soc_has_i2s1)]
     fn pdm_tx_config_validate_i2s1() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_tx_config_validate(&peripherals.I2S1);
     }
 
@@ -1670,6 +1679,7 @@ mod pdm_tx_tests {
     #[cfg(soc_has_i2s2)]
     fn pdm_tx_config_validate_i2s2() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_tx_config_validate(&peripherals.I2S2);
     }
 
@@ -1742,6 +1752,7 @@ mod pdm_rx_tests {
     #[cfg(soc_has_i2s0)]
     fn pdm_rx_config_validate_i2s0() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_rx_config_validate(&peripherals.I2S0);
     }
 
@@ -1757,6 +1768,7 @@ mod pdm_rx_tests {
     #[cfg(all(soc_has_i2s1, not(esp32)))]
     fn pdm_rx_config_validate_i2s1() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_rx_config_validate(&peripherals.I2S1);
     }
 
@@ -1771,6 +1783,7 @@ mod pdm_rx_tests {
     #[cfg(soc_has_i2s2)]
     fn pdm_rx_config_validate_i2s2() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_rx_config_validate(&peripherals.I2S2);
     }
 

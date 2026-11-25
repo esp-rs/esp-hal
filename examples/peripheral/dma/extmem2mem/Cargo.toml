@@ -9,54 +9,61 @@ aligned = "0.4.2"
 esp-alloc = { path = "../../../../esp-alloc" }
 esp-backtrace = { path = "../../../../esp-backtrace", features = [
     "panic-handler",
-    "println",
+    "log-04",
 ] }
 esp-bootloader-esp-idf = { path = "../../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../../esp-hal", features = [
     "log-04",
     "unstable",
 ] }
-esp-println = { path = "../../../../esp-println", features = ["log-04"] }
+esp-log = { path = "../../../../esp-log", features = ["log-04"] }
 log = "0.4.27"
 
 [features]
 esp32s3 = [
+    "esp-log/esp32s3",
     "esp-alloc/esp32s3",
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",
 ]
 esp32c5 = [
+    "esp-log/esp32c5",
     "esp-alloc/esp32c5",
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-hal/esp32c5",
 ]
 esp32c61 = [
+    "esp-log/esp32c61",
     "esp-alloc/esp32c61",
     "esp-backtrace/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-hal/esp32c61",
 ]
 esp32h4 = [
+    "esp-log/esp32h4",
     "esp-alloc/esp32h4",
     "esp-backtrace/esp32h4",
     "esp-bootloader-esp-idf/esp32h4",
     "esp-hal/esp32h4",
 ]
 esp32p4 = [
+    "esp-log/esp32p4",
     "esp-alloc/esp32p4",
     "esp-backtrace/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
     "esp-hal/esp32p4",
 ]
 esp32s2 = [
+    "esp-log/esp32s2",
     "esp-alloc/esp32s2",
     "esp-backtrace/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-hal/esp32s2",
 ]
 esp32s31 = [
+    "esp-log/esp32s31",
     "esp-alloc/esp32s31",
     "esp-backtrace/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",

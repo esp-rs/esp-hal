@@ -40,7 +40,6 @@ use esp_hal::{
     sdmmc::{Config, SdHostController, SlotConfig},
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use sdio::{Addressable, BlockDevice, sd::Card};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -78,9 +77,8 @@ const fn pattern_byte(i: usize) -> u8 {
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -135,11 +133,11 @@ async fn main(_spawner: Spawner) {
     let mut card: BlockDevice<Card, _, _, 512> = BlockDevice::new_sd_card(slot, CARD_HZ, Delay)
         .await
         .unwrap();
-    println!("card initialized: {:?}", card.card());
+    log::info!("card initialized: {:?}", card.card());
 
     if FORMAT {
         let blocks = card.card().block_count();
-        println!("Formatting card ({blocks} blocks)");
+        log::info!("Formatting card ({blocks} blocks)");
 
         let mut mbr = [0u8; 512];
         let entry = &mut mbr[446..462];
@@ -168,7 +166,7 @@ async fn main(_spawner: Spawner) {
         part.flush().await.unwrap();
         part.seek(SeekFrom::Start(0)).await.unwrap();
         let fs = FileSystem::new(&mut part, FsOptions::new()).await.unwrap();
-        println!("Formatted: {:?}", fs.fat_type());
+        log::info!("Formatted: {:?}", fs.fat_type());
         fs.unmount().await.unwrap();
     }
 
@@ -180,7 +178,7 @@ async fn main(_spawner: Spawner) {
         },
         InputConfig::default().with_pull(Pull::Up),
     );
-    println!("Press the BOOT button to run the SD card test.");
+    log::info!("Press the BOOT button to run the SD card test.");
 
     loop {
         button.wait_for_falling_edge().await;
@@ -192,17 +190,17 @@ async fn main(_spawner: Spawner) {
                 match fat_idx {
                     Some(idx) => match mbr.open_partition(idx).await {
                         Ok(slice) => fat_crud(slice).await,
-                        Err(e) => println!("open_partition failed: {e:?}"),
+                        Err(e) => log::info!("open_partition failed: {e:?}"),
                     },
-                    None => println!("no FAT partition found"),
+                    None => log::info!("no FAT partition found"),
                 }
             }
             Ok(Scheme::Superfloppy(io)) => fat_crud(io).await,
-            Ok(Scheme::Unknown(_)) => println!("unrecognised volume layout"),
-            Err(e) => println!("partition scan failed: {e:?}"),
+            Ok(Scheme::Unknown(_)) => log::info!("unrecognised volume layout"),
+            Err(e) => log::info!("partition scan failed: {e:?}"),
         }
 
-        println!("Press the BOOT button to re-run.");
+        log::info!("Press the BOOT button to re-run.");
         button.wait_for_high().await;
     }
 }
@@ -246,9 +244,9 @@ impl<IO: Seek> Seek for RamWrites<IO> {
 /// Runs the CRUD cycle and reports the outcome.
 async fn fat_crud<IO: ReadWriteSeek>(io: IO) {
     match fat_crud_inner(io).await {
-        Ok(true) => println!("async FAT CRUD: PASS"),
-        Ok(false) => println!("async FAT CRUD: FAIL (content mismatch)"),
-        Err(e) => println!("async FAT CRUD: FAIL: {e:?}"),
+        Ok(true) => log::info!("async FAT CRUD: PASS"),
+        Ok(false) => log::info!("async FAT CRUD: FAIL (content mismatch)"),
+        Err(e) => log::info!("async FAT CRUD: FAIL: {e:?}"),
     }
 }
 
@@ -261,7 +259,7 @@ async fn fat_crud_inner<IO: ReadWriteSeek>(
     let ok = {
         let root = fs.root_dir();
 
-        println!("Single-block create");
+        log::info!("Single-block create");
         let mut f = root.create_file(TEST_FILE).await?;
         f.truncate().await?;
         f.write_all(MSG_CREATE).await?;
@@ -271,9 +269,9 @@ async fn fat_crud_inner<IO: ReadWriteSeek>(
             MSG_CREATE[i]
         })
         .await?;
-        println!("Single-block create: OK");
+        log::info!("Single-block create: OK");
 
-        println!("Single-block update");
+        log::info!("Single-block update");
         let mut f = root.open_file(TEST_FILE).await?;
         f.truncate().await?;
         f.write_all(MSG_UPDATE).await?;
@@ -283,9 +281,9 @@ async fn fat_crud_inner<IO: ReadWriteSeek>(
             MSG_UPDATE[i]
         })
         .await?;
-        println!("Single-block update: OK");
+        log::info!("Single-block update: OK");
 
-        println!("Multi-block update");
+        log::info!("Multi-block update");
         let mut payload = [0u8; MULTIBLOCK_LEN];
         for (i, b) in payload.iter_mut().enumerate() {
             *b = pattern_byte(i);
@@ -301,9 +299,9 @@ async fn fat_crud_inner<IO: ReadWriteSeek>(
             pattern_byte,
         )
         .await?;
-        println!("Multi-block update: OK");
+        log::info!("Multi-block update: OK");
 
-        println!("Delete file");
+        log::info!("Delete file");
         root.remove(TEST_FILE).await?;
         created_ok && updated_ok && multiblock_ok
     };

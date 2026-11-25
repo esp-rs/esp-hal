@@ -20,7 +20,6 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{interrupt::Priority, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_rtos::embassy::InterruptExecutor;
 use static_cell::StaticCell;
 
@@ -29,10 +28,10 @@ esp_bootloader_esp_idf::esp_app_desc!();
 /// Periodically print something.
 #[embassy_executor::task]
 async fn high_prio() {
-    println!("Starting high_prio()");
+    log::info!("Starting high_prio()");
     let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
-        println!("High priority ticks");
+        log::info!("High priority ticks");
         ticker.next().await;
     }
 }
@@ -40,12 +39,12 @@ async fn high_prio() {
 /// Simulates some blocking (badly behaving) task.
 #[embassy_executor::task]
 async fn low_prio_blocking() {
-    println!("Starting low-priority task that isn't actually async");
+    log::info!("Starting low-priority task that isn't actually async");
     loop {
-        println!("Doing some long and complicated calculation");
+        log::info!("Doing some long and complicated calculation");
         let start = Instant::now();
         while start.elapsed() < Duration::from_secs(5) {}
-        println!("Calculation finished");
+        log::info!("Calculation finished");
         Timer::after(Duration::from_secs(5)).await;
     }
 }
@@ -53,22 +52,23 @@ async fn low_prio_blocking() {
 /// A well-behaved, but starved async task.
 #[embassy_executor::task]
 async fn low_prio_async() {
-    println!(
+    log::info!(
         "Starting low-priority task that will not be able to run while the blocking task is running"
     );
     let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
-        println!("Low priority ticks");
+        log::info!("Low priority ticks");
         ticker.next().await;
     }
 }
 
 #[esp_hal::main]
 async fn main(low_prio_spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
-    println!("Init!");
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
@@ -80,7 +80,7 @@ async fn main(low_prio_spawner: Spawner) {
     let spawner = executor.start(Priority::Priority3);
     spawner.spawn(high_prio().unwrap());
 
-    println!("Spawning low-priority tasks");
+    log::info!("Spawning low-priority tasks");
     low_prio_spawner.spawn(low_prio_async().unwrap());
     low_prio_spawner.spawn(low_prio_blocking().unwrap());
 }

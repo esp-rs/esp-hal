@@ -16,6 +16,7 @@ mod tests {
     #[cfg(feature = "esp-radio-unstable")]
     #[test]
     async fn wifi_starts_with_trng_enabled(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -29,6 +30,7 @@ mod tests {
     #[test]
     #[timeout(15)]
     async fn test_scan_doesnt_leak(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 

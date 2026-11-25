@@ -25,7 +25,6 @@
 //! switches PSRAM to a low speed during idle, each active case writes a pattern to all of PSRAM
 //! before the hold, and checks the pattern after the hold.
 
-//% FEATURES: esp-println/uart
 //% CHIP_FILTER: sleep_driver_supported && sleep_deep_sleep
 
 #![no_std]
@@ -47,7 +46,6 @@ use esp_hal::{
     time::{Duration, Instant},
     timer::{PeriodicTimer, timg::TimerGroup},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -88,7 +86,7 @@ fn check_psram(label: &str, words: &[u32], invert: u32) {
         }
     }
     match first {
-        None => println!("PSRAM {label}: ok"),
+        None => log::info!("PSRAM {label}: ok"),
         Some(first) => panic!("PSRAM {label}: {bad} bad words, first at {first}"),
     }
 }
@@ -283,7 +281,7 @@ fn print_case(index: usize, case: Case) {
             waiti,
             freq_lock,
         } => {
-            println!(
+            log::info!(
                 "=== [{}/{}] active CPU={} cores={} idle={}{} ({} s) ===",
                 index + 1,
                 CASES.len(),
@@ -303,7 +301,7 @@ fn print_case(index: usize, case: Case) {
             cpu_pd,
             tagmem,
         } => {
-            println!(
+            log::info!(
                 "=== [{}/{}] light sleep cores={} cpu_pd={} tagmem={} ({} s) ===",
                 index + 1,
                 CASES.len(),
@@ -314,7 +312,7 @@ fn print_case(index: usize, case: Case) {
             );
         }
         Case::DeepSleep => {
-            println!(
+            log::info!(
                 "=== [{}/{}] deep sleep ({} s) ===",
                 index + 1,
                 CASES.len(),
@@ -382,7 +380,7 @@ fn check_handler_clock() {
         min_mhz >= full_mhz * 9 / 10,
         "handler CPU clock {min_mhz} MHz of {full_mhz} MHz"
     );
-    println!("lowest handler CPU clock: {min_mhz} MHz of {full_mhz} MHz");
+    log::info!("lowest handler CPU clock: {min_mhz} MHz of {full_mhz} MHz");
 }
 
 #[cfg(multi_core)]
@@ -447,6 +445,7 @@ fn main() -> ! {
         hal_config = hal_config.with_cpu_clock(CpuClock::max());
     }
     let peripherals = esp_hal::init(hal_config);
+    esp_log::init_uart!(peripherals);
 
     #[cfg(psram_driver_supported)]
     let psram_words: &mut [u32] = {
@@ -502,7 +501,7 @@ fn main() -> ! {
     #[cfg(supports_tagmem_power_down)]
     let mut tagmem_installed = false;
 
-    println!(
+    log::info!(
         "sleep_current: reset={:?} wake={:?} CPU={:?} phase={}/{}",
         reset_reason(Cpu::ProCpu),
         wakeup_cause(),
@@ -524,7 +523,7 @@ fn main() -> ! {
         if let Some(wants_max) = case_wants_max_clock(CASES[phase])
             && wants_max != max_clock
         {
-            println!(
+            log::info!(
                 "reset to {} CPU clock",
                 if wants_max { "max" } else { "default" }
             );
@@ -589,7 +588,7 @@ fn main() -> ! {
                     lpwr.install_cpu_retention_memory(CPU_RETENTION_MEMORY.take())
                         .unwrap();
                     cpu_pd_installed = true;
-                    println!("installed CPU retention memory");
+                    log::info!("installed CPU retention memory");
                 }
                 #[cfg(not(supports_cpu_power_down))]
                 let _ = cpu_pd;
@@ -599,7 +598,7 @@ fn main() -> ! {
                     lpwr.install_cache_tag_retention_memory(CACHE_TAGMEM.take())
                         .unwrap();
                     tagmem_installed = true;
-                    println!("installed cache tag retention memory");
+                    log::info!("installed cache tag retention memory");
                 }
                 #[cfg(not(supports_tagmem_power_down))]
                 let _ = tagmem;
@@ -610,7 +609,7 @@ fn main() -> ! {
                 delay.delay_millis(100);
                 lpwr.set_wakeup_deadline(Instant::now() + HOLD);
                 lpwr.sleep_light(RtcSleepConfig::default());
-                println!("woke from light sleep, cause={:?}", wakeup_cause());
+                log::info!("woke from light sleep, cause={:?}", wakeup_cause());
 
                 #[cfg(psram_driver_supported)]
                 if !psram_words.is_empty() {

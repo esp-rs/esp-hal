@@ -25,7 +25,6 @@ use esp_hal::{
     rtc_cntl::Rtc,
     touch::{Continuous, Touch, TouchConfig, TouchPad},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -39,7 +38,7 @@ fn interrupt_handler() {
         let mut touch1 = TOUCH1.borrow_ref_mut(cs);
         let touch1 = touch1.as_mut().unwrap();
         if touch1.is_interrupt_set() {
-            println!("touch 1 pin interrupt");
+            log::info!("touch 1 pin interrupt");
             touch1.clear_interrupt();
             // We disable the interrupt until the next loop iteration to avoid massive
             // retriggering.
@@ -50,8 +49,9 @@ fn interrupt_handler() {
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let mut rtc = Rtc::new(peripherals.RTC_TIMER);
     rtc.set_interrupt_handler(interrupt_handler);
@@ -80,7 +80,7 @@ fn main() -> ! {
 
     loop {
         let touch_reading = touch0.read();
-        println!("touch pad measurement: {touch_reading:?}");
+        log::info!("touch pad measurement: {touch_reading:?}");
         delay.delay_millis(500);
 
         critical_section::with(|cs| {

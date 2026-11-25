@@ -137,7 +137,7 @@ path = "{{ template_repo }}/esp-hal"
 #%endif
 features = [
     "{{ chip.name }}",
-    #%if option("unstable-hal")
+    #%if option("unstable-hal") || (!option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace")))
     "unstable",
     #%endif
     #%if option("defmt")
@@ -165,10 +165,12 @@ features = [
     #%endif
 ]
 
-#%if !option("probe-rs") && (group_selected("log-frontend") || group_selected("panic-handler"))
-[dependencies.esp-println]
+#%if !option("probe-rs") && (group_selected("log-frontend") || option("esp-backtrace"))
+# The logger macros use the unstable UART and USB-Serial-JTAG drivers of esp-hal, so esp-hal enables
+# `unstable` above.
+[dependencies.esp-log]
 #%if template_origin == "repository"
-path = "{{ template_repo }}/esp-println"
+path = "{{ template_repo }}/esp-log"
 #%else
 #+git = "{{ template_url }}"
 #+rev = "{{ template_commit }}"
@@ -176,13 +178,12 @@ path = "{{ template_repo }}/esp-println"
 features = [
     "{{ chip.name }}",
     #%if option("defmt")
-    #+    "defmt-espflash",
-    #%endif
-    #%if option("log")
+    #+    "defmt",
+    #%else
     "log-04",
     #%endif
 ]
-#%endif esp-println
+#%endif esp-log
 
 #%if option("esp-backtrace")
 [dependencies.esp-backtrace]
@@ -198,7 +199,7 @@ features = [
     #%if option("defmt")
     #+    "defmt",
     #%else
-    "println",
+    "log-04",
     #%endif
 ]
 #%endif esp-backtrace
