@@ -11,11 +11,21 @@
 
 #[embedded_test::tests(default_timeout = 2)]
 mod tests {
-    use esp_hal::{peripherals::Peripherals, usb::usb_serial_jtag::Config};
+    use esp_hal::{
+        DriverMode,
+        peripherals::Peripherals,
+        usb::usb_serial_jtag::{Config, UsbSerialJtag},
+    };
     use hil_test as _;
 
     struct Context {
         p: Peripherals,
+    }
+
+    // Other programs on the runner can leave bytes in the input FIFO. A chip reset does not clear
+    // the input FIFO.
+    fn drain_input_fifo<Dm: DriverMode>(usb_serial: &mut UsbSerialJtag<'_, Dm>) {
+        while usb_serial.read_buffered(&mut [0; 64]) != Ok(0) {}
     }
 
     #[init]
@@ -48,10 +58,7 @@ mod tests {
     #[test]
     fn usb_serial_jtag_reports_room_and_no_data(ctx: Context) {
         let mut usb_serial = hil_test::usb_serial_jtag!(ctx.p, Config::default()).unwrap();
-
-        // Other programs on the runner can leave bytes in the input FIFO. A chip reset does not
-        // clear the input FIFO.
-        while usb_serial.read_buffered(&mut [0; 64]) != Ok(0) {}
+        drain_input_fifo(&mut usb_serial);
 
         assert!(usb_serial.write_ready());
         assert!(!usb_serial.read_ready());
@@ -131,6 +138,7 @@ mod tests {
         let mut usb_serial = hil_test::usb_serial_jtag!(ctx.p, Config::default())
             .unwrap()
             .into_async();
+        drain_input_fifo(&mut usb_serial);
 
         assert_eq!(usb_serial.write(&[]), Ok(0));
         assert_eq!(usb_serial.read(&mut []), Ok(0));
@@ -243,10 +251,7 @@ mod tests {
         let config = Config::default().with_rx(RxConfig::default().with_timeout(timeout));
         let mut usb_serial = hil_test::usb_serial_jtag!(ctx.p, config).unwrap();
         let mut buf = [0u8; 8];
-
-        // Other programs on the runner can leave bytes in the input FIFO. A chip reset does not
-        // clear the input FIFO.
-        while usb_serial.read_buffered(&mut [0; 64]) != Ok(0) {}
+        drain_input_fifo(&mut usb_serial);
 
         let start = Instant::now();
         assert_eq!(usb_serial.read(&mut buf), Err(RxError::Timeout));

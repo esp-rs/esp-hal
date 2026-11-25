@@ -1008,20 +1008,27 @@ mod tests {
         // The counter resets at the limit. Poll faster than 30000 edges.
         const LIMIT: i16 = 30000;
         counter.unit.set_high_limit(Some(LIMIT)).unwrap();
-        counter.unit.clear();
 
-        let mut edges = 0u64;
-        let mut last = 0i16;
-        let start = Instant::now();
-        loop {
-            let value = counter.unit.value();
-            let elapsed = start.elapsed();
-            edges += (value as i32 - last as i32).rem_euclid(LIMIT as i32) as u64;
-            last = value;
-            if elapsed >= Duration::from_millis(20) {
-                return edges * 1_000_000 / elapsed.as_micros();
+        // The first window runs code that is not in the cache yet. A stall between reading the
+        // counter and reading the time counts edges outside the timed window, so only the second
+        // window counts.
+        let mut hz = 0;
+        for _ in 0..2 {
+            let mut edges = 0u64;
+            let mut last = counter.unit.value();
+            let start = Instant::now();
+            loop {
+                let value = counter.unit.value();
+                let elapsed = start.elapsed();
+                edges += (value as i32 - last as i32).rem_euclid(LIMIT as i32) as u64;
+                last = value;
+                if elapsed >= Duration::from_millis(20) {
+                    hz = edges * 1_000_000 / elapsed.as_micros();
+                    break;
+                }
             }
         }
+        hz
     }
 
     /// Configures each sample rate in sequence and checks that MCLK is 256 times the rate.
