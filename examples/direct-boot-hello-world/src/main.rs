@@ -5,9 +5,10 @@
 //!
 //! After a few seconds the chip enters deep sleep and wakes up again, so every other boot is a
 //! deep-sleep wakeup. Initialized RTC fast memory statics are loaded from flash after any other
-//! reset, and keep their values over deep sleep.
+//! reset, and keep their values over deep sleep. esp-hal has no sleep support for the ESP32-H21
+//! yet, so that chip stays awake.
 
-//% CHIP_FILTER: !esp32 && !esp32s2 && !esp32h21
+//% CHIP_FILTER: !esp32 && !esp32s2
 
 #![no_std]
 #![no_main]
@@ -18,17 +19,15 @@ use core::{
 };
 
 use esp_backtrace as _;
+#[cfg(not(feature = "esp32h21"))]
+use esp_hal::rtc_cntl::sleep::{LowPower, RtcSleepConfig};
 use esp_hal::{
     handler,
     interrupt::software::SoftwareInterrupt,
     main,
     peripherals::FROM_CPU_INTR2,
     ram,
-    rtc_cntl::{
-        SocResetReason,
-        reset_reason,
-        sleep::{LowPower, RtcSleepConfig},
-    },
+    rtc_cntl::{SocResetReason, reset_reason},
     system::Cpu,
     time::{Duration, Instant},
 };
@@ -131,11 +130,19 @@ fn main() -> ! {
         while now.elapsed() < Duration::from_millis(5000) {}
     }
 
-    println!("Entering deep sleep for 5 seconds");
-    let mut lpwr = LowPower::new(peripherals.LPWR);
-    lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(5));
-    // Let the UART finish the message.
-    let now = Instant::now();
-    while now.elapsed() < Duration::from_millis(100) {}
-    lpwr.sleep_deep(RtcSleepConfig::deep());
+    #[cfg(feature = "esp32h21")]
+    loop {
+        core::hint::spin_loop();
+    }
+
+    #[cfg(not(feature = "esp32h21"))]
+    {
+        println!("Entering deep sleep for 5 seconds");
+        let mut lpwr = LowPower::new(peripherals.LPWR);
+        lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(5));
+        // Let the UART finish the message.
+        let now = Instant::now();
+        while now.elapsed() < Duration::from_millis(100) {}
+        lpwr.sleep_deep(RtcSleepConfig::deep());
+    }
 }

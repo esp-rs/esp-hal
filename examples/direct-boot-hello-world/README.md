@@ -5,6 +5,7 @@ table or an app image header. It uses `esp-bootloader-direct-boot` instead of
 `esp-bootloader-esp-idf`, and checks what direct boot is responsible for: `.data` copied from
 flash, `.bss` zeroed, `#[ram]` code running, and interrupts handled. It then enters deep sleep for
 5 seconds, to check that initialized RTC fast memory statics keep their values over deep sleep.
+esp-hal has no sleep support for the ESP32-H21 yet, so that chip stays awake after the checks.
 
 Direct boot works on every chip except the ESP32 and the ESP32-S2.
 
@@ -28,12 +29,12 @@ cargo xtask build direct-boot-hello-world esp32c6
 
 The ELF file ends up in `target/<target>/release/direct-boot-hello-world`:
 
-| Chip                                    | `<target>`                      |
-| --------------------------------------- | ------------------------------- |
-| ESP32-C2, ESP32-C3                      | `riscv32imc-unknown-none-elf`   |
-| ESP32-C5, ESP32-C6, ESP32-C61, ESP32-H2 | `riscv32imac-unknown-none-elf`  |
-| ESP32-H4, ESP32-P4, ESP32-S31           | `riscv32imafc-unknown-none-elf` |
-| ESP32-S3                                | `xtensa-esp32s3-none-elf`       |
+| Chip                                               | `<target>`                      |
+| -------------------------------------------------- | ------------------------------- |
+| ESP32-C2, ESP32-C3                                 | `riscv32imc-unknown-none-elf`   |
+| ESP32-C5, ESP32-C6, ESP32-C61, ESP32-H2, ESP32-H21 | `riscv32imac-unknown-none-elf`  |
+| ESP32-H4, ESP32-P4, ESP32-S31                      | `riscv32imafc-unknown-none-elf` |
+| ESP32-S3                                           | `xtensa-esp32s3-none-elf`       |
 
 ## Create the flash image
 

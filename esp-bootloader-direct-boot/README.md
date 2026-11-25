@@ -23,6 +23,7 @@ links with `-Tlinkall.x` and invokes `esp_bootloader_direct_boot::direct_boot!()
 | ESP32-C61 | `0x0`        |
 | ESP32-H2  | `0x0`        |
 | ESP32-H4  | `0x0`        |
+| ESP32-H21 | `0x0`        |
 | ESP32-P4  | `0x0`        |
 | ESP32-S3  | `0x400`      |
 | ESP32-S31 | `0x0`        |
@@ -57,7 +58,7 @@ instead of `0x0`.
   partition table can't get in the way.
 - The image must fit into the flash the linker scripts map: 4 MB on the ESP32-C2 and ESP32-S3 (the
   ESP32-S3 ROM maps no more for direct boot), 8 MB on the ESP32-C3, 16 MB on the ESP32-C5, -C6,
-  -C61, -H2 and -H4, and 64 MB on the ESP32-P4 and ESP32-S31.
+  -C61, -H2, -H4 and -H21, and 64 MB on the ESP32-P4 and ESP32-S31.
 - On the ESP32-P4, `ESP_HAL_CONFIG_L2_CACHE_SIZE` must not be `0KB`.
 
 ## Minimum Supported Rust Version (MSRV)

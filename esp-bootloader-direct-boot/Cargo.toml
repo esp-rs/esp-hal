@@ -56,6 +56,8 @@ esp32h2  = ["esp-hal/esp32h2", "esp-rom-sys/esp32h2"]
 ##
 esp32h4  = ["esp-hal/esp32h4", "esp-rom-sys/esp32h4"]
 ##
+esp32h21 = ["esp-hal/esp32h21", "esp-rom-sys/esp32h21"]
+##
 esp32p4  = ["esp-hal/esp32p4", "esp-rom-sys/esp32p4"]
 ##
 esp32s3  = ["esp-hal/esp32s3", "esp-rom-sys/esp32s3"]

@@ -49,6 +49,11 @@ esp32h4 = [
     "esp-bootloader-direct-boot/esp32h4",
     "esp-hal/esp32h4",
 ]
+esp32h21 = [
+    "esp-backtrace/esp32h21",
+    "esp-bootloader-direct-boot/esp32h21",
+    "esp-hal/esp32h21",
+]
 esp32p4 = [
     "esp-backtrace/esp32p4",
     "esp-bootloader-direct-boot/esp32p4",
