@@ -7,18 +7,25 @@ use crate::{
 
 /// Detect PSRAM size by reading mode register MR2 via MSPI1.
 pub(super) fn psram_detect_size(speed_params: &PsramTimingParams) -> usize {
+    try_psram_detect_size(speed_params).unwrap_or_else(|mr2| {
+        // unknown -> EV Board default
+        warn!("Unknown PSRAM size: mr2={:#x}", mr2);
+        32 * 1024 * 1024
+    })
+}
+
+/// Reads the PSRAM size from mode register MR2 via MSPI1.
+///
+/// Returns `Err` with MR2 when its density field is not one of the known sizes.
+pub(super) fn try_psram_detect_size(speed_params: &PsramTimingParams) -> Result<usize, u8> {
     let (mr2, _mr3) = psram_mr_read(speed_params, MR_ADDR_MR2_MR3);
     match mr2 & 0x7 {
-        0x1 => 4 * 1024 * 1024,  //  32 Mbit
-        0x3 => 8 * 1024 * 1024,  //  64 Mbit
-        0x5 => 16 * 1024 * 1024, // 128 Mbit
-        0x6 => 64 * 1024 * 1024, // 512 Mbit
-        0x7 => 32 * 1024 * 1024, // 256 Mbit
-        _ => {
-            // unknown -> EV Board default
-            warn!("Unknown PSRAM size: mr2={:#x}", mr2);
-            32 * 1024 * 1024
-        }
+        0x1 => Ok(4 * 1024 * 1024),  //  32 Mbit
+        0x3 => Ok(8 * 1024 * 1024),  //  64 Mbit
+        0x5 => Ok(16 * 1024 * 1024), // 128 Mbit
+        0x6 => Ok(64 * 1024 * 1024), // 512 Mbit
+        0x7 => Ok(32 * 1024 * 1024), // 256 Mbit
+        _ => Err(mr2),
     }
 }
 
@@ -133,11 +140,22 @@ pub(super) fn configure_psram_mspi(timing: &PsramTimingParams, is_hex: bool) {
 /// Sets bus-clock divider for both PSRAM_MSPI0 and PSRAM_MSPI1.
 pub(super) fn set_bus_clock(clock: u32) -> bool {
     let source_mhz = PsramInstance::Psram.function_clock_frequency() / 1_000_000;
-    if !source_mhz.is_multiple_of(clock) {
+    let set = set_bus_clock_from(source_mhz, clock);
+    if !set {
         error!(
             "PSRAM source clock frequency must be an integer multiple of PSRAM frequency. Source={} MHz, PSRAM={} MHz",
             source_mhz, clock
         );
+    }
+    set
+}
+
+/// Sets the bus-clock divider for both PSRAM_MSPI0 and PSRAM_MSPI1, from a source clock of
+/// `source_mhz`.
+///
+/// Returns `false` when `clock` does not divide `source_mhz`.
+pub(super) fn set_bus_clock_from(source_mhz: u32, clock: u32) -> bool {
+    if !source_mhz.is_multiple_of(clock) {
         return false;
     }
 
@@ -434,8 +452,8 @@ unsafe extern "C" {
 /// bounded for completion. Replacement for ROM `esp_rom_spi_cmd_start`,
 /// which polls forever; a hang there gives no diagnostic, while the
 /// bounded variant surfaces a real failure as a returned error. After
-/// the bit clears, copies MISO bytes from W0..W{N} into `rx_buf`.
-fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
+/// the bit clears, returns W0, which holds the first four MISO bytes.
+fn mspi1_kick_and_collect() -> Result<u32, ()> {
     const SPI_USR_TRIGGER: u32 = 1 << 18;
     const MAX_ITERS: u32 = 1_000_000;
 
@@ -459,22 +477,7 @@ fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
         core::hint::spin_loop();
     }
 
-    // Copy MISO bytes from W0..W{N}.
-    if !rx.is_empty() {
-        let n_bytes = rx.len();
-        let n_words = n_bytes.div_ceil(4);
-        for i in 0..n_words {
-            let word = MEMSPI3::regs().w(i).read().bits();
-            for b in 0..4 {
-                let off = i * 4 + b;
-                if off >= n_bytes {
-                    break;
-                }
-                rx[off] = ((word >> (b * 8)) & 0xFF) as u8;
-            }
-        }
-    }
-    Ok(())
+    Ok(MEMSPI3::regs().w(0).read().bits())
 }
 
 /// Issue an AP OCT PSRAM register-read command (0x4040, 16-bit cmd,
@@ -488,7 +491,7 @@ fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
     const DATA_BITLEN: u32 = 16;
 
     let mut addr_local = addr;
-    let mut rx: [u8; 2] = [0; 2];
+    let mut rx: u32 = 0;
     let mut conf = EspRomSpiCmd {
         cmd: REG_READ_CMD,
         cmd_bit_len: CMD_BITLEN,
@@ -496,7 +499,7 @@ fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
         addr_bit_len: ADDR_BITLEN,
         tx_data: core::ptr::null_mut(),
         tx_data_bit_len: 0,
-        rx_data: rx.as_mut_ptr().cast::<u32>(),
+        rx_data: &raw mut rx,
         rx_data_bit_len: DATA_BITLEN,
         dummy_bit_len: timing.reg_dummy_bits,
     };
@@ -505,8 +508,8 @@ fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
         esp_rom_spi_set_op_mode(ROM_SPI_PSRAM_CMD_NUM, ESP_ROM_SPIFLASH_OPI_DTR_MODE);
         esp_rom_spi_cmd_config(ROM_SPI_PSRAM_CMD_NUM, &raw mut conf);
     }
-    let _ = mspi1_kick_and_collect(&mut rx);
-    u16::from_le_bytes(rx)
+    // A timeout reads as 0.
+    mspi1_kick_and_collect().unwrap_or(0) as u16
 }
 
 /// Issue an AP OCT PSRAM register-write command (0xC0C0) with 16-bit
@@ -536,6 +539,5 @@ fn mspi1_reg_write16(addr: u32, data: u16) {
         esp_rom_spi_set_op_mode(ROM_SPI_PSRAM_CMD_NUM, ESP_ROM_SPIFLASH_OPI_DTR_MODE);
         esp_rom_spi_cmd_config(ROM_SPI_PSRAM_CMD_NUM, &raw mut conf);
     }
-    let mut empty: [u8; 0] = [];
-    let _ = mspi1_kick_and_collect(&mut empty);
+    let _ = mspi1_kick_and_collect();
 }
