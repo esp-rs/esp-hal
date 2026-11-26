@@ -20,7 +20,7 @@ system_clocks = { clock_tree = [
     # Virtual clock node for peripherals that can be sourced from BBPLL but have a 160MHz max constraint.
     { name = "BBPLL_D3_CLOCK", type = "generic", output = "BBPLL_CLK / 3" },
 
-    # Their dividers follow the MPLL rate, see enable_mpll_clk_impl.
+    # Their dividers follow the MPLL rate, see set_mpll_dividers.
     { name = "PLL_F25M", type = "derived", from = "MPLL_CLK", output = "25_000_000" },
     { name = "PLL_F50M", type = "derived", from = "MPLL_CLK", output = "50_000_000" },
 

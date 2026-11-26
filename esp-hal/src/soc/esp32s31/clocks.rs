@@ -15,7 +15,8 @@ use crate::{
 
 /// The crystal frequency in MHz. The S31 supports only a 40 MHz crystal (`SOC_XTAL_SUPPORT_40M`).
 ///
-/// Light sleep uses this constant, because `xtal_clk_frequency` does not run from RAM.
+/// For code that cannot call `xtal_clk_frequency`, which is in `.text`: code that runs with the
+/// caches suspended.
 pub(crate) const XTAL_MHZ: u32 = 40;
 
 define_clock_tree_types!();
@@ -272,23 +273,39 @@ pub(crate) fn recalibrate_cpll(clocks: &ClockTree) {
 
 // MPLL_CLK
 
+/// Keeps PLL_F25M and PLL_F50M at 25 and 50 MHz from an MPLL at `mpll_mhz`, and makes the MPLL
+/// their source.
+#[inline(always)]
+fn set_mpll_dividers(mpll_mhz: u32) {
+    HP_SYS_CLKRST::regs().ref_25m_ctrl0().modify(|_, w| unsafe {
+        w.clk_div_num()
+            .bits((mpll_mhz / 25).saturating_sub(1) as u8)
+    });
+    HP_SYS_CLKRST::regs().ref_50m_ctrl0().modify(|_, w| unsafe {
+        w.clk_div_num()
+            .bits((mpll_mhz / 50).saturating_sub(1) as u8)
+    });
+    HP_SYS_CLKRST::regs()
+        .ref_500m_ctrl0()
+        .modify(|_, w| w.sel().set_bit());
+}
+
+/// Moves the running MPLL to `mpll_mhz`, and keeps PLL_F25M and PLL_F50M at 25 and 50 MHz.
+///
+/// The PSRAM retime calls this function with the caches suspended, so the function is inlined.
+#[inline(always)]
+pub(crate) fn set_mpll_rate(mpll_mhz: u32) {
+    set_mpll_dividers(mpll_mhz);
+    set_mpll_power(false);
+    set_mpll_power(true);
+    set_mpll_frequency(mpll_mhz);
+}
+
 fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
     let mpll_mhz = en.then(|| unwrap!(clocks.mpll_clk).value() / 1_000_000);
     if let Some(mpll_mhz) = mpll_mhz {
         psram_phy_ldo_init();
-
-        // Keep PLL_F25M and PLL_F50M at 25 and 50 MHz.
-        HP_SYS_CLKRST::regs()
-            .ref_25m_ctrl0()
-            .modify(|_, w| unsafe { w.clk_div_num().bits((mpll_mhz / 25 - 1) as u8) });
-        HP_SYS_CLKRST::regs()
-            .ref_50m_ctrl0()
-            .modify(|_, w| unsafe { w.clk_div_num().bits((mpll_mhz / 50 - 1) as u8) });
-
-        // Clock source of 25/50MHz dividers.
-        HP_SYS_CLKRST::regs()
-            .ref_500m_ctrl0()
-            .modify(|_, w| w.sel().set_bit()); // MPLL
+        set_mpll_dividers(mpll_mhz);
     }
 
     set_mpll_power(en);
@@ -379,12 +396,34 @@ pub(crate) fn requested_mpll_mhz(clocks: &ClockTree) -> Option<u32> {
     (clocks.mpll_clk_refcount > 0).then(|| unwrap!(clocks.mpll_clk).value() / 1_000_000)
 }
 
+/// Returns whether PSRAM runs from the MPLL.
+fn psram_on_mpll(clocks: &ClockTree) -> bool {
+    clocks.psram_function_clock_refcount[PsramInstance::Psram as usize] > 0
+        && clocks.psram_function_clock[PsramInstance::Psram as usize]
+            == Some(PsramFunctionClockConfig::Mpll)
+}
+
+/// Changes the rate of a running MPLL. PSRAM on the MPLL moves to the timing for the new rate.
+///
+/// PLL_F25M and PLL_F50M follow the rate, and stop while the MPLL restarts. Ethernet and SDMMC set
+/// fixed dividers from the MPLL rate and do not follow a later change.
 fn configure_mpll_clk_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<MpllClkConfig>,
-    _new_config: MpllClkConfig,
+    clocks: &mut ClockTree,
+    old_config: Option<MpllClkConfig>,
+    new_config: MpllClkConfig,
 ) {
-    // Configuration applied in enable_mpll_clk_impl
+    // A stopped MPLL takes its rate in enable_mpll_clk_impl.
+    let Some(old_config) = old_config else {
+        return;
+    };
+    if clocks.mpll_clk_refcount == 0 || old_config == new_config {
+        return;
+    }
+    if psram_on_mpll(clocks) {
+        crate::psram::implem::follow_mpll_rate(new_config);
+    } else {
+        set_mpll_rate(new_config.value() / 1_000_000);
+    }
 }
 
 /// Programs the PMU external LDO regulators for the MSPI PHY.

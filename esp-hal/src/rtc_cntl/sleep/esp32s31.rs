@@ -2,8 +2,8 @@
 use core::ops::Not;
 
 use crate::{
-    peripherals::{HP_ALIVE_SYS, HP_SYS_CLKRST, IOMUX_MSPI_PIN, LP_SYS as LP_AON, MEMSPI2, PMU},
-    psram::psram_range,
+    peripherals::{HP_ALIVE_SYS, HP_SYS_CLKRST, IOMUX_MSPI_PIN, LP_SYS as LP_AON, PMU},
+    psram::{self, psram_range},
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
@@ -883,9 +883,7 @@ fn disable_bbpll() {
 pub(crate) fn pmu_sleep_start(saved: &SavedState) -> bool {
     let psram = !psram_range().is_empty();
     if psram {
-        // Bits 26–31 are the six FIFO-empty bits.
-        const ALL_TRANSACTION_DONE: u32 = 0xfc00_0000;
-        while MEMSPI2::regs().smem_axi_addr_ctrl().read().bits() != ALL_TRANSACTION_DONE {}
+        psram::implem::wait_for_idle();
         hold_psram_pins(true);
     }
 
