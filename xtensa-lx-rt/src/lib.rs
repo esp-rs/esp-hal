@@ -75,7 +75,9 @@ global_asm!(
     main = sym main,
 );
 
-global_asm!(
+// `Reset` must be a single item: rustc does not emit separate `global_asm!` items in source
+// order.
+cfg_global_asm!(
     "
     // _xtensa_lx_rt_zero_fill
     //
@@ -159,18 +161,9 @@ Reset:
 
 .Linit_data_done:
     memw    // Make sure all writes are completed before proceeding. At this point, all static variables have been initialized.
-"
-);
-
-// According to 4.4.7.2 of the xtensa isa, ccount and compare are undefined on
-// reset, set all values to zero to disable. ("timer interrupts are cleared by writing CCOMPARE[i]")
-#[cfg(any(
-    XCHAL_HAVE_TIMER0,
-    XCHAL_HAVE_TIMER1,
-    XCHAL_HAVE_TIMER2,
-    XCHAL_HAVE_TIMER3
-))]
-cfg_global_asm!(
+",
+    // According to 4.4.7.2 of the xtensa isa, ccount and compare are undefined on
+    // reset, set all values to zero to disable. ("timer interrupts are cleared by writing CCOMPARE[i]")
     #[cfg(XCHAL_HAVE_TIMER0)]
     "wsr.ccompare0 a0",
     #[cfg(XCHAL_HAVE_TIMER1)]
@@ -179,10 +172,13 @@ cfg_global_asm!(
     "wsr.ccompare2 a0",
     #[cfg(XCHAL_HAVE_TIMER3)]
     "wsr.ccompare3 a0",
+    #[cfg(any(
+        XCHAL_HAVE_TIMER0,
+        XCHAL_HAVE_TIMER1,
+        XCHAL_HAVE_TIMER2,
+        XCHAL_HAVE_TIMER3
+    ))]
     "isync",
-);
-
-global_asm!(
     "
     l32r   a2, sym_init_start // vector table address
     wsr.vecbase a2
