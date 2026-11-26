@@ -63,6 +63,7 @@ A bootloader support crate provides `linkall.x`, which must:
   `_rtc_fast_persistent_*`, `_rtc_slow_bss_*` / `_rtc_slow_persistent_*` (chips with RTC slow
   memory) and `_uncached_*` (ESP32-P4).
 - Place the input sections esp-hal and the runtime crates emit, including `.trap*`, `.rwtext*`,
+  `.hal_main` (RISC-V, after `.init` and `.init.rust`),
   `.rtc_fast.*` / `.rtc_slow.*`, `.dram2_uninit*`, `.uncached.*` and `.espressif.metadata`.
 - Respect the memory protection esp-hal sets up from these symbols (below).
 

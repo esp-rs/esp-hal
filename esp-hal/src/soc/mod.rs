@@ -198,17 +198,38 @@ pub(crate) fn addr_in_range(addr: usize, range: Range<usize>) -> bool {
     range.contains(&addr)
 }
 
+// In its own section: with code in PSRAM, the link check on `.init` cannot cover `hal_main`, which
+// calls `.text` after the copy.
 #[cfg(feature = "rt")]
 #[cfg(riscv)]
 #[unsafe(export_name = "hal_main")]
+#[unsafe(link_section = ".hal_main")]
 fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
+    unsafe { setup_stack_guard() };
+    #[cfg(code_in_psram)]
+    crate::psram::code_in_psram::start();
+    start_main(a0, a1, a2)
+}
+
+/// The rest of `hal_main`. With code in PSRAM, it is the first function that runs from PSRAM.
+#[cfg(feature = "rt")]
+#[cfg(riscv)]
+#[cfg_attr(code_in_psram, inline(never))]
+#[cfg_attr(not(code_in_psram), inline(always))]
+fn start_main(a0: usize, a1: usize, a2: usize) -> ! {
     unsafe extern "Rust" {
         // This symbol will be provided by the user via `#[entry]`
         fn main(a0: usize, a1: usize, a2: usize) -> !;
     }
 
+    #[cfg(code_in_psram)]
+    {
+        crate::psram::code_in_psram::unmap_flash();
+        // The interrupt handlers are in `.text`, so the trap vector is `_pre_init_trap` until here.
+        crate::interrupt::setup_interrupts();
+    }
+
     unsafe {
-        setup_stack_guard();
         __esp_bootloader_init();
         main(a0, a1, a2);
     }
@@ -416,6 +437,7 @@ unsafe extern "C" {
 
 #[cfg(all(feature = "rt", riscv))]
 #[unsafe(naked)]
+#[cfg_attr(code_in_psram, unsafe(link_section = ".init"))]
 unsafe extern "C" fn setup_stack_guard() {
     // `-Z stack-protector=all` instruments every normal function. This store is what plants the
     // canary, so a prologue would snapshot the old word and the epilogue would report corruption.

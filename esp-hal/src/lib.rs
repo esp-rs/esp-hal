@@ -800,6 +800,9 @@ pub fn init(config: Config) -> Peripherals {
 
     crate::clock::init(config.clock_config());
 
+    #[cfg(code_in_psram)]
+    crate::psram::adopt_started_psram();
+
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.RTC_TIMER.reborrow());
 

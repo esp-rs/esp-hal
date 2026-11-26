@@ -47,9 +47,8 @@ fn try_main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-check-cfg=cfg(__test_adc_self_cal)");
     // HIL rustflags for encrypted-write tests that run without burned eFuses.
     println!("cargo:rustc-check-cfg=cfg(__test_flash)");
-    if let Ok(level) = std::env::var("OPT_LEVEL")
-        && (level == "0" || level == "1")
-    {
+    let is_debug_build = matches!(std::env::var("OPT_LEVEL").as_deref(), Ok("0" | "1"));
+    if is_debug_build {
         println!("cargo:rustc-cfg=is_debug_build");
     }
 
@@ -90,6 +89,19 @@ fn try_main() -> Result<(), Box<dyn Error>> {
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
         .expect("Failed to read esp_config.yml for esp-hal");
     let cfg = generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(chip)).unwrap();
+
+    if !suppress_panics
+        && is_debug_build
+        && matches!(
+            cfg.get("ESP_HAL_CONFIG_CODE_IN_PSRAM"),
+            Some(esp_config::Value::Bool(true))
+        )
+    {
+        bail!(
+            "code-in-psram needs esp-hal built at opt-level 2 or 3 (see the esp-hal crate \
+             documentation, Optimization level)"
+        );
+    }
 
     #[cfg(not(feature = "rt"))]
     let _ = cfg;
