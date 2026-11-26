@@ -27,6 +27,9 @@
 //!     - This is useful for quickly entering/skipping light sleep in auto-lightsleep mode.
 //! - request/release functions that update the reference counts and the bitmap
 //! - A way to access output frequency values. Ideally, cached.
+//! - For a node marked `early_init = "<cfg>"`: functions that start the node before `main`, under
+//!   that cfg. They call `configure_<node>_early_impl` and `enable_<node>_early_impl`, which
+//!   esp-hal implements.
 
 // TODO: some clock sources don't _really_ need refcount. This needs analysis to see which nodes can
 //       be simplified. (Probably the ones that only have one user, or those that are always on).
@@ -73,6 +76,66 @@ pub(crate) fn rustc_cfg_attr(cfg: Option<&str>) -> TokenStream {
         panic!("Invalid clock-tree `cfg` expression `{cfg}`: {err}");
     });
     quote! { #[cfg(#cfg)] }
+}
+
+/// The `early_init` property of a clock node: `false`, `true`, or the name of the cfg under which
+/// the node's early functions exist.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum EarlyInit {
+    Bool(bool),
+    Cfg(String),
+}
+
+impl Default for EarlyInit {
+    fn default() -> Self {
+        Self::Bool(false)
+    }
+}
+
+impl EarlyInit {
+    /// Returns whether the node has early functions in some build.
+    pub(crate) fn is_set(&self) -> bool {
+        *self != Self::Bool(false)
+    }
+
+    /// Returns whether the early functions of `self` exist in every build that has those of
+    /// `user`.
+    pub(crate) fn covers(&self, user: &EarlyInit) -> bool {
+        *self == Self::Bool(true) || self == user
+    }
+
+    /// Returns `#[cfg(<name>)]`, or nothing for `true`.
+    pub(crate) fn cfg_attr(&self) -> TokenStream {
+        match self {
+            Self::Cfg(cfg) => {
+                let cfg = format_ident!("{}", cfg);
+                quote! { #[cfg(#cfg)] }
+            }
+            Self::Bool(_) => quote! {},
+        }
+    }
+
+    /// Returns `#[cfg_attr(<name>, inline(always))]`, or `#[inline(always)]` for `true`.
+    pub(crate) fn inline_attr(&self) -> TokenStream {
+        match self {
+            Self::Cfg(cfg) => {
+                let cfg = format_ident!("{}", cfg);
+                quote! { #[cfg_attr(#cfg, inline(always))] }
+            }
+            Self::Bool(true) => quote! { #[inline(always)] },
+            Self::Bool(false) => quote! {},
+        }
+    }
+}
+
+impl std::fmt::Display for EarlyInit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Bool(value) => write!(f, "{value}"),
+            Self::Cfg(cfg) => write!(f, "\"{cfg}\""),
+        }
+    }
 }
 
 /// Returns the name of the config type generated for a node.
@@ -150,6 +213,7 @@ pub(crate) struct ClockNodeFunctions {
 
     pub frequency: Function,
     pub source_frequency: Function,
+    pub early_init: TokenStream,
     pub hal_functions: Vec<TokenStream>,
 }
 
@@ -173,6 +237,8 @@ impl ClockNodeFunctions {
         let release_impl = wrap(&self.release.implementation);
         let frequency_impl = wrap(&self.frequency.implementation);
         let source_frequency_impl = wrap(&self.source_frequency.implementation);
+        // Each early function has its own cfg attributes.
+        let early_init = &self.early_init;
 
         quote! {
             #apply_impl
@@ -181,6 +247,7 @@ impl ClockNodeFunctions {
             #release_impl
             #frequency_impl
             #source_frequency_impl
+            #early_init
         }
     }
 }
@@ -533,6 +600,27 @@ pub(crate) trait ClockTreeNodeType: Any {
     }
     fn wake_locking(&self) -> bool {
         false
+    }
+    /// Returns the node's `early_init` property, see [`ClockTreeNodeType::early_init_functions`].
+    fn early_init(&self) -> EarlyInit {
+        EarlyInit::default()
+    }
+    /// Returns `true` if the node's `early_init` functions include `request_<node>_early`, so that
+    /// another `early_init` node can start it as its source.
+    fn has_early_request(&self) -> bool {
+        false
+    }
+    /// Generates the node's `early_init` functions. Only sources, derived sources and multiplexers
+    /// support them.
+    fn early_init_functions(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> Result<TokenStream> {
+        anyhow::bail!(
+            "Clock node `{}`: `early_init` is not supported on this node type",
+            instance.name_str()
+        )
     }
     fn validate_source_data(
         &self,
