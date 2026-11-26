@@ -30,20 +30,15 @@ pub(crate) fn enable_phy(en: bool) {
             .modify(|_, w| w.clk_wifipwr_en().set_bit());
     }
 
-    // The front-end clocks stay on after the PHY turns off, as in ESP-IDF. The REGDMA saves the
-    // front-end registers on the way into light sleep, when the PHY is already off.
-    if !en {
-        return;
-    }
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
-        w.clk_fe_apb_en().set_bit();
-        w.clk_fe_20m_en().set_bit();
-        w.clk_fe_40m_en().set_bit();
-        w.clk_fe_80m_en().set_bit();
-        w.clk_fe_160m_en().set_bit();
-        w.clk_fe_dac_en().set_bit();
-        w.clk_fe_pwdet_adc_en().set_bit();
-        w.clk_fe_adc_en().set_bit()
+        w.clk_fe_apb_en().bit(en);
+        w.clk_fe_20m_en().bit(en);
+        w.clk_fe_40m_en().bit(en);
+        w.clk_fe_80m_en().bit(en);
+        w.clk_fe_160m_en().bit(en);
+        w.clk_fe_dac_en().bit(en);
+        w.clk_fe_pwdet_adc_en().bit(en);
+        w.clk_fe_adc_en().bit(en)
     });
 }
 

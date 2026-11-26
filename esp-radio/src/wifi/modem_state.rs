@@ -13,11 +13,14 @@
 use core::{ffi::c_int, mem::MaybeUninit, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
+#[cfg(any(esp32c5, esp32s31))]
+use esp_hal::rtc_cntl::regdma::MODEM_ENTRY;
 use esp_hal::rtc_cntl::{
     WakeupSource,
     regdma::{self, LinkConfig, LinkMemory, Module, PHY_ENTRY},
     sleep::WrappedSleepConfig,
 };
+use esp_phy::PhyClockGuard;
 use esp_sync::NonReentrantMutex;
 use portable_atomic::{AtomicBool, Ordering};
 
@@ -342,44 +345,14 @@ const I2C_MASTER_CLOCK_NODES: &[(u16, bool, bool)] = cfg_select! {
 const MODEM_STATE_CLOCK: &[LinkConfig] = cfg_select! {
     // The light sleep of esp-hal powers the BBPLL down. The nodes power it up and calibrate it.
     esp32s31 => &[
-        LinkConfig::write(
-            0x0600,
-            0x2070_40f4,
-            0x1100_0000,
-            0x1100_0000,
-            regdma::MODEM_ENTRY,
-        ),
-        LinkConfig::write(
-            0x0601,
-            0x2070_40f4,
-            0x0010_0000,
-            0x0010_0000,
-            regdma::MODEM_ENTRY,
-        ),
-        LinkConfig::write(
-            0x0602,
-            0x2058_9000,
-            0x4000_0000,
-            0x4000_0000,
-            regdma::MODEM_ENTRY,
-        ),
-        LinkConfig::write(
-            0x0603,
-            0x2070_401c,
-            0x1100_0000,
-            0x1100_0000,
-            regdma::MODEM_ENTRY,
-        ),
-        LinkConfig::write(
-            0x0604,
-            0x2071_0018,
-            0x4000_0000,
-            0x4000_0000,
-            regdma::MODEM_ENTRY,
-        ),
-        LinkConfig::write(0x0605, 0x2058_7174, 0, 0x80, regdma::MODEM_ENTRY),
-        LinkConfig::wait(0x0606, 0x2058_7174, 0x40, 0x40, regdma::MODEM_ENTRY),
-        LinkConfig::write(0x0607, 0x2058_7174, 0x80, 0x80, regdma::MODEM_ENTRY),
+        LinkConfig::write(0x0600, 0x2070_40f4, 0x1100_0000, 0x1100_0000, MODEM_ENTRY),
+        LinkConfig::write(0x0601, 0x2070_40f4, 0x0010_0000, 0x0010_0000, MODEM_ENTRY),
+        LinkConfig::write(0x0602, 0x2058_9000, 0x4000_0000, 0x4000_0000, MODEM_ENTRY),
+        LinkConfig::write(0x0603, 0x2070_401c, 0x1100_0000, 0x1100_0000, MODEM_ENTRY),
+        LinkConfig::write(0x0604, 0x2071_0018, 0x4000_0000, 0x4000_0000, MODEM_ENTRY),
+        LinkConfig::write(0x0605, 0x2058_7174, 0, 0x80, MODEM_ENTRY),
+        LinkConfig::wait(0x0606, 0x2058_7174, 0x40, 0x40, MODEM_ENTRY),
+        LinkConfig::write(0x0607, 0x2058_7174, 0x80, 0x80, MODEM_ENTRY),
     ],
     _ => &[],
 };
@@ -390,22 +363,10 @@ const MODEM_STATE_CLOCK: &[LinkConfig] = cfg_select! {
 fn bbpll_48mhz(burst: u32) -> [LinkConfig; 4] {
     const LPCON_CLK_CONF: u32 = 0x600a_f018;
     [
-        LinkConfig::write(
-            0x0106,
-            LPCON_CLK_CONF,
-            I2C_MST_EN,
-            I2C_MST_EN,
-            regdma::MODEM_ENTRY,
-        ),
-        LinkConfig::write(0x0107, 0x600a_f810, burst, u32::MAX, regdma::MODEM_ENTRY),
-        LinkConfig::wait(
-            0x0108,
-            0x600a_f814,
-            BURST_DONE,
-            BURST_DONE,
-            regdma::MODEM_ENTRY,
-        ),
-        LinkConfig::write(0x0109, LPCON_CLK_CONF, 0, I2C_MST_EN, regdma::MODEM_ENTRY),
+        LinkConfig::write(0x0106, LPCON_CLK_CONF, I2C_MST_EN, I2C_MST_EN, MODEM_ENTRY),
+        LinkConfig::write(0x0107, 0x600a_f810, burst, u32::MAX, MODEM_ENTRY),
+        LinkConfig::wait(0x0108, 0x600a_f814, BURST_DONE, BURST_DONE, MODEM_ENTRY),
+        LinkConfig::write(0x0109, LPCON_CLK_CONF, 0, I2C_MST_EN, MODEM_ENTRY),
     ]
 }
 
@@ -445,11 +406,13 @@ fn bursts() -> [u32; 3] {
     bursts
 }
 
+/// The memory of the REGDMA nodes, while the blob uses the modem state.
 static MEMORY: NonReentrantMutex<Option<Box<[MaybeUninit<u32>], InternalMemory>>> =
     NonReentrantMutex::new(None);
 
-/// Whether the blob uses the modem state.
-static ENABLED: AtomicBool = AtomicBool::new(false);
+/// Keeps the front-end clocks on after the PHY turns off. Light sleep saves the front-end
+/// registers when the PHY is already off, and the modem state restores them.
+static PHY_CLOCK: NonReentrantMutex<Option<PhyClockGuard<'static>>> = NonReentrantMutex::new(None);
 
 /// Whether the PHY link turned the RF off at least once, so that its nodes hold the state of the
 /// RF.
@@ -464,6 +427,7 @@ pub(super) fn init() {
         warn!("Enhanced light sleep needs the Wi-Fi retention memory, so it stays off");
         return;
     }
+    #[cfg_attr(not(esp32c5), expect(unused_variables))]
     let [rf_off, rf_on, bbpll_config] = bursts();
     let phy_link = phy_link(rf_on, rf_off);
     let bbpll: &[LinkConfig] = cfg_select! {
@@ -474,10 +438,7 @@ pub(super) fn init() {
                 &[]
             }
         }
-        _ => {{
-            let _ = bbpll_config;
-            &[]
-        }}
+        _ => &[],
     };
 
     let size = regdma::links_size(&phy_link)
@@ -507,6 +468,7 @@ pub(super) fn init() {
         unwrap!(regdma::attach(module));
     }
     MEMORY.with(|slot| *slot = Some(memory));
+    PHY_CLOCK.with(|slot| *slot = Some(esp_phy::enable_phy_clock()));
 
     esp_phy::set_rf_hooks(Some(esp_phy::RfHooks {
         turn_on: rf_turn_on,
@@ -516,7 +478,6 @@ pub(super) fn init() {
         esp_wifi_internal_modem_state_configure(true);
         esp_wifi_internal_light_sleep_configure(true);
     }
-    ENABLED.store(true, Ordering::Relaxed);
     WakeupSource::WifiBeacon.enable_with_hooks(Some(sleep_entry), None);
 }
 
@@ -524,9 +485,9 @@ pub(super) fn init() {
 ///
 /// Call this after `esp_wifi_deinit_internal`, before `mac_bb::deinit`.
 pub(super) fn deinit() {
-    if !ENABLED.swap(false, Ordering::Relaxed) {
+    let Some(memory) = MEMORY.with(Option::take) else {
         return;
-    }
+    };
     WakeupSource::WifiBeacon.disable();
     unsafe {
         esp_wifi_internal_light_sleep_configure(false);
@@ -535,7 +496,8 @@ pub(super) fn deinit() {
     esp_phy::set_rf_hooks(None);
     LINK_DONE.store(false, Ordering::Relaxed);
     destroy_modules();
-    MEMORY.with(|slot| *slot = None);
+    drop(memory);
+    PHY_CLOCK.with(|slot| *slot = None);
 }
 
 fn destroy_modules() {
@@ -549,7 +511,7 @@ fn destroy_modules() {
 /// up the next time.
 #[cfg(esp32c6)]
 pub(super) fn clear_rf_flag() {
-    if ENABLED.load(Ordering::Relaxed) && unsafe { pm_mac_modem_rf_already_enabled() } {
+    if unsafe { pm_mac_modem_rf_already_enabled() } {
         unsafe { pm_mac_modem_clear_rf_power_state() };
     }
 }
