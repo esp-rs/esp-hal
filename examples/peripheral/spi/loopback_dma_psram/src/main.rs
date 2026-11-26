@@ -57,12 +57,11 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    let (sclk, mosi, cs) =
-        cfg_select! {
-            feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
-            feature = "esp32s31" => (peripherals.GPIO11, peripherals.GPIO12, peripherals.GPIO13),
-            _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
-        };
+    let (sclk, mosi, cs) = cfg_select! {
+        feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
+        feature = "esp32s31" => (peripherals.GPIO11, peripherals.GPIO12, peripherals.GPIO13),
+        _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
+    };
 
     let (miso, mosi) = unsafe { mosi.split() };
 

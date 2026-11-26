@@ -106,9 +106,12 @@ impl<const PIN: u8> Flex<PIN> {
     pub fn level(&self) -> Level {
         cfg_select! {
             esp32c6 => ((unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN) & 0x1 != 0).into(),
-            esp32s2 => ((unsafe { &*LpIo::PTR }.in_().read().gpio_in_next().bits() >> PIN) & 0x1 != 0)
+            esp32s2 => ((unsafe { &*LpIo::PTR }.in_().read().gpio_in_next().bits() >> PIN) & 0x1
+                != 0)
                 .into(),
-            esp32s3 => ((unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0).into(),
+            esp32s3 => {
+                ((unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0).into()
+            }
             _ => {}
         }
     }
@@ -135,7 +138,9 @@ impl<const PIN: u8> Flex<PIN> {
             esp32s2 => ((unsafe { &*LpIo::PTR }.out().read().gpio_out_data().bits() >> PIN) & 0x1
                 != 0)
                 .into(),
-            esp32s3 => ((unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0).into(),
+            esp32s3 => {
+                ((unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0).into()
+            }
             _ => {}
         }
     }
