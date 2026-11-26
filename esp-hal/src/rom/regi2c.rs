@@ -3,7 +3,7 @@ use esp_sync::CountingLock;
 use crate::soc::regi2c::{regi2c_read, regi2c_write};
 
 /// Serializes accesses to the analog I2C master, which esp-hal shares with the PHY library.
-pub(crate) static LOCK: CountingLock = CountingLock::new();
+pub(crate) static REGI2C_LOCK: CountingLock = CountingLock::new();
 
 /// Locks the analog I2C master, for callers outside esp-hal that access it.
 ///
@@ -20,7 +20,7 @@ pub(crate) static LOCK: CountingLock = CountingLock::new();
 #[crate::ram]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn regi2c_enter_critical() {
-    unsafe { LOCK.acquire() };
+    unsafe { REGI2C_LOCK.acquire() };
 }
 
 /// Unlocks the analog I2C master locked by [`regi2c_enter_critical`].
@@ -37,7 +37,7 @@ unsafe extern "C" fn regi2c_enter_critical() {
 #[crate::ram]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn regi2c_exit_critical() {
-    unsafe { LOCK.release() };
+    unsafe { REGI2C_LOCK.release() };
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,12 +54,12 @@ impl RegI2cMaster {
 
     #[allow(unused)]
     pub fn write(&self, reg: u8, data: u8) {
-        LOCK.lock(|| self.write_unlocked(reg, data));
+        REGI2C_LOCK.lock(|| self.write_unlocked(reg, data));
     }
 
     #[allow(unused)]
     pub fn read(&self, reg: u8) -> u8 {
-        LOCK.lock(|| self.read_unlocked(reg))
+        REGI2C_LOCK.lock(|| self.read_unlocked(reg))
     }
 
     // The ESP32-S31 light sleep sets the MPLL with the caches suspended, through the RAM `read` and
@@ -69,7 +69,7 @@ impl RegI2cMaster {
 
     /// Writes `reg` without taking the lock.
     ///
-    /// The caller holds the lock, or runs where nothing else can access the analog I2C master.
+    /// The caller must hold [`REGI2C_LOCK`].
     #[allow(unused)]
     #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn write_unlocked(&self, reg: u8, data: u8) {
@@ -138,7 +138,7 @@ impl RawRegI2cField {
 
     #[allow(unused)]
     pub fn write_field(&self, data: u8) {
-        LOCK.lock(|| self.write_field_unlocked(data));
+        REGI2C_LOCK.lock(|| self.write_field_unlocked(data));
     }
 
     /// Writes the field without taking the lock. See [`RegI2cMaster::write_unlocked`].

@@ -631,14 +631,19 @@ fn sleep_transition(
             crate::soc::cache_writeback_all();
         }
 
-        let rejected = cfg_select! {
-            cpu_retention = "software" => {
-                // The software chips save the CPU inside the request, so the request belongs to
-                // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
-                cpu_retention::enter_sleep_with_retention(config, &saved, retention_buffer)
+        // The request writes analog I2C registers while the caches are suspended, where the lock
+        // cannot run, so the lock is held around the request.
+        let rejected = crate::rom::regi2c::REGI2C_LOCK.lock(|| {
+            cfg_select! {
+                cpu_retention = "software" => {
+                    // The software chips save the CPU inside the request, so the request belongs
+                    // to them. ESP-IDF wraps `pmu_sleep_start` the same way
+                    // (`sleep_modes.c:963-964`).
+                    cpu_retention::enter_sleep_with_retention(config, &saved, retention_buffer)
+                }
+                _ => config.enter_sleep(),
             }
-            _ => config.enter_sleep(),
-        };
+        });
 
         if config.is_deep_sleep() && !rejected {
             // The chip is entering deep sleep, and the wake resets it. Because RTC is in a

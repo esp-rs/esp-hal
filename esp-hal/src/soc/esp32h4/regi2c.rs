@@ -118,20 +118,22 @@ pub(crate) fn configure_master_clock() {
     // `PMU_HP_ICG_MODEM_CODE_MODEM` is 1 and `PMU_HP_ICG_MODEM_CODE_ACTIVE` is 2.
     const ICG_BITMAP: u8 = (1 << 1) | (1 << 2);
 
-    let lpcon = MODEM_LPCON::regs();
-    lpcon.clk_conf_power_st().modify(|r, w| unsafe {
-        w.clk_i2c_mst_st_map()
-            .bits(r.clk_i2c_mst_st_map().bits() | ICG_BITMAP);
-        w.clk_lp_apb_st_map()
-            .bits(r.clk_lp_apb_st_map().bits() | ICG_BITMAP)
+    crate::rom::regi2c::REGI2C_LOCK.lock(|| {
+        let lpcon = MODEM_LPCON::regs();
+        lpcon.clk_conf_power_st().modify(|r, w| unsafe {
+            w.clk_i2c_mst_st_map()
+                .bits(r.clk_i2c_mst_st_map().bits() | ICG_BITMAP);
+            w.clk_lp_apb_st_map()
+                .bits(r.clk_lp_apb_st_map().bits() | ICG_BITMAP)
+        });
+        lpcon.clk_conf().modify(|_, w| w.clk_i2c_mst_en().set_bit());
+        lpcon
+            .clk_conf_force_on()
+            .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
+        MODEM_SYSCON::regs()
+            .clk_conf()
+            .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
     });
-    lpcon.clk_conf().modify(|_, w| w.clk_i2c_mst_en().set_bit());
-    lpcon
-        .clk_conf_force_on()
-        .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
-    MODEM_SYSCON::regs()
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
 }
 
 fn regi2c_enable_block(block: u8) -> usize {

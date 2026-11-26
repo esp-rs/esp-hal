@@ -294,7 +294,7 @@ fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
     set_mpll_power(en);
 
     if let Some(mpll_mhz) = mpll_mhz {
-        crate::rom::regi2c::LOCK.lock(|| set_mpll_frequency(mpll_mhz));
+        set_mpll_frequency(mpll_mhz);
     }
 }
 
@@ -333,13 +333,16 @@ pub(crate) fn set_mpll_power(on: bool) {
 /// MPLL = XTAL * (fb_div + 1) / (ref_div + 1), with ref_div 1.
 ///
 /// Ref: [IDF `clk_ll_mpll_set_config` (esp32s31)](https://github.com/espressif/esp-idf/blob/27506a49bc919926f546e325d5f5334ba23db316/components/esp_hal_clock/esp32s31/include/hal/clk_tree_ll.h#L527-L545)
+pub(crate) fn set_mpll_frequency(mpll_mhz: u32) {
+    crate::rom::regi2c::REGI2C_LOCK.lock(|| set_mpll_frequency_unlocked(mpll_mhz));
+}
+
+/// [`set_mpll_frequency`] without taking the analog I2C lock. The caller must hold
+/// [`REGI2C_LOCK`](crate::rom::regi2c::REGI2C_LOCK).
 ///
 /// Light sleep calls this function with the caches suspended, so the function must be inlined.
-///
-/// The function does not lock the analog I2C master. The caller holds the lock, or runs with
-/// interrupts disabled and the other cores parked, as light sleep does.
 #[inline(always)]
-pub(crate) fn set_mpll_frequency(mpll_mhz: u32) {
+pub(crate) fn set_mpll_frequency_unlocked(mpll_mhz: u32) {
     // Analog settings IDF writes before each calibration.
     regi2c::I2C_MPLL_IR_CAL_EXT_CAP.write_field_unlocked(3);
     regi2c::I2C_MPLL_IR_CAL_ENX_CAP.write_field_unlocked(1);

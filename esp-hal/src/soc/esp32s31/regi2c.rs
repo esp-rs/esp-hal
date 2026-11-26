@@ -261,15 +261,17 @@ fn block_mask(block: u8) -> u32 {
 ///
 /// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e3/components/bootloader_support/src/esp32s31/bootloader_esp32s31.c#L56-L58>.
 pub(crate) fn configure_master_clock() {
-    MODEM_LPCON::regs()
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
-    MODEM_LPCON::regs()
-        .clk_conf_force_on()
-        .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
-    MODEM_SYSCON::regs()
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+    crate::rom::regi2c::REGI2C_LOCK.lock(|| {
+        MODEM_LPCON::regs()
+            .clk_conf()
+            .modify(|_, w| w.clk_i2c_mst_en().set_bit());
+        MODEM_LPCON::regs()
+            .clk_conf_force_on()
+            .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
+        MODEM_SYSCON::regs()
+            .clk_conf()
+            .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+    });
 }
 
 #[inline(always)]
