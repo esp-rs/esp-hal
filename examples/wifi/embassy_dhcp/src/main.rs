@@ -15,6 +15,9 @@
 //! - `CPU_POWERDOWN` lets light sleep power the CPU down, and retains its state in RAM. This saves
 //!   more current, but it makes the sleep and the wake slower. Only the ESP32-C3, -C5, -C6, -C61,
 //!   -S3 and -S31 support this. On other chips the constant has no effect.
+//! - `MAC_BB_POWERDOWN` lets light sleep power the Wi-Fi MAC and baseband down, and retains their
+//!   state in RAM. Only the ESP32-C3, -C5, -C6, -C61, -S3 and -S31 support this. On other chips the
+//!   constant has no effect.
 //!
 //! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
 //! the output.
@@ -35,7 +38,6 @@ use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::wifi::{
     AuthenticationMethodConfig,
     Config,
@@ -72,13 +74,13 @@ unsafe extern "Rust" fn _esp_alloc_alloc(
     ptr: usize,
     size: usize,
 ) {
-    println!("Allocated {} bytes: {:x}", size, ptr);
+    log::info!("Allocated {} bytes: {:x}", size, ptr);
 }
 
 #[cfg(feature = "alloc-hooks")]
 #[unsafe(no_mangle)]
 unsafe extern "Rust" fn _esp_alloc_dealloc(_heap: &EspHeap, ptr: usize, size: usize) {
-    println!("Deallocated {} bytes: {:x}", size, ptr);
+    log::info!("Deallocated {} bytes: {:x}", size, ptr);
 }
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
@@ -102,6 +104,9 @@ const POWER_SAVE: PowerSaveMode = PowerSaveMode::Minimum;
 const LIGHT_SLEEP: bool = true;
 /// Whether light sleep powers the CPU down. Requires [`LIGHT_SLEEP`] to be enabled.
 const CPU_POWERDOWN: bool = true;
+/// Whether light sleep powers the Wi-Fi MAC and baseband down. Requires [`LIGHT_SLEEP`] to be
+/// enabled.
+const MAC_BB_POWERDOWN: bool = true;
 
 // An example reads no chip capability, so this condition lists the chips that support CPU
 // power-down.
@@ -153,20 +158,56 @@ cfg_select! {
     }
 }
 
+cfg_select! {
+    any(
+        feature = "esp32c3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32s3",
+        feature = "esp32s31",
+    ) => {
+        use esp_radio::wifi::{RetentionStorage, install_retention_memory};
+
+        #[ram(reclaimed, unstable(zeroed))]
+        static WIFI_RETENTION_MEMORY: RetentionStorage = RetentionStorage::new();
+
+        /// The reclaimed RAM that MAC and baseband power-down takes from the heap. The 16 bytes
+        /// cover its alignment.
+        const MAC_BB_POWERDOWN_RAM: usize = size_of::<RetentionStorage>() + 16;
+
+        fn enable_mac_bb_powerdown() {
+            install_retention_memory(WIFI_RETENTION_MEMORY.take()).unwrap();
+        }
+    }
+    _ => {
+        const MAC_BB_POWERDOWN_RAM: usize = 0;
+
+        fn enable_mac_bb_powerdown() {}
+    }
+}
+
+/// The reclaimed RAM that the retention memories take from the heap.
+const RETENTION_RAM: usize = CPU_POWERDOWN_RAM + MAC_BB_POWERDOWN_RAM;
+
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE - CPU_POWERDOWN_RAM);
-    esp_alloc::heap_allocator!(size: 36 * 1024 + CPU_POWERDOWN_RAM);
+    esp_log::init_uart!(peripherals);
+
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE - RETENTION_RAM);
+    esp_alloc::heap_allocator!(size: 36 * 1024 + RETENTION_RAM);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     if LIGHT_SLEEP {
         let mut sleep = esp_rtos::sleep::configure(peripherals.LPWR);
         if CPU_POWERDOWN {
             enable_cpu_powerdown(&mut sleep);
+        }
+        if MAC_BB_POWERDOWN {
+            enable_mac_bb_powerdown();
         }
         esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
     } else {
@@ -181,7 +222,7 @@ async fn main(spawner: Spawner) -> ! {
             )),
     );
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
     let wifi_interface = esp_radio::wifi::Interface::station();
     let mut controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
@@ -189,7 +230,7 @@ async fn main(spawner: Spawner) -> ! {
     )
     .unwrap();
     controller.set_power_saving(POWER_SAVE).unwrap();
-    println!("Wifi configured and started!");
+    log::info!("Wifi configured and started!");
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -204,11 +245,11 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    println!("Scan");
+    log::info!("Scan");
     let scan_config = ScanConfig::default().with_max(10);
     let result = controller.scan_async(&scan_config).await.unwrap();
     for ap in result {
-        println!("{:?}", ap);
+        log::info!("{:?}", ap);
     }
 
     spawner.spawn(connection(controller).unwrap());
@@ -217,7 +258,7 @@ async fn main(spawner: Spawner) -> ! {
     stack.wait_config_up().await;
 
     if let Some(config) = stack.config_v4() {
-        println!("Got IP: {}", config.address);
+        log::info!("Got IP: {}", config.address);
     }
 
     // Init HTTP client
@@ -248,10 +289,10 @@ async fn main(spawner: Spawner) -> ! {
         match response.body().read_to_end().await {
             Ok(data) => {
                 if let Ok(st) = core::str::from_utf8(data) {
-                    println!("Body: {}", st);
+                    log::info!("Body: {}", st);
                 }
             }
-            Err(e) => println!("Body error: {:?}", e),
+            Err(e) => log::info!("Body error: {:?}", e),
         }
         Timer::after(Duration::from_millis(3000)).await;
     }
@@ -259,21 +300,21 @@ async fn main(spawner: Spawner) -> ! {
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
+    log::info!("start connection task");
 
     loop {
-        println!("About to connect...");
+        log::info!("About to connect...");
 
         match controller.connect_async().await {
             Ok(info) => {
-                println!("Wifi connected to {:?}", info);
+                log::info!("Wifi connected to {:?}", info);
 
                 // wait until we're no longer connected
                 let info = controller.wait_for_disconnect_async().await.ok();
-                println!("Disconnected: {:?}", info);
+                log::info!("Disconnected: {:?}", info);
             }
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                log::info!("Failed to connect to wifi: {e:?}");
             }
         }
 

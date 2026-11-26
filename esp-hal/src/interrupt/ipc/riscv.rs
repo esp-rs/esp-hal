@@ -140,6 +140,116 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
     )
 }
 
+// The posted requests run Rust code, so `drain_handler` treats the FPU as `esp-riscv-rt` treats it
+// around `handle_interrupts`. With `float-save-restore`, it saves `fcsr` and the caller-saved FPU
+// registers. Without it, it turns the FPU off, so that an FPU instruction in a request traps. The
+// hardware does not change `mstatus.FS` on a trap or on `mret`.
+
+#[cfg(all(target_feature = "f", feature = "float-save-restore"))]
+macro_rules! drain_fpu_enter {
+    () => {
+        "
+        frcsr t0
+        sw   t0, 56(sp)
+        fsw  ft0, 60(sp)
+        fsw  ft1, 64(sp)
+        fsw  ft2, 68(sp)
+        fsw  ft3, 72(sp)
+        fsw  ft4, 76(sp)
+        fsw  ft5, 80(sp)
+        fsw  ft6, 84(sp)
+        fsw  ft7, 88(sp)
+        fsw  ft8, 92(sp)
+        fsw  ft9, 96(sp)
+        fsw  ft10, 100(sp)
+        fsw  ft11, 104(sp)
+        fsw  fa0, 108(sp)
+        fsw  fa1, 112(sp)
+        fsw  fa2, 116(sp)
+        fsw  fa3, 120(sp)
+        fsw  fa4, 124(sp)
+        fsw  fa5, 128(sp)
+        fsw  fa6, 132(sp)
+        fsw  fa7, 136(sp)
+        "
+    };
+}
+
+#[cfg(all(target_feature = "f", feature = "float-save-restore"))]
+macro_rules! drain_fpu_exit {
+    () => {
+        "
+        flw  ft0, 60(sp)
+        flw  ft1, 64(sp)
+        flw  ft2, 68(sp)
+        flw  ft3, 72(sp)
+        flw  ft4, 76(sp)
+        flw  ft5, 80(sp)
+        flw  ft6, 84(sp)
+        flw  ft7, 88(sp)
+        flw  ft8, 92(sp)
+        flw  ft9, 96(sp)
+        flw  ft10, 100(sp)
+        flw  ft11, 104(sp)
+        flw  fa0, 108(sp)
+        flw  fa1, 112(sp)
+        flw  fa2, 116(sp)
+        flw  fa3, 120(sp)
+        flw  fa4, 124(sp)
+        flw  fa5, 128(sp)
+        flw  fa6, 132(sp)
+        flw  fa7, 136(sp)
+        lw   t0, 56(sp)
+        fscsr t0
+        "
+    };
+}
+
+#[cfg(all(target_feature = "f", not(feature = "float-save-restore")))]
+macro_rules! drain_fpu_enter {
+    () => {
+        "
+        li   t0, 0x6000
+        csrrc t0, mstatus, t0
+        sw   t0, 56(sp)
+        "
+    };
+}
+
+#[cfg(all(target_feature = "f", not(feature = "float-save-restore")))]
+macro_rules! drain_fpu_exit {
+    () => {
+        "
+        li   t1, 0x6000
+        csrc mstatus, t1
+        lw   t0, 56(sp)
+        and  t0, t0, t1
+        csrs mstatus, t0
+        "
+    };
+}
+
+#[cfg(not(target_feature = "f"))]
+macro_rules! drain_fpu_enter {
+    () => {
+        ""
+    };
+}
+
+#[cfg(not(target_feature = "f"))]
+macro_rules! drain_fpu_exit {
+    () => {
+        ""
+    };
+}
+
+/// The stack frame of [`drain_handler`], 16-byte aligned.
+const DRAIN_FRAME_SIZE: usize = if cfg!(all(target_feature = "f", feature = "float-save-restore")) {
+    144
+} else {
+    64
+};
+
 /// Runs the posted requests of one CPU, then returns to [`ipc_handler`].
 ///
 /// `t1` holds the address of the `CoreState` of the CPU. This function saves the registers
@@ -155,7 +265,7 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
 unsafe extern "C" fn drain_handler() {
     core::arch::naked_asm!(
         "
-        addi sp, sp, -64
+        addi sp, sp, -{frame}
         sw   ra, 0(sp)
         sw   t2, 4(sp)
         sw   t3, 8(sp)
@@ -170,11 +280,15 @@ unsafe extern "C" fn drain_handler() {
         sw   a5, 44(sp)
         sw   a6, 48(sp)
         sw   a7, 52(sp)
-
+        ",
+        drain_fpu_enter!(),
+        "
         mv   a0, t1
         la   t0, {drain}
         jalr ra, 0(t0)
-
+        ",
+        drain_fpu_exit!(),
+        "
         lw   ra, 0(sp)
         lw   t2, 4(sp)
         lw   t3, 8(sp)
@@ -189,10 +303,11 @@ unsafe extern "C" fn drain_handler() {
         lw   a5, 44(sp)
         lw   a6, 48(sp)
         lw   a7, 52(sp)
-        addi sp, sp, 64
+        addi sp, sp, {frame}
         ret
         ",
         drain = sym drain_current_core,
+        frame = const DRAIN_FRAME_SIZE,
     )
 }
 

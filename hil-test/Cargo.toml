@@ -127,7 +127,7 @@ esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
 esp-metadata-generated = { path = "../esp-metadata-generated" }
-esp-println        = { path = "../esp-println", default-features = false, features = ["auto", "critical-section", "defmt-espflash"], optional = true }
+esp-log       = { path = "../esp-log", default-features = false, features = ["defmt"], optional = true }
 esp-rtos           = { path = "../esp-rtos", optional = true }
 esp-sync           = { path = "../esp-sync" }
 esp-radio          = { path = "../esp-radio", optional = true }
@@ -182,8 +182,9 @@ default = ["log-serial"]
 unstable = ["esp-hal/unstable"]
 esp-rtos = ["dep:esp-rtos"]
 
-# Logs on the serial port of the probe.
-log-serial = ["dep:esp-println", "defmt"]
+# Logs on the serial port of the probe. Only tests that enable `unstable` log, because the
+# logger uses the unstable UART and USB-Serial-JTAG drivers.
+log-serial = ["dep:esp-log", "defmt"]
 # Logs over RTT, for the tests that use UART0 or the USB-Serial-JTAG port. Disable `log-serial`.
 log-rtt = ["dep:rtt-target", "defmt"]
 # Enabled by `log-serial` and `log-rtt`.
@@ -195,113 +196,113 @@ rtos-radio-driver = ["dep:esp-rtos", "esp-rtos/esp-radio", "dep:esp-radio-rtos-d
 
 # Device support (required!):
 esp32 = [
+    "esp-log?/esp32",
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32",
     "esp-alloc?/esp32",
     "esp-radio?/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-metadata-generated/esp32",
-    "esp-println?/esp32",
     "esp-rtos?/esp32",
 ]
 esp32c2 = [
+    "esp-log?/esp32c2",
     "esp-hal/esp32c2",
     "esp-alloc?/esp32c2",
     "esp-radio?/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-metadata-generated/esp32c2",
-    "esp-println?/esp32c2",
     "esp-rtos?/esp32c2"
 ]
 esp32c3 = [
+    "esp-log?/esp32c3",
     "esp-hal/esp32c3",
     "esp-alloc?/esp32c3",
     "esp-radio?/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-metadata-generated/esp32c3",
-    "esp-println?/esp32c3",
     "esp-rtos?/esp32c3",
 ]
 esp32c5 = [
+    "esp-log?/esp32c5",
     "esp-hal/esp32c5",
     "esp-alloc?/esp32c5",
     "esp-radio?/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-metadata-generated/esp32c5",
-    "esp-println?/esp32c5",
     "esp-rtos?/esp32c5",
 ]
 esp32c6 = [
+    "esp-log?/esp32c6",
     "esp-hal/esp32c6",
     "esp-alloc?/esp32c6",
     "esp-radio?/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-metadata-generated/esp32c6",
-    "esp-println?/esp32c6",
     "esp-rtos?/esp32c6",
 ]
 esp32c61 = [
+    "esp-log?/esp32c61",
     "esp-hal/esp32c61",
     "esp-alloc?/esp32c61",
     "esp-radio?/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-metadata-generated/esp32c61",
-    "esp-println?/esp32c61",
     "esp-rtos?/esp32c61",
 ]
 esp32h2 = [
+    "esp-log?/esp32h2",
     "esp-hal/esp32h2",
     "esp-alloc?/esp32h2",
     "esp-radio?/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-metadata-generated/esp32h2",
-    "esp-println?/esp32h2",
     "esp-rtos?/esp32h2",
 ]
 esp32h4 = [
+    "esp-log?/esp32h4",
     "esp-hal/esp32h4",
     "esp-alloc?/esp32h4",
     "esp-radio?/esp32h4",
     "esp-bootloader-esp-idf/esp32h4",
     "esp-metadata-generated/esp32h4",
-    "esp-println?/esp32h4",
     "esp-rtos?/esp32h4",
 ]
 esp32p4 = [
+    "esp-log?/esp32p4",
     "esp-hal/esp32p4",
     "esp-alloc?/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
     "esp-metadata-generated/esp32p4",
-    "esp-println?/esp32p4",
     "esp-rtos?/esp32p4",
 ]
 esp32s2 = [
+    "esp-log?/esp32s2",
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s2",
     "esp-alloc?/esp32s2",
     "esp-radio?/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-metadata-generated/esp32s2",
-    "esp-println?/esp32s2",
     "esp-rtos?/esp32s2"
 ]
 esp32s3 = [
+    "esp-log?/esp32s3",
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s3",
     "esp-alloc?/esp32s3",
     "esp-radio?/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-metadata-generated/esp32s3",
-    "esp-println?/esp32s3",
     "esp-rtos?/esp32s3",
 ]
 esp32s31 = [
+    "esp-log?/esp32s31",
     "esp-hal/esp32s31",
     "esp-alloc?/esp32s31",
     "esp-radio?/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",
     "esp-metadata-generated/esp32s31",
-    "esp-println?/esp32s31",
     "esp-rtos?/esp32s31",
 ]
 

@@ -14,7 +14,6 @@ use embassy_time::{Duration, Ticker};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::esp_now::{
     BROADCAST_ADDRESS,
     EspNowManager,
@@ -43,9 +42,10 @@ macro_rules! mk_static {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
@@ -61,7 +61,7 @@ async fn main(spawner: Spawner) -> ! {
     drop(controller);
     esp_now.set_channel(11).unwrap();
 
-    println!("esp-now version {}", esp_now.version().unwrap());
+    log::info!("esp-now version {}", esp_now.version().unwrap());
 
     let (manager, sender, receiver) = esp_now.split();
     let manager = mk_static!(EspNowManager, manager);
@@ -87,10 +87,10 @@ async fn main(spawner: Spawner) -> ! {
             }
         };
 
-        println!("Send hello to peer {:?}", peer.peer_address);
+        log::info!("Send hello to peer {:?}", peer.peer_address);
         let mut sender = sender.lock().await;
         let status = sender.send_async(&peer.peer_address, b"Hello Peer.").await;
-        println!("Send hello status: {:?}", status);
+        log::info!("Send hello status: {:?}", status);
     }
 }
 
@@ -100,10 +100,10 @@ async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender>) {
     loop {
         ticker.next().await;
 
-        println!("Send Broadcast...");
+        log::info!("Send Broadcast...");
         let mut sender = sender.lock().await;
         let status = sender.send_async(&BROADCAST_ADDRESS, b"Hello.").await;
-        println!("Send broadcast status: {:?}", status);
+        log::info!("Send broadcast status: {:?}", status);
     }
 }
 
@@ -111,7 +111,7 @@ async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender>) {
 async fn listener(manager: &'static EspNowManager, mut receiver: EspNowReceiver) {
     loop {
         let r = receiver.receive_async().await;
-        println!("Received {:?}", r.data());
+        log::info!("Received {:?}", r.data());
         if r.info.dst_address == BROADCAST_ADDRESS {
             if !manager.peer_exists(&r.info.src_address) {
                 manager
@@ -123,7 +123,7 @@ async fn listener(manager: &'static EspNowManager, mut receiver: EspNowReceiver)
                         encrypt: false,
                     })
                     .unwrap();
-                println!("Added peer {:?}", r.info.src_address);
+                log::info!("Added peer {:?}", r.info.src_address);
             }
         }
     }

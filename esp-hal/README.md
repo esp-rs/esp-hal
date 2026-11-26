@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/esp-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-hal)
 [![docs.rs](https://img.shields.io/docsrs/esp-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-hal/latest/)
-![MSRV](https://img.shields.io/badge/MSRV-1.95.0-blue?labelColor=1C2C2E&style=flat-square)
+![MSRV](https://img.shields.io/badge/MSRV-1.100.0-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-hal?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
@@ -32,11 +32,11 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ESP32-C6 | [Datasheet][esp32c6-datasheet] [TRM][esp32c6-trm] | `riscv32imac-unknown-none-elf` |  |
 | ESP32-C61 | [Datasheet][esp32c61-datasheet] [TRM][esp32c61-trm] | `riscv32imac-unknown-none-elf` |  |
 | ESP32-H2 | [Datasheet][esp32h2-datasheet] [TRM][esp32h2-trm] | `riscv32imac-unknown-none-elf` |  |
-| ESP32-H4 | [Datasheet][esp32h4-datasheet] [TRM][esp32h4-trm] | `riscv32imafc-unknown-none-elf` | In early stages of development. |
+| ESP32-H4 | [Datasheet][esp32h4-datasheet] [TRM][esp32h4-trm] | `riscv32imafc-unknown-none-elf` |  |
 | ESP32-P4 | [Datasheet][esp32p4-datasheet] [TRM][esp32p4-trm] | `riscv32imafc-unknown-none-elf` | Revisions below v3.0 are not supported. |
 | ESP32-S2 | [Datasheet][esp32s2-datasheet] [TRM][esp32s2-trm] | `xtensa-esp32s2-none-elf` |  |
 | ESP32-S3 | [Datasheet][esp32s3-datasheet] [TRM][esp32s3-trm] | `xtensa-esp32s3-none-elf` |  |
-| ESP32-S31 | [Datasheet][esp32s31-datasheet] [TRM][esp32s31-trm] | `riscv32imafc-unknown-none-elf` | In early stages of development. |
+| ESP32-S31 | [Datasheet][esp32s31-datasheet] [TRM][esp32s31-trm] | `riscv32imafc-unknown-none-elf` |  |
 
 [esp32-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf
 [esp32-trm]: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf

@@ -142,7 +142,7 @@ pub(crate) fn locked<R>(f: impl FnOnce(&mut State) -> R) -> R {
     let sem = acquire_lock();
     // SAFETY: The mutex is held. The mutex is not recursive, so a nested call blocks and does not
     // create a second reference.
-    let res = f(unsafe { &mut *STATE.0.get() });
+    let res = f(unsafe { STATE.0.as_mut_unchecked() });
     sem.give();
 
     res

@@ -48,6 +48,10 @@
 //!   interrupts and waits in RAM until the operation ends. A core that wakes while an operation
 //!   waits for it joins that park before its sleep call returns. So a sleep or a wait during a
 //!   flash cycle does not get an upper bound.
+//! - Every [`REPORT_EVERY`], core 0 prints the counts. The logger masks the interrupts of core 0
+//!   until the UART sends the line, about 12 ms. The interrupt that ends a wait runs on core 0, so
+//!   a wait on the other core stays blocked for that time. A sleep or a wait during a report does
+//!   not get an upper bound either.
 //! - On a chip with two cores, a random core requests each sleep while the other core works. The
 //!   working core must return from the park, and with CPU retention from the rendezvous, with its
 //!   state intact. A core that makes no progress for [`STALL_REPORTS`] reports fails the phase.
@@ -66,8 +70,6 @@
 //! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
 //% CHIP_FILTER: sleep_light_sleep && sleep_has_wakeup_source_timer
-//% FEATURES: esp-println/uart
-
 #![no_std]
 #![no_main]
 
@@ -408,10 +410,10 @@ struct Counts {
     /// deadline.
     longest_early_us: AtomicU32,
     /// The longest time in microseconds by which a checked long sleep or wait ended after its
-    /// deadline, without a flash cycle during it.
+    /// deadline, without a flash cycle or a report during it.
     longest_overrun_us: AtomicU32,
-    /// The same, for a long sleep or wait during a flash cycle.
-    longest_flash_overrun_us: AtomicU32,
+    /// The same, for a long sleep or wait during a flash cycle or a report.
+    longest_stalled_overrun_us: AtomicU32,
 }
 
 static COUNTS: Counts = Counts {
@@ -427,7 +429,7 @@ static COUNTS: Counts = Counts {
     progress: [const { AtomicU32::new(0) }; CORES],
     longest_early_us: AtomicU32::new(0),
     longest_overrun_us: AtomicU32::new(0),
-    longest_flash_overrun_us: AtomicU32::new(0),
+    longest_stalled_overrun_us: AtomicU32::new(0),
 };
 
 fn count(counter: &AtomicU32) -> u32 {
@@ -466,6 +468,10 @@ static mut SCRATCH: Option<Scratch> = None;
 /// writes, or reads. A sleep or a wait during which a cycle ran does not get an upper bound,
 /// because a flash operation can delay its end.
 static FLASH_GEN: AtomicU32 = AtomicU32::new(0);
+
+/// The same as [`FLASH_GEN`], for a report. A report on core 0 and a flash cycle on core 1 can
+/// overlap.
+static REPORT_GEN: AtomicU32 = AtomicU32::new(0);
 
 /// Erases, writes, and verifies the next sector of the free space. A cycle runs when
 /// [`FLASH_PERIOD`] has passed since the last one and the other core is not in a cycle.
@@ -568,30 +574,50 @@ fn busy_wait(length: Duration) {
     while Instant::now() < end {}
 }
 
-/// Returns whether a flash cycle was running when the caller read `flash_gen` from
-/// [`FLASH_GEN`], or ran after that.
-fn flash_ran(flash_gen: u32) -> bool {
-    flash_gen % 2 == 1 || FLASH_GEN.load(Ordering::Acquire) != flash_gen
+/// The values of [`FLASH_GEN`] and [`REPORT_GEN`] before a sleep or a wait.
+#[derive(Clone, Copy)]
+struct Stalls {
+    flash: u32,
+    report: u32,
+}
+
+impl Stalls {
+    fn now() -> Self {
+        Self {
+            flash: FLASH_GEN.load(Ordering::Acquire),
+            report: REPORT_GEN.load(Ordering::Acquire),
+        }
+    }
+
+    /// Returns whether a flash cycle or a report was active when [`Stalls::now`] read the
+    /// counts, or started after that.
+    fn stalled(self) -> bool {
+        let ran = |before: u32, counter: &AtomicU32| {
+            before % 2 == 1 || counter.load(Ordering::Acquire) != before
+        };
+        ran(self.flash, &FLASH_GEN) || ran(self.report, &REPORT_GEN)
+    }
 }
 
 /// Returns whether a long sleep or a wait ended within its bounds, and records by how much it ended
 /// early or late. A sleep or wait of `length` that took `took` must not end more than [`TOLERANCE`]
-/// early. When no flash cycle ran during it, it must also not end more than [`TOLERANCE`] late.
+/// early. When no flash cycle or report ran during it, it must also not end more than
+/// [`TOLERANCE`] late.
 ///
 /// The bounds are wider than the error that the report shows, because a fault in the timer wakeup
 /// or in the time update moves the end by much more.
-fn length_ok(took: Duration, length: Duration, flash_gen: u32) -> bool {
-    let during_flash = flash_ran(flash_gen);
+fn length_ok(took: Duration, length: Duration, stalls: Stalls) -> bool {
+    let stalled = stalls.stalled();
     let early = length.as_micros().saturating_sub(took.as_micros()) as u32;
     COUNTS.longest_early_us.fetch_max(early, Ordering::Relaxed);
     let overrun = took.as_micros().saturating_sub(length.as_micros()) as u32;
-    let longest = if during_flash {
-        &COUNTS.longest_flash_overrun_us
+    let longest = if stalled {
+        &COUNTS.longest_stalled_overrun_us
     } else {
         &COUNTS.longest_overrun_us
     };
     longest.fetch_max(overrun, Ordering::Relaxed);
-    took + TOLERANCE >= length && (during_flash || took <= length + TOLERANCE)
+    took + TOLERANCE >= length && (stalled || took <= length + TOLERANCE)
 }
 
 /// Requests one light sleep of random length, then checks the sleep and PSRAM. Returns at once when
@@ -624,7 +650,7 @@ fn sleep_round(core: usize, lpwr: &mut LowPower<'_>, rng: &mut Rng, retention: b
         _ => Duration::from_micros(1_000 + u64::from(random % 9_000)),
     };
 
-    let flash_gen = FLASH_GEN.load(Ordering::Acquire);
+    let stalls = Stalls::now();
     // The deadline and the measured length of the sleep must count from the same `Instant`.
     // Otherwise a flash operation on the other core can stop this core between the two reads, for
     // longer than `TOLERANCE`.
@@ -652,7 +678,7 @@ fn sleep_round(core: usize, lpwr: &mut LowPower<'_>, rng: &mut Rng, retention: b
             count(&COUNTS.not_slept);
         } else if !wakeup_cause().contains(WakeupSource::Timer) {
             problem!("core {core}: sleep {n} woke on {:?}", wakeup_cause());
-        } else if !length_ok(slept, length, flash_gen) {
+        } else if !length_ok(slept, length, stalls) {
             problem!("core {core}: sleep {n} lasted {slept} of {length}");
         } else {
             count(&COUNTS.long_slept);
@@ -679,13 +705,13 @@ fn wait_round(core: usize, rng: &mut Rng) {
     let seed = rng.next();
     fill(dirty, seed);
     let length = Duration::from_micros(1_000 + u64::from(rng.below(29_001)));
-    let flash_gen = FLASH_GEN.load(Ordering::Acquire);
+    let stalls = Stalls::now();
     let before = Instant::now();
     CurrentThreadHandle::get().delay(length);
     let waited = Instant::now() - before;
     let n = count(&COUNTS.waits);
     count(&COUNTS.progress[core]);
-    if !length_ok(waited, length, flash_gen) {
+    if !length_ok(waited, length, stalls) {
         problem!("core {core}: wait {n} lasted {waited} of {length}");
     }
     let bad = check_words(dirty, 0..dirty.len, seed);
@@ -735,6 +761,7 @@ impl Controller {
 
     fn report(&self) {
         let c = &COUNTS;
+        REPORT_GEN.fetch_add(1, Ordering::AcqRel);
         report!(
             "stress: {} s, sleeps {}, short {}, long {}, long slept {}, refused {}, not slept {}, waits {}, work passes {}, flash cycles {}",
             (Instant::now() - self.started).as_secs(),
@@ -750,12 +777,13 @@ impl Controller {
         );
         if c.long_slept.load(Ordering::Relaxed) + c.waits.load(Ordering::Relaxed) > 0 {
             report!(
-                "  bounds: at most {} µs early, longest overrun {} µs, during a flash cycle {} µs",
+                "  bounds: at most {} µs early, longest overrun {} µs, during a flash cycle or a report {} µs",
                 c.longest_early_us.load(Ordering::Relaxed),
                 c.longest_overrun_us.load(Ordering::Relaxed),
-                c.longest_flash_overrun_us.load(Ordering::Relaxed),
+                c.longest_stalled_overrun_us.load(Ordering::Relaxed),
             );
         }
+        REPORT_GEN.fetch_add(1, Ordering::AcqRel);
     }
 
     /// Fails the phase when a core made no progress for [`STALL_REPORTS`] reports in a row.
@@ -776,6 +804,9 @@ impl Controller {
     /// Reports the phase, then resets the chip for the next phase, or reports the run and stops.
     fn end(&mut self) -> ! {
         self.report();
+        // The count stays odd until the reset, so that no sleep or wait during the lines below
+        // gets an upper bound.
+        REPORT_GEN.fetch_add(1, Ordering::AcqRel);
         let phase = Phase::get(self.index);
         let c = &COUNTS;
         let made = |counter: &AtomicU32| counter.load(Ordering::Relaxed) > 0;
@@ -922,6 +953,7 @@ fn main() -> ! {
     let phase = Phase::get(index);
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(phase.cpu_clock()));
+    esp_log::init_uart!(peripherals);
 
     report!(
         "light-sleep-stress: reset={:?}, CPU clock {:?}",

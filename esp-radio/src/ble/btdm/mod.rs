@@ -1,10 +1,9 @@
-use alloc::boxed::Box;
 use core::{ptr::NonNull, task::Poll};
 
 use esp_phy::PhyInitGuard;
 use portable_atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
-use super::{Config, ReceivedPacket};
+use super::Config;
 #[cfg(feature = "coex")]
 use crate::sys::include;
 use crate::{
@@ -84,16 +83,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     trace!("notify_host_recv {:?} {}", data, len);
 
     let data = unsafe { core::slice::from_raw_parts(data, len as usize) };
-
-    let packet = ReceivedPacket {
-        data: Box::from(data),
-    };
-
-    super::BT_STATE.with(|state| state.rx_queue.push_back(packet));
-
-    super::dump_packet_info(data);
-
-    crate::ble::controller::hci_read_data_available();
+    super::queue_rx_packet(core::iter::once(data));
 
     0
 }

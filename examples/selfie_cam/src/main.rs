@@ -28,7 +28,6 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use esp_rtos::CurrentThreadHandle;
 use static_cell::ConstStaticCell;
 
@@ -141,11 +140,12 @@ assign_resources! {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
-
     let peripherals = esp_hal::init(
         esp_hal::Config::default().with_cpu_clock(ClockConfig::from(CpuClock::max())),
     );
+
+    esp_log::init_uart!(peripherals);
+
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
     esp_alloc::heap_allocator!(size: 128 * 1024);
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
@@ -184,7 +184,7 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(camera::capture(camera).unwrap());
 
     let touch = Touch::new(i2c).await;
-    println!("Goodix touch controller at 0x{:02x}", touch.address());
+    log::info!("Goodix touch controller at 0x{:02x}", touch.address());
 
     let mut app = App {
         touch,
@@ -225,7 +225,7 @@ impl App {
             Err(_) => None,
         };
         if let Some(photos) = &photos {
-            println!("{} photos {PLACE}", photos.len());
+            log::info!("{} photos {PLACE}", photos.len());
         }
         self.photos = photos;
     }
@@ -319,7 +319,7 @@ impl App {
             let elapsed = report.elapsed();
             if elapsed >= Duration::from_secs(5) {
                 let (frames, dropped) = camera::take_counts();
-                println!(
+                log::info!(
                     "camera {} fps, {} incomplete frames; drawing the panel takes {}% of this core; {} late refills, {} resyncs, {} frames with LCD underruns",
                     frames as u64 * 1000 / elapsed.as_millis(),
                     dropped,
@@ -358,7 +358,7 @@ impl App {
         let saved = match jpeg {
             Ok(jpeg) => match self.storage.save(number, &jpeg).await {
                 Err(storage::Error::Full) => {
-                    println!("No room for more photos {PLACE}");
+                    log::info!("No room for more photos {PLACE}");
                     self.show_message("No room for more photos");
                     self.camera_status();
                     return;
@@ -371,7 +371,7 @@ impl App {
         };
         match saved {
             Ok(bytes) => {
-                println!(
+                log::info!(
                     "Saved {} ({} KB): encoding took {} ms, writing {} ms",
                     storage::file_name(number),
                     bytes / 1024,
@@ -384,7 +384,7 @@ impl App {
                 self.show_message(&format!("Saved {}", storage::file_name(number)));
             }
             Err(error) => {
-                println!("Cannot save the photo: {error}");
+                log::info!("Cannot save the photo: {error}");
                 self.show_message("Cannot save the photo");
             }
         }
@@ -464,14 +464,14 @@ impl App {
         let name = storage::file_name(number);
         match self.storage.delete(number).await {
             Ok(()) => {
-                println!("Deleted {name}");
+                log::info!("Deleted {name}");
                 if let Some(photos) = &mut self.photos {
                     photos.remove(index);
                 }
                 true
             }
             Err(error) => {
-                println!("Cannot delete {name}: {error:?}");
+                log::info!("Cannot delete {name}: {error:?}");
                 self.show_message("Cannot delete the photo");
                 false
             }
@@ -511,13 +511,13 @@ impl App {
         self.message = None;
         match decoded {
             Ok(()) => {
-                println!("Loaded {name} in {} ms", started.elapsed().as_millis());
+                log::info!("Loaded {name} in {} ms", started.elapsed().as_millis());
                 let photo = Picture::new(frame);
                 self.post(Some(photo.clone()), false, Mode::Gallery);
                 Some(photo)
             }
             Err(error) => {
-                println!("Cannot load {name}: {error}");
+                log::info!("Cannot load {name}: {error}");
                 picture::give_back(frame);
                 self.show_message("Cannot load this photo");
                 self.post(None, false, Mode::Gallery);

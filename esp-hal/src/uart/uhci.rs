@@ -100,6 +100,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaConfigError,
         DmaEligiblePeripheral,
         DmaError,
         DmaRxBuffer,
@@ -378,6 +379,16 @@ where
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
     }
+
+    /// Applies a DMA configuration to both halves of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.channel.apply_config(config)
+    }
 }
 
 impl<'d> Uhci<'d, Blocking> {
@@ -389,8 +400,8 @@ impl<'d> Uhci<'d, Blocking> {
     ) -> Self {
         let guard = GenericPeripheralGuard::new();
 
-        let channel = Channel::new(channel.into());
-        channel.runtime_ensure_compatible(uhci.dma_peripheral());
+        let mut channel = Channel::new(channel.into());
+        channel.connect(uhci.dma_peripheral());
 
         let uhci = Uhci {
             uart,
@@ -449,10 +460,7 @@ where
         mut self,
         mut tx_buffer: Buf,
     ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
-        let res = unsafe {
-            self.channel_tx
-                .prepare_transfer(self.uhci_per.dma_peripheral(), &mut tx_buffer)
-        };
+        let res = unsafe { self.channel_tx.prepare_transfer(&mut tx_buffer) };
         if let Err(err) = res {
             return Err((err.into(), self, tx_buffer));
         }
@@ -469,6 +477,16 @@ where
     pub fn apply_config(&mut self, config: &TxConfig) -> Result<(), ConfigError> {
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
+    }
+
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.channel_tx.apply_config(config)
     }
 }
 
@@ -495,10 +513,7 @@ where
         mut rx_buffer: Buf,
     ) -> Result<UhciDmaRxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         {
-            let res = unsafe {
-                self.channel_rx
-                    .prepare_transfer(self.uhci_per.dma_peripheral(), &mut rx_buffer)
-            };
+            let res = unsafe { self.channel_rx.prepare_transfer(&mut rx_buffer) };
             if let Err(err) = res {
                 return Err((err.into(), self, rx_buffer));
             }
@@ -516,6 +531,16 @@ where
     pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
+    }
+
+    /// Applies a DMA configuration to the RX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.channel_rx.apply_config(config)
     }
 }
 
@@ -827,5 +852,7 @@ with_uhci_dma_engine! {
         type ErasedChannel<'d> = crate::dma::$any_channel<'d>;
         type ErasedTxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Tx;
         type ErasedRxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Rx;
+
+        crate::dma::driver_dma_config!($engine);
     };
 }

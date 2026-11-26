@@ -1,6 +1,6 @@
 #![no_std]
 
-// By default, the tests log through esp-println on the serial port that probe-rs reads, because
+// By default, the tests log through esp-log on the serial port that probe-rs reads, because
 // polling RTT halts the cores. The tests that use UART0 or the USB-Serial-JTAG port for themselves
 // log over RTT.
 
@@ -13,7 +13,41 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 use esp_hal as _;
 #[cfg(feature = "log-serial")]
-use esp_println as _;
+#[doc(hidden)]
+pub use esp_log;
+
+/// Installs the logger on the serial port that probe-rs reads: USB-Serial-JTAG where the chip has
+/// it, otherwise UART0 on its default TX pin. Moves the fields it uses out of `$peripherals`.
+///
+/// The drivers are unstable, so this does nothing unless the test enables `unstable`. It also does
+/// nothing with `log-rtt`.
+#[macro_export]
+macro_rules! init_logger {
+    ($peripherals:expr) => {
+        #[cfg(all(feature = "log-serial", feature = "unstable"))]
+        $crate::init_logger!(@install $peripherals);
+        #[cfg(not(all(feature = "log-serial", feature = "unstable")))]
+        let _ = &$peripherals;
+    };
+    (@install $peripherals:expr) => {{
+        cfg_select! {
+            // `esp_log::init_usb!` uses the pins of the default PHY, but the eFuse of some boards
+            // selects the other one.
+            soc_has_usb_device => {
+                static WRITER: static_cell::StaticCell<
+                    esp_hal::usb::usb_serial_jtag::UsbSerialJtagTx<'static, esp_hal::Blocking>,
+                > = static_cell::StaticCell::new();
+                let (_, tx) = $crate::usb_serial_jtag!($peripherals, Default::default())
+                    .unwrap()
+                    .split();
+                $crate::esp_log::init(WRITER.init(tx));
+            }
+            _ => {
+                $crate::esp_log::init_uart!($peripherals);
+            }
+        }
+    }};
+}
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
@@ -64,6 +98,17 @@ macro_rules! assert_ne {
 
 #[cfg(feature = "defmt")]
 #[macro_export]
+macro_rules! assert_matches {
+    ($left:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?))
+    };
+    ($left:expr, $pattern:pat $(if $guard:expr)?, $($arg:tt)+) => {
+        defmt::assert!(::core::matches!($left, $pattern $(if $guard)?), $($arg)+)
+    };
+}
+
+#[cfg(feature = "defmt")]
+#[macro_export]
 macro_rules! panic {
     ($($t:tt)*) => { defmt::panic!($($t)*) }
 }
@@ -84,6 +129,12 @@ macro_rules! assert_eq {
 #[macro_export]
 macro_rules! assert_ne {
     ($($t:tt)*) => { ::core::assert_ne!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! assert_matches {
+    ($($t:tt)*) => { ::core::assert_matches!($($t)*) }
 }
 
 #[cfg(not(feature = "defmt"))]

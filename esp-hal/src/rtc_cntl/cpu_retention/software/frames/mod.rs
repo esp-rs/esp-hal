@@ -19,6 +19,11 @@ macro_rules! critical_frame {
         )+
     ) => {
         /// Registers that the assembly saves, because the CPU has no valid state at that point.
+        ///
+        /// The save is an `extern "C"` function, and both of its returns are ordinary returns
+        /// to the caller. The frame holds the registers that the callee must preserve, and the
+        /// CSRs. Without `float-save-restore`, it also holds the caller-saved FPU registers: see
+        /// `fpu_temporaries`.
         #[repr(C)]
         pub(crate) struct CriticalSleepFrame {
             $(
@@ -38,9 +43,7 @@ critical_frame! {
         sp,
         gp,
         tp,
-        t0, t1, t2, t3, t4, t5, t6,
         s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11,
-        a0, a1, a2, a3, a4, a5, a6, a7,
         mstatus,
         mtvec,
         mcause,
@@ -59,16 +62,22 @@ critical_frame! {
     },
     #[cfg(any(esp32h4, esp32p4, esp32s31))]
     {
-        fpu_ft0, fpu_ft1, fpu_ft2, fpu_ft3, fpu_ft4, fpu_ft5, fpu_ft6, fpu_ft7,
-        fpu_ft8, fpu_ft9, fpu_ft10, fpu_ft11,
         fpu_fs0, fpu_fs1, fpu_fs2, fpu_fs3, fpu_fs4, fpu_fs5, fpu_fs6, fpu_fs7,
         fpu_fs8, fpu_fs9, fpu_fs10, fpu_fs11,
-        fpu_fa0, fpu_fa1, fpu_fa2, fpu_fa3, fpu_fa4, fpu_fa5, fpu_fa6, fpu_fa7,
         fpu_fcsr,
+    },
+    #[cfg(all(
+        any(esp32h4, esp32p4, esp32s31),
+        not(all(feature = "rt", feature = "float-save-restore"))
+    ))]
+    {
+        fpu_ft0, fpu_ft1, fpu_ft2, fpu_ft3, fpu_ft4, fpu_ft5, fpu_ft6, fpu_ft7,
+        fpu_ft8, fpu_ft9, fpu_ft10, fpu_ft11,
+        fpu_fa0, fpu_fa1, fpu_fa2, fpu_fa3, fpu_fa4, fpu_fa5, fpu_fa6, fpu_fa7,
     }
 }
 
-/// `RV_SLEEP_CTX_FRMSZ`: the critical frame size, rounded up to 16 bytes.
+/// The critical frame size, rounded up to 16 bytes, as esp-idf does for `RV_SLEEP_CTX_FRMSZ`.
 pub(crate) const CRITICAL_FRAME_SIZE: usize = size_of::<CriticalSleepFrame>().next_multiple_of(16);
 
 /// Declares the non-critical frame and the matched pair that moves it.

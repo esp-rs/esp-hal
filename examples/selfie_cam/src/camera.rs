@@ -33,7 +33,6 @@ use esp_hal::{
     ram,
     time::Rate,
 };
-use esp_println::println;
 
 use crate::{
     CameraResources,
@@ -117,7 +116,7 @@ pub async fn start(
     i2c.write_read_async(ADDRESS, &[0xf7], &mut id[..1]).await?;
     i2c.write_read_async(ADDRESS, &[0xf8], &mut id[1..]).await?;
     if id != ID {
-        println!("Unexpected camera ID {:02x}{:02x}", id[0], id[1]);
+        log::info!("Unexpected camera ID {:02x}{:02x}", id[0], id[1]);
     }
 
     for &[register, value] in INIT {
@@ -222,7 +221,7 @@ pub async fn capture(camera: Camera<'static, Blocking>) -> ! {
                 LATEST.signal(Picture::new(frame));
             } else {
                 if DROPPED.fetch_add(1, Ordering::Relaxed).is_multiple_of(16) {
-                    println!("incomplete frame: {bytes} bytes");
+                    log::info!("incomplete frame: {bytes} bytes");
                 }
                 picture::give_back(frame);
             }

@@ -427,6 +427,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.regdma_list_count") => {
+        5
+    };
     ("sleep.idle_frequency_scaling") => {
         false
     };
@@ -444,6 +447,9 @@ macro_rules! property {
     };
     ("dma.gdma_version", str) => {
         stringify!(3)
+    };
+    ("dma.psram_max_burst") => {
+        64
     };
     ("interrupts.status_registers") => {
         4
@@ -716,20 +722,21 @@ macro_rules! define_lp_io_signals {
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
 ///
-/// This macro has four options for its "Individual matcher" case:
+/// This macro has five options for its "Individual matcher" case:
 ///
 /// - `all`: `($num:literal)`
 /// - `tx`: `($num:literal, $idx:literal)`
 /// - `rx`: `($num:literal, $idx:literal)`
 /// - `tx_tuples`: `($blocks:literal, ($($peri:ident),+))`
+/// - `rx_tuples`: `($blocks:literal, ($($peri:ident),+))`
 ///
 /// Macro fragments:
 ///
 /// - `$num`: number of the channel, e.g. `0`
 /// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
-/// - `$blocks`: number of RAM blocks of a TX channel that uses the RAM of the channels that follow
-///   it, e.g. `2`
-/// - `$peri`: the singletons of these channels, the TX channel first, e.g. `RMT_CH1`
+/// - `$blocks`: number of RAM blocks of a channel that uses the RAM of the channels that follow it,
+///   e.g. `2`
+/// - `$peri`: the singletons of these channels, the TX or RX channel first, e.g. `RMT_CH1`
 ///
 /// Example data:
 ///
@@ -737,6 +744,7 @@ macro_rules! define_lp_io_signals {
 /// - `tx`: `(1, 1)`
 /// - `rx`: `(2, 0)`
 /// - `tx_tuples`: `(2, (RMT_CH1, RMT_CH2))`
+/// - `rx_tuples`: `(2, (RMT_CH2, RMT_CH3))`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_rmt_channel {
@@ -751,12 +759,14 @@ macro_rules! for_each_rmt_channel {
         _for_each_inner_rmt_channel!((4, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3)));
         _for_each_inner_rmt_channel!((2, (RMT_CH1, RMT_CH2)));
         _for_each_inner_rmt_channel!((3, (RMT_CH1, RMT_CH2, RMT_CH3)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH2, RMT_CH3)));
         _for_each_inner_rmt_channel!((all(0), (1), (2), (3)));
         _for_each_inner_rmt_channel!((tx(0, 0), (1, 1)));
         _for_each_inner_rmt_channel!((rx(2, 0), (3, 1)));
         _for_each_inner_rmt_channel!((tx_tuples(2, (RMT_CH0, RMT_CH1)), (3, (RMT_CH0,
         RMT_CH1, RMT_CH2)), (4, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3)), (2, (RMT_CH1,
         RMT_CH2)), (3, (RMT_CH1, RMT_CH2, RMT_CH3))));
+        _for_each_inner_rmt_channel!((rx_tuples(2, (RMT_CH2, RMT_CH3))));
     };
 }
 #[macro_export]
@@ -868,7 +878,9 @@ macro_rules! for_each_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
+        _for_each_inner_dma_engine!(("AHB_GDMA", 0, 1, 2, 3, 4, 5));
         _for_each_inner_dma_engine!((all("AHB_GDMA")));
+        _for_each_inner_dma_engine!((priority("AHB_GDMA", 0, 1, 2, 3, 4, 5)));
     };
 }
 #[macro_export]
@@ -893,10 +905,15 @@ macro_rules! for_each_dma_channel {
         [SPI3, SPI2, UHCI0, I2S0, AES, SHA, PARL_IO]));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4, 4, interrupt_in = DMA_IN_CH4,
         interrupt_out = DMA_OUT_CH4, compatible = [SPI3, SPI2, UHCI0, I2S0, AES, SHA,
-        PARL_IO])); _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0),
-        ("AHB_GDMA", DMA_CH1), ("AHB_GDMA", DMA_CH2), ("AHB_GDMA", DMA_CH3), ("AHB_GDMA",
-        DMA_CH4))); _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA",
-        any_channel = AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
+        PARL_IO])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, can_access_psram =
+        true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, can_access_psram =
+        true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, can_access_psram =
+        true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH3, can_access_psram =
+        true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4, can_access_psram =
+        true)); _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA",
+        DMA_CH1), ("AHB_GDMA", DMA_CH2), ("AHB_GDMA", DMA_CH3), ("AHB_GDMA", DMA_CH4)));
+        _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA", any_channel =
+        AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
         _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
         DMA_IN_CH0, interrupt_out = DMA_OUT_CH0, compatible = [SPI3, SPI2, UHCI0, I2S0,
         AES, SHA, PARL_IO]), ("AHB_GDMA", DMA_CH1, 1, interrupt_in = DMA_IN_CH1,
@@ -908,6 +925,10 @@ macro_rules! for_each_dma_channel {
         4, interrupt_in = DMA_IN_CH4, interrupt_out = DMA_OUT_CH4, compatible = [SPI3,
         SPI2, UHCI0, I2S0, AES, SHA, PARL_IO])));
         _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("AHB_GDMA", DMA_CH0, can_access_psram =
+        true), ("AHB_GDMA", DMA_CH1, can_access_psram = true), ("AHB_GDMA", DMA_CH2,
+        can_access_psram = true), ("AHB_GDMA", DMA_CH3, can_access_psram = true),
+        ("AHB_GDMA", DMA_CH4, can_access_psram = true)));
     };
 }
 #[macro_export]
@@ -4410,8 +4431,14 @@ macro_rules! implement_peripheral_clocks {
             UsbFs,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] =
-                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UsbDevice];
+            const KEEP_ENABLED: &[Peripheral] = &[
+                Self::Systimer,
+                Self::Timg0,
+                #[cfg(keep_uart0_enabled)]
+                Self::Uart0,
+                #[cfg(keep_usb_serial_jtag_enabled)]
+                Self::UsbDevice,
+            ];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,

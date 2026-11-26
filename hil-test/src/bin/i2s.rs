@@ -32,6 +32,7 @@ macro_rules! i2s_instance_resources {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s: esp_hal::i2s::AnyI2s<'static> = peripherals.$i2s.into();
         let dma_channel = i2s_test_dma_channel!(peripherals, $i2s);
 
@@ -61,7 +62,14 @@ mod tests {
     use esp_hal::{
         Async,
         delay::Delay,
-        dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, DmaTxStreamBuf, aligned::InternalMemory},
+        dma::{
+            BurstConfig,
+            DmaDescriptor,
+            DmaRxBuf,
+            DmaTxBuf,
+            DmaTxStreamBuf,
+            aligned::InternalMemory,
+        },
         dma_rx_stream_buffer,
         dma_tx_stream_buffer,
         gpio::{AnyPin, NoPin, Pin},
@@ -85,6 +93,19 @@ mod tests {
     }
 
     const BUFFER_SIZE: usize = 2000;
+
+    // Internal burst makes the 8000 B read buffers 4092 B descriptors. On chips with a 12-bit
+    // `rx_eof_num`, the I2S raises its EOF about 4 KB into the read, so in the last descriptor.
+    const RX_BURST_CONFIGS: [BurstConfig; 2] = [
+        BurstConfig::DEFAULT,
+        cfg_select! {
+            dma_can_access_psram => BurstConfig {
+                external_memory: esp_hal::dma::ExternalBurstConfig::DEFAULT,
+                internal_memory: esp_hal::dma::InternalBurstConfig::Enabled,
+            },
+            _ => BurstConfig::Enabled,
+        },
+    ];
 
     #[derive(Clone)]
     struct SampleSource {
@@ -429,28 +450,32 @@ mod tests {
             .with_din(din)
             .build();
 
-        for _ in 0..10 {
-            let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
-            let (res, i2s_rx_back, done_rx) = rx_transfer.wait();
-            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        for burst in RX_BURST_CONFIGS {
+            rx_buffer.set_burst_config(burst).unwrap();
 
-            assert!(done_rx.number_of_received_bytes() != 0);
+            for _ in 0..10 {
+                let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+                let (res, i2s_rx_back, done_rx) = rx_transfer.wait();
+                assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
 
-            let mut tmp = [0u8; 8000];
-            let read = done_rx.read_received_data(&mut tmp);
+                assert!(done_rx.number_of_received_bytes() != 0);
 
-            // I2S RX might not fill each buffer for every descriptor - so the read byte count might
-            // be less than the buffer size, but it should never be zero if the transfer
-            // completed successfully.
-            assert!(read != 0);
+                let mut tmp = [0u8; 8000];
+                let read = done_rx.read_received_data(&mut tmp);
 
-            let l = read - read % 4;
-            for chunk in tmp[..l].chunks(4) {
-                assert_eq!(chunk, [1, 0, 254, 255]);
+                // I2S RX might not fill each buffer for every descriptor - so the read byte count
+                // might be less than the buffer size, but it should never be zero if the transfer
+                // completed successfully.
+                assert!(read != 0);
+
+                let l = read - read % 4;
+                for chunk in tmp[..l].chunks(4) {
+                    assert_eq!(chunk, [1, 0, 254, 255]);
+                }
+
+                i2s_rx = i2s_rx_back;
+                rx_buffer = done_rx;
             }
-
-            i2s_rx = i2s_rx_back;
-            rx_buffer = done_rx;
         }
     }
 
@@ -490,30 +515,34 @@ mod tests {
             .with_din(din)
             .build();
 
-        for _ in 0..10 {
-            let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
-            rx_transfer.wait_for_done_async().await.unwrap();
-            assert_eq!(rx_transfer.is_done(), true);
-            let (res, i2s_rx_back, done_rx) = rx_transfer.wait_async().await;
-            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        for burst in RX_BURST_CONFIGS {
+            rx_buffer.set_burst_config(burst).unwrap();
 
-            assert!(done_rx.number_of_received_bytes() != 0);
+            for _ in 0..10 {
+                let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+                rx_transfer.wait_for_done_async().await.unwrap();
+                assert_eq!(rx_transfer.is_done(), true);
+                let (res, i2s_rx_back, done_rx) = rx_transfer.wait_async().await;
+                assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
 
-            let mut tmp = [0u8; 8000];
-            let read = done_rx.read_received_data(&mut tmp);
+                assert!(done_rx.number_of_received_bytes() != 0);
 
-            // I2S RX might not fill each buffer for every descriptor - so the read byte count might
-            // be less than the buffer size, but it should never be zero if the transfer
-            // completed successfully.
-            assert!(read != 0);
+                let mut tmp = [0u8; 8000];
+                let read = done_rx.read_received_data(&mut tmp);
 
-            let l = read - read % 4;
-            for chunk in tmp[..l].chunks(4) {
-                assert_eq!(chunk, [1, 0, 254, 255]);
+                // I2S RX might not fill each buffer for every descriptor - so the read byte count
+                // might be less than the buffer size, but it should never be zero if the transfer
+                // completed successfully.
+                assert!(read != 0);
+
+                let l = read - read % 4;
+                for chunk in tmp[..l].chunks(4) {
+                    assert_eq!(chunk, [1, 0, 254, 255]);
+                }
+
+                i2s_rx = i2s_rx_back;
+                rx_buffer = done_rx;
             }
-
-            i2s_rx = i2s_rx_back;
-            rx_buffer = done_rx;
         }
     }
 
@@ -1007,20 +1036,27 @@ mod tests {
         // The counter resets at the limit. Poll faster than 30000 edges.
         const LIMIT: i16 = 30000;
         counter.unit.set_high_limit(Some(LIMIT)).unwrap();
-        counter.unit.clear();
 
-        let mut edges = 0u64;
-        let mut last = 0i16;
-        let start = Instant::now();
-        loop {
-            let value = counter.unit.value();
-            let elapsed = start.elapsed();
-            edges += (value as i32 - last as i32).rem_euclid(LIMIT as i32) as u64;
-            last = value;
-            if elapsed >= Duration::from_millis(20) {
-                return edges * 1_000_000 / elapsed.as_micros();
+        // The first window runs code that is not in the cache yet. A stall between reading the
+        // counter and reading the time counts edges outside the timed window, so only the second
+        // window counts.
+        let mut hz = 0;
+        for _ in 0..2 {
+            let mut edges = 0u64;
+            let mut last = counter.unit.value();
+            let start = Instant::now();
+            loop {
+                let value = counter.unit.value();
+                let elapsed = start.elapsed();
+                edges += (value as i32 - last as i32).rem_euclid(LIMIT as i32) as u64;
+                last = value;
+                if elapsed >= Duration::from_millis(20) {
+                    hz = edges * 1_000_000 / elapsed.as_micros();
+                    break;
+                }
             }
         }
+        hz
     }
 
     /// Configures each sample rate in sequence and checks that MCLK is 256 times the rate.
@@ -1372,6 +1408,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s = peripherals.I2S0.into();
         let dma_channel: I2sDmaChannel<'static> = peripherals.DMA_I2S0.into();
         run_i2s_parallel_interrupt(i2s, dma_channel);
@@ -1383,6 +1420,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s = peripherals.I2S1.into();
         let dma_channel: I2sDmaChannel<'static> = peripherals.DMA_I2S1.into();
         run_i2s_parallel_interrupt(i2s, dma_channel);
@@ -1424,6 +1462,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s = peripherals.I2S0.into();
         let dma_channel: esp_hal::dma::I2sDmaChannel<'static> = peripherals.DMA_I2S0.into();
         run_driver_does_not_hang_when_async(i2s, dma_channel).await;
@@ -1435,6 +1474,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let i2s = peripherals.I2S1.into();
         let dma_channel: esp_hal::dma::I2sDmaChannel<'static> = peripherals.DMA_I2S1.into();
         run_driver_does_not_hang_when_async(i2s, dma_channel).await;
@@ -1469,6 +1509,7 @@ mod i2s_parallel_tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let (_, dout) = hil_test::common_test_pins!(peripherals);
         let (clock_in, clock_out) = unsafe { dout.split() };
         let counter = super::EdgeCounter::new(clock_in);
@@ -1571,6 +1612,7 @@ macro_rules! pdm_instance_resources {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         let (clk, dout) = hil_test::common_test_pins!(peripherals);
         (
             peripherals.$i2s,
@@ -1642,6 +1684,7 @@ mod pdm_tx_tests {
     #[cfg(soc_has_i2s0)]
     fn pdm_tx_config_validate_i2s0() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_tx_config_validate(&peripherals.I2S0);
     }
 
@@ -1656,6 +1699,7 @@ mod pdm_tx_tests {
     #[cfg(soc_has_i2s1)]
     fn pdm_tx_config_validate_i2s1() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_tx_config_validate(&peripherals.I2S1);
     }
 
@@ -1670,6 +1714,7 @@ mod pdm_tx_tests {
     #[cfg(soc_has_i2s2)]
     fn pdm_tx_config_validate_i2s2() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_tx_config_validate(&peripherals.I2S2);
     }
 
@@ -1742,6 +1787,7 @@ mod pdm_rx_tests {
     #[cfg(soc_has_i2s0)]
     fn pdm_rx_config_validate_i2s0() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_rx_config_validate(&peripherals.I2S0);
     }
 
@@ -1757,6 +1803,7 @@ mod pdm_rx_tests {
     #[cfg(all(soc_has_i2s1, not(esp32)))]
     fn pdm_rx_config_validate_i2s1() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_rx_config_validate(&peripherals.I2S1);
     }
 
@@ -1771,6 +1818,7 @@ mod pdm_rx_tests {
     #[cfg(soc_has_i2s2)]
     fn pdm_rx_config_validate_i2s2() {
         let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
         run_test_pdm_rx_config_validate(&peripherals.I2S2);
     }
 

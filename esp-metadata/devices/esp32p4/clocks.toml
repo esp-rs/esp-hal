@@ -62,6 +62,7 @@ system_clocks = { clock_tree = [
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         { name = "XTAL_D2", outputs = "XTAL_D2_CLK" },
     ] },
+    { name = "LP_PERI_CLK", type = "generic", always_on = true, params = { divisor = "0..64" }, output = "LP_FAST_CLK / (divisor + 1)" },
     { name = "LP_SLOW_CLK", type = "mux", variants = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
@@ -93,6 +94,11 @@ system_clocks = { clock_tree = [
         #{ name = "PLL_LP_CLK",      outputs = "PLL_LP_CLK" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "LP_PERI", outputs = "LP_PERI_CLK", default = true },
+        ] },
+    ] },
     { group = "PSRAM", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL", outputs = "XTAL_CLK", default = true },
@@ -195,6 +201,17 @@ system_clocks = { clock_tree = [
         ] },
       ],
     },
+    # Function clocks live in HP_SYS_CLKRST. The divider register stores N - 1.
+    { group = "LCD_CAM", clocks = [
+        { name = "LCD_CLOCK", type = "generic", wake_locking = true, output = "(sclk * div_a) / (div_num * div_a + div_b)", params = { sclk = [
+            { name = "XTAL_CLK",  outputs = "XTAL_CLK", default = true },
+            { name = "PLL_F160M", outputs = "PLL_F160M" },
+        ], div_num = "1 ..= 256", div_a = "1 ..= 255", div_b = "0 ..= 255" } },
+        { name = "CAM_CLOCK", type = "generic", wake_locking = true, output = "(sclk * div_a) / (div_num * div_a + div_b)", params = { sclk = [
+            { name = "XTAL_CLK",  outputs = "XTAL_CLK", default = true },
+            { name = "PLL_F160M", outputs = "PLL_F160M" },
+        ], div_num = "1 ..= 256", div_a = "1 ..= 255", div_b = "0 ..= 255" } },
+    ] },
     # APLL (register value 1 on PHY_PLL_REFCLK) is intentionally omitted
     # because it is not yet modelled in the clock tree.
     { group = "MIPI_DSI", clocks = [
@@ -248,7 +265,7 @@ peripheral_clocks = { templates = [
 ], peripheral_clocks = [
     # Ref: TRM v0.5 Ch 12 (Reset and Clock), Ch 22 (System Registers).
     # UARTs -- sys_clk + apb_clk; reset asserts both core+apb together.
-    { name = "Uart0", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" }, keep_enabled = true },
+    { name = "Uart0", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" }, keep_enabled = "keep_uart0_enabled" },
     { name = "Uart1", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },
     { name = "Uart2", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },
     { name = "Uart3", template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_template = "{{uart_rst_template}}" } },
@@ -269,7 +286,7 @@ peripheral_clocks = { templates = [
     { name = "Timg1", template_params = { clk_en_template = "{{apb_clk_template}}", clk_field = "timergrp1", rst_group = "1", rst_field = "timergrp1" } },
     # IO MUX -- gated via PERI_CLK_CTRL26; KEEP_ENABLED because GPIO depends on it.
     { name = "Iomux", template_params = { clk_en_template = "{{control}}::regs().peri_clk_ctrl26().modify(|_, w| w.iomux_clk_en().bit(enable));", rst_group = "1" }, keep_enabled = true },
-    # PWM/Counter/RMT -- LCD/CAM clock gate lives in SOC_CLK_CTRL3 (not modelled in current PAC), keep stub.
+    # PWM/Counter/RMT
     { name = "Ledc",   template_params = { rst_group = "1", rst_field = "ledc" } },
     { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Pcnt",   template_params = { clk_en_template = "{{apb_clk_template}}", rst_group = "1" } },
@@ -284,7 +301,7 @@ peripheral_clocks = { templates = [
     # USB -- reset is via LP-domain registers, leave rst as no-op here.
     { name = "UsbFs",  template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "usb_otg11", rst_template = "{{no_rst}}" } },
     { name = "UsbHs",  template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "usb_otg20", rst_template = "{{no_rst}}" } },
-    { name = "UsbDevice", template_params = { clk_en_template = "{{apb_clk_template}}", rst_template = "{{no_rst}}" }, keep_enabled = true },
+    { name = "UsbDevice", template_params = { clk_en_template = "{{apb_clk_template}}", rst_template = "{{no_rst}}" }, keep_enabled = "keep_usb_serial_jtag_enabled" },
     # Connectivity -- EMAC and SDMMC reset live in dedicated registers, no HP_RST_EN gate.
     { name = "Emac",  template_params = { clk_en_template = "{{sys_clk_template}}", rst_template = "{{no_rst}}" } },
     { name = "SdioHost", template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "sdmmc", rst_template = "crate::peripherals::LP_AON_CLKRST::regs().lp_aonclkrst_hp_sdmmc_emac_rst_ctrl().modify(|_, w| w.lp_aonclkrst_rst_en_sdmmc().bit(reset));" } },
@@ -306,12 +323,16 @@ peripheral_clocks = { templates = [
     { name = "Jpeg",    template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "jpeg",     rst_group = "0", rst_field = "jpeg" } },
     # Pixel processing accelerator
     { name = "Ppa",     template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "ppa",      rst_group = "1", rst_field = "ppa" } },
+    { name = "Tsens", template_params = {
+        clk_en_template = "crate::peripherals::LP_PERI::regs().clk_en().modify(|_, w| w.ck_en_lp_tsens().bit(enable));",
+        rst_template = "crate::peripherals::LP_PERI::regs().reset_en().modify(|_, w| w.rst_en_lp_tsens().bit(reset));"
+    } },
     # ADC -- the digital controller needs both the APB gate and the PERI_CLK_CTRL23 function clock.
     { name = "ApbSarAdc", template_params = { clk_en_template = "{{apb_clk_template}} {{control}}::regs().peri_clk_ctrl23().modify(|_, w| w.adc_clk_en().bit(enable));", clk_field = "adc", rst_group = "2", rst_field = "adc" } },
     # Parallel IO -- reset asserts the parlio block plus its rx/tx subreset bits in one write.
     { name = "ParlIo", template_params = { clk_en_template = "{{sys_apb_clk_template}}", clk_field = "parlio", rst_template = "{{control}}::regs().hp_rst_en2().modify(|_, w| w.rst_en_parlio().bit(reset).rst_en_parlio_rx().bit(reset).rst_en_parlio_tx().bit(reset));" } },
-    # LCD/CAM -- clock gate lives in SOC_CLK_CTRL3 (not modelled), only reset is wired up.
-    { name = "LcdCam", template_params = { rst_group = "2", rst_field = "lcdcam" } },
+    # LCD/CAM -- APB clock gate in SOC_CLK_CTRL3; reset in HP_RST_EN2.
+    { name = "LcdCam", template_params = { clk_en_template = "{{control}}::regs().soc_clk_ctrl3().modify(|_, w| w.lcdcam_apb_clk_en().bit(enable));", rst_group = "2", rst_field = "lcdcam" } },
     # MIPI-DSI -- sys_clk in SOC_CLK_CTRL1; bridge reset in HP_RST_EN0.
     { name = "MipiDsi", template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "dsi", rst_group = "0", rst_field = "dsi_brg" } },
 ] }

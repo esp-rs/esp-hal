@@ -29,6 +29,7 @@ mod tests {
 
     #[test]
     fn espnow_max_encrypt_num_is_honored(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -57,6 +58,7 @@ mod tests {
 
     #[test]
     fn espnow_max_encrypt_num_raises_the_limit(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -78,6 +80,7 @@ mod tests {
 
     #[test]
     fn esp_now_survives_controller_drop(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -100,6 +103,7 @@ mod tests {
 
     #[test]
     fn sta_disconnected_pm_can_be_configured(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 

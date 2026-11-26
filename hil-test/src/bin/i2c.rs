@@ -76,6 +76,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
@@ -264,8 +265,9 @@ mod tests {
             }
 
             // Assert that the I2C transaction was cancelled.
-            hil_test::assert!(
-                matches!(select_result, Either::Second(_)),
+            hil_test::assert_matches!(
+                select_result,
+                Either::Second(_),
                 "({}) Transaction completed with {:?}",
                 n_yield,
                 select_result
@@ -576,6 +578,7 @@ mod i2c_slave {
     ];
     const TIMEOUT_CASES: [(bool, u8); 4] = [(false, 14), (true, 14), (false, 22), (true, 22)];
     const MAX_LEFTOVER_BYTES: usize = u16::MAX as usize;
+    const SCL_RISE_TIME: time::Duration = time::Duration::from_micros(10);
     static LONG_RESPONSE: [u8; MAX_LEFTOVER_BYTES + 2] = [0x5a; MAX_LEFTOVER_BYTES + 2];
     static MASTER_DONE: AtomicBool = AtomicBool::new(false);
     static MASTER_PAUSED: AtomicBool = AtomicBool::new(false);
@@ -754,6 +757,9 @@ mod i2c_slave {
                 self.pause_on_read_stretch = false;
                 pause_master().await;
             }
+            // SCL can read low for SCL_RISE_TIME after release. That low level is not a stretch.
+            let released = time::Instant::now();
+            while self.scl.is_low() && released.elapsed() < SCL_RISE_TIME {}
             while self.scl.is_low() {
                 Timer::after_micros(50).await;
             }
@@ -980,6 +986,7 @@ mod i2c_slave {
     }
 
     fn setup(peripherals: Peripherals) -> Context {
+        hil_test::init_logger!(peripherals);
         MASTER_DONE.store(false, Ordering::SeqCst);
         MASTER_PAUSED.store(false, Ordering::SeqCst);
         let timg = TimerGroup::new(peripherals.TIMG0);
@@ -1007,6 +1014,7 @@ mod i2c_slave {
     #[test]
     #[cfg(i2c_slave_i2c1)]
     async fn async_i2c1_write_read(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         esp_rtos::start(TimerGroup::new(peripherals.TIMG0).timer0);
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
         let (slave, mut master) = connect_bus(peripherals.I2C1, sda, scl);
@@ -1032,6 +1040,7 @@ mod i2c_slave {
     #[test]
     #[cfg(soc_has_pcr)]
     fn function_clock_lifetime(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let mut i2c = peripherals.I2C0;
         // An inherited enabled gate would hide a missing clock request.
         PCR::regs()
@@ -1039,10 +1048,10 @@ mod i2c_slave {
             .modify(|_, w| w.i2c_sclk_en().clear_bit());
         assert!(!function_clock_enabled());
 
-        assert!(matches!(
+        hil_test::assert_matches!(
             I2cSlave::new(i2c.reborrow(), Config::new(0x80)),
             Err(ConfigError::AddressInvalid)
-        ));
+        );
         assert!(!function_clock_enabled());
 
         for _ in 0..2 {
@@ -1059,6 +1068,7 @@ mod i2c_slave {
 
     #[test]
     fn invalid_config_preserves_state(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let mut slave = I2cSlave::new(peripherals.I2C0, Config::new(ADDRESS)).unwrap();
         let regs = I2C0::regs();
         regs.data()
@@ -1689,6 +1699,7 @@ mod i2c_slave {
             } else {
                 assert_eq!(slave.listen(&mut [0]).await, Err(Error::Timeout));
             }
+            assert_eq!(regs.to().read().time_out_value().bits(), timeout);
             wait_for_pause().await;
             MASTER_PAUSED.store(false, Ordering::SeqCst);
             // Keep the next listen from recovering the controller before the bus check.
@@ -1865,6 +1876,7 @@ mod clock_gate {
         static STOPPED: AtomicBool = AtomicBool::new(false);
 
         let mut p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         let mut adc = p.ADC1;
         let mut cpu_control = CpuControl::new(p.CPU_CTRL);
         let stack = mk_static!(Stack<8192>, Stack::new());

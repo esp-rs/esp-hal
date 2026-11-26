@@ -9,6 +9,34 @@ use crate::{
     system::PeripheralGuard,
 };
 
+// Unused on chips without engine priorities.
+#[allow(unused_macros)]
+macro_rules! priority_enum {
+    ($name:ident, $engine:literal, $($level:literal),+) => {
+        paste::paste! {
+            #[doc = concat!("Channel priority of the ", $engine, " engine.")]
+            ///
+            /// The arbiter serves the channel with the highest priority first. Level 0 is the
+            /// lowest priority and the default.
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            #[non_exhaustive]
+            pub enum $name {
+                $(
+                    #[doc = concat!("Priority level ", stringify!($level), ".")]
+                    [<Priority $level>] = $level,
+                )+
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::Priority0
+            }
+        }
+    };
+}
+
 for_each_dma_engine! {
     ("AHB_GDMA") => {
         mod gdma;
@@ -35,6 +63,59 @@ for_each_dma_engine! {
         pub use spi::*;
     };
 }
+
+/// Names the configuration type of a DMA engine.
+macro_rules! engine_config {
+    ("AHB_GDMA") => {
+        crate::dma::AhbGdmaConfig
+    };
+    ("AXI_GDMA") => {
+        crate::dma::AxiGdmaConfig
+    };
+    ("SPI_DMA") => {
+        crate::dma::SpiDmaConfig
+    };
+    ("I2S_DMA") => {
+        crate::dma::I2sDmaConfig
+    };
+    ("CRYPTO_DMA") => {
+        crate::dma::CryptoDmaConfig
+    };
+    ("COPY_DMA") => {
+        crate::dma::CopyDmaConfig
+    };
+}
+pub(crate) use engine_config;
+
+/// Declares the `DmaConfig` alias of a driver module, and `DmaPriority` on engines with
+/// priority registers.
+macro_rules! driver_dma_config {
+    (@config $engine:tt) => {
+        /// The DMA configuration type of this driver's DMA engine.
+        ///
+        /// `apply_dma_config` applies this configuration.
+        #[instability::unstable]
+        pub type DmaConfig = $crate::dma::engine_config!($engine);
+    };
+    ("AHB_GDMA") => {
+        $crate::dma::driver_dma_config!(@config "AHB_GDMA");
+
+        /// The channel priority type of this driver's DMA engine.
+        #[instability::unstable]
+        pub type DmaPriority = $crate::dma::AhbPriority;
+    };
+    ("AXI_GDMA") => {
+        $crate::dma::driver_dma_config!(@config "AXI_GDMA");
+
+        /// The channel priority type of this driver's DMA engine.
+        #[instability::unstable]
+        pub type DmaPriority = $crate::dma::AxiPriority;
+    };
+    ($engine:tt) => {
+        $crate::dma::driver_dma_config!(@config $engine);
+    };
+}
+pub(crate) use driver_dma_config;
 
 /// Implemented by peripheral singletons that can be used with a DMA engine.
 pub trait DmaEligiblePeripheral<D: DmaChannel> {
@@ -68,6 +149,9 @@ for_each_peripheral! {
 
 #[doc(hidden)]
 pub trait RegisterAccess: Sealed {
+    /// The configuration type of the channel's DMA engine.
+    type Config: Copy + Default;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard>;
 
@@ -82,10 +166,8 @@ pub trait RegisterAccess: Sealed {
     /// descriptors in internal RAM.
     fn set_descr_burst_mode(&self, burst_mode: bool);
 
-    /// The priority of the channel. The larger the value, the higher the
-    /// priority.
-    #[cfg(dma_max_priority_is_set)]
-    fn set_priority(&self, priority: crate::dma::DmaPriority);
+    /// Writes the engine configuration to the channel half.
+    fn apply_config(&self, config: &Self::Config);
 
     /// Selects a peripheral for the channel.
     fn set_peripheral(&self, _peripheral: u8) {}
@@ -128,6 +210,9 @@ pub trait RegisterAccess: Sealed {
 pub trait RxRegisterAccess: RegisterAccess {
     #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, value: bool);
+
+    /// Inlink descriptor address when a successful EOF occurs on the Rx channel.
+    fn last_dscr_address(&self) -> usize;
 
     fn peripheral_interrupt(&self) -> Option<Interrupt>;
     fn async_handler(&self) -> Option<InterruptHandler>;
@@ -179,11 +264,14 @@ pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {}
 
 /// A description of a DMA Channel.
 pub trait DmaChannel: Sized + crate::private::Sealed {
+    /// The configuration type of the channel's DMA engine.
+    type Config: Copy + Default;
+
     /// A description of the RX half of a DMA Channel.
-    type Rx: DmaRxChannel + From<Self>;
+    type Rx: DmaRxChannel<Config = Self::Config> + From<Self>;
 
     /// A description of the TX half of a DMA Channel.
-    type Tx: DmaTxChannel + From<Self>;
+    type Tx: DmaTxChannel<Config = Self::Config> + From<Self>;
 
     /// Splits the DMA channel into its RX and TX halves.
     #[cfg(dma_separate_in_out_interrupts)] // TODO relax this to allow splitting on all chips
@@ -212,6 +300,7 @@ macro_rules! impl_channel_common {
     ($peri:ident, $instance:ident) => {
         paste::paste! {
             impl<'d> DmaChannel for $instance<'d> {
+                type Config = <[<$peri RxChannel>]<'d> as RegisterAccess>::Config;
                 type Rx = [<$peri RxChannel>]<'d>;
                 type Tx = [<$peri TxChannel>]<'d>;
 

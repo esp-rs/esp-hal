@@ -383,24 +383,6 @@ impl RawMutex {
     }
 }
 
-unsafe impl embassy_sync_06::blocking_mutex::raw::RawMutex for RawMutex {
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: Self = Self::new();
-
-    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        self.inner.lock(f)
-    }
-}
-
-unsafe impl embassy_sync_07::blocking_mutex::raw::RawMutex for RawMutex {
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: Self = Self::new();
-
-    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        self.inner.lock(f)
-    }
-}
-
 unsafe impl embassy_sync_08::blocking_mutex::raw::RawMutex for RawMutex {
     #[allow(clippy::declare_interior_mutable_const)]
     const INIT: Self = Self::new();
@@ -433,7 +415,7 @@ impl<T> NonReentrantMutex<T> {
     /// Calling this reentrantly will panic.
     pub fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
         self.lock_state
-            .lock_non_reentrant(|| f(unsafe { &mut *self.data.get() }))
+            .lock_non_reentrant(|| f(unsafe { self.data.as_mut_unchecked() }))
     }
 }
 

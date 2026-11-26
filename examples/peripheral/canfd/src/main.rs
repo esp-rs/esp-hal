@@ -35,14 +35,14 @@ use esp_hal::{
     delay::Delay,
     main,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     // Without an external transceiver, we only need a single line between the two
     // MCUs.
@@ -84,7 +84,7 @@ fn main() -> ! {
         while canfd.rx_frame_count() == 0 {}
         let received = canfd.receive().unwrap();
 
-        println!("Received a frame: {received:?}");
+        log::info!("Received a frame: {received:?}");
         delay.delay_millis(250);
 
         // Transmit a new frame back to the other ESP.
@@ -102,5 +102,5 @@ fn send(canfd: &mut CanFd<'_>, frame: &Frame) {
             state => panic!("transmission failed: {state:?}"),
         }
     }
-    println!("Sent a frame");
+    log::info!("Sent a frame");
 }

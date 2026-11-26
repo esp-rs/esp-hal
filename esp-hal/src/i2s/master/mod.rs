@@ -230,6 +230,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaConfigError,
         DmaEligiblePeripheral,
         DmaError,
         DmaRxBuffer,
@@ -320,6 +321,8 @@ with_i2s_dma_engine! {
 
         // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
         type I2sMasterErased<'d> = crate::dma::$any_channel<'d>;
+
+        crate::dma::driver_dma_config!($engine);
     };
 }
 
@@ -499,7 +502,9 @@ where
 {
     /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
-        self.completed || self.i2s_rx.i2s.info().is_rx_done()
+        self.completed
+            || self.i2s_rx.i2s.info().is_rx_done()
+            || self.i2s_rx.rx_channel.has_eof_on_last_descriptor()
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
@@ -544,10 +549,8 @@ where
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     pub async fn wait_async(mut self) -> (Result<(), DmaError>, I2sRx<'d, Async>, Buf::Final) {
         if !self.completed {
-            // we treat DescriptorEmpty as rx transfer is done
-            if let Err(err) = DmaRxFuture::new_with_config(
+            if let Err(err) = DmaRxFuture::new_until_end_of_chain(
                 &mut self.i2s_rx.rx_channel,
-                enum_set!(DmaRxInterrupt::DescriptorEmpty),
                 enum_set!(DmaRxInterrupt::ErrorEof | DmaRxInterrupt::DescriptorError),
             )
             .await
@@ -573,10 +576,8 @@ where
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     pub async fn wait_for_done_async(&mut self) -> Result<(), DmaError> {
         if !self.completed {
-            // we treat DescriptorEmpty as rx transfer is done
-            DmaRxFuture::new_with_config(
+            DmaRxFuture::new_until_end_of_chain(
                 &mut self.i2s_rx.rx_channel,
-                enum_set!(DmaRxInterrupt::DescriptorEmpty),
                 enum_set!(DmaRxInterrupt::ErrorEof | DmaRxInterrupt::DescriptorError),
             )
             .await?;
@@ -1509,9 +1510,9 @@ impl<'d> I2s<'d, Blocking> {
         channel: I2sMasterErased<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let channel = Channel::new(channel);
+        let mut channel = Channel::new(channel);
         let i2s = i2s.degrade();
-        channel.runtime_ensure_compatible(i2s.dma_peripheral());
+        channel.connect(i2s.dma_peripheral());
 
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -1573,6 +1574,16 @@ impl<'d> I2s<'d, Blocking> {
                     #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
                     Config::Pdm(_) => DataFormat::Data16Channel16,
                 },
+                #[cfg(i2s_version = "1")]
+                sample_period_cycles: match config {
+                    Config::Tdm(c) => sample_period_cycles(c.sample_rate),
+                    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+                    Config::Pdm(c) => sample_period_cycles(match (c.tx, c.rx) {
+                        (Some(tx), _) => tx.clock.sample_rate,
+                        (None, Some(rx)) => rx.clock.sample_rate,
+                        (None, None) => unreachable!(),
+                    }),
+                },
             },
         })
     }
@@ -1599,6 +1610,8 @@ impl<'d> I2s<'d, Blocking> {
                 mclk_out_guard: self.i2s_tx.mclk_out_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.i2s_tx.data_format,
+                #[cfg(i2s_version = "1")]
+                sample_period_cycles: self.i2s_tx.sample_period_cycles,
             },
         }
     }
@@ -1712,6 +1725,14 @@ where
     }
 }
 
+/// The sample period in CPU cycles, rounded up.
+#[cfg(i2s_version = "1")]
+pub(crate) fn sample_period_cycles(sample_rate: Rate) -> u32 {
+    crate::clock::cpu_clock()
+        .as_hz()
+        .div_ceil(sample_rate.as_hz())
+}
+
 /// I2S TX channel.
 pub struct I2sTx<'d, Dm>
 where
@@ -1725,6 +1746,8 @@ where
     _mclk_out_guard: Option<I2sMclkOutGuard>,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
+    #[cfg(i2s_version = "1")]
+    sample_period_cycles: u32,
 }
 
 impl<Dm> core::fmt::Debug for I2sTx<'_, Dm>
@@ -1750,14 +1773,17 @@ where
         self.i2s.info().reset_tx();
         let res = unsafe {
             self.tx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = res {
             return Err((Error::DmaError(err), self, buffer));
         }
 
-        self.i2s.info().tx_start();
+        self.i2s.info().tx_start(
+            #[cfg(i2s_version = "1")]
+            self.sample_period_cycles,
+        );
 
         Ok(I2sTxDmaTransfer {
             i2s_tx: ManuallyDrop::new(self),
@@ -1774,6 +1800,16 @@ where
             #[cfg(i2s_version = "1")]
             self.data_format,
         )
+    }
+
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.tx_channel.apply_config(config)
     }
 }
 
@@ -1823,7 +1859,7 @@ where
 
         let res = unsafe {
             self.rx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = res {
@@ -1848,6 +1884,16 @@ where
             #[cfg(i2s_version = "1")]
             self.data_format,
         )
+    }
+
+    /// Applies a DMA configuration to the RX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.rx_channel.apply_config(config)
     }
 }
 
@@ -2029,6 +2075,8 @@ pub(crate) mod private {
         pub(crate) mclk_out_guard: Option<I2sMclkOutGuard>,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
+        #[cfg(i2s_version = "1")]
+        pub(crate) sample_period_cycles: u32,
     }
 
     impl<'d, Dm> TxCreator<'d, Dm>
@@ -2046,6 +2094,8 @@ pub(crate) mod private {
                 _mclk_out_guard: self.mclk_out_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
+                #[cfg(i2s_version = "1")]
+                sample_period_cycles: self.sample_period_cycles,
             }
         }
 

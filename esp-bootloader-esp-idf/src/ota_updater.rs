@@ -1,4 +1,6 @@
 //! # A more convenient way to access Over The Air Updates (OTA) functionality.
+//!
+//! Application rollback requirements are documented on [`crate::ota::OtaImageState`].
 
 use crate::{
     ota::OtaImageState,
@@ -111,18 +113,20 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         self.ota_data()?.current_app_partition()
     }
 
-    /// Returns the [OtaImageState] of the currently selected partition.
+    /// Returns the [`OtaImageState`] of the currently selected partition.
     ///
     /// # Errors
-    /// A [Error::InvalidState] if no partition is currently selected.
+    ///
+    /// [`Error::InvalidState`] if no partition is currently selected.
     pub fn current_ota_state(&mut self) -> Result<OtaImageState, Error> {
         self.ota_data()?.current_ota_state()
     }
 
-    /// Sets the [OtaImageState] of the currently selected slot.
+    /// Sets the [`OtaImageState`] of the currently selected slot.
     ///
     /// # Errors
-    /// A [Error::InvalidState] if no partition is currently selected.
+    ///
+    /// [`Error::InvalidState`] if no partition is currently selected.
     pub fn set_current_ota_state(&mut self, state: OtaImageState) -> Result<(), Error> {
         self.ota_data()?.set_current_ota_state(state)
     }

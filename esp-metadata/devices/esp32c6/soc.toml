@@ -1,9 +1,6 @@
 # ESP32-C6 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32c6"
@@ -363,6 +360,8 @@ wakeup_sources = {
 [device.sleep.retention]
 cpu_retention = "software"
 modem_retention = "regdma"
+regdma_list_count = 4
+regdma_bt_needs_pll = true
 cpu_retention_frame = "c6_h2"
 supports_top_power_down = true
 

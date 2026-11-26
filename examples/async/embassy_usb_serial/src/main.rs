@@ -38,10 +38,11 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
@@ -95,9 +96,9 @@ async fn main(_spawner: Spawner) {
     let echo_fut = async {
         loop {
             class.wait_connection().await;
-            esp_println::println!("Connected");
+            log::info!("Connected");
             let _ = echo(&mut class).await;
-            esp_println::println!("Disconnected");
+            log::info!("Disconnected");
         }
     };
 

@@ -123,10 +123,14 @@ unstable_module! {
     // only include sleep where it's been implemented
     #[cfg(sleep_driver_supported)]
     pub mod sleep;
+    // Public for esp-radio, which builds the REGDMA nodes of the radios.
+    #[cfg(modem_retention = "regdma")]
+    #[doc(hidden)]
+    pub mod regdma;
 }
 
 cfg_select! {
-    any(supports_cpu_power_down, modem_retention = "backup_dma") => {
+    any(supports_cpu_power_down, supports_modem_power_down) => {
         mod retention_memory;
         #[doc(hidden)]
         #[instability::unstable]

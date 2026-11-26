@@ -1,7 +1,7 @@
 //! UART Test
 //!
-//! The tests drive UART0, which esp-println prints to if no USB host is attached, so they log over
-//! RTT.
+//! The tests drive UART0, which the serial logger uses on chips without USB-Serial-JTAG, so they
+//! log over RTT.
 
 //% CHIP_FILTER: uart_driver_supported
 //% FEATURES: unstable embassy log-rtt
@@ -523,7 +523,7 @@ mod async_tx_rx {
         timer::timg::TimerGroup,
         uart::{self, RxConfig, RxError, RxErrorKind, UartRx, UartTx},
     };
-    use hil_test::{assert, assert_eq, assert_ne};
+    use hil_test::{assert, assert_eq, assert_matches, assert_ne};
 
     struct Context {
         rx: UartRx<'static, Async>,
@@ -666,7 +666,7 @@ mod async_tx_rx {
         // The read is supposed to return an error because the FIFO is just 128 bytes
         // long.
         let res = ctx.rx.read_async(&mut read).await;
-        assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
+        assert_matches!(res, Err(RxError::FifoOverflowed), "{:?}", res);
     }
 
     #[test]
@@ -679,7 +679,7 @@ mod async_tx_rx {
         // The read is supposed to return an error because the FIFO is just 128 bytes
         // long.
         let res = ctx.rx.read_async(&mut read).await;
-        assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
+        assert_matches!(res, Err(RxError::FifoOverflowed), "{:?}", res);
 
         // Now we should be able to write and read back the same data.
         for _ in 0..5 {
@@ -745,7 +745,7 @@ mod async_tx_rx {
         )
         .await;
 
-        assert!(matches!(should_timeout, Either::Second(_)));
+        assert_matches!(should_timeout, Either::Second(_));
     }
 
     #[test]
@@ -772,7 +772,7 @@ mod async_tx_rx {
         )
         .await;
 
-        assert!(matches!(should_timeout, Either::Second(_)));
+        assert_matches!(should_timeout, Either::Second(_));
     }
 
     #[test]
@@ -806,7 +806,7 @@ mod async_tx_rx {
 
         // Default RX FIFO threshold should be more than 3 bytes, so we don't expect
         // read to become ready.
-        assert!(matches!(should_be_tx, Either::Second(_)));
+        assert_matches!(should_be_tx, Either::Second(_));
 
         let read = ctx.rx.read_async(&mut data).await;
 

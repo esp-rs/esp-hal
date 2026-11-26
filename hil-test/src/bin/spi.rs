@@ -325,6 +325,7 @@ mod tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
 
         #[cfg(dma_can_access_psram)]
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
@@ -958,10 +959,7 @@ mod tests {
             }
         };
         let result = select(op(&mut spi, ctx.rx_buffer, ctx.tx_buffer), cancel).await;
-        assert!(
-            matches!(result, Either::Second(_)),
-            "Operation was not cancelled"
-        );
+        hil_test::assert_matches!(result, Either::Second(_), "Operation was not cancelled");
 
         // A transfer waits for the peripheral to become idle before it starts. If a
         // chunk was left over, its rest (~4.6 ms) is clocked out before this transfer's
@@ -1432,6 +1430,7 @@ mod psram_dma {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
         let (mosi, miso) = hil_test::common_test_pins!(peripherals);
@@ -1497,6 +1496,7 @@ mod half_duplex_write_psram {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
         let sclk = peripherals.GPIO0;
@@ -1646,6 +1646,7 @@ mod read {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let sclk = peripherals.GPIO0;
         let (miso, miso_mirror) = hil_test::common_test_pins!(peripherals);
@@ -1972,6 +1973,7 @@ mod write {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (mosi, _) = hil_test::common_test_pins!(peripherals);
         let (sclk, cs) = hil_test::i2c_pins!(peripherals);
@@ -2476,6 +2478,7 @@ mod spi_slave {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (mosi_pin, miso_pin) = hil_test::i2c_pins!(peripherals);
         let (sclk_pin, _) = hil_test::common_test_pins!(peripherals);
@@ -2916,6 +2919,7 @@ mod qspi_dma {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (mut pin, mut pin_mirror) = hil_test::common_test_pins!(peripherals);
         let mut unconnected_pin = hil_test::unconnected_pin!(peripherals);
@@ -3375,6 +3379,7 @@ mod stable {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+        hil_test::init_logger!(peripherals);
 
         let (mosi, miso) = hil_test::common_test_pins!(peripherals);
         let sclk = hil_test::unconnected_pin!(peripherals);

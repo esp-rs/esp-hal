@@ -14,14 +14,34 @@
 //! verified, the OTA Data partition is updated to specify that this image
 //! should be used for the next boot.
 //!
-//! Note: The prebuilt bootloaders provided by `espflash` _might not_ include
-//! OTA support. In that case, the bootloader must be built from source.
+//! The general procedure to change the active slot:
+//! - Read the partition table with [`crate::partitions::read_partition_table`].
+//! - Find the `data`/`ota` partition.
+//! - Initialize [`Ota`].
+//! - Read the current slot and change the current slot.
 //!
-//! The general procedure to change the active slot
-//! - read the partition table [crate::partitions::read_partition_table]
-//! - find the Data/Ota partition
-//! - initialize [Ota]
-//! - read the current slot, change the current slot
+//! ## Application Rollback
+//!
+//! Application rollback is separate from selecting the next OTA slot. It
+//! requires a second-stage bootloader built from source with
+//! `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`. ESP-IDF leaves this option
+//! disabled. The prebuilt bootloaders that `espflash` flashes follow that
+//! default. Without this option, an image left in [`OtaImageState::New`] stays
+//! selected and starts again after a crash.
+//!
+//! When the option is enabled, the bootloader and the application coordinate
+//! through [`OtaImageState`]:
+//!
+//! - The application sets [`OtaImageState::New`] when activating the image.
+//! - On the first boot, the bootloader changes the state to [`OtaImageState::PendingVerify`] and
+//!   starts the image.
+//! - The application must set [`OtaImageState::Valid`] if the image operates correctly, or
+//!   [`OtaImageState::Invalid`] if it does not.
+//! - If the state is still [`OtaImageState::PendingVerify`] on the next boot, the bootloader
+//!   changes it to [`OtaImageState::Aborted`] and starts the previous working image.
+//!
+//! The bootloader does not select a slot in [`OtaImageState::Invalid`] or
+//! [`OtaImageState::Aborted`]. Only OTA slots participate in rollback.
 //!
 //! For more details see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html>
 use crate::partitions::{
@@ -69,39 +89,53 @@ impl OtaDataSlot {
     }
 }
 
-/// OTA image states for checking operability of the app.
+/// Image states stored in the OTA data partition.
+///
+/// The bootloader changes [`Self::New`] and [`Self::PendingVerify`] only when
+/// it is built with `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`. See [Application
+/// Rollback](crate::ota#application-rollback).
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default, Hash, strum::FromRepr)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
 pub enum OtaImageState {
-    /// Monitor the first boot. The bootloader will change this to
-    /// `PendingVerify` if auto-rollback is enabled.
+    /// New image, waiting for its first boot under application rollback.
     ///
-    /// Applications set this state after activating a newly installed update.
+    /// The application sets this state when activating an image. With
+    /// `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, the bootloader changes the
+    /// state to [`Self::PendingVerify`] on the first boot. Without this option,
+    /// the bootloader leaves the state unchanged and starts the image on every
+    /// boot.
     New           = 0x0,
 
-    /// Bootloader changes [OtaImageState::New] to
-    /// [OtaImageState::PendingVerify] to indicate the app should confirm the
-    /// image as working.
+    /// Image started once, waiting for the application to confirm it.
+    ///
+    /// With `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, the bootloader sets this
+    /// state from [`Self::New`] before the first start. The application must
+    /// set [`Self::Valid`] or [`Self::Invalid`] before the next reset. If the
+    /// state is still [`Self::PendingVerify`] on the next boot, the bootloader
+    /// changes it to [`Self::Aborted`] and does not start the image.
     PendingVerify = 0x1,
 
-    /// Set by the firmware once it's found to be working. The bootloader will
-    /// consider this Slot as working and continue to use it.
+    /// Image confirmed as working by the application.
+    ///
+    /// The bootloader keeps this slot selected.
     Valid         = 0x2,
 
-    /// Set by the firmware once it's found to be non-working.
+    /// Image marked as non-functional by the application.
     ///
-    /// The bootloader will consider this Slot as non-working and not try to
-    /// boot it further.
+    /// The bootloader does not select this slot.
     Invalid       = 0x3,
 
-    /// The bootloader will change the state to [OtaImageState::Aborted] if the
-    /// application didn't change [OtaImageState::PendingVerify]
-    /// to either [OtaImageState::Valid] or [OtaImageState::Invalid].
+    /// Image that failed to confirm operability before reset.
+    ///
+    /// With `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, the bootloader changes
+    /// [`Self::PendingVerify`] to this state when an unconfirmed image reboots.
+    /// The bootloader does not select this slot.
     Aborted       = 0x4,
 
-    /// Undefined. The bootloader won't make any assumptions about the working
-    /// state of this slot.
+    /// Slot with no operability information.
+    ///
+    /// The bootloader selects this slot without rollback checks.
     #[default]
     Undefined     = 0xFFFFFFFF,
 }
@@ -361,10 +395,11 @@ impl<'a, 'd> Ota<'a, 'd> {
         Ok(slot)
     }
 
-    /// Sets the [OtaImageState] of the currently selected slot.
+    /// Sets the [`OtaImageState`] of the currently selected slot.
     ///
     /// # Errors
-    /// A [Error::InvalidState] if no partition is currently selected.
+    ///
+    /// [`Error::InvalidState`] if no partition is currently selected.
     pub fn set_current_ota_state(&mut self, state: OtaImageState) -> Result<(), Error> {
         if let (UNINITIALIZED_SEQUENCE, UNINITIALIZED_SEQUENCE) = self.get_slot_seq()? {
             Err(Error::InvalidState)
@@ -377,10 +412,11 @@ impl<'a, 'd> Ota<'a, 'd> {
         }
     }
 
-    /// Returns the [OtaImageState] of the currently selected slot.
+    /// Returns the [`OtaImageState`] of the currently selected slot.
     ///
     /// # Errors
-    /// A [Error::InvalidState] if no partition is currently selected.
+    ///
+    /// [`Error::InvalidState`] if no partition is currently selected.
     pub fn current_ota_state(&mut self) -> Result<OtaImageState, Error> {
         if let (UNINITIALIZED_SEQUENCE, UNINITIALIZED_SEQUENCE) = self.get_slot_seq()? {
             Err(Error::InvalidState)
@@ -761,10 +797,10 @@ mod tests {
         flash.write(0x0000, &slot).unwrap();
 
         let mut region = ota_region(&mut flash, PARTITION_RAW);
-        assert!(matches!(
+        assert_matches!(
             OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
             Err(crate::partitions::Error::Invalid)
-        ));
+        );
     }
 
     #[test]
@@ -781,10 +817,10 @@ mod tests {
         flash.write(0x0000, &slot).unwrap();
 
         let mut region = ota_region(&mut flash, PARTITION_RAW);
-        assert!(matches!(
+        assert_matches!(
             OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
             Err(crate::partitions::Error::Invalid)
-        ));
+        );
     }
 
     #[test]
@@ -797,10 +833,10 @@ mod tests {
         flash.write(0x0000, &slot).unwrap();
 
         let mut region = ota_region(&mut flash, PARTITION_RAW);
-        assert!(matches!(
+        assert_matches!(
             OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
             Err(crate::partitions::Error::Invalid)
-        ));
+        );
     }
 
     #[test]

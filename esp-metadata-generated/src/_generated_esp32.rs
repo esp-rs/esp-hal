@@ -379,6 +379,9 @@ macro_rules! property {
     ("rgb_display.output_lines", str) => {
         stringify!(24)
     };
+    ("rgb_display.has_rgb_timing_registers") => {
+        false
+    };
     ("adc.line_calibration") => {
         true
     };
@@ -715,20 +718,21 @@ macro_rules! define_lp_io_signals {
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
 ///
-/// This macro has four options for its "Individual matcher" case:
+/// This macro has five options for its "Individual matcher" case:
 ///
 /// - `all`: `($num:literal)`
 /// - `tx`: `($num:literal, $idx:literal)`
 /// - `rx`: `($num:literal, $idx:literal)`
 /// - `tx_tuples`: `($blocks:literal, ($($peri:ident),+))`
+/// - `rx_tuples`: `($blocks:literal, ($($peri:ident),+))`
 ///
 /// Macro fragments:
 ///
 /// - `$num`: number of the channel, e.g. `0`
 /// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
-/// - `$blocks`: number of RAM blocks of a TX channel that uses the RAM of the channels that follow
-///   it, e.g. `2`
-/// - `$peri`: the singletons of these channels, the TX channel first, e.g. `RMT_CH1`
+/// - `$blocks`: number of RAM blocks of a channel that uses the RAM of the channels that follow it,
+///   e.g. `2`
+/// - `$peri`: the singletons of these channels, the TX or RX channel first, e.g. `RMT_CH1`
 ///
 /// Example data:
 ///
@@ -736,6 +740,7 @@ macro_rules! define_lp_io_signals {
 /// - `tx`: `(1, 1)`
 /// - `rx`: `(2, 0)`
 /// - `tx_tuples`: `(2, (RMT_CH1, RMT_CH2))`
+/// - `rx_tuples`: `(2, (RMT_CH2, RMT_CH3))`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_rmt_channel {
@@ -782,6 +787,35 @@ macro_rules! for_each_rmt_channel {
         _for_each_inner_rmt_channel!((2, (RMT_CH5, RMT_CH6)));
         _for_each_inner_rmt_channel!((3, (RMT_CH5, RMT_CH6, RMT_CH7)));
         _for_each_inner_rmt_channel!((2, (RMT_CH6, RMT_CH7)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH0, RMT_CH1)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH0, RMT_CH1, RMT_CH2)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3)));
+        _for_each_inner_rmt_channel!((5, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4)));
+        _for_each_inner_rmt_channel!((6, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4,
+        RMT_CH5))); _for_each_inner_rmt_channel!((7, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3,
+        RMT_CH4, RMT_CH5, RMT_CH6))); _for_each_inner_rmt_channel!((8, (RMT_CH0, RMT_CH1,
+        RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH1, RMT_CH2)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH1, RMT_CH2, RMT_CH3)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4)));
+        _for_each_inner_rmt_channel!((5, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5)));
+        _for_each_inner_rmt_channel!((6, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5,
+        RMT_CH6))); _for_each_inner_rmt_channel!((7, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4,
+        RMT_CH5, RMT_CH6, RMT_CH7))); _for_each_inner_rmt_channel!((2, (RMT_CH2,
+        RMT_CH3))); _for_each_inner_rmt_channel!((3, (RMT_CH2, RMT_CH3, RMT_CH4)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5)));
+        _for_each_inner_rmt_channel!((5, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)));
+        _for_each_inner_rmt_channel!((6, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6,
+        RMT_CH7))); _for_each_inner_rmt_channel!((2, (RMT_CH3, RMT_CH4)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH3, RMT_CH4, RMT_CH5)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)));
+        _for_each_inner_rmt_channel!((5, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH4, RMT_CH5)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH4, RMT_CH5, RMT_CH6)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH5, RMT_CH6)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH5, RMT_CH6, RMT_CH7)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH6, RMT_CH7)));
         _for_each_inner_rmt_channel!((all(0), (1), (2), (3), (4), (5), (6), (7)));
         _for_each_inner_rmt_channel!((tx(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5),
         (6, 6), (7, 7))); _for_each_inner_rmt_channel!((rx(0, 0), (1, 1), (2, 2), (3, 3),
@@ -798,6 +832,22 @@ macro_rules! for_each_rmt_channel {
         (4, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5)), (5, (RMT_CH2, RMT_CH3, RMT_CH4,
         RMT_CH5, RMT_CH6)), (6, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)),
         (2, (RMT_CH3, RMT_CH4)), (3, (RMT_CH3, RMT_CH4, RMT_CH5)), (4, (RMT_CH3, RMT_CH4,
+        RMT_CH5, RMT_CH6)), (5, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)), (2,
+        (RMT_CH4, RMT_CH5)), (3, (RMT_CH4, RMT_CH5, RMT_CH6)), (4, (RMT_CH4, RMT_CH5,
+        RMT_CH6, RMT_CH7)), (2, (RMT_CH5, RMT_CH6)), (3, (RMT_CH5, RMT_CH6, RMT_CH7)),
+        (2, (RMT_CH6, RMT_CH7)))); _for_each_inner_rmt_channel!((rx_tuples(2, (RMT_CH0,
+        RMT_CH1)), (3, (RMT_CH0, RMT_CH1, RMT_CH2)), (4, (RMT_CH0, RMT_CH1, RMT_CH2,
+        RMT_CH3)), (5, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4)), (6, (RMT_CH0,
+        RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5)), (7, (RMT_CH0, RMT_CH1, RMT_CH2,
+        RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)), (8, (RMT_CH0, RMT_CH1, RMT_CH2, RMT_CH3,
+        RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)), (2, (RMT_CH1, RMT_CH2)), (3, (RMT_CH1,
+        RMT_CH2, RMT_CH3)), (4, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4)), (5, (RMT_CH1,
+        RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5)), (6, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4,
+        RMT_CH5, RMT_CH6)), (7, (RMT_CH1, RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6,
+        RMT_CH7)), (2, (RMT_CH2, RMT_CH3)), (3, (RMT_CH2, RMT_CH3, RMT_CH4)), (4,
+        (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5)), (5, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5,
+        RMT_CH6)), (6, (RMT_CH2, RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)), (2,
+        (RMT_CH3, RMT_CH4)), (3, (RMT_CH3, RMT_CH4, RMT_CH5)), (4, (RMT_CH3, RMT_CH4,
         RMT_CH5, RMT_CH6)), (5, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)), (2,
         (RMT_CH4, RMT_CH5)), (3, (RMT_CH4, RMT_CH5, RMT_CH6)), (4, (RMT_CH4, RMT_CH5,
         RMT_CH6, RMT_CH7)), (2, (RMT_CH5, RMT_CH6)), (3, (RMT_CH5, RMT_CH6, RMT_CH7)),
@@ -949,6 +999,7 @@ macro_rules! for_each_dma_engine {
         => {} } _for_each_inner_dma_engine!(("SPI_DMA"));
         _for_each_inner_dma_engine!(("I2S_DMA"));
         _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA")));
+        _for_each_inner_dma_engine!((priority));
     };
 }
 #[macro_export]
@@ -967,7 +1018,11 @@ macro_rules! for_each_dma_channel {
         interrupt = SPI3_DMA, compatible = [SPI3]));
         _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S0, 0, interrupt = I2S0,
         compatible = [I2S0])); _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S1, 1,
-        interrupt = I2S1, compatible = [I2S1]));
+        interrupt = I2S1, compatible = [I2S1])); _for_each_inner_dma_channel!(("SPI_DMA",
+        DMA_SPI2, can_access_psram = false)); _for_each_inner_dma_channel!(("SPI_DMA",
+        DMA_SPI3, can_access_psram = false)); _for_each_inner_dma_channel!(("I2S_DMA",
+        DMA_I2S0, can_access_psram = false)); _for_each_inner_dma_channel!(("I2S_DMA",
+        DMA_I2S1, can_access_psram = false));
         _for_each_inner_dma_channel!((names("SPI_DMA", DMA_SPI2), ("SPI_DMA", DMA_SPI3),
         ("I2S_DMA", DMA_I2S0), ("I2S_DMA", DMA_I2S1)));
         _for_each_inner_dma_channel!((separate_any_type("SPI_DMA", any_channel =
@@ -978,6 +1033,9 @@ macro_rules! for_each_dma_channel {
         [I2S0]), ("I2S_DMA", DMA_I2S1, 1, interrupt = I2S1, compatible = [I2S1])));
         _for_each_inner_dma_channel!((split));
         _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("SPI_DMA", DMA_SPI2, can_access_psram =
+        false), ("SPI_DMA", DMA_SPI3, can_access_psram = false), ("I2S_DMA", DMA_I2S0,
+        can_access_psram = false), ("I2S_DMA", DMA_I2S1, can_access_psram = false)));
     };
 }
 #[macro_export]
@@ -4284,7 +4342,13 @@ macro_rules! implement_peripheral_clocks {
             Uhci1,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] = &[Self::Timg0, Self::Uart0, Self::UartMem];
+            const KEEP_ENABLED: &[Peripheral] = &[
+                Self::Timg0,
+                #[cfg(keep_uart0_enabled)]
+                Self::Uart0,
+                #[cfg(keep_uart0_enabled)]
+                Self::UartMem,
+            ];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,

@@ -157,6 +157,7 @@ mod tests {
     #[test]
     async fn default_handler_does_not_run_because_gpio_is_defined() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
@@ -172,6 +173,7 @@ mod tests {
     #[test]
     async fn default_handler_runs_because_handler_is_set() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let mut io = Io::new(peripherals.IO_MUX);
         io.set_interrupt_handler(interrupt_handler);
@@ -189,6 +191,7 @@ mod tests {
     #[test]
     async fn task_that_runs_at_handlers_priority_is_not_locked_up() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         // Register an interrupt handler. Since we are not dealing with raw interrupts
         // here, it's okay to do nothing. Handling async GPIO events will
@@ -227,6 +230,7 @@ mod tests {
         HANDLER_MODE.store(HandlerMode::HandleAll as u8, Ordering::Relaxed);
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
@@ -249,6 +253,7 @@ mod tests {
         rebind_user_gpio_handler();
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
@@ -279,6 +284,7 @@ mod tests {
         HANDLER_MODE.store(HandlerMode::UnlistenOnly as u8, Ordering::Relaxed);
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 

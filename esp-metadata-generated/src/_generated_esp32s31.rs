@@ -418,6 +418,9 @@ macro_rules! property {
     ("rgb_display.output_lines", str) => {
         stringify!(24)
     };
+    ("rgb_display.has_rgb_timing_registers") => {
+        true
+    };
     ("adc.line_calibration") => {
         false
     };
@@ -459,6 +462,12 @@ macro_rules! property {
     };
     ("dac.resolution", str) => {
         stringify!(12)
+    };
+    ("temp_sensor.min_stabilization_time_us") => {
+        0
+    };
+    ("temp_sensor.min_stabilization_time_us", str) => {
+        stringify!(0)
     };
     ("dma2d.tx_channel_count") => {
         4
@@ -571,7 +580,16 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.regdma_list_count") => {
+        5
+    };
     ("sleep.idle_frequency_scaling") => {
+        true
+    };
+    ("assist_debug.has_sp_monitor") => {
+        true
+    };
+    ("assist_debug.has_region_monitor") => {
         true
     };
     ("dma.mem2mem_requires_peripheral") => {
@@ -588,6 +606,9 @@ macro_rules! property {
     };
     ("dma.gdma_version", str) => {
         stringify!(3)
+    };
+    ("dma.psram_max_burst") => {
+        128
     };
     ("interrupts.status_registers") => {
         6
@@ -947,20 +968,21 @@ macro_rules! define_lp_io_signals {
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
 ///
-/// This macro has four options for its "Individual matcher" case:
+/// This macro has five options for its "Individual matcher" case:
 ///
 /// - `all`: `($num:literal)`
 /// - `tx`: `($num:literal, $idx:literal)`
 /// - `rx`: `($num:literal, $idx:literal)`
 /// - `tx_tuples`: `($blocks:literal, ($($peri:ident),+))`
+/// - `rx_tuples`: `($blocks:literal, ($($peri:ident),+))`
 ///
 /// Macro fragments:
 ///
 /// - `$num`: number of the channel, e.g. `0`
 /// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
-/// - `$blocks`: number of RAM blocks of a TX channel that uses the RAM of the channels that follow
-///   it, e.g. `2`
-/// - `$peri`: the singletons of these channels, the TX channel first, e.g. `RMT_CH1`
+/// - `$blocks`: number of RAM blocks of a channel that uses the RAM of the channels that follow it,
+///   e.g. `2`
+/// - `$peri`: the singletons of these channels, the TX or RX channel first, e.g. `RMT_CH1`
 ///
 /// Example data:
 ///
@@ -968,6 +990,7 @@ macro_rules! define_lp_io_signals {
 /// - `tx`: `(1, 1)`
 /// - `rx`: `(2, 0)`
 /// - `tx_tuples`: `(2, (RMT_CH1, RMT_CH2))`
+/// - `rx_tuples`: `(2, (RMT_CH2, RMT_CH3))`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_rmt_channel {
@@ -1004,6 +1027,12 @@ macro_rules! for_each_rmt_channel {
         _for_each_inner_rmt_channel!((3, (RMT_CH3, RMT_CH4, RMT_CH5)));
         _for_each_inner_rmt_channel!((4, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)));
         _for_each_inner_rmt_channel!((5, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH4, RMT_CH5)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH4, RMT_CH5, RMT_CH6)));
+        _for_each_inner_rmt_channel!((4, (RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH5, RMT_CH6)));
+        _for_each_inner_rmt_channel!((3, (RMT_CH5, RMT_CH6, RMT_CH7)));
+        _for_each_inner_rmt_channel!((2, (RMT_CH6, RMT_CH7)));
         _for_each_inner_rmt_channel!((all(0), (1), (2), (3), (4), (5), (6), (7)));
         _for_each_inner_rmt_channel!((tx(0, 0), (1, 1), (2, 2), (3, 3)));
         _for_each_inner_rmt_channel!((rx(4, 0), (5, 1), (6, 2), (7, 3)));
@@ -1021,6 +1050,9 @@ macro_rules! for_each_rmt_channel {
         RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)), (2, (RMT_CH3, RMT_CH4)), (3,
         (RMT_CH3, RMT_CH4, RMT_CH5)), (4, (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6)), (5,
         (RMT_CH3, RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7))));
+        _for_each_inner_rmt_channel!((rx_tuples(2, (RMT_CH4, RMT_CH5)), (3, (RMT_CH4,
+        RMT_CH5, RMT_CH6)), (4, (RMT_CH4, RMT_CH5, RMT_CH6, RMT_CH7)), (2, (RMT_CH5,
+        RMT_CH6)), (3, (RMT_CH5, RMT_CH6, RMT_CH7)), (2, (RMT_CH6, RMT_CH7))));
     };
 }
 /// This macro can be used to generate code for each slot of the SDMMC/SDIO host driver.
@@ -1412,7 +1444,12 @@ macro_rules! for_each_dma_engine {
         macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
         _for_each_inner_dma_engine!(("AXI_GDMA"));
-        _for_each_inner_dma_engine!((all("AHB_GDMA"), ("AXI_GDMA")));
+        _for_each_inner_dma_engine!(("AHB_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+        12, 13, 14, 15)); _for_each_inner_dma_engine!(("AXI_GDMA", 0, 1, 2, 3, 4, 5, 6,
+        7, 8, 9, 10, 11, 12, 13, 14, 15)); _for_each_inner_dma_engine!((all("AHB_GDMA"),
+        ("AXI_GDMA"))); _for_each_inner_dma_engine!((priority("AHB_GDMA", 0, 1, 2, 3, 4,
+        5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15), ("AXI_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8,
+        9, 10, 11, 12, 13, 14, 15)));
     };
 }
 #[macro_export]
@@ -1447,7 +1484,15 @@ macro_rules! for_each_dma_channel {
         compatible = [LCD_CAM, SPI2, SPI3, PARL_IO, AES, SHA]));
         _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH2, 2, interrupt_in =
         AXI_PDMA_IN_CH2, interrupt_out = AXI_PDMA_OUT_CH2, compatible = [LCD_CAM, SPI2,
-        SPI3, PARL_IO, AES, SHA])); _for_each_inner_dma_channel!((names("AHB_GDMA",
+        SPI3, PARL_IO, AES, SHA])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH3,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH0,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH1,
+        can_access_psram = true)); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH2,
+        can_access_psram = true)); _for_each_inner_dma_channel!((names("AHB_GDMA",
         DMA_CH0), ("AHB_GDMA", DMA_CH1), ("AHB_GDMA", DMA_CH2), ("AHB_GDMA", DMA_CH3),
         ("AHB_GDMA", DMA_CH4), ("AXI_GDMA", DMA_AXI_CH0), ("AXI_GDMA", DMA_AXI_CH1),
         ("AXI_GDMA", DMA_AXI_CH2)));
@@ -1469,6 +1514,12 @@ macro_rules! for_each_dma_channel {
         SPI3, PARL_IO, AES, SHA]), ("AXI_GDMA", DMA_AXI_CH2, 2, interrupt_in =
         AXI_PDMA_IN_CH2, interrupt_out = AXI_PDMA_OUT_CH2, compatible = [LCD_CAM, SPI2,
         SPI3, PARL_IO, AES, SHA]))); _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("AHB_GDMA", DMA_CH0, can_access_psram =
+        true), ("AHB_GDMA", DMA_CH1, can_access_psram = true), ("AHB_GDMA", DMA_CH2,
+        can_access_psram = true), ("AHB_GDMA", DMA_CH3, can_access_psram = true),
+        ("AHB_GDMA", DMA_CH4, can_access_psram = true), ("AXI_GDMA", DMA_AXI_CH0,
+        can_access_psram = true), ("AXI_GDMA", DMA_AXI_CH1, can_access_psram = true),
+        ("AXI_GDMA", DMA_AXI_CH2, can_access_psram = true)));
     };
 }
 #[macro_export]
@@ -6337,7 +6388,9 @@ macro_rules! implement_peripheral_clocks {
                 Self::ApbSarAdc,
                 Self::Systimer,
                 Self::Timg0,
+                #[cfg(keep_uart0_enabled)]
                 Self::Uart0,
+                #[cfg(keep_usb_serial_jtag_enabled)]
                 Self::UsbDevice,
             ];
             const COUNT: usize = Self::ALL.len();

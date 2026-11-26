@@ -23,6 +23,14 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
+/// Configuration of the ESP32-S2 crypto DMA channel.
+///
+/// This channel has no priority register.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct CryptoDmaConfig {}
+
 /// Immutable per-channel metadata.
 #[doc(hidden)]
 pub struct ChannelInfo {
@@ -76,6 +84,8 @@ impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
 impl DmaTxChannel for CryptoDmaTxChannel<'_> {}
 
 impl RegisterAccess for CryptoDmaTxChannel<'_> {
+    type Config = CryptoDmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CryptoDma))
@@ -94,6 +104,8 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
             .conf()
             .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
+
+    fn apply_config(&self, _config: &CryptoDmaConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.regs()
@@ -274,6 +286,8 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CryptoDmaRxChannel<'_> {
+    type Config = CryptoDmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CryptoDma))
@@ -288,6 +302,8 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+
+    fn apply_config(&self, _config: &CryptoDmaConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.regs()
@@ -358,6 +374,14 @@ impl RxRegisterAccess for CryptoDmaRxChannel<'_> {
     #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, en: bool) {
         self.regs().conf().modify(|_, w| w.mem_trans_en().bit(en));
+    }
+
+    fn last_dscr_address(&self) -> usize {
+        self.regs()
+            .in_suc_eof_des_addr()
+            .read()
+            .in_suc_eof_des_addr()
+            .bits() as usize
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {

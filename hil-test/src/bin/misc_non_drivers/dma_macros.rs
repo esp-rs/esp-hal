@@ -14,7 +14,8 @@ mod tests {
     #[init]
     fn init() {
         // Ensures that watchdogs are disabled
-        let _ = esp_hal::init(Default::default());
+        let peripherals = esp_hal::init(Default::default());
+        hil_test::init_logger!(peripherals);
     }
 
     #[test]

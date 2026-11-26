@@ -78,15 +78,17 @@ static PHASE: [AtomicU8; Cpu::COUNT] = [const { AtomicU8::new(Phase::Idle as u8)
 static FUNCTION: [AtomicPtr<()>; Cpu::COUNT] =
     [const { AtomicPtr::new(core::ptr::null_mut()) }; Cpu::COUNT];
 
-/// The number of parks that hold each core.
+/// The number of parks that hold each core. Only the holder of the [`CLAIM`] changes it.
 static COUNT: [AtomicUsize; Cpu::COUNT] = [const { AtomicUsize::new(0) }; Cpu::COUNT];
 
-const NO_CLAIM: u8 = u8::MAX;
+const NO_CLAIM: u32 = u32::MAX;
 
 /// The core that parks, unparks or stops the other core, or [`NO_CLAIM`].
 ///
 /// Two cores that park each other at the same time stall each other. The claim prevents that case.
-static CLAIM: AtomicU8 = AtomicU8::new(NO_CLAIM);
+///
+/// A word, because Xtensa and RISC-V have no compare-exchange of a byte.
+static CLAIM: AtomicU32 = AtomicU32::new(NO_CLAIM);
 
 /// The number of starts of the APP core.
 ///
@@ -125,7 +127,8 @@ pub(crate) fn park_request(core: Option<Cpu>) -> Option<(Cpu, u32)> {
             }
             return None;
         }
-        if count.load(Ordering::Relaxed) == 0 {
+        let parks = count.load(Ordering::Relaxed);
+        if parks == 0 {
             // After an unpark, `core` must leave `serve` before the next request.
             if phase.load(Ordering::Acquire) != Phase::Idle as u8 {
                 continue;
@@ -136,7 +139,7 @@ pub(crate) fn park_request(core: Option<Cpu>) -> Option<(Cpu, u32)> {
             // interrupts, and a stop of `core` needs the claim.
             debug_assert!(result.is_ok(), "Posting the park request failed");
         }
-        count.fetch_add(1, Ordering::Relaxed);
+        count.store(parks + 1, Ordering::Relaxed);
         let generation = GENERATION.load(Ordering::Relaxed);
         drop(claim);
 
@@ -346,7 +349,7 @@ fn serve(current: Cpu) {
 struct Claim(RestoreState);
 
 impl Claim {
-    #[inline(always)]
+    #[ram]
     fn take() -> Self {
         loop {
             let token = unsafe { SingleCoreInterruptLock.enter() };
@@ -354,7 +357,7 @@ impl Claim {
             let current = Cpu::current();
             match CLAIM.compare_exchange(
                 NO_CLAIM,
-                current as u8,
+                current as u32,
                 Ordering::Acquire,
                 Ordering::Relaxed,
             ) {
@@ -368,7 +371,7 @@ impl Claim {
                 // The other core needs the claim to stall the current core.
                 Ok(_) => CLAIM.store(NO_CLAIM, Ordering::Release),
                 Err(owner) => {
-                    debug_assert_ne!(owner, current as u8, "The claim cannot nest")
+                    debug_assert_ne!(owner, current as u32, "The claim cannot nest")
                 }
             }
             serve(current);

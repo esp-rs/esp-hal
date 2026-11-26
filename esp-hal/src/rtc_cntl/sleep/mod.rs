@@ -59,6 +59,52 @@ impl SleepCpuClock {
     }
 }
 
+/// The wakeup waits in `TIMER1` for the PLL, the XTL buffer, and CK8M.
+///
+/// `TIMER1` counts these waits in RTC slow clock cycles, so the XTL wait of a light sleep is set in
+/// time. With the 32 kHz crystal as the slow clock, the reset value of 80 cycles makes a light
+/// sleep wakeup about 2.4 ms long.
+/// See <https://github.com/espressif/esp-idf/blob/e4df0c12f70/components/esp_hw_support/port/esp32s3/rtc_sleep.c#L271-L277>.
+#[cfg(all(not(soc_has_pmu), feature = "rt"))]
+struct WakeupWaits {
+    pll: u8,
+    xtl: u16,
+    ck8m: u8,
+}
+
+#[cfg(all(not(soc_has_pmu), feature = "rt"))]
+impl WakeupWaits {
+    fn for_sleep(kind: SleepKind) -> Self {
+        let (pll, xtl, ck8m) = match kind {
+            SleepKind::Deep => (
+                sleep_impl::RTC_CNTL_PLL_BUF_WAIT_DEFAULT,
+                u64::from(sleep_impl::RTC_CNTL_XTL_BUF_WAIT_DEFAULT),
+                sleep_impl::RTC_CNTL_CK8M_WAIT_DEFAULT,
+            ),
+            SleepKind::Light => (
+                sleep_impl::RTC_CNTL_PLL_BUF_WAIT_SLP_CYCLES,
+                crate::clock::us_to_rtc_ticks(u64::from(sleep_impl::RTC_CNTL_XTL_BUF_WAIT_SLP_US)),
+                sleep_impl::RTC_CNTL_CK8M_WAIT_SLP_CYCLES,
+            ),
+        };
+        Self {
+            pll,
+            // The field has 10 bits, and `bits` drops the high bits of a longer wait.
+            xtl: xtl.min(0x3FF) as u16,
+            ck8m,
+        }
+    }
+
+    #[inline(always)]
+    fn write(self) {
+        LPWR::regs().timer1().modify(|_, w| unsafe {
+            w.pll_buf_wait().bits(self.pll);
+            w.xtl_buf_wait().bits(self.xtl);
+            w.ck8m_wait().bits(self.ck8m)
+        });
+    }
+}
+
 #[cfg(soc_has_pmu)]
 pub(crate) mod pmu_common;
 
@@ -386,6 +432,8 @@ impl<'d> LowPower<'d> {
 
         let mut config = config;
         config.set_sleep_kind(kind);
+        #[cfg(modem_retention = "regdma")]
+        crate::rtc_cntl::regdma::prepare_sleep(kind == SleepKind::Light);
 
         // The slow clock drifts after the calibration at boot, and a deep sleep can be long. The
         // calibration comes before the entry hooks, because a wakeup source that limits the sleep
@@ -492,6 +540,8 @@ impl<'d> LowPower<'d> {
             kind,
             wakeup_mask,
             reject_mask,
+            #[cfg(not(soc_has_pmu))]
+            WakeupWaits::for_sleep(kind),
             #[cfg(supports_cpu_power_down)]
             retention_buffer,
             #[cfg(all(cpu_retention = "software", multi_core))]
@@ -542,6 +592,7 @@ fn sleep_transition(
     kind: SleepKind,
     wakeup_mask: u32,
     reject_mask: u32,
+    #[cfg(not(soc_has_pmu))] wakeup_waits: WakeupWaits,
     #[cfg(supports_cpu_power_down)] retention_buffer: Option<core::ptr::NonNull<u8>>,
     #[cfg(all(cpu_retention = "software", multi_core))] app_cpu_saved: bool,
 ) -> bool {
@@ -556,6 +607,9 @@ fn sleep_transition(
         cpu_retention::prepare_cpu_retention(retention_buffer);
 
         let saved = config.start_sleep(wakeup_mask, reject_mask);
+        // After the CPU clock switch, because the RC_FAST disable path writes `CK8M_WAIT`.
+        #[cfg(not(soc_has_pmu))]
+        wakeup_waits.write();
 
         // Last, because this step takes the pads away from the peripherals that drove them. The
         // wakeup sources have their holds now, and no later step needs a pad.

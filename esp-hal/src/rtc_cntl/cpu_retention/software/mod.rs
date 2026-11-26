@@ -55,8 +55,17 @@ macro_rules! critical_regs_asm {
     // saves and restores register values that no later code can read.
     //
     // `.option arch, +f` only affects the assembler; `mstatus.FS` enables the unit.
+    //
+    // [`fpu_temporaries`] adds the caller-saved FPU registers when the frame must hold them.
+    (fpu, $($rest:tt)*) => {
+        fpu_temporaries!($($rest)*);
+    };
+
     (
-        fpu,
+        @fpu
+        temporaries_save: [$($temporaries_save:literal),* $(,)?],
+        temporaries_restore: [$($temporaries_restore:literal),* $(,)?],
+        temporaries_operands: [$($temporary:ident = const $temporary_value:expr),* $(,)?],
         save_extra: [$($save_extra:literal),* $(,)?],
         restore_extra: [$($restore_extra:literal),* $(,)?]
         $(, $operand:ident = const $value:expr)* $(,)?
@@ -68,24 +77,9 @@ macro_rules! critical_regs_asm {
                 "csrs mstatus, t2",
                 ".option push",
                 ".option arch, +f",
-                "fsw ft0, {fpu_ft0}(t0)",
-                "fsw ft1, {fpu_ft1}(t0)",
-                "fsw ft2, {fpu_ft2}(t0)",
-                "fsw ft3, {fpu_ft3}(t0)",
-                "fsw ft4, {fpu_ft4}(t0)",
-                "fsw ft5, {fpu_ft5}(t0)",
-                "fsw ft6, {fpu_ft6}(t0)",
-                "fsw ft7, {fpu_ft7}(t0)",
+                $($temporaries_save,)*
                 "fsw fs0, {fpu_fs0}(t0)",
                 "fsw fs1, {fpu_fs1}(t0)",
-                "fsw fa0, {fpu_fa0}(t0)",
-                "fsw fa1, {fpu_fa1}(t0)",
-                "fsw fa2, {fpu_fa2}(t0)",
-                "fsw fa3, {fpu_fa3}(t0)",
-                "fsw fa4, {fpu_fa4}(t0)",
-                "fsw fa5, {fpu_fa5}(t0)",
-                "fsw fa6, {fpu_fa6}(t0)",
-                "fsw fa7, {fpu_fa7}(t0)",
                 "fsw fs2, {fpu_fs2}(t0)",
                 "fsw fs3, {fpu_fs3}(t0)",
                 "fsw fs4, {fpu_fs4}(t0)",
@@ -96,10 +90,6 @@ macro_rules! critical_regs_asm {
                 "fsw fs9, {fpu_fs9}(t0)",
                 "fsw fs10, {fpu_fs10}(t0)",
                 "fsw fs11, {fpu_fs11}(t0)",
-                "fsw ft8, {fpu_ft8}(t0)",
-                "fsw ft9, {fpu_ft9}(t0)",
-                "fsw ft10, {fpu_ft10}(t0)",
-                "fsw ft11, {fpu_ft11}(t0)",
                 "csrr t2, fcsr",
                 "sw t2, {fpu_fcsr}(t0)",
                 ".option pop",
@@ -110,24 +100,9 @@ macro_rules! critical_regs_asm {
                 "csrs mstatus, t2",
                 ".option push",
                 ".option arch, +f",
-                "flw ft0, {fpu_ft0}(t0)",
-                "flw ft1, {fpu_ft1}(t0)",
-                "flw ft2, {fpu_ft2}(t0)",
-                "flw ft3, {fpu_ft3}(t0)",
-                "flw ft4, {fpu_ft4}(t0)",
-                "flw ft5, {fpu_ft5}(t0)",
-                "flw ft6, {fpu_ft6}(t0)",
-                "flw ft7, {fpu_ft7}(t0)",
+                $($temporaries_restore,)*
                 "flw fs0, {fpu_fs0}(t0)",
                 "flw fs1, {fpu_fs1}(t0)",
-                "flw fa0, {fpu_fa0}(t0)",
-                "flw fa1, {fpu_fa1}(t0)",
-                "flw fa2, {fpu_fa2}(t0)",
-                "flw fa3, {fpu_fa3}(t0)",
-                "flw fa4, {fpu_fa4}(t0)",
-                "flw fa5, {fpu_fa5}(t0)",
-                "flw fa6, {fpu_fa6}(t0)",
-                "flw fa7, {fpu_fa7}(t0)",
                 "flw fs2, {fpu_fs2}(t0)",
                 "flw fs3, {fpu_fs3}(t0)",
                 "flw fs4, {fpu_fs4}(t0)",
@@ -138,34 +113,15 @@ macro_rules! critical_regs_asm {
                 "flw fs9, {fpu_fs9}(t0)",
                 "flw fs10, {fpu_fs10}(t0)",
                 "flw fs11, {fpu_fs11}(t0)",
-                "flw ft8, {fpu_ft8}(t0)",
-                "flw ft9, {fpu_ft9}(t0)",
-                "flw ft10, {fpu_ft10}(t0)",
-                "flw ft11, {fpu_ft11}(t0)",
                 "lw t2, {fpu_fcsr}(t0)",
                 "csrw fcsr, t2",
                 ".option pop",
             ],
             $($operand = const $value,)*
+            $($temporary = const $temporary_value,)*
             fpu_enable = const 1 << 13,
-            fpu_ft0 = const offset_of!(CriticalSleepFrame, fpu_ft0),
-            fpu_ft1 = const offset_of!(CriticalSleepFrame, fpu_ft1),
-            fpu_ft2 = const offset_of!(CriticalSleepFrame, fpu_ft2),
-            fpu_ft3 = const offset_of!(CriticalSleepFrame, fpu_ft3),
-            fpu_ft4 = const offset_of!(CriticalSleepFrame, fpu_ft4),
-            fpu_ft5 = const offset_of!(CriticalSleepFrame, fpu_ft5),
-            fpu_ft6 = const offset_of!(CriticalSleepFrame, fpu_ft6),
-            fpu_ft7 = const offset_of!(CriticalSleepFrame, fpu_ft7),
             fpu_fs0 = const offset_of!(CriticalSleepFrame, fpu_fs0),
             fpu_fs1 = const offset_of!(CriticalSleepFrame, fpu_fs1),
-            fpu_fa0 = const offset_of!(CriticalSleepFrame, fpu_fa0),
-            fpu_fa1 = const offset_of!(CriticalSleepFrame, fpu_fa1),
-            fpu_fa2 = const offset_of!(CriticalSleepFrame, fpu_fa2),
-            fpu_fa3 = const offset_of!(CriticalSleepFrame, fpu_fa3),
-            fpu_fa4 = const offset_of!(CriticalSleepFrame, fpu_fa4),
-            fpu_fa5 = const offset_of!(CriticalSleepFrame, fpu_fa5),
-            fpu_fa6 = const offset_of!(CriticalSleepFrame, fpu_fa6),
-            fpu_fa7 = const offset_of!(CriticalSleepFrame, fpu_fa7),
             fpu_fs2 = const offset_of!(CriticalSleepFrame, fpu_fs2),
             fpu_fs3 = const offset_of!(CriticalSleepFrame, fpu_fs3),
             fpu_fs4 = const offset_of!(CriticalSleepFrame, fpu_fs4),
@@ -176,10 +132,6 @@ macro_rules! critical_regs_asm {
             fpu_fs9 = const offset_of!(CriticalSleepFrame, fpu_fs9),
             fpu_fs10 = const offset_of!(CriticalSleepFrame, fpu_fs10),
             fpu_fs11 = const offset_of!(CriticalSleepFrame, fpu_fs11),
-            fpu_ft8 = const offset_of!(CriticalSleepFrame, fpu_ft8),
-            fpu_ft9 = const offset_of!(CriticalSleepFrame, fpu_ft9),
-            fpu_ft10 = const offset_of!(CriticalSleepFrame, fpu_ft10),
-            fpu_ft11 = const offset_of!(CriticalSleepFrame, fpu_ft11),
             fpu_fcsr = const offset_of!(CriticalSleepFrame, fpu_fcsr),
         );
     };
@@ -198,18 +150,8 @@ macro_rules! critical_regs_asm {
                 sp = const offset_of!(CriticalSleepFrame, sp),
                 gp = const offset_of!(CriticalSleepFrame, gp),
                 tp = const offset_of!(CriticalSleepFrame, tp),
-                t1 = const offset_of!(CriticalSleepFrame, t1),
-                t2 = const offset_of!(CriticalSleepFrame, t2),
                 s0 = const offset_of!(CriticalSleepFrame, s0),
                 s1 = const offset_of!(CriticalSleepFrame, s1),
-                a0 = const offset_of!(CriticalSleepFrame, a0),
-                a1 = const offset_of!(CriticalSleepFrame, a1),
-                a2 = const offset_of!(CriticalSleepFrame, a2),
-                a3 = const offset_of!(CriticalSleepFrame, a3),
-                a4 = const offset_of!(CriticalSleepFrame, a4),
-                a5 = const offset_of!(CriticalSleepFrame, a5),
-                a6 = const offset_of!(CriticalSleepFrame, a6),
-                a7 = const offset_of!(CriticalSleepFrame, a7),
                 s2 = const offset_of!(CriticalSleepFrame, s2),
                 s3 = const offset_of!(CriticalSleepFrame, s3),
                 s4 = const offset_of!(CriticalSleepFrame, s4),
@@ -220,10 +162,6 @@ macro_rules! critical_regs_asm {
                 s9 = const offset_of!(CriticalSleepFrame, s9),
                 s10 = const offset_of!(CriticalSleepFrame, s10),
                 s11 = const offset_of!(CriticalSleepFrame, s11),
-                t3 = const offset_of!(CriticalSleepFrame, t3),
-                t4 = const offset_of!(CriticalSleepFrame, t4),
-                t5 = const offset_of!(CriticalSleepFrame, t5),
-                t6 = const offset_of!(CriticalSleepFrame, t6),
                 mstatus = const offset_of!(CriticalSleepFrame, mstatus),
                 mtvec = const offset_of!(CriticalSleepFrame, mtvec),
                 mcause = const offset_of!(CriticalSleepFrame, mcause),
@@ -250,26 +188,16 @@ macro_rules! critical_regs_asm {
         unsafe extern "C" fn critical_regs_save(
             _frame: *mut CriticalSleepFrame,
         ) -> *mut CriticalSleepFrame {
+            // The save must not write `mscratch`. An IPC request can run the sleep, and the IPC
+            // handler holds the interrupted `t0` there. A rejected sleep restores no CSR.
             core::arch::naked_asm!(
-                "csrw mscratch, t0",
                 "mv t0, a0",
                 "sw ra, {ra}(t0)",
                 "sw sp, {sp}(t0)",
                 "sw gp, {gp}(t0)",
                 "sw tp, {tp}(t0)",
-                "sw t1, {t1}(t0)",
-                "sw t2, {t2}(t0)",
                 "sw s0, {s0}(t0)",
                 "sw s1, {s1}(t0)",
-                "mv a0, t0",
-                "sw a0, {a0}(t0)",
-                "sw a1, {a1}(t0)",
-                "sw a2, {a2}(t0)",
-                "sw a3, {a3}(t0)",
-                "sw a4, {a4}(t0)",
-                "sw a5, {a5}(t0)",
-                "sw a6, {a6}(t0)",
-                "sw a7, {a7}(t0)",
                 "sw s2, {s2}(t0)",
                 "sw s3, {s3}(t0)",
                 "sw s4, {s4}(t0)",
@@ -280,10 +208,6 @@ macro_rules! critical_regs_asm {
                 "sw s9, {s9}(t0)",
                 "sw s10, {s10}(t0)",
                 "sw s11, {s11}(t0)",
-                "sw t3, {t3}(t0)",
-                "sw t4, {t4}(t0)",
-                "sw t5, {t5}(t0)",
-                "sw t6, {t6}(t0)",
                 "csrr t1, mstatus",
                 "sw t1, {mstatus}(t0)",
                 "csrr t2, mtvec",
@@ -304,11 +228,6 @@ macro_rules! critical_regs_asm {
                 "and t2, t1, t2",
                 "ori t2, t2, {going_to_sleep}",
                 "sw t2, {pmufunc}(t0)",
-                "mv t3, t0",
-                "csrr t0, mscratch",
-                "lw t1, {t1}(t3)",
-                "lw t2, {t2}(t3)",
-                "lw t3, {t3}(t3)",
                 "ret",
                 going_to_sleep = const PMUFUNC_GOING_TO_SLEEP,
                 $($common)*
@@ -346,10 +265,6 @@ macro_rules! critical_regs_asm {
                 "csrw mcause, t1",
                 "lw t2, {mtval}(t0)",
                 "csrw mtval, t2",
-                "lw t6, {t6}(t0)",
-                "lw t5, {t5}(t0)",
-                "lw t4, {t4}(t0)",
-                "lw t3, {t3}(t0)",
                 "lw s11, {s11}(t0)",
                 "lw s10, {s10}(t0)",
                 "lw s9, {s9}(t0)",
@@ -360,32 +275,132 @@ macro_rules! critical_regs_asm {
                 "lw s4, {s4}(t0)",
                 "lw s3, {s3}(t0)",
                 "lw s2, {s2}(t0)",
-                "lw a7, {a7}(t0)",
-                "lw a6, {a6}(t0)",
-                "lw a5, {a5}(t0)",
-                "lw a4, {a4}(t0)",
-                "lw a3, {a3}(t0)",
-                "lw a2, {a2}(t0)",
-                "lw a1, {a1}(t0)",
-                "lw a0, {a0}(t0)",
                 "lw s1, {s1}(t0)",
                 "lw s0, {s0}(t0)",
-                "lw t2, {t2}(t0)",
-                "lw t1, {t1}(t0)",
                 "lw tp, {tp}(t0)",
                 "lw gp, {gp}(t0)",
                 "lw sp, {sp}(t0)",
                 "lw ra, {ra}(t0)",
-                "lw t0, {t0}(t0)",
+                // `a0` is not in the frame. This return still has to hand the frame address back.
+                "mv a0, t0",
                 "2:",
                 "ret",
-                t0 = const offset_of!(CriticalSleepFrame, t0),
                 just_woke = const PMUFUNC_JUST_WOKE,
                 critical_frame_ptr = sym CRITICAL_FRAME_PTR,
                 core_mask = const Cpu::COUNT - 1,
                 $($common)*
             );
         }
+    };
+}
+
+/// Emits an FPU frame shape, with the caller-saved FPU registers when the frame must hold them.
+///
+/// A sleep can run in an interrupt handler, the IPC handler among them. Each interrupt entry saves
+/// the interrupted integer registers on the stack. With `float-save-restore`, it saves the
+/// caller-saved FPU registers too. Without the feature, they stay in the FPU, which loses them in
+/// the sleep.
+#[cfg(all(
+    any(
+        cpu_retention_frame = "s31",
+        cpu_retention_frame = "h4",
+        cpu_retention_frame = "p4"
+    ),
+    feature = "rt",
+    feature = "float-save-restore"
+))]
+macro_rules! fpu_temporaries {
+    ($($rest:tt)*) => {
+        critical_regs_asm!(
+            @fpu
+            temporaries_save: [],
+            temporaries_restore: [],
+            temporaries_operands: [],
+            $($rest)*
+        );
+    };
+}
+
+#[cfg(all(
+    any(
+        cpu_retention_frame = "s31",
+        cpu_retention_frame = "h4",
+        cpu_retention_frame = "p4"
+    ),
+    not(all(feature = "rt", feature = "float-save-restore"))
+))]
+macro_rules! fpu_temporaries {
+    ($($rest:tt)*) => {
+        critical_regs_asm!(
+            @fpu
+            temporaries_save: [
+                "fsw ft0, {fpu_ft0}(t0)",
+                "fsw ft1, {fpu_ft1}(t0)",
+                "fsw ft2, {fpu_ft2}(t0)",
+                "fsw ft3, {fpu_ft3}(t0)",
+                "fsw ft4, {fpu_ft4}(t0)",
+                "fsw ft5, {fpu_ft5}(t0)",
+                "fsw ft6, {fpu_ft6}(t0)",
+                "fsw ft7, {fpu_ft7}(t0)",
+                "fsw ft8, {fpu_ft8}(t0)",
+                "fsw ft9, {fpu_ft9}(t0)",
+                "fsw ft10, {fpu_ft10}(t0)",
+                "fsw ft11, {fpu_ft11}(t0)",
+                "fsw fa0, {fpu_fa0}(t0)",
+                "fsw fa1, {fpu_fa1}(t0)",
+                "fsw fa2, {fpu_fa2}(t0)",
+                "fsw fa3, {fpu_fa3}(t0)",
+                "fsw fa4, {fpu_fa4}(t0)",
+                "fsw fa5, {fpu_fa5}(t0)",
+                "fsw fa6, {fpu_fa6}(t0)",
+                "fsw fa7, {fpu_fa7}(t0)",
+            ],
+            temporaries_restore: [
+                "flw ft0, {fpu_ft0}(t0)",
+                "flw ft1, {fpu_ft1}(t0)",
+                "flw ft2, {fpu_ft2}(t0)",
+                "flw ft3, {fpu_ft3}(t0)",
+                "flw ft4, {fpu_ft4}(t0)",
+                "flw ft5, {fpu_ft5}(t0)",
+                "flw ft6, {fpu_ft6}(t0)",
+                "flw ft7, {fpu_ft7}(t0)",
+                "flw ft8, {fpu_ft8}(t0)",
+                "flw ft9, {fpu_ft9}(t0)",
+                "flw ft10, {fpu_ft10}(t0)",
+                "flw ft11, {fpu_ft11}(t0)",
+                "flw fa0, {fpu_fa0}(t0)",
+                "flw fa1, {fpu_fa1}(t0)",
+                "flw fa2, {fpu_fa2}(t0)",
+                "flw fa3, {fpu_fa3}(t0)",
+                "flw fa4, {fpu_fa4}(t0)",
+                "flw fa5, {fpu_fa5}(t0)",
+                "flw fa6, {fpu_fa6}(t0)",
+                "flw fa7, {fpu_fa7}(t0)",
+            ],
+            temporaries_operands: [
+                fpu_ft0 = const offset_of!(CriticalSleepFrame, fpu_ft0),
+                fpu_ft1 = const offset_of!(CriticalSleepFrame, fpu_ft1),
+                fpu_ft2 = const offset_of!(CriticalSleepFrame, fpu_ft2),
+                fpu_ft3 = const offset_of!(CriticalSleepFrame, fpu_ft3),
+                fpu_ft4 = const offset_of!(CriticalSleepFrame, fpu_ft4),
+                fpu_ft5 = const offset_of!(CriticalSleepFrame, fpu_ft5),
+                fpu_ft6 = const offset_of!(CriticalSleepFrame, fpu_ft6),
+                fpu_ft7 = const offset_of!(CriticalSleepFrame, fpu_ft7),
+                fpu_ft8 = const offset_of!(CriticalSleepFrame, fpu_ft8),
+                fpu_ft9 = const offset_of!(CriticalSleepFrame, fpu_ft9),
+                fpu_ft10 = const offset_of!(CriticalSleepFrame, fpu_ft10),
+                fpu_ft11 = const offset_of!(CriticalSleepFrame, fpu_ft11),
+                fpu_fa0 = const offset_of!(CriticalSleepFrame, fpu_fa0),
+                fpu_fa1 = const offset_of!(CriticalSleepFrame, fpu_fa1),
+                fpu_fa2 = const offset_of!(CriticalSleepFrame, fpu_fa2),
+                fpu_fa3 = const offset_of!(CriticalSleepFrame, fpu_fa3),
+                fpu_fa4 = const offset_of!(CriticalSleepFrame, fpu_fa4),
+                fpu_fa5 = const offset_of!(CriticalSleepFrame, fpu_fa5),
+                fpu_fa6 = const offset_of!(CriticalSleepFrame, fpu_fa6),
+                fpu_fa7 = const offset_of!(CriticalSleepFrame, fpu_fa7),
+            ],
+            $($rest)*
+        );
     };
 }
 

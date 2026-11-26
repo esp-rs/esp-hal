@@ -40,6 +40,15 @@ pub struct DmaChannelDef {
     /// TX/OUT direction interrupt name (set when the channel has separate in/out interrupts).
     #[serde(default)]
     pub interrupt_out: Option<String>,
+    /// Set to `false` when this channel cannot access PSRAM, although its engine can.
+    #[serde(default)]
+    pub can_access_psram: Option<bool>,
+}
+
+impl DmaChannelDef {
+    fn can_access_psram(&self, engine: &DmaEngineDef) -> bool {
+        engine.can_access_psram() && self.can_access_psram.unwrap_or(true)
+    }
 }
 
 /// A peripheral instance that can use a DMA engine.
@@ -59,6 +68,7 @@ pub struct DmaEngineDef {
     /// The name of the engine (e.g. `"AHB_GDMA"`, `"SPI_DMA"`, `"I2S_DMA"`).
     pub name: String,
 
+    /// The highest channel priority level. Absent on engines without priority registers.
     #[serde(default)]
     pub max_priority: Option<u32>,
 
@@ -67,7 +77,8 @@ pub struct DmaEngineDef {
     #[expect(dead_code)]
     pub internal_ram_burst_sizes: Vec<u32>,
 
-    /// Configurable burst sizes, when supported. Implies `can_access_psram = true`.
+    /// Configurable burst sizes, when supported. An empty list means the engine cannot access
+    /// PSRAM.
     #[serde(default)]
     pub burst_sizes: Vec<u32>,
 
@@ -82,6 +93,35 @@ pub struct DmaEngineDef {
 
     /// The channels belonging to this engine.
     pub channels: Vec<DmaChannelDef>,
+}
+
+impl DmaEngineDef {
+    fn can_access_psram(&self) -> bool {
+        !self.burst_sizes.is_empty()
+    }
+}
+
+/// The largest burst the PSRAM controller accepts from DMA, in bytes.
+#[derive(Debug, Default, Clone, Copy, serde::Deserialize)]
+#[serde(transparent)]
+pub struct PsramMaxBurst(Option<u32>);
+
+impl GenericProperty for PsramMaxBurst {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        self.0.map(|_| vec!["dma.can_access_psram".to_string()])
+    }
+
+    fn property_macro_branches(&self) -> TokenStream {
+        let Some(value) = self.0 else {
+            return quote! {};
+        };
+        let value = number(value);
+        quote! {
+            ("dma.psram_max_burst") => {
+                #value
+            };
+        }
+    }
 }
 
 /// All DMA engines on a device.
@@ -126,8 +166,40 @@ impl DmaEngines {
         Ok(())
     }
 
-    fn max_priority(&self) -> Option<u32> {
-        self.0.iter().flat_map(|e| e.max_priority).max()
+    pub(crate) fn validate_psram(&self, psram_max_burst: PsramMaxBurst) -> Result<()> {
+        for engine in &self.0 {
+            for channel in &engine.channels {
+                match channel.can_access_psram {
+                    Some(true) => bail!(
+                        "DMA channel '{}': only `can_access_psram = false` can be set",
+                        channel.name
+                    ),
+                    Some(false) => ensure!(
+                        engine.can_access_psram(),
+                        "DMA channel '{}': can_access_psram = false is redundant, engine '{}' has no burst_sizes",
+                        channel.name,
+                        engine.name
+                    ),
+                    None => {}
+                }
+            }
+        }
+
+        if let PsramMaxBurst(Some(max)) = psram_max_burst {
+            ensure!(
+                max.is_power_of_two(),
+                "psram_max_burst = {max} is not a power of two"
+            );
+            ensure!(
+                self.0.iter().any(|engine| engine
+                    .channels
+                    .iter()
+                    .any(|channel| channel.can_access_psram(engine))),
+                "psram_max_burst is set, but no DMA channel can access PSRAM"
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -160,18 +232,6 @@ impl GenericProperty for DmaEngines {
             }
         }
 
-        if self.0.iter().any(|engine| !engine.burst_sizes.is_empty()) {
-            // TODO: this symbol encodes whether _any_ engine can access PSRAM
-            // and can be used to enable relevant API.
-            cfgs.push("dma.can_access_psram".to_string());
-        }
-
-        // TODO: temporary
-        if let Some(max_priority) = self.max_priority() {
-            cfgs.push(format!("dma.max_priority=\"{}\"", max_priority));
-            cfgs.push("dma.max_priority_is_set".to_string());
-        }
-
         Some(cfgs)
     }
 
@@ -182,8 +242,10 @@ impl GenericProperty for DmaEngines {
         let mut split = vec![];
 
         let mut engines = vec![];
+        let mut priorities = vec![];
         let mut engine_channels = vec![];
         let mut engine_any_channels = vec![];
+        let mut psram = vec![];
         // One entry per (channel, peripheral) pair from DMA `compatible_with` lists.
         // If the list is empty (GDMA), this contains nothing.
         let mut dma_pairs = vec![];
@@ -200,6 +262,11 @@ impl GenericProperty for DmaEngines {
         for engine in self.0.iter() {
             let engine_name = engine.name.as_str();
             engines.push(quote! { #engine_name });
+
+            if let Some(max_priority) = engine.max_priority {
+                let levels = (0..=max_priority).map(number);
+                priorities.push(quote! { #engine_name, #(#levels),* });
+            }
 
             let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
             let any_channel = format_ident!("{channel}Channel");
@@ -250,6 +317,9 @@ impl GenericProperty for DmaEngines {
                 }
 
                 engine_channels.push(quote! { #engine_name, #ch });
+
+                let can_access_psram = channel.can_access_psram(engine);
+                psram.push(quote! { #engine_name, #ch, can_access_psram = #can_access_psram });
 
                 let compatible_peris = if channel.compatible_with.is_empty() {
                     engine
@@ -311,13 +381,17 @@ impl GenericProperty for DmaEngines {
                     ("shared", &shared),
                     ("split", &split),
                     ("no_own_interrupt", &no_own_interrupt),
+                    ("psram", &psram),
                 ],
             ))
         } else {
             None
         };
 
-        let dma_engines_macro = generate_for_each_macro("dma_engine", &[("all", &engines)]);
+        let dma_engines_macro = generate_for_each_macro(
+            "dma_engine",
+            &[("all", &engines), ("priority", &priorities)],
+        );
 
         // Always emit for_each_dma_channel_peri_pair! so drivers can call it
         // unconditionally. On GDMA chips it expands to nothing.

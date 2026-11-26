@@ -348,6 +348,7 @@ fn init_tracing() {
             TraceEvents::ProcessTimerQueue as u32,
             "process timer queue",
         );
+        #[cfg(feature = "embassy")]
         rtos_trace::trace::name_marker(
             TraceEvents::ProcessEmbassyTimerQueue as u32,
             "process embassy timer queue",

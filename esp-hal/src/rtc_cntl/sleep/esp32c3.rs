@@ -66,6 +66,12 @@ pub const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
 pub const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u8 = 100;
 /// Default number of cycles to wait for the internal 8 MHz clock to stabilize.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
+/// Wait time for the XTL buffer on a light sleep wakeup, in microseconds.
+pub(super) const RTC_CNTL_XTL_BUF_WAIT_SLP_US: u32 = 250;
+/// Wait time for the PLL buffer on a light sleep wakeup, in RTC slow clock cycles.
+pub(super) const RTC_CNTL_PLL_BUF_WAIT_SLP_CYCLES: u8 = 1;
+/// Wait time for the internal 8 MHz clock on a light sleep wakeup, in RTC slow clock cycles.
+pub(super) const RTC_CNTL_CK8M_WAIT_SLP_CYCLES: u8 = 4;
 /// Default number of cycles required to enable the internal 8 MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 

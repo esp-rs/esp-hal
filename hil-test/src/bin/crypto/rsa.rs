@@ -65,6 +65,7 @@ mod tests {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+        hil_test::init_logger!(peripherals);
 
         let rsa = Rsa::new(peripherals.RSA, esp_hal::rsa::Config::default()).unwrap();
 
@@ -175,6 +176,10 @@ mod tests {
             d.wrapping_rem_vartime(&modulus.resize()).resize()
         }
 
+        // Computing these at runtime needs more stack than the ESP32-S2 has left.
+        static R: MAX = compute_r(&MODULUS);
+        const MPRIME: u32 = compute_mprime(&MODULUS);
+
         // 10^3 mod bignum = 1000
 
         let mut outbuf = [u32::MAX; MAX::LIMBS];
@@ -182,10 +187,9 @@ mod tests {
             &mut ctx.rsa,
             THREE.as_words(),
             MODULUS.as_words(),
-            compute_mprime(&MODULUS),
+            MPRIME,
         );
-        let r = compute_r(&MODULUS);
-        mod_exp.start_exponentiation(TEN.as_words(), r.as_words());
+        mod_exp.start_exponentiation(TEN.as_words(), R.as_words());
         mod_exp.read_results(&mut outbuf);
 
         let words = RESULT.as_words();
@@ -388,6 +392,7 @@ mod work_queue_tests {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         #[allow(unused_mut)]
         let mut rsa = RsaBackend::new(peripherals.RSA);

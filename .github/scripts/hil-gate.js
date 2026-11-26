@@ -1,11 +1,16 @@
 const RUN_TESTS_STEP = "Run Tests";
 
+// The gate tolerates this many failed runners; one more blocks the merge.
+const MAX_FAILED_RUNNERS = 3;
+
 function isHilRunMatrixJob(name) {
   // Matches "hil-run (…)" but not "hil-run-radio (…)".
   return /(?:^|\/\s*)hil-run \(/i.test(String(name || ""));
 }
 
 function classifyMatrixJob(job) {
+  // GitHub names each leg "hil-run (<soc>, <arch>, <runner>)".
+  const soc = /hil-run \(([^,)]+)/i.exec(job.name)?.[1];
   const steps = job.steps || [];
   const runTests = steps.find((s) => s.name === RUN_TESTS_STEP);
   if (!runTests) {
@@ -18,19 +23,19 @@ function classifyMatrixJob(job) {
     // cancelled or timed out leaves the same skipped step behind, so only a
     // successful job means "not tested".
     if (job.conclusion === "success") {
-      return { kind: "skipped" };
+      return { soc, kind: "skipped" };
     }
-    return { kind: "failed" };
+    return { soc, kind: "failed" };
   }
   if (conclusion === "success") {
-    return { kind: "passed" };
+    return { soc, kind: "passed" };
   }
   if (
     conclusion === "failure" ||
     conclusion === "cancelled" ||
     conclusion === null
   ) {
-    return { kind: "failed" };
+    return { soc, kind: "failed" };
   }
 
   return {
@@ -38,18 +43,24 @@ function classifyMatrixJob(job) {
   };
 }
 
-function evaluateHilRunResults(classifications) {
+function evaluateHilRunResults(classifications, requiredChips = []) {
   const executed = classifications.filter(
     (c) => c.kind === "passed" || c.kind === "failed",
   );
   const failures = classifications.filter((c) => c.kind === "failed");
+  // A required chip must have passed, so a mistyped label fails too.
+  const requiredNotPassed = requiredChips.filter(
+    (soc) => !classifications.some((c) => c.soc === soc && c.kind === "passed"),
+  );
 
-  if (executed.length === 0) {
-    return { pass: true, executed: 0, failures: 0 };
-  }
-
-  const pass = failures.length * 2 < executed.length;
-  return { pass, executed: executed.length, failures: failures.length };
+  const pass =
+    failures.length <= MAX_FAILED_RUNNERS && requiredNotPassed.length === 0;
+  return {
+    pass,
+    executed: executed.length,
+    failures: failures.length,
+    requiredNotPassed,
+  };
 }
 
 async function listWorkflowRunJobs(github, context) {
@@ -81,7 +92,7 @@ async function listWorkflowRunJobs(github, context) {
   return jobs;
 }
 
-async function evaluateHilGate({ github, context, core }) {
+async function evaluateHilGate({ github, context, core, requiredChips = "" }) {
   const jobs = await listWorkflowRunJobs(github, context);
   const matrixJobs = jobs.filter((job) => isHilRunMatrixJob(job.name));
 
@@ -100,7 +111,10 @@ async function evaluateHilGate({ github, context, core }) {
     classifications.push(result);
   }
 
-  const verdict = evaluateHilRunResults(classifications);
+  const verdict = evaluateHilRunResults(
+    classifications,
+    requiredChips.split(" ").filter(Boolean),
+  );
   if (verdict.pass) {
     if (verdict.executed > 0) {
       core.info(
@@ -112,7 +126,15 @@ async function evaluateHilGate({ github, context, core }) {
     return;
   }
 
-  core.setFailed("HIL gate failed: ≥50% of executed runners failed");
+  if (verdict.requiredNotPassed.length > 0) {
+    core.setFailed(
+      `HIL gate failed: required chips did not pass: ${verdict.requiredNotPassed.join(", ")}`,
+    );
+    return;
+  }
+  core.setFailed(
+    `HIL gate failed: ${verdict.failures}/${verdict.executed} executed runners failed`,
+  );
 }
 
 module.exports = {

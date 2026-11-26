@@ -1,8 +1,16 @@
-//! PDM TX for an NS4150,LM386 or similar amplifier connected via low-pass filter,
-//! playing ESP-IDF's "Twinkle Twinkle Little Star" demo.
+//! PDM TX playing ESP-IDF's "Twinkle Twinkle Little Star" demo with the codec-line defaults
+//! (`PdmTxConfig::new_codec_default`), as ESP-IDF's `i2s_pdm` example does without
+//! `CONFIG_EXAMPLE_PDM_TX_DAC`.
 //!
-//! e.g. ESP32-C3-LCDKit (on-board NS4150), PDM data goes to the on-board NS4150 on **GPIO3**
-//! (`AUDIO_PA`). No separate clock pin. (DAC case)
+//! Only the data line is routed, on **GPIO3** (**GPIO4** on ESP32). No clock pin. That is enough
+//! to hear the demo on an amplifier fed through a low-pass filter, e.g. the on-board NS4150 on
+//! the ESP32-C3-LCDKit (`AUDIO_PA`), or an LM386. For that wiring
+//! `PdmTxConfig::new_dac_default` (not on ESP32) is the intended configuration; a PDM codec also
+//! needs the clock pin.
+//!
+//! The output is quiet: `AMPLITUDE` matches ESP-IDF's example (about -30 dBFS), and the codec
+//! defaults halve the signal in the high-pass stage. Raise `AMPLITUDE` or switch to the DAC
+//! defaults for more volume.
 
 //% CHIP_FILTER: i2s_driver_supported && i2s_supports_pdm_tx
 //% FEATURES: unstable
@@ -20,7 +28,6 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -76,7 +83,7 @@ impl TwinklePlayer {
             tone_buf: [0; MAX_TONE_POINT],
             phase: PlayerPhase::Gap { samples_left: 0 },
         };
-        println!(
+        log::info!(
             "Playing {} `twinkle twinkle little star`",
             TONE_NAME[player.tone_select]
         );
@@ -103,7 +110,7 @@ impl TwinklePlayer {
         if self.song_idx >= SONG.len() {
             self.song_idx = 0;
             self.tone_select = (self.tone_select + 1) % 3;
-            println!(
+            log::info!(
                 "Playing {} `twinkle twinkle little star`",
                 TONE_NAME[self.tone_select]
             );
@@ -161,9 +168,10 @@ impl TwinklePlayer {
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    println!("embassy_i2s_pdm: init");
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
+
+    log::info!("embassy_i2s_pdm: init");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -178,7 +186,7 @@ async fn main(_spawner: Spawner) {
     let i2s = match I2s::new_pdm(peripherals.I2S0, dma_channel, pdm_cfg) {
         Ok(i2s) => i2s.into_async(),
         Err(err) => {
-            println!("I2S PDM init failed: {err:?}");
+            log::info!("I2S PDM init failed: {err:?}");
             loop {
                 core::hint::spin_loop();
             }
@@ -192,10 +200,10 @@ async fn main(_spawner: Spawner) {
     let i2s_tx = i2s.i2s_tx.with_dout(dout).build();
     cfg_select! {
         feature = "esp32" => {
-            println!("embassy_i2s_pdm: PDM TX on GPIO4 @ {} Hz", SAMPLE_RATE_HZ);
+            log::info!("embassy_i2s_pdm: PDM TX on GPIO4 @ {} Hz", SAMPLE_RATE_HZ);
         }
         _ => {
-            println!("embassy_i2s_pdm: PDM TX on GPIO3 @ {} Hz", SAMPLE_RATE_HZ);
+            log::info!("embassy_i2s_pdm: PDM TX on GPIO3 @ {} Hz", SAMPLE_RATE_HZ);
         }
     }
 
@@ -206,7 +214,7 @@ async fn main(_spawner: Spawner) {
     let mut transaction = match i2s_tx.write(buffer) {
         Ok(tx) => tx,
         Err((err, _, _)) => {
-            println!("I2S DMA write failed: {err:?}");
+            log::info!("I2S DMA write failed: {err:?}");
             loop {
                 core::hint::spin_loop();
             }

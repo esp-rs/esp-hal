@@ -169,7 +169,7 @@ pub mod dma {
     use crate::RegisterToggle;
     use crate::{
         DriverMode,
-        dma::{Channel, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
+        dma::{Channel, DmaConfigError, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
         rtc_cntl::WakeLock,
         spi::Error,
     };
@@ -212,8 +212,8 @@ pub mod dma {
 
     impl<'d> SpiDma<'d, Blocking> {
         pub(super) fn new(spi: AnySpi<'d>, channel: SpiSlaveErased<'d>) -> Self {
-            let channel = Channel::new(channel);
-            channel.runtime_ensure_compatible(spi.dma_peripheral());
+            let mut channel = Channel::new(channel);
+            channel.connect(spi.dma_peripheral());
             let guard = PeripheralGuard::new(spi.info().peripheral);
 
             Self {
@@ -231,8 +231,17 @@ pub mod dma {
         fn driver(&self) -> DmaDriver {
             DmaDriver {
                 info: self.spi.info(),
-                dma_peripheral: self.spi.dma_peripheral(),
             }
+        }
+
+        /// Applies a DMA configuration to both halves of the DMA channel.
+        ///
+        /// # Errors
+        ///
+        /// [`DmaConfigError`] when the channel cannot apply the configuration.
+        #[instability::unstable]
+        pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+            self.channel.apply_config(config)
         }
 
         /// Registers a buffer for a DMA write.
@@ -454,7 +463,6 @@ pub mod dma {
 
     struct DmaDriver {
         info: &'static Info,
-        dma_peripheral: crate::dma::DmaPeripheral,
     }
 
     impl DmaDriver {
@@ -476,17 +484,13 @@ pub mod dma {
 
             if read_buffer_len > 0 {
                 unsafe {
-                    channel
-                        .rx
-                        .prepare_transfer(self.dma_peripheral, rx_buffer)?;
+                    channel.rx.prepare_transfer(rx_buffer)?;
                 }
             }
 
             if write_buffer_len > 0 {
                 unsafe {
-                    channel
-                        .tx
-                        .prepare_transfer(self.dma_peripheral, tx_buffer)?;
+                    channel.tx.prepare_transfer(tx_buffer)?;
                 }
             }
 
@@ -614,6 +618,8 @@ pub mod dma {
             }
 
             type SpiSlaveErased<'d> = crate::dma::$any_channel<'d>;
+
+            crate::dma::driver_dma_config!($engine);
         };
     }
 }
@@ -769,8 +775,9 @@ impl Info {
             });
 
             if dma {
-                assert!(
-                    matches!(data_mode, Mode::_1 | Mode::_3),
+                assert_matches!(
+                    data_mode,
+                    Mode::_1 | Mode::_3,
                     "Mode {:?} is not supported with DMA",
                     data_mode
                 );

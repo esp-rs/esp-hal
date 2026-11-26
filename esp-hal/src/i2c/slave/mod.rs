@@ -19,6 +19,7 @@
 use core::{
     future::Future,
     marker::PhantomData,
+    mem::DropGuard,
     pin::Pin,
     sync::atomic::{AtomicBool, Ordering},
     task::{Context, Poll},
@@ -45,7 +46,7 @@ use crate::{
     i2c::master::I2cAddress,
     interrupt::InterruptHandler,
     pac::i2c0::RegisterBlock,
-    private::{self, DropGuard},
+    private,
     ram,
     rtc_cntl::WakeLock,
     system::PeripheralGuard,
@@ -302,7 +303,7 @@ impl<'d> I2cSlave<'d, Async> {
             }
         }
         .await;
-        bytes_read.defuse();
+        DropGuard::dismiss(bytes_read);
         result
     }
 
@@ -339,7 +340,7 @@ impl<'d> I2cSlave<'d, Async> {
             }
         }
         .await;
-        cancel_on_drop.defuse();
+        DropGuard::dismiss(cancel_on_drop);
         result
     }
 }
@@ -817,8 +818,14 @@ impl Driver<'_> {
     }
 
     fn recover(&self) {
-        let address = self.regs().slave_addr().read().slave_addr().bits() as u8;
+        let regs = self.regs();
+        let address = regs.slave_addr().read().slave_addr().bits() as u8;
+        // setup writes the driver default into the bus timeout.
+        let timeout = regs.to().read().time_out_value().bits();
         self.setup(&Config::new(address)).ok();
+        regs.to()
+            .modify(|_, w| unsafe { w.time_out_value().bits(timeout) });
+        self.update_registers();
     }
 
     fn start_listen(&self) {

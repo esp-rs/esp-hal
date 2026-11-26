@@ -23,6 +23,14 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
+/// Configuration of the ESP32-S2 copy DMA channel.
+///
+/// This channel has no priority register.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct CopyDmaConfig {}
+
 /// Immutable per-channel metadata.
 #[doc(hidden)]
 pub struct ChannelInfo {
@@ -82,6 +90,8 @@ impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
 impl DmaTxChannel for CopyDmaTxChannel<'_> {}
 
 impl RegisterAccess for CopyDmaTxChannel<'_> {
+    type Config = CopyDmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CopyDma))
@@ -92,6 +102,8 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+
+    fn apply_config(&self, _config: &CopyDmaConfig) {}
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
 
@@ -254,6 +266,8 @@ impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CopyDmaRxChannel<'_> {
+    type Config = CopyDmaConfig;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CopyDma))
@@ -264,6 +278,8 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+
+    fn apply_config(&self, _config: &CopyDmaConfig) {}
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
 
@@ -315,6 +331,14 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
 impl RxRegisterAccess for CopyDmaRxChannel<'_> {
     #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, _value: bool) {}
+
+    fn last_dscr_address(&self) -> usize {
+        self.regs()
+            .in_eof_des_addr()
+            .read()
+            .in_suc_eof_des_addr()
+            .bits() as usize
+    }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         None

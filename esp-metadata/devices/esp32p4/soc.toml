@@ -1,9 +1,6 @@
 # ESP32-P4 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32p4"
@@ -85,6 +82,7 @@ peripherals = [
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
+    { name = "TSENS", pac = "LP_TSENS", clock_group = "TSENS" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UART2", interrupts = { peri = "UART2" }, stable = true, clock_group = "UART" },
@@ -111,6 +109,7 @@ peripherals = [
     { name = "AXI_GDMA", pac = "AXI_DMA" },
     { name = "DMA2D" },
     { name = "JPEG", interrupts = { peri = "JPEG" } },
+    { name = "LCD_CAM", interrupts = { peri = "LCD_CAM" }, clock_group = "LCD_CAM" },
     { name = "PPA" },
 
     { name = "ETH", virtual = true, interrupts = { peri = "ETH_MAC" } },
@@ -225,11 +224,12 @@ has_pd_en = true
 support_status = { status = "partial", issue = 6754 }
 gdma_version = 2
 separate_in_out_interrupts = true
+psram_max_burst = 128
 engines = [
     {
         name = "AHB_GDMA",
         max_priority = 5,
-        burst_sizes = [0, 4, 16, 32], # unclear if 64 byte (INCR16) is supported
+        burst_sizes = [4, 16, 32, 64],
         drivers = ["i2s", "uhci"],
         peripheral_instances = [
             { name = "UHCI0", dma_id = 2 },
@@ -247,9 +247,9 @@ engines = [
         name = "AXI_GDMA",
         max_priority = 5,
         burst_sizes = [8, 16, 32, 64, 128],
-        drivers = ["aes", "sha", "spi_master", "spi_slave", "parl_io"],
+        drivers = ["aes", "sha", "spi_master", "spi_slave", "lcd_cam", "parl_io"],
         peripheral_instances = [
-            # LCD_CAM
+            { name = "LCD_CAM", dma_id = 0 },
             { name = "SPI2", dma_id = 1 },
             { name = "SPI3", dma_id = 2 },
             { name = "PARL_IO", dma_id = 3 },
@@ -300,7 +300,7 @@ support_status = "not_supported"
 [device.bit_scrambler]
 support_status = "not_supported"
 [device.camera]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6751 }
 [device.ds]
 support_status = "not_supported"
 [device.ecdsa]
@@ -416,7 +416,7 @@ instances = {
     },
 }
 [device.rgb_display]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6744 }
 output_lines = 24
 
 [device.rmt]
@@ -545,7 +545,8 @@ support_status = "not_supported"
 [device.i3c_slave]
 support_status = "not_supported"
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6778 }
+register_block = "lp_tsens"
 [device.touch]
 support_status = "not_supported"
 [device.uhci]

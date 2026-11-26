@@ -24,6 +24,21 @@ use crate::{
 #[cfg_attr(dma_gdma_version = "3", path = "ahb_v3.rs")]
 mod implementation;
 
+for_each_dma_engine! {
+    ("AHB_GDMA", $($level:literal),+) => {
+        priority_enum!(AhbPriority, "AHB GDMA", $($level),+);
+    };
+}
+
+/// Configuration of an AHB GDMA channel.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AhbGdmaConfig {
+    /// The channel priority.
+    priority: AhbPriority,
+}
+
 /// Immutable per-channel metadata owned by each `DMA_CH*` singleton.
 pub(crate) struct ChannelInfo {
     /// Hardware channel index used to select the register bank.
@@ -96,6 +111,7 @@ impl AhbGdmaChannel<'_> {
 
 impl crate::private::Sealed for AhbGdmaChannel<'_> {}
 impl<'d> DmaChannel for AhbGdmaChannel<'d> {
+    type Config = AhbGdmaConfig;
     type Rx = AhbGdmaRxChannel<'d>;
     type Tx = AhbGdmaTxChannel<'d>;
 

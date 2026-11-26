@@ -13,12 +13,10 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator},
+    rmt::{PulseCode, Rmt, RmtConfig, RxConfig},
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::{print, println};
-
 esp_bootloader_esp_idf::esp_app_desc!();
 
 const WIDTH: usize = 80;
@@ -39,35 +37,31 @@ async fn signal_task(mut pin: Output<'static>) {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) {
-    println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    let freq = cfg_select! {
-        feature = "esp32h2" => Rate::from_mhz(32),
-        _ => Rate::from_mhz(80),
+    let rmt = Rmt::new(peripherals.RMT, RmtConfig::default())
+        .unwrap()
+        .into_async();
+    let rx_config = RxConfig::default()
+        .with_tick_rate(Rate::from_mhz(1))
+        .with_idle_ns(10_000_000);
+
+    let rx_channel = cfg_select! {
+        any(feature = "esp32", feature = "esp32s2") => peripherals.RMT_CH0,
+        any(feature = "esp32s3", feature = "esp32s31", feature = "esp32p4") => peripherals.RMT_CH7,
+        _ => peripherals.RMT_CH2,
     };
-
-    let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
-    let rx_config = RxChannelConfig::default()
-        .with_clk_divider(255)
-        .with_idle_threshold(10000);
-
-    let channel = cfg_select! {
-        any(feature = "esp32", feature = "esp32s2") => {
-            rmt.channel0.configure_rx(&rx_config).unwrap()
-        }
-        any(feature = "esp32s3", feature = "esp32s31", feature = "esp32p4") => {
-            rmt.channel7.configure_rx(&rx_config).unwrap()
-        }
-        _ => rmt.channel2.configure_rx(&rx_config).unwrap(),
-    };
-
-    let mut channel = channel.with_pin(peripherals.GPIO4);
+    let mut channel = rmt
+        .async_rx_channel(rx_channel, rx_config)
+        .unwrap()
+        .with_pin(peripherals.GPIO4);
 
     spawner.spawn(
         signal_task(Output::new(
@@ -81,9 +75,9 @@ async fn main(spawner: Spawner) {
     let mut data = [PulseCode::default(); 48];
 
     loop {
-        println!("receive");
-        if channel.receive(&mut data).await.is_err() {
-            println!("receive error");
+        log::info!("receive");
+        if channel.receive_async(&mut data).await.is_err() {
+            log::info!("receive error");
             continue;
         }
 
@@ -100,34 +94,37 @@ async fn main(spawner: Spawner) {
             total += entry.length2() as usize;
         }
 
-        for entry in &data[..data.len()] {
-            if entry.length1() == 0 {
-                break;
-            }
+        let waveform = core::fmt::from_fn(|f| {
+            for entry in &data[..data.len()] {
+                if entry.length1() == 0 {
+                    break;
+                }
 
-            let count = WIDTH / (total / entry.length1() as usize);
-            let c = match entry.level1() {
-                Level::High => '-',
-                Level::Low => '_',
-            };
-            for _ in 0..count + 1 {
-                print!("{}", c);
-            }
+                let count = WIDTH / (total / entry.length1() as usize);
+                let c = match entry.level1() {
+                    Level::High => '-',
+                    Level::Low => '_',
+                };
+                for _ in 0..count + 1 {
+                    write!(f, "{}", c)?;
+                }
 
-            if entry.length2() == 0 {
-                break;
-            }
+                if entry.length2() == 0 {
+                    break;
+                }
 
-            let count = WIDTH / (total / entry.length2() as usize);
-            let c = match entry.level2() {
-                Level::High => '-',
-                Level::Low => '_',
-            };
-            for _ in 0..count + 1 {
-                print!("{}", c);
+                let count = WIDTH / (total / entry.length2() as usize);
+                let c = match entry.level2() {
+                    Level::High => '-',
+                    Level::Low => '_',
+                };
+                for _ in 0..count + 1 {
+                    write!(f, "{}", c)?;
+                }
             }
-        }
+            Ok(())
+        });
 
-        println!();
+        log::info!("{waveform}");
     }
 }

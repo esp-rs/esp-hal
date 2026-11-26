@@ -60,6 +60,7 @@ impl CpuClock {
         )),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_peri_clk: None,
         timg_calibration_clock: None,
     };
 
@@ -80,6 +81,7 @@ impl CpuClock {
         )),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_peri_clk: None,
         timg_calibration_clock: None,
     };
 
@@ -98,6 +100,7 @@ impl CpuClock {
         )),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_peri_clk: None,
         timg_calibration_clock: None,
     };
 }
@@ -128,7 +131,18 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(self, clocks: &mut ClockTree) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
+        if self.lp_peri_clk.is_none() {
+            // Keep the LP peripheral divider configured by the bootloader.
+            self.lp_peri_clk = Some(LpPeriClkConfig::new(
+                LP_AON_CLKRST::regs()
+                    .lp_aonclkrst_lp_clk_conf()
+                    .read()
+                    .lp_aonclkrst_lp_peri_div_num()
+                    .bits() as u32,
+            ));
+        }
+
         with_single_bus_clock_update(|| self.apply(clocks));
     }
 }
@@ -440,6 +454,16 @@ fn configure_lp_fast_clk_impl(
         });
 }
 
+fn configure_lp_peri_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<LpPeriClkConfig>,
+    new: LpPeriClkConfig,
+) {
+    LP_AON_CLKRST::regs()
+        .lp_aonclkrst_lp_clk_conf()
+        .modify(|_, w| unsafe { w.lp_aonclkrst_lp_peri_div_num().bits(new.divisor() as u8) });
+}
+
 // LP_SLOW_CLK mux
 fn configure_lp_slow_clk_impl(
     _clocks: &mut ClockTree,
@@ -615,6 +639,68 @@ impl ParlIoInstance {
                     ParlIoClkConfig::RcFastClk => 1,
                     ParlIoClkConfig::PllF160m => 2,
                 })
+            });
+    }
+}
+
+impl LcdCamInstance {
+    fn enable_lcd_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl19()
+            .modify(|_, w| w.lcd_clk_en().bit(en));
+    }
+
+    fn configure_lcd_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamLcdClockConfig>,
+        new_config: LcdCamLcdClockConfig,
+    ) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl19()
+            .modify(|_, w| unsafe {
+                w.lcd_clk_src_sel().bits(match new_config.sclk() {
+                    LcdCamLcdClockSclk::XtalClk => 0,
+                    LcdCamLcdClockSclk::PllF160m => 1,
+                })
+            });
+        // The register stores N - 1.
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl110()
+            .modify(|_, w| unsafe {
+                w.lcd_clk_div_num().bits((new_config.div_num() - 1) as u8);
+                w.lcd_clk_div_denominator().bits(new_config.div_a() as u8);
+                w.lcd_clk_div_numerator().bits(new_config.div_b() as u8)
+            });
+    }
+
+    fn enable_cam_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl119()
+            .modify(|_, w| w.cam_clk_en().bit(en));
+    }
+
+    fn configure_cam_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamCamClockConfig>,
+        new_config: LcdCamCamClockConfig,
+    ) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl119()
+            .modify(|_, w| unsafe {
+                w.cam_clk_src_sel().bits(match new_config.sclk() {
+                    LcdCamCamClockSclk::XtalClk => 0,
+                    LcdCamCamClockSclk::PllF160m => 1,
+                })
+            });
+        // The register stores N - 1.
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl120()
+            .modify(|_, w| unsafe {
+                w.cam_clk_div_num().bits((new_config.div_num() - 1) as u8);
+                w.cam_clk_div_denominator().bits(new_config.div_a() as u8);
+                w.cam_clk_div_numerator().bits(new_config.div_b() as u8)
             });
     }
 }

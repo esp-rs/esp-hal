@@ -52,6 +52,7 @@ jobs:
     outputs:
       labels: ${{ steps.labels.outputs.labels }}
       packages: ${{ steps.labels.outputs.packages }}
+      hil-required-chips: ${{ steps.labels.outputs.hil-required-chips }}
       run-build: ${{ steps.decide.outputs.run-build }}
       run-docs: ${{ steps.decide.outputs.run-docs }}
       run-msrv: ${{ steps.decide.outputs.run-msrv }}
@@ -65,22 +66,28 @@ jobs:
         id: labels
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_GROUP_REF: ${{ github.event.merge_group.head_ref }}
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # Not the event payload: a re-run reuses it, labels and all.
             LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels --jq '.labels[].name')
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            COMMIT_MSG=$(git log -1 --pretty=%B)
-            PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*" || true)
+            # The queue ref is `refs/heads/gh-readonly-queue/<base>/pr-<number>-<sha>`.
+            PR_NUMBER=$(echo "$MERGE_GROUP_REF" | { grep -oP '(?<=/pr-)[0-9]+(?=-)' || true; })
             if [ -n "$PR_NUMBER" ]; then
               LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>/dev/null || true)
             fi
           fi
 
           PACKAGES=""
+          HIL_REQUIRED_CHIPS=""
           if [ -n "$LABELS" ]; then
             PACKAGES=$(printf '%s\n' "$LABELS" \
               | { grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true; } \
+              | tr '\n' ' ' | xargs)
+            # `hil-required-<soc>` makes a failure on that chip alone block the merge.
+            HIL_REQUIRED_CHIPS=$(printf '%s\n' "$LABELS" \
+              | { grep -oP '(?<=^hil-required-)[a-z0-9]+$' || true; } \
               | tr '\n' ' ' | xargs)
           fi
 
@@ -88,9 +95,11 @@ jobs:
 
           echo "labels=$LABELS_SPACE" >> "$GITHUB_OUTPUT"
           echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+          echo "hil-required-chips=$HIL_REQUIRED_CHIPS" >> "$GITHUB_OUTPUT"
 
           echo "Detected labels: $LABELS_SPACE"
           echo "Detected packages: $PACKAGES"
+          echo "Detected HIL-required chips: $HIL_REQUIRED_CHIPS"
 
       - name: Decide what to run
         id: decide
@@ -450,6 +459,7 @@ jobs:
             esp-hal
             esp-hal-procmacros
             esp-lp-hal
+            esp-log
             esp-metadata
             esp-phy
             esp-println
@@ -565,7 +575,8 @@ jobs:
     secrets: inherit
 
   # --------------------------------------------------------------------------
-  # HIL — build jobs gate artifacts; hil-gate gates device runs (≥50% rule).
+  # HIL — build jobs gate artifacts; hil-gate gates device runs (four failed
+  # runners, or any failure on a `hil-required-<soc>` chip).
 
   # `merge-freeze-gate` is a dependency so that a frozen-out queue entry never
   # occupies the device runners.
@@ -576,6 +587,7 @@ jobs:
     with:
       chips: all
       package: all
+      required_chips: ${{ needs.calculate.outputs.hil-required-chips }}
     secrets: inherit
 
   # --------------------------------------------------------------------------
@@ -587,8 +599,9 @@ jobs:
   # Failed or cancelled jobs cause this gate to fail.
   #
   # The `hil` job is the reusable hil.yml workflow, so it covers test
-  # compilation and the runner tool as well; its hil-gate job blocks when ≥50%
-  # of executed hil-run matrix legs fail. hil-run-radio is informational only.
+  # compilation and the runner tool as well; its hil-gate job blocks when four
+  # or more hil-run matrix legs fail, or when a `hil-required-<soc>` chip fails.
+  # hil-run-radio is informational only.
   # merge-freeze-gate rejects queue entries while a merge freeze is in effect.
   ci-result:
     if: ${{ always() }}

@@ -84,13 +84,14 @@
 //! # {after_snippet}
 //! ```
 
+use core::mem::DropGuard;
+
 use operator::Operator;
 use timer::Timer;
 
 use crate::{
     gpio::OutputSignal,
     pac,
-    private::DropGuard,
     soc::clocks::{self, ClockTree},
     system::{Peripheral, PeripheralGuard},
     time::Rate,

@@ -30,6 +30,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
@@ -47,7 +48,7 @@ async fn main(_spawner: Spawner) {
         i2c.write_read_async(0x77, &[0xaa], &mut data)
             .await
             .unwrap();
-        esp_println::println!("direct:       {:02x?}", data);
+        log::info!("direct:       {:02x?}", data);
         read_data(&mut i2c).await;
         Timer::after(Duration::from_millis(1000)).await;
     }
@@ -60,5 +61,5 @@ where
     let mut data = [0u8; 22];
     i2c.write_read(0x77, &[0xaa], &mut data).await.unwrap();
 
-    esp_println::println!("embedded_hal: {:02x?}", data);
+    log::info!("embedded_hal: {:02x?}", data);
 }

@@ -12,6 +12,7 @@ exclude  = [
     "esp-hal-procmacros",
     "esp-rom-sys",
     "esp-lp-hal",
+    "esp-log",
     "esp-metadata",
     "esp-metadata-generated",
     "esp-phy",

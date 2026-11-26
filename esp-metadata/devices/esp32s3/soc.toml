@@ -1,9 +1,6 @@
 # ESP32-S3 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32s3"
@@ -146,6 +143,7 @@ gdma_version = 1
 separate_in_out_interrupts = true
 mem2mem_requires_peripheral = true
 ext_mem_configurable_block_size = true
+psram_max_burst = 64
 engines = [
     {
         name = "AHB_GDMA",

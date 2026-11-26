@@ -195,7 +195,7 @@ peripheral_clocks = { templates = [
     { name = "SdioHost", template_params = { reg_group = "en1" } },
     { name = "LcdCam", template_params = { reg_group = "en1" } },
     { name = "Uart2", template_params = { reg_group = "en1" } },
-    { name = "UsbDevice", template_params = { reg_group = "en1" }, keep_enabled = true },
+    { name = "UsbDevice", template_params = { reg_group = "en1" }, keep_enabled = "keep_usb_serial_jtag_enabled" },
     { name = "DedicatedGpio", template_params = { clk_en_register = "cpu_peri_clk_en", rst_register = "cpu_peri_rst_en" } },
 
     { name = "RtcIoMux", keep_enabled = true, template_params = {
@@ -222,7 +222,7 @@ peripheral_clocks = { templates = [
         clk_en_register = "sar_peri_clk_gate_conf", clk_en_field = "tsens_clk_en",
         rst_register = "sar_peri_reset_conf", rst_field = "sar_tsens_reset"
     } },
-    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
+    { name = "UartMem", keep_enabled = "keep_uart0_enabled" },
     { name = "UsbFs", template_params = { peripheral = "usb" } },
     { name = "I2s1" },
     { name = "Mcpwm1", template_params = { peripheral = "pwm1" } },
@@ -241,7 +241,7 @@ peripheral_clocks = { templates = [
     { name = "Spi2" },
     { name = "Uart1" },
     { name = "I2s0" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = "keep_uart0_enabled" },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

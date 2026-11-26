@@ -19,7 +19,6 @@
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, delay::Delay, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::ble::controller::BleConnector;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -79,7 +78,7 @@ fn send_cmd(connector: &mut BleConnector, name: &str, ogf: u8, ocf: u16, params:
             && evt[4] == op[0]
             && evt[5] == op[1]
         {
-            println!(
+            log::info!(
                 "[{}] (0x{:04x}) complete: status=0x{:02x} payload={:02x?}",
                 name,
                 u16::from_le_bytes(op),
@@ -93,8 +92,8 @@ fn send_cmd(connector: &mut BleConnector, name: &str, ogf: u8, ocf: u16, params:
 
 #[esp_hal::main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
@@ -262,7 +261,7 @@ fn main() -> ! {
     );
     assert_eq!(status, 0x00, "LE Set Extended Advertising Enable failed");
 
-    println!(
+    log::info!(
         "PASS: Advertising as \"ESP Periodic Adv\" (FF:E4:05:1A:8F:FF), updating periodic payload every second..."
     );
 

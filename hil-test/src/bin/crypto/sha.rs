@@ -161,6 +161,7 @@ mod tests {
     fn init() -> Context {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let peripherals = esp_hal::init(config);
+        hil_test::init_logger!(peripherals);
 
         Context {
             #[cfg(rng_trng_supported)]
@@ -428,6 +429,7 @@ mod work_queue_tests {
     fn init() -> Context {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let peripherals = esp_hal::init(config);
+        hil_test::init_logger!(peripherals);
 
         Context {
             sha: ShaBackend::new(peripherals.SHA),

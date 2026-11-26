@@ -62,6 +62,8 @@ with_lcd_cam_dma_engine! {
         // must implement the traits only once, outside of the macro.
         impl<'d> LcdDmaTxChannel<'d> for ErasedTxChannel<'d> {}
         impl<'d> CamDmaRxChannel<'d> for ErasedRxChannel<'d> {}
+
+        crate::dma::driver_dma_config!($engine);
     };
 }
 

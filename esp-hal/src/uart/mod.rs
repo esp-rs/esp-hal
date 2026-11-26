@@ -58,7 +58,7 @@ mod clocks;
 mod compat;
 mod low_level;
 
-use core::{marker::PhantomData, sync::atomic::Ordering};
+use core::{marker::PhantomData, mem::DropGuard, sync::atomic::Ordering};
 
 use embedded_hal_async::delay::DelayNs;
 use enumset::{EnumSet, EnumSetType};
@@ -89,7 +89,6 @@ use crate::{
     },
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
-    private::DropGuard,
     rtc_cntl::WakeLock,
 };
 
@@ -614,6 +613,10 @@ where
         // Connect RX to an idle high level.
         uart.info().rx_signal.connect_to(&crate::gpio::Level::High);
         uart.info().cts_signal.connect_to(&crate::gpio::Level::Low);
+
+        // Outputs only appear on the pins passed to the driver.
+        crate::gpio::disconnect_io_mux_output(uart.info().tx_signal);
+        crate::gpio::disconnect_io_mux_output(uart.info().rts_signal);
 
         Self {
             uart,

@@ -48,6 +48,7 @@ mod tests {
 
     #[test]
     async fn adc_reads_unaffected_by_radio(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 

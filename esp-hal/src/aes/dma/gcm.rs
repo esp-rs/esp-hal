@@ -29,7 +29,6 @@ use crate::{
     dma::{
         BurstConfig,
         DmaDescriptor,
-        DmaEligiblePeripheral,
         DmaRxBuffer,
         DmaTxBuffer,
         NoBuffer,
@@ -136,10 +135,9 @@ impl<'d> AesDma<'d> {
 
         // Both channels are prepared before the key goes in, so that a DMA error leaves no key in
         // the registers.
-        let peri = self.aes.aes.dma_peripheral();
         unwrap!(
-            unsafe { self.channel.tx.prepare_transfer(peri, &mut input) }
-                .and_then(|_| unsafe { self.channel.rx.prepare_transfer(peri, &mut output) })
+            unsafe { self.channel.tx.prepare_transfer(&mut input) }
+                .and_then(|_| unsafe { self.channel.rx.prepare_transfer(&mut output) })
         );
 
         self.aes.write_mode(mode);

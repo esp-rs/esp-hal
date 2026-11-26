@@ -147,6 +147,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         #[cfg(feature = "unstable")]
         let delay = Delay::new();
@@ -624,7 +625,7 @@ mod tests {
         })
         .await;
 
-        assert!(matches!(should_timeout, Either::Second(_)));
+        hil_test::assert_matches!(should_timeout, Either::Second(_));
     }
 
     #[test]
@@ -853,25 +854,36 @@ mod tests {
     #[cfg(all(ulp_riscv_driver_supported, feature = "unstable"))]
     fn creating_lpio_does_not_panic() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
-        // Do not use JTAG or USB Serial/JTAG pins because they break the tests.
-        let debug_pins = cfg_select!(
-            esp32 => [13, 14, 15, 16],
-            any(esp32c2, esp32c3) => [4, 5],
-            esp32s3 => [19, 20],
-            _ => [],
-        );
+        macro_rules! into_lp {
+            ($gpio:ident, $pin:literal) => {
+                esp_hal::gpio::Input::new(peripherals.$gpio, esp_hal::gpio::InputConfig::default())
+                    .into_lp::<$pin>()
+                    .unwrap();
+            };
+        }
+
+        // Do not use the USB Serial/JTAG pins, because they break the tests. The logger also owns
+        // them, so the code must not name them.
+        #[cfg(esp32s3)]
+        macro_rules! lp_pin {
+            (GPIO19, $pin:literal) => {};
+            (GPIO20, $pin:literal) => {};
+            ($gpio:ident, $pin:literal) => {
+                into_lp!($gpio, $pin)
+            };
+        }
+        #[cfg(not(esp32s3))]
+        macro_rules! lp_pin {
+            ($gpio:ident, $pin:literal) => {
+                into_lp!($gpio, $pin)
+            };
+        }
 
         esp_metadata_generated::for_each_lp_function! {
             (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                if !debug_pins.contains(&$pin) {
-                    esp_hal::gpio::Input::new(
-                        peripherals.$gpio,
-                        esp_hal::gpio::InputConfig::default(),
-                    )
-                    .into_lp::<$pin>()
-                    .unwrap();
-                }
+                lp_pin!($gpio, $pin);
             };
         }
     }
@@ -903,6 +915,7 @@ mod pad_hold {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let (lp_pad, lp_probe) = hil_test::lp_test_pins!(peripherals);
         #[cfg(not(esp32))]

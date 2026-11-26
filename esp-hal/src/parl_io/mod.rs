@@ -137,6 +137,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaConfigError,
         DmaError,
         DmaPeripheral,
         DmaRxBuffer,
@@ -1260,8 +1261,8 @@ impl<'d> ParlIo<'d, Blocking> {
     ) -> Result<Self, Error> {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
-        let dma_channel = Channel::new(dma_channel.into());
-        dma_channel.runtime_ensure_compatible(DmaPeripheral::PARL_IO);
+        let mut dma_channel = Channel::new(dma_channel.into());
+        dma_channel.connect(DmaPeripheral::PARL_IO);
 
         Ok(Self {
             tx: TxCreator {
@@ -1400,6 +1401,16 @@ impl<'d, Dm> ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.tx_channel.apply_config(config)
+    }
+
     /// Performs a DMA write.
     ///
     /// Returns a [`ParlIoTxTransfer`] that can be used to wait for the
@@ -1441,7 +1452,7 @@ where
 
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::PARL_IO, &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = result {
@@ -1751,6 +1762,16 @@ impl<'d, Dm> ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
 {
+    /// Applies a DMA configuration to the RX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.rx_channel.apply_config(config)
+    }
+
     /// Performs a DMA read.
     ///
     /// Returns a [`ParlIoRxTransfer`] that can be used to wait for the
@@ -1792,7 +1813,7 @@ where
 
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::PARL_IO, &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = result {
@@ -2670,5 +2691,7 @@ with_parl_io_dma_engine! {
         type ErasedChannel<'d> = crate::dma::$any_channel<'d>;
         type ErasedTxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Tx;
         type ErasedRxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Rx;
+
+        crate::dma::driver_dma_config!($engine);
     };
 }

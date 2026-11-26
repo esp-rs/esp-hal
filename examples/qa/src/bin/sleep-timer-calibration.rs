@@ -23,7 +23,6 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -39,6 +38,7 @@ static mut PRE_SLEEP_US: u64 = 0;
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
     let rtc = Rtc::new(peripherals.RTC_TIMER);
     let mut lpwr = LowPower::new(peripherals.LPWR);
@@ -46,7 +46,7 @@ fn main() -> ! {
     if reset_reason(Cpu::ProCpu) == Some(SocResetReason::CoreDeepSleep) {
         let slept_ms = (rtc.time_since_power_up().as_micros() - unsafe { PRE_SLEEP_US }) / 1_000;
         let pass = slept_ms < SLEEP_MS + BOOT_MS;
-        println!(
+        log::info!(
             "Slept {} ms, expected {} ms [{}]",
             slept_ms,
             SLEEP_MS,
@@ -58,7 +58,7 @@ fn main() -> ! {
         }
     }
 
-    println!("Sleeping {} ms with a stale slow clock period", SLEEP_MS);
+    log::info!("Sleeping {} ms with a stale slow clock period", SLEEP_MS);
     Delay::new().delay_millis(100);
 
     cfg_select! {

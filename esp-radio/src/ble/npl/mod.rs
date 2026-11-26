@@ -1,9 +1,8 @@
-use alloc::vec::Vec;
 use core::{mem::transmute, ptr::NonNull};
 
 use esp_phy::PhyInitGuard;
 
-use super::{Config, ReceivedPacket, in_isr};
+use super::{Config, in_isr};
 use crate::{
     compat::{
         self,
@@ -1300,6 +1299,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             register_modem_sleep();
         }
 
+        #[cfg(modem_retention = "regdma")]
+        super::mac_bb::init(config.modem_sleep() && super::lp_clk::light_sleep_supported());
+
         #[cfg(feature = "coex")]
         crate::sys::include::coex_enable();
 
@@ -1345,6 +1347,8 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
 pub(crate) fn ble_deinit() {
     super::lp_clk::release_wake_source();
+    #[cfg(modem_retention = "regdma")]
+    super::mac_bb::deinit();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 
@@ -1387,25 +1391,12 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
     let payload = unsafe { core::slice::from_raw_parts(cmd.offset(2), len) };
     trace!("$ pld = {:?}", payload);
 
-    let mut data = Vec::with_capacity(len + 3);
-    data.push(0x04); // this is an event
-    data.push(event);
-    data.push(len as u8);
-    data.extend_from_slice(payload);
-
-    super::dump_packet_info(&data);
-
-    super::BT_STATE.with(|state| {
-        state.rx_queue.push_back(ReceivedPacket {
-            data: data.into_boxed_slice(),
-        });
-    });
+    // 0x04: this is an event
+    super::queue_rx_packet([&[0x04, event, len as u8][..], payload].into_iter());
 
     unsafe {
         r_ble_hci_trans_buf_free(cmd);
     }
-
-    crate::ble::controller::hci_read_data_available();
 
     0
 }
@@ -1419,34 +1410,17 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
             .map(|mbuf| unsafe { core::slice::from_raw_parts(mbuf.om_data, mbuf.om_len as usize) })
     };
 
-    let len = 1 + chain().map(<[u8]>::len).sum::<usize>();
-    let mut data = Vec::new();
-    if data.try_reserve_exact(len).is_err() {
-        warn!(
-            "Out of memory, dropping a received ACL packet of {} bytes",
-            len
-        );
-        unsafe {
-            r_os_mbuf_free_chain(om as *mut _);
-        }
-        return ESP_ERR_NO_MEM as i32;
-    }
-    data.push(0x02); // ACL
-    chain().for_each(|data_slice| data.extend_from_slice(data_slice));
-
-    super::dump_packet_info(&data);
-
-    super::BT_STATE.with(|state| {
-        state.rx_queue.push_back(ReceivedPacket {
-            data: data.into_boxed_slice(),
-        });
-    });
+    // 0x02: ACL
+    let queued = super::try_queue_rx_packet(core::iter::once(&[0x02][..]).chain(chain()));
 
     unsafe {
         r_os_mbuf_free_chain(om as *mut _);
     }
 
-    crate::ble::controller::hci_read_data_available();
+    if !queued {
+        warn!("Out of memory, dropping a received ACL packet");
+        return ESP_ERR_NO_MEM as i32;
+    }
 
     0
 }
@@ -1468,6 +1442,9 @@ fn send_packet(packet: &[u8]) {
     unsafe {
         if packet[0] == DATA_TYPE_COMMAND {
             let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
+            if cmd.is_null() {
+                super::out_of_memory("an HCI command buffer", packet.len() - 1);
+            }
             core::ptr::copy_nonoverlapping(
                 &raw const packet[1], // don't send the TYPE
                 cmd as *mut u8,
@@ -1481,9 +1458,15 @@ fn send_packet(packet: &[u8]) {
             }
         } else if packet[0] == DATA_TYPE_ACL {
             let om = r_os_msys_get_pkthdr(packet.len() as u16, ACL_DATA_MBUF_LEADINGSPACE as u16);
+            if om.is_null() {
+                super::out_of_memory("an ACL mbuf", packet.len() - 1);
+            }
 
+            // The append allocates further blocks when the packet does not fit the first one.
             let res = r_os_mbuf_append(om, packet.as_ptr().offset(1), (packet.len() - 1) as u16);
-            assert!(res == 0, "r_os_mbuf_append returned {}", res);
+            if res != 0 {
+                super::out_of_memory("an ACL mbuf", packet.len() - 1);
+            }
 
             // this modification of the ACL data packet makes it getting sent and
             // received by the other side
