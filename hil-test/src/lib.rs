@@ -11,6 +11,15 @@ compile_error!(
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+/// Returns whether the flash tool wrote the ELF file's SHA-256 into [`ESP_APP_DESC`].
+///
+/// The read must stay in the crate that declares the descriptor, where the compiler sees its
+/// initializer.
+#[inline(never)]
+pub fn app_elf_sha256_is_written() -> bool {
+    ESP_APP_DESC.app_elf_sha256().iter().any(|&byte| byte != 0)
+}
+
 use esp_hal as _;
 #[cfg(feature = "log-serial")]
 #[doc(hidden)]
