@@ -158,6 +158,8 @@ type PrinterImpl = noop::Printer;
     )
 ))]
 mod auto_printer {
+    use portable_atomic::{AtomicBool, Ordering};
+
     use crate::{
         LockToken,
         serial_jtag_printer::Printer as PrinterSerialJtag,
@@ -171,8 +173,10 @@ mod auto_printer {
             // SOF packet is sent by the HOST every 1ms on a full speed bus.
             // Between two consecutive ticks, there will be at least 1ms (selectable tick
             // rate range is 1 - 1000Hz).
-            // We don't reset the flag - if it was ever connected we assume serial-jtag is
-            // used
+            // If it was ever connected we assume serial-jtag is used. esp-hal clears the flag
+            // when it checks for a host before light sleep, so we remember that we saw it.
+            static SOF_SEEN: AtomicBool = AtomicBool::new(false);
+
             #[cfg(feature = "esp32c3")]
             const USB_DEVICE_INT_RAW: *const u32 = 0x60043008 as *const u32;
             #[cfg(any(
@@ -193,7 +197,10 @@ mod auto_printer {
 
             const SOF_INT_MASK: u32 = 0b10;
 
-            unsafe { (USB_DEVICE_INT_RAW.read_volatile() & SOF_INT_MASK) != 0 }
+            let seen = SOF_SEEN.load(Ordering::Relaxed)
+                || unsafe { (USB_DEVICE_INT_RAW.read_volatile() & SOF_INT_MASK) != 0 };
+            SOF_SEEN.store(seen, Ordering::Relaxed);
+            seen
         }
 
         pub fn write_bytes_in_cs(bytes: &[u8], token: LockToken<'_>) {

@@ -8,7 +8,7 @@
 //! chip stays awake for longer than the 100 ms attach debounce. A kept pull-up does not help,
 //! because the host then finds a device that does not respond.
 
-use portable_atomic::{AtomicBool, AtomicU32, Ordering};
+use portable_atomic::{AtomicU32, Ordering};
 
 use super::{RtcSleepConfig, SleepKind};
 use crate::{
@@ -206,75 +206,26 @@ impl Disconnected {
 
 /// Returns whether a USB host talks to USB Serial/JTAG.
 ///
-/// A host that has not suspended the bus sends a start-of-frame packet every millisecond, and each
-/// packet advances the frame index. A change in the last few milliseconds counts, because two
-/// calls within a millisecond see the same index. The SOF interrupt flag stays untouched, because
-/// esp-println reads it to pick its output.
-///
-/// The 11-bit index wraps every 2048 ms, so a call a multiple of that after the previous one sees
-/// the same index. After a call that found a host, an unchanged index is read again one frame
-/// later. A call with no earlier index, because USB Serial/JTAG was off at [`init`], misses a host
-/// for one sleep.
+/// A host that has not suspended the bus sets the start-of-frame (SOF) interrupt flag every
+/// millisecond. Each call clears the flag, so a flag that an earlier call saw in the last few
+/// milliseconds also counts. The `auto` feature of esp-println reads the same flag.
 pub(super) fn host_connected() -> bool {
-    const TOLERANCE_US: u32 = 3_000;
     // Longer than the 1 ms between two start-of-frame packets.
-    const RESAMPLE_GAP_US: u32 = 1_100;
+    const TOLERANCE_US: u32 = 3_000;
+    static LAST_SOF_US: AtomicU32 = AtomicU32::new(0);
 
     if !module_is_enabled() || !pad_is_enabled() {
         return false;
     }
 
-    let changed_recently =
-        || now_us().wrapping_sub(LAST_CHANGE_US.load(Ordering::Relaxed)) < TOLERANCE_US;
-
-    let frame = frame_index();
-    let last_frame = LAST_FRAME.swap(frame, Ordering::Relaxed);
-    if last_frame == NO_FRAME {
-        return false;
-    }
-
-    if frame != last_frame {
-        LAST_CHANGE_US.store(now_us(), Ordering::Relaxed);
-    } else if WAS_CONNECTED.load(Ordering::Relaxed) && !changed_recently() {
-        crate::rom::ets_delay_us(RESAMPLE_GAP_US);
-        let frame = frame_index();
-        if frame != last_frame {
-            LAST_FRAME.store(frame, Ordering::Relaxed);
-            LAST_CHANGE_US.store(now_us(), Ordering::Relaxed);
-        }
-    }
-
-    let connected = changed_recently();
-    WAS_CONNECTED.store(connected, Ordering::Relaxed);
-    connected
-}
-
-/// Reads the first frame index, so that the first [`host_connected`] call needs no wait.
-///
-/// Runs before the time driver starts, so it stores no timestamp.
-pub(super) fn init() {
-    if module_is_enabled() && pad_is_enabled() {
-        LAST_FRAME.store(frame_index(), Ordering::Relaxed);
-    }
-}
-
-const NO_FRAME: u32 = u32::MAX;
-static LAST_FRAME: AtomicU32 = AtomicU32::new(NO_FRAME);
-static LAST_CHANGE_US: AtomicU32 = AtomicU32::new(0);
-static WAS_CONNECTED: AtomicBool = AtomicBool::new(false);
-
-fn frame_index() -> u32 {
-    u32::from(
-        USB_DEVICE::regs()
-            .fram_num()
-            .read()
-            .sof_frame_index()
-            .bits(),
-    )
-}
-
-fn now_us() -> u32 {
-    crate::time::Instant::now()
+    let now_us = crate::time::Instant::now()
         .duration_since_epoch()
-        .as_micros() as u32
+        .as_micros() as u32;
+    let regs = USB_DEVICE::regs();
+    if regs.int_raw().read().sof().bit_is_set() {
+        regs.int_clr().write(|w| w.sof().clear_bit_by_one());
+        LAST_SOF_US.store(now_us, Ordering::Relaxed);
+    }
+
+    now_us.wrapping_sub(LAST_SOF_US.load(Ordering::Relaxed)) < TOLERANCE_US
 }

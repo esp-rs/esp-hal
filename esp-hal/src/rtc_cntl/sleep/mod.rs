@@ -33,10 +33,12 @@ keep working. When the option is disabled, light sleep also starts while a host 
 }]
 #![doc = cfg_select! {
     sleep_keeps_cpu_powered_for_usb_serial_jtag => r#"
+
 While a host is connected, light sleep keeps USB Serial/JTAG running and the CPU powered, even if
 CPU power-down is enabled, which increases the light-sleep current.
 "#,
     sleep_keeps_usb_serial_jtag => r#"
+
 While a host is connected, light sleep keeps USB Serial/JTAG running, which increases the
 light-sleep current. While a debugger is attached, such a light sleep also keeps the CPU powered.
 "#,
@@ -224,9 +226,6 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     RtcSleepConfig::base_settings(rtc);
 
     set_mask(0);
-
-    #[cfg(soc_has_usb_device)]
-    usb_serial_jtag::init();
 }
 
 /// Returns whether the last reset was a wakeup from deep sleep.
