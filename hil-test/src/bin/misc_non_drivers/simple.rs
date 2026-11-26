@@ -186,6 +186,12 @@ mod tests {
         assert_eq!(expected_md5_digest, *md5_digest);
     }
 
+    #[test]
+    fn app_elf_sha256_is_written(ctx: Context) {
+        hil_test::init_logger!(ctx.p);
+        assert!(hil_test::app_elf_sha256_is_written());
+    }
+
     /// This is just to check that we can create a bootable image
     /// if there is something with a "specific" alignment in `.rodata`
     /// on chips with "D/I vaddr are shared" (SOC_MMU_DI_VADDR_SHARED)

@@ -98,6 +98,8 @@
 #![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![no_std]
 
+use core::cell::UnsafeCell;
+
 // Assumptions about the bootloader which needs to get double checked for other supported
 // bootloaders
 //
@@ -145,6 +147,17 @@ extern "C" fn __init_data() -> bool {
     false
 }
 
+/// The ELF file's SHA-256 in [`EspAppDesc`].
+///
+/// The flash tool writes it into the image. The `UnsafeCell` stops the compiler from
+/// replacing a read with the initializer.
+#[repr(transparent)]
+struct ElfSha256(UnsafeCell<[u8; 32]>);
+
+// SAFETY: The bytes are in flash and nothing writes them at runtime, so shared reads cannot
+// race.
+unsafe impl Sync for ElfSha256 {}
+
 /// ESP-IDF compatible application descriptor.
 ///
 /// This gets populated by the [esp_app_desc] macro.
@@ -167,7 +180,7 @@ pub struct EspAppDesc {
     /// Version IDF.
     idf_ver: [core::ffi::c_char; 32],
     /// sha256 of elf file.
-    app_elf_sha256: [u8; 32],
+    app_elf_sha256: ElfSha256,
     /// Minimal eFuse block revision supported by image, in format `major * 100 + minor`.
     min_efuse_blk_rev_full: u16,
     /// Maximal eFuse block revision supported by image, in format `major * 100 + minor`.
@@ -179,6 +192,8 @@ pub struct EspAppDesc {
     /// Reserved.
     reserv2: [u32; 18],
 }
+
+const _: () = core::assert!(core::mem::offset_of!(EspAppDesc, app_elf_sha256) == 0x90);
 
 impl EspAppDesc {
     /// Needs to be public since it's used by the macro.
@@ -204,7 +219,7 @@ impl EspAppDesc {
             time: str_to_cstr_array(build_time),
             date: str_to_cstr_array(build_date),
             idf_ver: str_to_cstr_array(idf_ver),
-            app_elf_sha256: [0; 32],
+            app_elf_sha256: ElfSha256(UnsafeCell::new([0; 32])),
             min_efuse_blk_rev_full,
             max_efuse_blk_rev_full,
             mmu_page_size: (mmu_page_size.ilog2()) as u8,
@@ -248,11 +263,12 @@ impl EspAppDesc {
         array_to_str(&self.idf_ver)
     }
 
-    /// SHA256.
+    /// SHA-256 of the ELF file.
     ///
-    /// The default tooling won't populate this.
+    /// The flash tool writes it into the image. It is all zeros if the tool did not.
     pub fn app_elf_sha256(&self) -> &[u8; 32] {
-        &self.app_elf_sha256
+        // SAFETY: Nothing writes the bytes at runtime.
+        unsafe { &*self.app_elf_sha256.0.get() }
     }
 
     /// Minimal eFuse block revision supported by image.
@@ -285,7 +301,7 @@ impl core::fmt::Debug for EspAppDesc {
             .field("time", &self.time())
             .field("date", &self.date())
             .field("idf_ver", &self.idf_ver())
-            .field("app_elf_sha256", &self.app_elf_sha256)
+            .field("app_elf_sha256", self.app_elf_sha256())
             .field("min_efuse_blk_rev_full", &self.min_efuse_blk_rev_full)
             .field("max_efuse_blk_rev_full", &self.max_efuse_blk_rev_full)
             .field("mmu_page_size", &self.mmu_page_size)
@@ -318,7 +334,7 @@ impl defmt::Format for EspAppDesc {
             self.time(),
             self.date(),
             self.idf_ver(),
-            self.app_elf_sha256,
+            self.app_elf_sha256(),
             self.min_efuse_blk_rev_full,
             self.max_efuse_blk_rev_full,
             self.mmu_page_size,
