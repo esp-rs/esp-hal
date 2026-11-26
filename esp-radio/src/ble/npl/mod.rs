@@ -1411,15 +1411,10 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     };
 
     // 0x02: ACL
-    let queued = super::try_queue_rx_packet(core::iter::once(&[0x02][..]).chain(chain()));
+    super::queue_rx_packet(core::iter::once(&[0x02][..]).chain(chain()));
 
     unsafe {
         r_os_mbuf_free_chain(om as *mut _);
-    }
-
-    if !queued {
-        warn!("Out of memory, dropping a received ACL packet");
-        return ESP_ERR_NO_MEM as i32;
     }
 
     0

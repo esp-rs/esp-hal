@@ -703,12 +703,8 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, _arg: *const c_void) -> i
             .map(|mbuf| unsafe { core::slice::from_raw_parts(mbuf.om_data, mbuf.om_len as usize) })
     };
 
-    let queued = super::try_queue_rx_packet(core::iter::once(&[0x02][..]).chain(chain()));
+    super::queue_rx_packet(core::iter::once(&[0x02][..]).chain(chain()));
     unsafe { r_os_mbuf_free_chain(om.cast_mut()) };
-    if !queued {
-        warn!("Out of memory, dropping a received ACL packet");
-        return ESP_ERR_NO_MEM as i32;
-    }
     0
 }
 

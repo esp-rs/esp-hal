@@ -317,8 +317,8 @@ pub(crate) fn clear_bt_state() {
 
 /// Panics because there is no memory for a BLE packet.
 ///
-/// The host and the controller cannot stay in step once a command, an event or a sent ACL packet
-/// is lost, and BLE stays unusable until a reboot. Panicking at least names the cause.
+/// The host and the controller cannot stay in step once an HCI packet is lost, and BLE stays
+/// unusable until a reboot. Panicking at least names the cause.
 #[cold]
 pub(crate) fn out_of_memory(what: &str, len: usize) -> ! {
     // A comfortable free heap points at an exhausted controller pool instead.
@@ -332,15 +332,14 @@ pub(crate) fn out_of_memory(what: &str, len: usize) -> ! {
 
 /// Copies an HCI packet into the receive queue, and wakes the host reader.
 ///
-/// `parts` make up the packet, indicator byte first. Returns `false`, and queues nothing, when
-/// the heap cannot hold the packet.
-pub(crate) fn try_queue_rx_packet<'a>(parts: impl Iterator<Item = &'a [u8]> + Clone) -> bool {
+/// `parts` make up the packet, indicator byte first. Panics when the heap cannot hold the packet.
+pub(crate) fn queue_rx_packet<'a>(parts: impl Iterator<Item = &'a [u8]> + Clone) {
     let len = parts.clone().map(<[u8]>::len).sum::<usize>();
 
     let mut data = Vec::new();
     // An exact reservation keeps `into_boxed_slice` from reallocating.
     if data.try_reserve_exact(len).is_err() {
-        return false;
+        out_of_memory("a received HCI packet", len);
     }
     parts.for_each(|part| data.extend_from_slice(part));
     dump_packet_info(&data);
@@ -354,20 +353,10 @@ pub(crate) fn try_queue_rx_packet<'a>(parts: impl Iterator<Item = &'a [u8]> + Cl
         });
         true
     });
-    if queued {
-        controller::hci_read_data_available();
+    if !queued {
+        out_of_memory("a received HCI packet", len);
     }
-    queued
-}
-
-/// Like [`try_queue_rx_packet`], but panics when the heap cannot hold the packet.
-pub(crate) fn queue_rx_packet<'a>(parts: impl Iterator<Item = &'a [u8]> + Clone) {
-    if !try_queue_rx_packet(parts.clone()) {
-        out_of_memory(
-            "a received HCI packet",
-            parts.map(<[u8]>::len).sum::<usize>(),
-        );
-    }
+    controller::hci_read_data_available();
 }
 
 /// Checks if there is any HCI data available to read.
