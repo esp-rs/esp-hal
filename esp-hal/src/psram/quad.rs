@@ -127,9 +127,9 @@ pub(crate) fn psram_init(
     // unless MSPI splits it. 2 MB chips have 512 B pages, larger chips 1024 B.
     // See <https://github.com/espressif/esp-idf/blob/e4df0c12f70/components/esp_psram/device/esp_psram_impl_ap_quad.c#L401-L409>.
     let page_size = if config.size.get() == 2 * 1024 * 1024 {
-        512
+        PsramPageSize::Size512
     } else {
-        1024
+        PsramPageSize::Size1024
     };
     psram_ctrlr_ll_enable_split_trans(PSRAM_CTRLR_LL_MSPI_ID_0, true);
     psram_ctrlr_ll_set_page_size(PSRAM_CTRLR_LL_MSPI_ID_0, page_size);

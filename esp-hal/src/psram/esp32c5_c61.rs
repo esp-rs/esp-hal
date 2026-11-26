@@ -358,16 +358,18 @@ mod ctrlr_ll {
             .modify(|_, w| w.smem_split_trans_en().bit(enable));
     }
 
-    /// Sets the page size of the PSRAM chip in bytes: 256, 512, 1024 or 2048.
-    #[inline(always)]
-    pub(crate) fn psram_ctrlr_ll_set_page_size(_mspi_id: u32, page_size: u32) {
-        assert_matches!(page_size, 256 | 512 | 1024 | 2048);
+    /// The page size of the PSRAM chip. The discriminant is the `smem_page_size` value.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub(crate) enum PsramPageSize {
+        Size512  = 1,
+        Size1024 = 2,
+    }
 
-        // The register value is log2(page_size) - 8.
-        SPI0::regs().smem_ecc_ctrl().modify(|_, w| unsafe {
-            w.smem_page_size()
-                .bits(page_size.trailing_zeros() as u8 - 8)
-        });
+    #[inline(always)]
+    pub(crate) fn psram_ctrlr_ll_set_page_size(_mspi_id: u32, page_size: PsramPageSize) {
+        SPI0::regs()
+            .smem_ecc_ctrl()
+            .modify(|_, w| unsafe { w.smem_page_size().bits(page_size as u8) });
     }
 
     #[inline(always)]
