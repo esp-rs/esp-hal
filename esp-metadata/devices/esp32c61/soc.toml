@@ -1,9 +1,6 @@
 # ESP32-C61 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32c61"
@@ -111,6 +108,7 @@ peripherals = [
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
     { name = "PSRAM", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },
@@ -165,6 +163,7 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 support_status = { status = "partial", issue = 6754 }
 gdma_version = 2
 separate_in_out_interrupts = true
+psram_max_burst = 32
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
@@ -378,7 +377,10 @@ instances = [
 support_status = { status = "not_supported", issue = 5417 }
 
 [device.temp_sensor]
-support_status = { status = "not_supported", issue = 5421 }
+support_status = { status = "partial", issue = 6778 }
+register_block = "apb_saradc"
+# A range change takes up to 0.6 ms to settle.
+min_stabilization_time_us = 1000
 
 ## Radio
 [device.wifi]

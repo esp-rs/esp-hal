@@ -130,6 +130,7 @@ mod tests {
 
     #[test]
     async fn wifi_dhcp_http_test(p: Peripherals) {
+        hil_test::init_logger!(p);
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
 
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -147,6 +148,7 @@ mod tests {
 
     #[test]
     async fn unchanged_access_point_config_keeps_the_station(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -167,6 +169,7 @@ mod tests {
 
     #[test]
     async fn wifi_drop(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 

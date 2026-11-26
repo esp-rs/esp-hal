@@ -267,6 +267,16 @@ fn start_core1_init_impl() -> ! {
     // reset doesn't re-enter this stale entry point. Matches IDF's `call_start_cpu1`.
     crate::rom::ets_set_appcpu_boot_addr(0);
 
+    // The core 1 start clears that core's PC-recording register (`rcd_en`).
+    #[cfg(assist_debug_driver_supported)]
+    crate::peripherals::ASSIST_DEBUG::regs()
+        .cpu(1)
+        .rcd_en()
+        .modify(|_, w| {
+            w.rcd_pdebugen().set_bit();
+            w.rcd_recorden().set_bit()
+        });
+
     unsafe {
         #[cfg(stack_guard_monitoring)]
         {

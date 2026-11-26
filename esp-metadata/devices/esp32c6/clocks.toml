@@ -213,7 +213,7 @@ peripheral_clocks = { templates = [
     # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
 ], peripheral_clocks = [
     # This list is based on TRM (v1.1) - 8.4.1 PCR Registers
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = "keep_uart0_enabled" },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
@@ -228,7 +228,7 @@ peripheral_clocks = { templates = [
     { name = "I2s0", template_params = { peripheral = "i2s" } },
     { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" }, keep_enabled = true }, # used by some wifi calibration steps.
     { name = "Tsens", template_params = { conf_register = "tsens_clk_conf" } },
-    { name = "UsbDevice", keep_enabled = true },
+    { name = "UsbDevice", keep_enabled = "keep_usb_serial_jtag_enabled" },
     # { name = "Intmtx" },
     { name = "Pcnt" },
     { name = "Etm" },

@@ -382,6 +382,12 @@ macro_rules! property {
     ("adc.sar_power_override") => {
         false
     };
+    ("temp_sensor.min_stabilization_time_us") => {
+        0
+    };
+    ("temp_sensor.min_stabilization_time_us", str) => {
+        stringify!(0)
+    };
     ("ledc.version") => {
         2
     };
@@ -1013,7 +1019,10 @@ macro_rules! for_each_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
+        _for_each_inner_dma_engine!(("AHB_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
         _for_each_inner_dma_engine!((all("AHB_GDMA")));
+        _for_each_inner_dma_engine!((priority("AHB_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8,
+        9)));
     };
 }
 #[macro_export]
@@ -1031,6 +1040,9 @@ macro_rules! for_each_dma_channel {
         compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC]));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt = DMA_CH2,
         compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC]));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, can_access_psram = false));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, can_access_psram = false));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, can_access_psram = false));
         _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA", DMA_CH1),
         ("AHB_GDMA", DMA_CH2)));
         _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA", any_channel =
@@ -1041,6 +1053,9 @@ macro_rules! for_each_dma_channel {
         = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC])));
         _for_each_inner_dma_channel!((split));
         _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("AHB_GDMA", DMA_CH0, can_access_psram =
+        false), ("AHB_GDMA", DMA_CH1, can_access_psram = false), ("AHB_GDMA", DMA_CH2,
+        can_access_psram = false)));
     };
 }
 #[macro_export]
@@ -4739,8 +4754,11 @@ macro_rules! implement_peripheral_clocks {
             const KEEP_ENABLED: &[Peripheral] = &[
                 Self::Systimer,
                 Self::Timg0,
+                #[cfg(keep_uart0_enabled)]
                 Self::Uart0,
+                #[cfg(keep_uart0_enabled)]
                 Self::UartMem,
+                #[cfg(keep_usb_serial_jtag_enabled)]
                 Self::UsbDevice,
             ];
             const COUNT: usize = Self::ALL.len();

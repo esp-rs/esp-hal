@@ -45,6 +45,7 @@ mod tests {
 
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
@@ -71,6 +72,7 @@ mod tests {
 
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
 
         static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<2>> = StaticCell::new();
         let executor_core0 = InterruptExecutor::new(p.FROM_CPU_INTR2);
@@ -1508,6 +1510,7 @@ mod second_core_only {
 
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
+        hil_test::init_logger!(p);
 
         let timg0 = TimerGroup::new(p.TIMG0);
 

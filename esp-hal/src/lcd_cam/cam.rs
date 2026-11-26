@@ -94,7 +94,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
-    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, asynch::DmaRxFuture},
+    dma::{ChannelRx, DmaConfigError, DmaError, DmaPeripheral, DmaRxBuffer, asynch::DmaRxFuture},
     gpio::{
         InputConfig,
         InputSignal,
@@ -102,7 +102,15 @@ use crate::{
         OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, ErasedRxChannel, calculate_clkm},
+    lcd_cam::{
+        BitOrder,
+        ByteOrder,
+        CamDmaRxChannel,
+        ClockError,
+        DmaConfig,
+        ErasedRxChannel,
+        calculate_clkm,
+    },
     pac,
     peripherals::LCD_CAM,
     soc::clocks::{ClockTree, LcdCamCamClockConfig, LcdCamInstance},
@@ -200,8 +208,8 @@ impl<'d> Camera<'d, Blocking> {
         channel: impl CamDmaRxChannel<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let rx_channel = ChannelRx::new(channel.into());
-        rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
+        let mut rx_channel = ChannelRx::new(channel.into());
+        rx_channel.connect(DmaPeripheral::LCD_CAM);
 
         let mut this = Self { cam, rx_channel };
 
@@ -232,6 +240,16 @@ impl<'d> Camera<'d, Async> {
 impl<'d, Dm: DriverMode> Camera<'d, Dm> {
     fn regs(&self) -> &pac::lcd_cam::RegisterBlock {
         self.cam.lcd_cam.register_block()
+    }
+
+    /// Applies a DMA configuration to the RX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.rx_channel.apply_config(config)
     }
 
     /// Applies the configuration to the camera interface.
@@ -477,7 +495,7 @@ impl<'d, Dm: DriverMode> Camera<'d, Dm> {
         // Start DMA to receive incoming transfer.
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
+                .prepare_transfer(&mut buf)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
 

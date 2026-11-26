@@ -919,6 +919,10 @@ driver_configs![
             properties: {
                 #[serde(default)]
                 register_block: TempSensorRegisterBlock,
+                /// Shortest settle time after power-up or a range change, in microseconds.
+                /// The sensor needs this time at every clock frequency.
+                #[serde(default)]
+                min_stabilization_time_us: u32,
             }
         },
         TouchProperties {
@@ -1154,6 +1158,10 @@ driver_configs![
                 separate_in_out_interrupts: bool,
                 #[serde(default)]
                 gdma_version: Option<u32>,
+                /// Not `Option<PsramMaxBurst>`: an optional property also emits
+                /// `dma_psram_max_burst_is_set` when the value is absent.
+                #[serde(default)]
+                psram_max_burst: PsramMaxBurst,
                 #[serde(default)]
                 engines: DmaEngines,
             }

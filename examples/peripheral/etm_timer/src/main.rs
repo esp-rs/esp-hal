@@ -30,8 +30,9 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let mut led = Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default());
     led.set_high();

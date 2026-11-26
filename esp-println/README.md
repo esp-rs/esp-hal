@@ -6,6 +6,11 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-println?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
+> **Deprecated.** Use [esp-log](https://github.com/esp-rs/esp-hal/tree/main/esp-log) instead. It
+> provides a `log` and `defmt` backend on esp-hal's UART or USB-Serial-JTAG driver, which
+> `esp_log::init_uart!` or `esp_log::init_usb!` creates after `esp_hal::init`. These drivers require
+> the `unstable` feature of `esp-hal`.
+
 A library that provides `print!`, `println!`, `dbg!` implementations and
 logging capabilities for Espressif devices.
 
@@ -32,6 +37,17 @@ use esp_println::println;
 ```
 
 You can now `println!("Hello world")` as usual.
+
+## Using esp-println with esp-hal
+
+`esp_hal::init` can gate the clocks of peripherals that no driver uses. esp-println writes to UART0
+and USB-Serial-JTAG outside of esp-hal's drivers, so they must stay enabled:
+
+- For UART0 output (the `uart` feature, or `auto` without a USB host), leave
+  `ESP_HAL_CONFIG_KEEP_UART0_ENABLED` at its default, `true`. Dropping a UART0 driver of esp-hal
+  still stops UART0's function clock, and with it the output.
+- For USB-Serial-JTAG output, leave `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_ENABLED` at its default,
+  `true`.
 
 ## Logging
 

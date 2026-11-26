@@ -1,9 +1,6 @@
 # ESP32-S31 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32s31"
@@ -12,7 +9,6 @@ target = "riscv32imafc-unknown-none-elf"
 cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_datasheet_en.pdf"
 trm       = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf"
-support_note = "In early stages of development."
 
 [device.mmu]
 page_size = 0x10000
@@ -228,8 +224,8 @@ support_status = { status = "partial", issue = 6777 }
 [device.lp_timer]
 
 [device.assist_debug]
-support_status = "not_supported"
-has_sp_monitor = false
+support_status = { status = "partial", issue = 6749 }
+has_sp_monitor = true
 has_region_monitor = true
 
 [device.rng]
@@ -319,12 +315,13 @@ instances = [
 support_status = { status = "partial", issue = 6754 }
 gdma_version = 3
 separate_in_out_interrupts = true
+psram_max_burst = 128
 # TODO: add LP_GDMA engine
 engines = [
     {
         name = "AHB_GDMA",
         max_priority = 15,
-        burst_sizes = [0, 4, 16, 32, 64],
+        burst_sizes = [4, 16, 32, 64],
         drivers = ["uhci", "i2s"],
         peripheral_instances = [
             { name = "UHCI0", dma_id = 0 },

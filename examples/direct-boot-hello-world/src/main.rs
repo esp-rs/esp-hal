@@ -32,7 +32,6 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
-use esp_println::println;
 
 esp_bootloader_direct_boot::direct_boot!();
 
@@ -63,18 +62,19 @@ fn swint_handler() {
 }
 
 fn report(name: &str, ok: bool) {
-    println!("[{}] {}", if ok { " OK " } else { "FAIL" }, name);
+    log::info!("[{}] {}", if ok { " OK " } else { "FAIL" }, name);
 }
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    println!("Hello from direct boot!");
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Hello from direct boot!");
 
     let reason = reset_reason(Cpu::ProCpu);
-    println!("reset reason: {:?}", reason);
+    log::info!("reset reason: {:?}", reason);
     let deep_sleep_wakeup = reason == Some(SocResetReason::CoreDeepSleep);
 
     // SAFETY: single-threaded, no references are created.
@@ -101,7 +101,7 @@ fn main() -> ! {
                 "RTC .data kept over deep sleep",
                 pattern == DATA_PATTERN && boots > 0,
             );
-            println!("deep-sleep wakeups since the last reset: {}", boots);
+            log::info!("deep-sleep wakeups since the last reset: {}", boots);
         } else {
             report(
                 "RTC .data copied from flash",
@@ -125,13 +125,13 @@ fn main() -> ! {
 
     // Long enough for a watchdog the ROM armed to reset the chip.
     for _ in 0..3 {
-        println!("Bing!");
+        log::info!("Bing!");
 
         let now = Instant::now();
         while now.elapsed() < Duration::from_millis(5000) {}
     }
 
-    println!("Entering deep sleep for 5 seconds");
+    log::info!("Entering deep sleep for 5 seconds");
     let mut lpwr = LowPower::new(peripherals.LPWR);
     lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(5));
     // Let the UART finish the message.

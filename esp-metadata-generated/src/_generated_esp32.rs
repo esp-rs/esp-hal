@@ -999,6 +999,7 @@ macro_rules! for_each_dma_engine {
         => {} } _for_each_inner_dma_engine!(("SPI_DMA"));
         _for_each_inner_dma_engine!(("I2S_DMA"));
         _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA")));
+        _for_each_inner_dma_engine!((priority));
     };
 }
 #[macro_export]
@@ -1017,7 +1018,11 @@ macro_rules! for_each_dma_channel {
         interrupt = SPI3_DMA, compatible = [SPI3]));
         _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S0, 0, interrupt = I2S0,
         compatible = [I2S0])); _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S1, 1,
-        interrupt = I2S1, compatible = [I2S1]));
+        interrupt = I2S1, compatible = [I2S1])); _for_each_inner_dma_channel!(("SPI_DMA",
+        DMA_SPI2, can_access_psram = false)); _for_each_inner_dma_channel!(("SPI_DMA",
+        DMA_SPI3, can_access_psram = false)); _for_each_inner_dma_channel!(("I2S_DMA",
+        DMA_I2S0, can_access_psram = false)); _for_each_inner_dma_channel!(("I2S_DMA",
+        DMA_I2S1, can_access_psram = false));
         _for_each_inner_dma_channel!((names("SPI_DMA", DMA_SPI2), ("SPI_DMA", DMA_SPI3),
         ("I2S_DMA", DMA_I2S0), ("I2S_DMA", DMA_I2S1)));
         _for_each_inner_dma_channel!((separate_any_type("SPI_DMA", any_channel =
@@ -1028,6 +1033,9 @@ macro_rules! for_each_dma_channel {
         [I2S0]), ("I2S_DMA", DMA_I2S1, 1, interrupt = I2S1, compatible = [I2S1])));
         _for_each_inner_dma_channel!((split));
         _for_each_inner_dma_channel!((no_own_interrupt));
+        _for_each_inner_dma_channel!((psram("SPI_DMA", DMA_SPI2, can_access_psram =
+        false), ("SPI_DMA", DMA_SPI3, can_access_psram = false), ("I2S_DMA", DMA_I2S0,
+        can_access_psram = false), ("I2S_DMA", DMA_I2S1, can_access_psram = false)));
     };
 }
 #[macro_export]
@@ -4334,7 +4342,13 @@ macro_rules! implement_peripheral_clocks {
             Uhci1,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] = &[Self::Timg0, Self::Uart0, Self::UartMem];
+            const KEEP_ENABLED: &[Peripheral] = &[
+                Self::Timg0,
+                #[cfg(keep_uart0_enabled)]
+                Self::Uart0,
+                #[cfg(keep_uart0_enabled)]
+                Self::UartMem,
+            ];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,

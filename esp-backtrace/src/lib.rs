@@ -37,6 +37,8 @@ extern crate esp_metadata_generated;
 use defmt as _;
 #[cfg(feature = "println")]
 use esp_println as _;
+#[cfg(feature = "log-04")]
+use log_04 as _;
 
 const MAX_BACKTRACE_ADDRESSES: usize =
     esp_config::esp_config_int!(usize, "ESP_BACKTRACE_CONFIG_BACKTRACE_FRAMES");
@@ -82,6 +84,18 @@ macro_rules! println {
 }
 
 #[cfg(all(feature = "panic-handler", feature = "defmt", stack_dump))]
+pub(crate) use println;
+
+#[cfg(all(feature = "panic-handler", feature = "log-04"))]
+macro_rules! println {
+    // Every record is its own line already.
+    ("") => {};
+    ($($arg:tt)*) => {
+        log_04::error!($($arg)*);
+    };
+}
+
+#[cfg(all(feature = "panic-handler", feature = "log-04", stack_dump))]
 pub(crate) use println;
 
 #[cfg(all(feature = "panic-handler", feature = "println"))]

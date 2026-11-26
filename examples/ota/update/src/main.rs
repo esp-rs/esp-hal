@@ -43,7 +43,6 @@ use esp_hal::{
     gpio::{Input, InputConfig, Pull},
     main,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -53,8 +52,9 @@ const SECTOR_SIZE: usize = 4096;
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
 
@@ -64,10 +64,10 @@ fn main() -> ! {
 
     // List all partitions - this is just FYI
     for part in pt.iter() {
-        println!("{:?}", part);
+        log::info!("{:?}", part);
     }
 
-    println!("Currently booted partition {:?}", pt.booted_partition());
+    log::info!("Currently booted partition {:?}", pt.booted_partition());
 
     let mut ota =
         esp_bootloader_esp_idf::ota_updater::OtaUpdater::new(&mut flash, &mut buffer).unwrap();
@@ -79,11 +79,11 @@ fn main() -> ! {
         esp_bootloader_esp_idf::partitions::AppPartitionSubType::Factory
     };
 
-    println!(
+    log::info!(
         "current image state {:?} (only relevant if the bootloader was built with auto-rollback support)",
         ota.current_ota_state()
     );
-    println!("currently selected partition {:?}", current);
+    log::info!("currently selected partition {:?}", current);
 
     // Mark the current slot as VALID - this is only needed if the bootloader was
     // built with auto-rollback support. The default pre-compiled bootloader in
@@ -92,7 +92,7 @@ fn main() -> ! {
         if state == esp_bootloader_esp_idf::ota::OtaImageState::New
             || state == esp_bootloader_esp_idf::ota::OtaImageState::PendingVerify
         {
-            println!("Changed state to VALID");
+            log::info!("Changed state to VALID");
             ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::Valid)
                 .unwrap();
         }
@@ -109,7 +109,7 @@ fn main() -> ! {
 
     let boot_button = Input::new(button, InputConfig::default().with_pull(Pull::Up));
 
-    println!("Press boot button to flash and switch to the next OTA slot");
+    log::info!("Press boot button to flash and switch to the next OTA slot");
     let mut done = false;
     loop {
         if boot_button.is_low() && !done {
@@ -117,13 +117,13 @@ fn main() -> ! {
 
             let (mut next_app_partition, part_type) = ota.next_partition().unwrap();
 
-            println!("Flashing image to {:?}", part_type);
+            log::info!("Flashing image to {:?}", part_type);
 
             // Write to the app partition. The region is encrypted if flash
             // encryption is enabled.
             let mut sector_buffer = [0xff; SECTOR_SIZE];
             for (sector, chunk) in OTA_IMAGE.chunks(SECTOR_SIZE).enumerate() {
-                println!("Writing sector {sector}...");
+                log::info!("Writing sector {sector}...");
 
                 let offset = (sector * SECTOR_SIZE) as u32;
                 next_app_partition
@@ -140,7 +140,7 @@ fn main() -> ! {
                     .unwrap();
             }
 
-            println!("Changing OTA slot and setting the state to NEW");
+            log::info!("Changing OTA slot and setting the state to NEW");
 
             ota.activate_next_partition().unwrap();
             ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::New)

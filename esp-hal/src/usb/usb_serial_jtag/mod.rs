@@ -181,6 +181,10 @@ mod pins;
 
 pub use pins::UsbSerialJtagPin;
 
+/// How long the controller stays disconnected before the driver turns it on after
+/// `esp_hal::init` disconnected it.
+const RECONNECT_DELAY_MS: u32 = 100;
+
 /// USB Serial/JTAG transmitter error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -406,8 +410,10 @@ impl<'d> UsbSerialJtag<'d, Blocking> {
         config: Config,
     ) -> Result<Self, ConfigError> {
         pins::validate_pins(&dp, &dm)?;
-        pins::enable_pads();
+        // Register writes are lost while the clock is gated, and `new_inner` may be what enables
+        // it.
         let mut this = Self::new_inner(usb_device);
+        pins::enable_pads();
         this.apply_config(&config)?;
         Ok(this)
     }
@@ -554,12 +560,14 @@ where
     Dm: DriverMode,
 {
     fn new_inner(usb_device: USB_DEVICE<'d>) -> Self {
-        // A reset breaks the USB-JTAG connection. `UsbDevice` is in `Peripheral::KEEP_ENABLED`, so
-        // `enable` returns `false` and the reset does not run.
+        // The driver has no `Drop`, so a count increment on an already enabled controller is undone
+        // to prevent an overflow.
         if PeripheralClockControl::enable(Peripheral::UsbDevice) {
-            PeripheralClockControl::reset(Peripheral::UsbDevice);
+            // `esp_hal::init` disconnected the controller, possibly while the host was still
+            // enumerating the boot ROM's connection. A host that misses the disconnect does not
+            // enumerate the controller again, so the pads stay off for a while.
+            crate::delay::Delay::new().delay_millis(RECONNECT_DELAY_MS);
         } else {
-            // The driver has no `Drop`, so undo the count increment to prevent an overflow.
             PeripheralClockControl::disable(Peripheral::UsbDevice);
         }
 

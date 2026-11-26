@@ -76,6 +76,7 @@ fn main() -> ! {
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    hil_test::init_logger!(peripherals);
 
     let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154);
     ieee802154.set_config(Config {

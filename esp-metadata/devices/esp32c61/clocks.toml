@@ -70,6 +70,12 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
+    { group = "TSENS", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+        ] },
+    ] },
     { group = "UART", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
@@ -148,7 +154,7 @@ peripheral_clocks = { templates = [
     { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
     { name = "rst_field", value = "{{peripheral}}_rst_en" },
 ], peripheral_clocks = [
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = "keep_uart0_enabled" },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Uart2", template_params = { conf_register = "uart(2).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
@@ -157,10 +163,11 @@ peripheral_clocks = { templates = [
     { name = "AhbGdma", template_params = { peripheral = "gdma" } },
     { name = "I2s0", template_params = { peripheral = "i2s" } },
     { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" } }, # used by some wifi calibration steps.
+    { name = "Tsens", template_params = { conf_register = "tsens_clk_conf" } },
     { name = "Spi2" },
 
     { name = "Sha" },
     { name = "Ecc" },
     { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true },
-    { name = "UsbDevice", keep_enabled = true },
+    { name = "UsbDevice", keep_enabled = "keep_usb_serial_jtag_enabled" },
 ] }

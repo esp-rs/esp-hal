@@ -41,7 +41,6 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use esp_radio::{
     ble::controller::BleConnector,
     wifi::{
@@ -167,7 +166,6 @@ struct BatteryService {
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock({
         #[cfg_attr(feature = "esp32c2", allow(unused_mut))]
         let mut config = ClockConfig::from(CpuClock::max());
@@ -183,6 +181,8 @@ async fn main(spawner: Spawner) -> ! {
 
         config
     }));
+
+    esp_log::init_uart!(peripherals);
 
     // COEX needs more RAM - add some more
     #[cfg(feature = "esp32")]
@@ -222,7 +222,7 @@ async fn main(spawner: Spawner) -> ! {
             )),
     );
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
     let wifi_interface = esp_radio::wifi::Interface::station();
     let mut controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
@@ -230,7 +230,7 @@ async fn main(spawner: Spawner) -> ! {
     )
     .unwrap();
     controller.set_power_saving(POWER_SAVE).unwrap();
-    println!("Wifi started!");
+    log::info!("Wifi started!");
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -245,11 +245,11 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    println!("Scan");
+    log::info!("Scan");
     let scan_config = ScanConfig::default().with_max(10);
     let result = controller.scan_async(&scan_config).await.unwrap();
     for ap in result {
-        println!("{:?}", ap);
+        log::info!("{:?}", ap);
     }
 
     spawner.spawn(ble_task(ble_controller).unwrap());
@@ -258,7 +258,7 @@ async fn main(spawner: Spawner) -> ! {
 
     stack.wait_config_up().await;
     if let Some(config) = stack.config_v4() {
-        println!("Got IP: {}", config.address);
+        log::info!("Got IP: {}", config.address);
     }
 
     // Init HTTP client
@@ -289,10 +289,10 @@ async fn main(spawner: Spawner) -> ! {
         match response.body().read_to_end().await {
             Ok(data) => {
                 if let Ok(st) = core::str::from_utf8(data) {
-                    println!("Body: {}", st);
+                    log::info!("Body: {}", st);
                 }
             }
-            Err(e) => println!("Body error: {:?}", e),
+            Err(e) => log::info!("Body error: {:?}", e),
         }
         Timer::after(Duration::from_millis(3000)).await;
     }
@@ -302,7 +302,7 @@ async fn main(spawner: Spawner) -> ! {
 pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) {
     let address = Address::random([0xff, 0xe4, 0x05, 0x1a, 0x8f, 0xff]);
 
-    println!("Our address = {:?}", address);
+    log::info!("Our address = {:?}", address);
 
     let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
         HostResources::new();
@@ -322,7 +322,7 @@ pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) 
     )
     .unwrap();
 
-    println!("Starting advertising and GATT service");
+    log::info!("Starting advertising and GATT service");
     let server = Server::new_with_config(GapConfig::Peripheral(PeripheralConfig {
         name: "TrouBLE",
         appearance: &appearance::power_device::GENERIC_POWER_DEVICE,
@@ -348,7 +348,7 @@ pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) 
                 Ok(adv) => {
                     match adv.accept().await.unwrap().with_attribute_server(&server) {
                         Ok(conn) => {
-                            println!("got connection");
+                            log::info!("got connection");
                             let a = gatt_events_task(&server, &conn);
                             let b = custom_task(&server, &conn, &stack);
                             // run until any task ends (usually because the connection has been
@@ -356,7 +356,7 @@ pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) 
                             // state.
                             select(a, b).await;
                         }
-                        Err(err) => println!("Error occurred: {:?}", err),
+                        Err(err) => log::info!("Error occurred: {:?}", err),
                     }
                 }
                 Err(e) => {
@@ -385,15 +385,16 @@ async fn gatt_events_task<P: PacketPool>(
                     GattEvent::Read(event) => {
                         if event.handle() == level.handle {
                             let value = server.get(&level);
-                            println!("[gatt] Read Event to Level Characteristic: {:?}", value);
+                            log::info!("[gatt] Read Event to Level Characteristic: {:?}", value);
                         }
                     }
                     GattEvent::Write(event) => {
                         if event.handle() == level.handle {
                             event.with_data(|offset, data| {
-                                println!(
+                                log::info!(
                                     "[gatt] Write Event to Level Characteristic at {}: {:?}",
-                                    offset, data
+                                    offset,
+                                    data
                                 )
                             });
                         }
@@ -404,33 +405,33 @@ async fn gatt_events_task<P: PacketPool>(
                 // in order to ensure reply is sent.
                 match event.accept() {
                     Ok(reply) => reply.send().await,
-                    Err(e) => println!("[gatt] error sending response: {:?}", e),
+                    Err(e) => log::info!("[gatt] error sending response: {:?}", e),
                 };
             }
             _ => {} // ignore other Gatt Connection Events
         }
     };
-    println!("[gatt] disconnected: {:?}", reason);
+    log::info!("[gatt] disconnected: {:?}", reason);
     Ok(())
 }
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
+    log::info!("start connection task");
 
     loop {
-        println!("About to connect...");
+        log::info!("About to connect...");
 
         match controller.connect_async().await {
             Ok(info) => {
-                println!("Wifi connected to {:?}", info);
+                log::info!("Wifi connected to {:?}", info);
 
                 // wait until we're no longer connected
                 let info = controller.wait_for_disconnect_async().await.ok();
-                println!("Disconnected: {:?}", info);
+                log::info!("Disconnected: {:?}", info);
             }
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                log::info!("Failed to connect to wifi: {e:?}");
             }
         }
 
@@ -456,16 +457,16 @@ async fn custom_task<C: Controller, P: PacketPool>(
     let level = server.battery_service.level;
     loop {
         tick = tick.wrapping_add(1);
-        println!("[custom_task] notifying connection of tick {}", tick);
+        log::info!("[custom_task] notifying connection of tick {}", tick);
         if level.notify(conn, &tick, true).await.is_err() {
-            println!("[custom_task] error notifying connection");
+            log::info!("[custom_task] error notifying connection");
             break;
         };
         // read RSSI (Received Signal Strength Indicator) of the connection.
         if let Ok(rssi) = conn.raw().rssi(stack).await {
-            println!("[custom_task] RSSI: {:?}", rssi);
+            log::info!("[custom_task] RSSI: {:?}", rssi);
         } else {
-            println!("[custom_task] error getting RSSI");
+            log::info!("[custom_task] error getting RSSI");
             break;
         };
         Timer::after_secs(2).await;

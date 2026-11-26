@@ -47,9 +47,10 @@ macro_rules! dma_alloc_buffer {
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger(log::LevelFilter::Info);
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
+
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
     let delay = Delay::new();

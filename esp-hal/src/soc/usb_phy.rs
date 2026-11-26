@@ -88,6 +88,18 @@ pub(crate) fn usj_pads() -> Option<PhyPads> {
     }
 }
 
+/// Disconnects the USB Serial/JTAG controller from its pads and removes the pulls, so the host
+/// sees the device detach.
+pub(crate) fn disconnect_usj() {
+    USB_DEVICE::regs().conf0().modify(|_, w| {
+        w.usb_pad_enable().clear_bit();
+        w.dm_pullup().clear_bit();
+        w.dm_pulldown().clear_bit();
+        w.dp_pullup().clear_bit();
+        w.dp_pulldown().clear_bit()
+    });
+}
+
 /// Disconnects the USB controller that drives the pad of `gpio`, so the pad works as a GPIO.
 ///
 /// The pad and pull bits of each controller follow the controller to the PHY that it is mapped
@@ -99,13 +111,7 @@ pub(crate) fn release_pad(gpio: u8) {
     if usj_pads() == Some(pads) {
         // Workaround to make D+ and D- work when the pin is assigned to
         // the `USB_SERIAL_JTAG` peripheral by default.
-        USB_DEVICE::regs().conf0().modify(|_, w| {
-            w.usb_pad_enable().clear_bit();
-            w.dm_pullup().clear_bit();
-            w.dm_pulldown().clear_bit();
-            w.dp_pullup().clear_bit();
-            w.dp_pulldown().clear_bit()
-        });
+        disconnect_usj();
     } else {
         #[cfg(any(esp32h4, esp32p4))]
         peripherals::USB_WRAP::regs().otg_conf().modify(|_, w| {

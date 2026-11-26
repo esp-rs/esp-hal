@@ -81,7 +81,7 @@ pub(crate) const PSRAM_CACHE_LINE: usize = cfg_select! {
     // available.
     soc_internal_memory_cached => 128,
     esp32s31 => 64,
-    any(esp32, esp32c5, esp32c61) => 32, // TODO: fixed 32-bytes, metadata-ify
+    any(esp32, esp32c5, esp32c61, esp32h4) => 32, // TODO: fixed 32-bytes, metadata-ify
     _ => crate::soc::CONFIG_DATA_CACHE_LINE_SIZE,
 };
 

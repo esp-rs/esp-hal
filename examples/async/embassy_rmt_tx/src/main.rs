@@ -19,16 +19,16 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
@@ -50,9 +50,9 @@ async fn main(_spawner: Spawner) {
     data[data.len() - 1] = PulseCode::new(Level::High, 3000, Level::Low, 500);
 
     loop {
-        println!("transmit");
+        log::info!("transmit");
         channel.transmit_async(&data).await.unwrap();
-        println!("transmitted\n");
+        log::info!("transmitted\n");
         Timer::after(Duration::from_millis(500)).await;
     }
 }

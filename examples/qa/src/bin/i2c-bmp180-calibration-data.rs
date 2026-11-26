@@ -17,14 +17,13 @@ use esp_hal::{
     i2c::master::{Config, I2c},
     main,
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
     // Create a new peripheral object with the described wiring and standard
     // I2C clock speed:
@@ -37,6 +36,6 @@ fn main() -> ! {
         let mut data = [0u8; 22];
         i2c.write_read(0x77, &[0xaa], &mut data).ok();
 
-        println!("{:02x?}", data);
+        log::info!("{:02x?}", data);
     }
 }

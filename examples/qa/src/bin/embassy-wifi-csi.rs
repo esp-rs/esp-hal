@@ -13,7 +13,6 @@ use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
-use esp_println::println;
 use esp_radio::wifi::{
     AuthenticationMethodConfig,
     Config,
@@ -43,9 +42,9 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    esp_log::init_uart!(peripherals);
 
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
@@ -61,21 +60,21 @@ async fn main(spawner: Spawner) -> ! {
             )),
     );
 
-    println!("Starting wifi");
+    log::info!("Starting wifi");
     let wifi_interface = esp_radio::wifi::Interface::station();
     let mut controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )
     .unwrap();
-    println!("Wifi configured and started!");
+    log::info!("Wifi configured and started!");
 
     // enable some "interesting" events to be received in the connection task
     esp_radio::wifi::event::enable_wifi_events(
         WifiEvent::HomeChannelChange | WifiEvent::StationBeaconTimeout,
     );
 
-    println!("CSI data will be printed shortly ...");
+    log::info!("CSI data will be printed shortly ...");
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -93,15 +92,15 @@ async fn main(spawner: Spawner) -> ! {
     let csi = CsiConfig::default();
     controller
         .set_csi(csi, |data: esp_radio::wifi::csi::WifiCsiInfo| {
-            println!("rssi: {:?} rate: {}", data.rssi(), data.rate());
+            log::info!("rssi: {:?} rate: {}", data.rssi(), data.rate());
         })
         .unwrap();
 
-    println!("Scan");
+    log::info!("Scan");
     let scan_config = ScanConfig::default().with_max(10);
     let result = controller.scan_async(&scan_config).await.unwrap();
     for ap in result {
-        println!("{:?}", ap);
+        log::info!("{:?}", ap);
     }
 
     spawner.spawn(connection(controller).unwrap());
@@ -110,7 +109,7 @@ async fn main(spawner: Spawner) -> ! {
     stack.wait_config_up().await;
 
     if let Some(config) = stack.config_v4() {
-        println!("Got IP: {}", config.address);
+        log::info!("Got IP: {}", config.address);
     }
 
     loop {
@@ -120,21 +119,21 @@ async fn main(spawner: Spawner) -> ! {
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
+    log::info!("start connection task");
 
     loop {
-        println!("About to connect...");
+        log::info!("About to connect...");
 
         match controller.connect_async().await {
             Ok(info) => {
-                println!("Wifi connected to {:?}", info);
+                log::info!("Wifi connected to {:?}", info);
 
                 // wait until we're no longer connected
                 let info = controller.wait_for_disconnect_async().await.ok();
-                println!("Disconnected: {:?}", info);
+                log::info!("Disconnected: {:?}", info);
             }
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                log::info!("Failed to connect to wifi: {e:?}");
             }
         }
 

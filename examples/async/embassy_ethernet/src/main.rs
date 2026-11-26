@@ -63,7 +63,6 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use reqwless::{
     client::HttpClient,
     request::{Method, RequestBuilder},
@@ -87,11 +86,11 @@ type EthDriver = Ethernet<'static, esp_hal::Async, GenericPhy>;
 
 #[esp_rtos::main]
 async fn main(spawner: Spawner) {
-    esp_println::logger::init_logger_from_env();
-
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+
+    esp_log::init_uart!(peripherals);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
@@ -200,12 +199,12 @@ async fn main(spawner: Spawner) {
     // `wait_config_up` is DHCP, not PHY link, so wait for the link first.
     stack.wait_link_up().await;
 
-    println!("Waiting for DHCP lease…");
+    log::info!("Waiting for DHCP lease…");
     stack.wait_config_up().await;
 
     if let Some(cfg) = stack.config_v4() {
-        println!("IP:      {}", cfg.address);
-        println!("Gateway: {:?}", cfg.gateway);
+        log::info!("IP:      {}", cfg.address);
+        log::info!("Gateway: {:?}", cfg.gateway);
     }
 
     // ── Have fun ───────────────────────────────────────────────────────
@@ -231,7 +230,7 @@ async fn main(spawner: Spawner) {
             let response = builder.send(&mut rx_buf).await?;
             let data = response.body().read_to_end().await?;
             if let Ok(st) = core::str::from_utf8(data) {
-                println!("Body: {}", st);
+                log::info!("Body: {}", st);
             }
             Ok::<_, reqwless::Error>(())
         })
@@ -239,8 +238,8 @@ async fn main(spawner: Spawner) {
 
         match result {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => println!("HTTP error: {:?}", e),
-            Err(_) => println!("HTTP request timed out"),
+            Ok(Err(e)) => log::info!("HTTP error: {:?}", e),
+            Err(_) => log::info!("HTTP request timed out"),
         }
 
         Timer::after(Duration::from_millis(3000)).await;

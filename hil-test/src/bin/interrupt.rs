@@ -73,6 +73,7 @@ mod tests {
     fn init() -> Context {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let peripherals = esp_hal::init(config);
+        hil_test::init_logger!(peripherals);
 
         let cpu_intr = cfg_select! {
             soc_has_intpri => &peripherals.INTPRI,
@@ -100,11 +101,10 @@ mod tests {
         Context { sw0_trigger_addr }
     }
 
-    // Handler function (assigned above) reads cycles count from CSR and stores it into `LAST_PERF`
-    // static, which this test then reads and asserts its value to detect regressions
-    #[test]
+    // Runs from RAM, so the result does not depend on where the code lands in flash.
+    #[esp_hal::ram]
     #[rustfmt::skip]
-    fn interrupt_latency(ctx: Context) {
+    fn trigger_interrupt(sw0_trigger_addr: u32) {
         unsafe {
             asm!(
                 "
@@ -124,12 +124,23 @@ mod tests {
                     sw {bit}, 0({addr})           # trigger FROM_CPU_INTR2
                 ",
                 options(nostack),
-                addr = in(reg) ctx.sw0_trigger_addr,
+                addr = in(reg) sw0_trigger_addr,
                 bit = out(reg) _,
             )
         }
+    }
+
+    // Handler function (assigned above) reads cycles count from CSR and stores it into `LAST_PERF`
+    // static, which this test then reads and asserts its value to detect regressions
+    #[test]
+    fn interrupt_latency(ctx: Context) {
+        trigger_interrupt(ctx.sw0_trigger_addr);
 
         let perf_counter = unsafe { LAST_PERF };
+
+        // The handler stops the counter, and `ets_delay_us` in ROM busy-waits on it, so the UART
+        // logger would hang in `flush`.
+        unsafe { asm!("csrrwi x0, 0x7e1, 1") };
         defmt::info!("Performance counter: {}", perf_counter);
 
         // TODO c3/c2 values should be adjusted to catch smaller regressions

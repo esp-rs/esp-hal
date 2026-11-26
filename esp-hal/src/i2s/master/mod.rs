@@ -230,6 +230,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaConfigError,
         DmaEligiblePeripheral,
         DmaError,
         DmaRxBuffer,
@@ -320,6 +321,8 @@ with_i2s_dma_engine! {
 
         // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
         type I2sMasterErased<'d> = crate::dma::$any_channel<'d>;
+
+        crate::dma::driver_dma_config!($engine);
     };
 }
 
@@ -1509,9 +1512,9 @@ impl<'d> I2s<'d, Blocking> {
         channel: I2sMasterErased<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let channel = Channel::new(channel);
+        let mut channel = Channel::new(channel);
         let i2s = i2s.degrade();
-        channel.runtime_ensure_compatible(i2s.dma_peripheral());
+        channel.connect(i2s.dma_peripheral());
 
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -1750,7 +1753,7 @@ where
         self.i2s.info().reset_tx();
         let res = unsafe {
             self.tx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = res {
@@ -1774,6 +1777,16 @@ where
             #[cfg(i2s_version = "1")]
             self.data_format,
         )
+    }
+
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.tx_channel.apply_config(config)
     }
 }
 
@@ -1823,7 +1836,7 @@ where
 
         let res = unsafe {
             self.rx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(&mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = res {
@@ -1848,6 +1861,16 @@ where
             #[cfg(i2s_version = "1")]
             self.data_format,
         )
+    }
+
+    /// Applies a DMA configuration to the RX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.rx_channel.apply_config(config)
     }
 }
 

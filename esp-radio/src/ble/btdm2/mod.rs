@@ -16,7 +16,7 @@ use core::{
 
 use esp_phy::PhyInitGuard;
 
-use super::{Config, ReceivedPacket, in_isr};
+use super::{Config, in_isr};
 use crate::{
     compat::{
         self,
@@ -673,32 +673,16 @@ extern "C" fn wr_btdm_coex_register_ble_cb(_ty: u32, _func: *mut c_void) -> i32 
     }
 }
 
-/// Hands a complete HCI packet, indicator byte first, to the host reader.
-fn queue_rx_packet(header: &[u8], payload: &[u8]) {
-    let mut data = alloc::vec::Vec::with_capacity(header.len() + payload.len());
-    data.extend_from_slice(header);
-    data.extend_from_slice(payload);
-    queue_rx_data(data);
-}
-
-/// Hands an already assembled HCI packet, indicator byte first, to the host reader.
-fn queue_rx_data(data: alloc::vec::Vec<u8>) {
-    super::dump_packet_info(&data);
-    super::BT_STATE.with(|state| {
-        state.rx_queue.push_back(ReceivedPacket {
-            data: data.into_boxed_slice(),
-        });
-    });
-    crate::ble::controller::hci_read_data_available();
-}
-
+/// Receives the controller's events for commands sent through `r_btdm_hci_trans_rx`.
+///
+/// "Tx" is from the controller's side. These are mostly Command Complete and Command Status
+/// events, so losing one would leave the host waiting.
 extern "C" fn btdm_hci_controller_tx(pkt: *mut HciDriverPacket) -> i32 {
     let Some(pkt) = (unsafe { pkt.as_mut() }) else {
         return -1;
     };
-    queue_rx_packet(&[pkt.type_], unsafe {
-        core::slice::from_raw_parts(pkt.data, pkt.length as usize)
-    });
+    let payload = unsafe { core::slice::from_raw_parts(pkt.data, pkt.length as usize) };
+    super::queue_rx_packet([&[pkt.type_][..], payload].into_iter());
     unsafe { r_btdm_hci_trans_buf_free(core::ptr::from_mut(pkt)) };
     0
 }
@@ -706,9 +690,8 @@ extern "C" fn btdm_hci_controller_tx(pkt: *mut HciDriverPacket) -> i32 {
 unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, _arg: *const c_void) -> i32 {
     let event = unsafe { *cmd };
     let len = unsafe { *cmd.add(1) };
-    queue_rx_packet(&[0x04, event, len], unsafe {
-        core::slice::from_raw_parts(cmd.add(2), len as usize)
-    });
+    let payload = unsafe { core::slice::from_raw_parts(cmd.add(2), len as usize) };
+    super::queue_rx_packet([&[0x04, event, len][..], payload].into_iter());
     unsafe { r_ble_hci_trans_buf_free(cmd) };
     0
 }
@@ -720,20 +703,12 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, _arg: *const c_void) -> i
             .map(|mbuf| unsafe { core::slice::from_raw_parts(mbuf.om_data, mbuf.om_len as usize) })
     };
 
-    let len = 1 + chain().map(<[u8]>::len).sum::<usize>();
-    let mut data = alloc::vec::Vec::new();
-    if data.try_reserve_exact(len).is_err() {
-        warn!(
-            "Out of memory, dropping a received ACL packet of {} bytes",
-            len
-        );
-        unsafe { r_os_mbuf_free_chain(om.cast_mut()) };
+    let queued = super::try_queue_rx_packet(core::iter::once(&[0x02][..]).chain(chain()));
+    unsafe { r_os_mbuf_free_chain(om.cast_mut()) };
+    if !queued {
+        warn!("Out of memory, dropping a received ACL packet");
         return ESP_ERR_NO_MEM as i32;
     }
-    data.push(0x02);
-    chain().for_each(|payload| data.extend_from_slice(payload));
-    queue_rx_data(data);
-    unsafe { r_os_mbuf_free_chain(om.cast_mut()) };
     0
 }
 
@@ -749,8 +724,7 @@ fn send_hci_packet(packet: &[u8]) {
             // `r_ble_hci_trans_hs_cmd_tx`.
             let pkt = r_btdm_hci_trans_buf_alloc(HCI_DRIVER_TYPE_CMD, 0);
             if pkt.is_null() {
-                warn!("r_btdm_hci_trans_buf_alloc failed");
-                return;
+                super::out_of_memory("an HCI command buffer", packet.len() - 1);
             }
             (*pkt).type_ = HCI_DRIVER_TYPE_CMD;
             (*pkt).length = (packet.len() - 1) as u16;
@@ -762,12 +736,12 @@ fn send_hci_packet(packet: &[u8]) {
         } else if packet[0] == DATA_TYPE_ACL {
             let om = r_os_msys_get_pkthdr(packet.len() as u16, ACL_DATA_MBUF_LEADINGSPACE as u16);
             if om.is_null() {
-                warn!("r_os_msys_get_pkthdr failed");
-                return;
+                super::out_of_memory("an ACL mbuf", packet.len() - 1);
             }
+            // The append allocates further blocks when the packet does not fit the first one.
             let res = r_os_mbuf_append(om, packet.as_ptr().add(1), (packet.len() - 1) as u16);
             if res != 0 {
-                panic!("r_os_mbuf_append returned {}", res);
+                super::out_of_memory("an ACL mbuf", packet.len() - 1);
             }
             *((*om).om_data as *mut u8).add(1) = 0;
             let res = r_ble_hci_trans_hs_acl_tx(om);

@@ -66,8 +66,6 @@
 //! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
 //% CHIP_FILTER: sleep_light_sleep && sleep_has_wakeup_source_timer
-//% FEATURES: esp-println/uart
-
 #![no_std]
 #![no_main]
 
@@ -922,6 +920,7 @@ fn main() -> ! {
     let phase = Phase::get(index);
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(phase.cpu_clock()));
+    esp_log::init_uart!(peripherals);
 
     report!(
         "light-sleep-stress: reset={:?}, CPU clock {:?}",

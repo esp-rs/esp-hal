@@ -97,6 +97,7 @@ mod tests {
     /// should be able to observe the received ACK frame.
     #[test]
     async fn transmit_is_acknowledged(p: Peripherals) {
+        hil_test::init_logger!(p);
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
 
         let mut acked = false;
@@ -120,6 +121,7 @@ mod tests {
     /// the DUT should receive a frame carrying the payload it sent.
     #[test]
     async fn receives_echoed_frame(p: Peripherals) {
+        hil_test::init_logger!(p);
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
 
         assert!(
@@ -133,6 +135,7 @@ mod tests {
     /// under the PHY), and dropping it must not power down or gate what the driver still uses.
     #[test]
     async fn survives_ble_init_and_drop(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_radio::ble::controller::BleConnector;
 
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
@@ -173,6 +176,7 @@ mod tests {
     /// DUT acknowledges it, and only then delivers it - so it must arrive.
     #[test]
     async fn receives_acknowledged_echo(p: Peripherals) {
+        hil_test::init_logger!(p);
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
 
         let mut echoed = false;
@@ -206,6 +210,7 @@ mod tests {
     /// `start_receive`.
     #[test]
     async fn sleep_stops_reception_until_start_receive(p: Peripherals) {
+        hil_test::init_logger!(p);
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
         sleep_stops_reception(&mut ieee802154).await;
     }
@@ -214,6 +219,7 @@ mod tests {
     /// the RF.
     #[test]
     async fn sleep_stops_reception_until_start_receive_with_modem_sleep(p: Peripherals) {
+        hil_test::init_logger!(p);
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
         ieee802154.set_config(Config {
             modem_sleep: true,
@@ -274,6 +280,7 @@ mod tests {
     /// `sleep` stops a transmission that is in progress, as the ESP-IDF driver does: it fails.
     #[test]
     async fn sleep_aborts_transmission(p: Peripherals) {
+        hil_test::init_logger!(p);
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
         ieee802154.set_tx_done_callback_fn(on_tx_done);
         ieee802154.set_tx_failed_callback_fn(on_tx_failed);
@@ -301,6 +308,7 @@ mod tests {
     /// again, with the drop at varying points of the transmission.
     #[test]
     async fn survives_drop_with_transmission_in_flight(p: Peripherals) {
+        hil_test::init_logger!(p);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
@@ -335,6 +343,7 @@ mod tests {
     /// for BLE. Dropping BLE then closes the RF, and `start_receive` must reopen it.
     #[test]
     async fn wakes_after_ble_dropped_while_asleep(p: Peripherals) {
+        hil_test::init_logger!(p);
         use esp_radio::ble::controller::BleConnector;
 
         let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);

@@ -66,7 +66,7 @@ pub(crate) fn backtrace_internal(fp: u32, suppress: u32) -> Backtrace {
 #[cfg(all(stack_dump, feature = "panic-handler"))]
 pub(super) fn dump_stack() {
     cfg_select! {
-        feature = "println" => {
+        any(feature = "println", feature = "log-04") => {
             const MAX_STACK_DUMP_SIZE: u32 = match () {
                 _ if cfg!(stack_dump_max_size_4k) => 4 * 1024,
                 _ if cfg!(stack_dump_max_size_8k) => 8 * 1024,
@@ -93,16 +93,45 @@ pub(super) fn dump_stack() {
                 sp + MAX_STACK_DUMP_SIZE,
             );
 
-            esp_println::print!("STACKDUMP: {:08x} ", pc);
-            for address in sp..end {
-                let byte = unsafe { (address as *const u8).read_volatile() };
-                esp_println::print!("{:02x}", byte);
+            cfg_select! {
+                feature = "log-04" => {
+                    // espflash only decodes a line that starts with `STACKDUMP: `, so the dump
+                    // starts after the record's level prefix on a new line. The trailing space
+                    // keeps a color reset out of the hex field.
+                    super::println!("\n{} ", StackDump { pc, sp, end });
+                }
+                _ => {
+                    esp_println::print!("STACKDUMP: {:08x} ", pc);
+                    for address in sp..end {
+                        let byte = unsafe { (address as *const u8).read_volatile() };
+                        esp_println::print!("{:02x}", byte);
+                    }
+                    esp_println::println!();
+                }
             }
-            esp_println::println!();
         }
         _ => {
             super::println!("Stack dumps are not supported with DEFMT.");
         }
+    }
+}
+
+#[cfg(all(stack_dump, feature = "panic-handler", feature = "log-04"))]
+struct StackDump {
+    pc: u32,
+    sp: u32,
+    end: u32,
+}
+
+#[cfg(all(stack_dump, feature = "panic-handler", feature = "log-04"))]
+impl core::fmt::Display for StackDump {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "STACKDUMP: {:08x} ", self.pc)?;
+        for address in self.sp..self.end {
+            let byte = unsafe { (address as *const u8).read_volatile() };
+            write!(f, "{:02x}", byte)?;
+        }
+        Ok(())
     }
 }
 

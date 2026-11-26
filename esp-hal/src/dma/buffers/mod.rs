@@ -283,7 +283,7 @@ impl BurstConfig {
             #[cfg(dma_can_access_psram)]
             pub(super) const fn min_dram_alignment(self, direction: TransferDirection) -> usize;
 
-            #[cfg(all(dma_can_access_psram, not(esp32s31)))] // Burst always enabled
+            #[cfg(all(dma_can_access_psram, not(dma_gdma_version = "3")))] // Burst always enabled
             pub(super) fn is_burst_enabled(self) -> bool;
         }
     }
@@ -1851,6 +1851,12 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
     type Final = DmaLoopBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        {
+            self.descriptor.writeback();
+            self.buffer.writeback();
+        }
+
         Preparation {
             start: self.descriptor.as_mut_ptr(),
             #[cfg(dma_can_access_psram)]

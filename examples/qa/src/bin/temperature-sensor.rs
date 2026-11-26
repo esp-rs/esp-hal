@@ -12,14 +12,13 @@ use esp_hal::{
     main,
     tsens::{Config, TemperatureSensor},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_log::init_uart!(peripherals);
 
     let mut temperature_sensor =
         TemperatureSensor::new(peripherals.TSENS, Config::default()).unwrap();
@@ -28,9 +27,9 @@ fn main() -> ! {
     loop {
         let sample = temperature_sensor.get_temperature();
         if let Some(celsius) = sample.to_celsius() {
-            println!("Temperature: {:.2} °C", celsius);
+            log::info!("Temperature: {:.2} °C", celsius);
         } else {
-            println!(
+            log::info!(
                 "Uncalibrated temperature: {:.2} °C",
                 sample.to_uncalibrated_celsius()
             );

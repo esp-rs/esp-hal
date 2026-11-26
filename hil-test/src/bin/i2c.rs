@@ -76,6 +76,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0);
@@ -985,6 +986,7 @@ mod i2c_slave {
     }
 
     fn setup(peripherals: Peripherals) -> Context {
+        hil_test::init_logger!(peripherals);
         MASTER_DONE.store(false, Ordering::SeqCst);
         MASTER_PAUSED.store(false, Ordering::SeqCst);
         let timg = TimerGroup::new(peripherals.TIMG0);
@@ -1012,6 +1014,7 @@ mod i2c_slave {
     #[test]
     #[cfg(i2c_slave_i2c1)]
     async fn async_i2c1_write_read(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         esp_rtos::start(TimerGroup::new(peripherals.TIMG0).timer0);
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
         let (slave, mut master) = connect_bus(peripherals.I2C1, sda, scl);
@@ -1037,6 +1040,7 @@ mod i2c_slave {
     #[test]
     #[cfg(soc_has_pcr)]
     fn function_clock_lifetime(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let mut i2c = peripherals.I2C0;
         // An inherited enabled gate would hide a missing clock request.
         PCR::regs()
@@ -1064,6 +1068,7 @@ mod i2c_slave {
 
     #[test]
     fn invalid_config_preserves_state(peripherals: Peripherals) {
+        hil_test::init_logger!(peripherals);
         let mut slave = I2cSlave::new(peripherals.I2C0, Config::new(ADDRESS)).unwrap();
         let regs = I2C0::regs();
         regs.data()
@@ -1871,6 +1876,7 @@ mod clock_gate {
         static STOPPED: AtomicBool = AtomicBool::new(false);
 
         let mut p = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(p);
         let mut adc = p.ADC1;
         let mut cpu_control = CpuControl::new(p.CPU_CTRL);
         let stack = mk_static!(Stack<8192>, Stack::new());

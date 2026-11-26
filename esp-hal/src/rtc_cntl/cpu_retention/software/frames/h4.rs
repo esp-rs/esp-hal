@@ -8,7 +8,14 @@ pub(crate) const PMUFUNC_GOING_TO_SLEEP: u32 = 1;
 /// Low two bits of `CriticalSleepFrame::pmufunc`: the CPU has just woken.
 pub(crate) const PMUFUNC_JUST_WOKE: u32 = 3;
 
-const _: () = ::core::assert!(size_of::<CriticalSleepFrame>() == 73 * 4);
+const _: () = ::core::assert!(
+    size_of::<CriticalSleepFrame>()
+        == if cfg!(all(feature = "rt", feature = "float-save-restore")) {
+            38 * 4
+        } else {
+            58 * 4
+        }
+);
 
 // The custom numbers come from `esp32h4/sleep_cpu.c:52-63`, and the PMA numbers from
 // `components/riscv/include/riscv/csr.h`.

@@ -35,10 +35,11 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
-    esp_println::println!("Init!");
-
-    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
+
+    log::info!("Init!");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
@@ -80,11 +81,11 @@ async fn main(_spawner: Spawner) {
 
     loop {
         let mut buffer = [0; 1024];
-        esp_println::println!("Sending bytes");
+        log::info!("Sending bytes");
         embedded_hal_async::spi::SpiBus::transfer(&mut spi, &mut buffer, &send_buffer)
             .await
             .unwrap();
-        esp_println::println!("Bytes received: {:?}", buffer);
+        log::info!("Bytes received: {:?}", buffer);
         Timer::after(Duration::from_millis(5_000)).await;
     }
 }

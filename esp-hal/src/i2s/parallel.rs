@@ -100,7 +100,14 @@ use crate::{
     DriverMode,
     RegisterToggle,
     clock::dividers::FractionalDivider,
-    dma::{ChannelTx, DmaEligiblePeripheral, DmaError, DmaTxBuffer, asynch::DmaTxFuture},
+    dma::{
+        ChannelTx,
+        DmaConfigError,
+        DmaEligiblePeripheral,
+        DmaError,
+        DmaTxBuffer,
+        asynch::DmaTxFuture,
+    },
     gpio::{
         OutputConfig,
         OutputSignal,
@@ -333,9 +340,9 @@ impl<'d> I2sParallel<'d, Blocking> {
         mut pins: impl TxPins<'d>,
         clock_pin: impl PeripheralOutput<'d>,
     ) -> Self {
-        let channel = ChannelTx::new(channel);
+        let mut channel = ChannelTx::new(channel);
         let i2s = i2s.degrade();
-        channel.runtime_ensure_compatible(i2s.dma_peripheral());
+        channel.connect(i2s.dma_peripheral());
 
         let guard = PeripheralGuard::new(i2s.peripheral());
 
@@ -447,11 +454,8 @@ where
     ) -> Result<I2sParallelTransfer<'d, BUF, Dm>, (DmaError, Self, BUF)> {
         self.instance.tx_reset(self.sample_period_cycles);
         self.instance.tx_fifo_reset();
-        let result = unsafe {
-            self.tx_channel
-                .prepare_transfer(self.instance.dma_peripheral(), &mut data)
-        }
-        .and_then(|_| self.tx_channel.start_transfer());
+        let result = unsafe { self.tx_channel.prepare_transfer(&mut data) }
+            .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {
             return Err((err, self, data));
         }
@@ -460,6 +464,16 @@ where
             i2s: ManuallyDrop::new(self),
             buf_view: ManuallyDrop::new(data.into_view()),
         })
+    }
+
+    /// Applies a DMA configuration to the TX half of the DMA channel.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaConfigError`] when the channel cannot apply the configuration.
+    #[instability::unstable]
+    pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+        self.tx_channel.apply_config(config)
     }
 }
 
@@ -977,6 +991,8 @@ with_i2s_dma_engine! {
                 impl<'d> I2sParallelDmaChannel<'d, $peri> for $ch {}
             }
         }
+
+        crate::dma::driver_dma_config!($engine);
     };
 }
 

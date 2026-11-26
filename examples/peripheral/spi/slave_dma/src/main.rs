@@ -38,14 +38,14 @@ use esp_hal::{
     main,
     spi::{Mode, slave::Spi},
 };
-use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger(log::LevelFilter::Info);
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_log::init_uart!(peripherals);
 
     let mut master_sclk = Output::new(peripherals.GPIO4, Level::Low, OutputConfig::default());
     let master_miso = Input::new(
@@ -98,9 +98,9 @@ fn main() -> ! {
         slave_receive.as_mut_slice().fill(0xff);
         i = i.wrapping_add(1);
 
-        println!("Iteration {i}");
+        log::info!("Iteration {i}");
 
-        println!("Do `transfer`");
+        log::info!("Do `transfer`");
 
         let transfer = spi
             .transfer(
@@ -121,7 +121,7 @@ fn main() -> ! {
         );
 
         (spi, (slave_receive, slave_send)) = transfer.wait();
-        println!(
+        log::info!(
             "slave got {:x?} .. {:x?}, master got {:x?} .. {:x?}",
             &slave_receive.as_slice()[..10],
             &slave_receive.as_slice()[slave_receive.len() - 10..],
@@ -131,7 +131,7 @@ fn main() -> ! {
 
         delay.delay_millis(250);
 
-        println!("Do `read`");
+        log::info!("Do `read`");
         slave_receive.as_mut_slice().fill(0xff);
         let transfer = spi.read(slave_receive.len(), slave_receive).unwrap();
 
@@ -145,7 +145,7 @@ fn main() -> ! {
         );
 
         (spi, slave_receive) = transfer.wait();
-        println!(
+        log::info!(
             "slave got {:x?} .. {:x?}",
             &slave_receive.as_slice()[..10],
             &slave_receive.as_slice()[slave_receive.len() - 10..],
@@ -153,7 +153,7 @@ fn main() -> ! {
 
         delay.delay_millis(250);
 
-        println!("Do `write`");
+        log::info!("Do `write`");
         let transfer = spi.write(slave_send.len(), slave_send).unwrap();
 
         master_receive.fill(0);
@@ -168,7 +168,7 @@ fn main() -> ! {
         );
 
         (spi, slave_send) = transfer.wait();
-        println!(
+        log::info!(
             "master got {:x?} .. {:x?}",
             &master_receive[..10],
             &master_receive[master_receive.len() - 10..],
@@ -176,7 +176,7 @@ fn main() -> ! {
 
         delay.delay_millis(250);
 
-        println!();
+        log::info!("");
     }
 }
 

@@ -1,9 +1,6 @@
 # ESP32-H2 Device Metadata
 #
 # Empty [`device.driver`] tables imply `partial` support status.
-#
-# If you modify a driver support status, run `cargo update-metadata` to
-# update the table in the esp-hal README.
 
 [device]
 name   = "esp32h2"
@@ -110,6 +107,7 @@ peripherals = [
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_BLE_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "FROM_CPU_INTR0", virtual = true },
     { name = "FROM_CPU_INTR1", virtual = true },
     { name = "FROM_CPU_INTR2", virtual = true },
@@ -432,7 +430,10 @@ support_status = { status = "partial", issue = 6758 }
 [device.systimer]
 support_status = { status = "partial", issue = 6777 }
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 6778 }
+register_block = "apb_saradc"
+# A range change takes up to 1.2 ms to settle.
+min_stabilization_time_us = 1500
 [device.lp_timer]
 
 ## Radio
