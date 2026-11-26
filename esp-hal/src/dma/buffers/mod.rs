@@ -977,8 +977,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 
 /// DMA Streaming Receive Buffer.
 ///
-/// This is a contiguous buffer linked together by DMA descriptors, and the
-/// buffer is evenly distributed between each descriptor provided.
+/// This is a contiguous buffer linked together by DMA descriptors.
 ///
 /// It is used for continuously streaming data from a peripheral's FIFO.
 ///
@@ -1024,8 +1023,22 @@ pub struct DmaRxStreamBuf {
 }
 
 impl DmaRxStreamBuf {
-    /// Creates a new [`DmaRxStreamBuf`] evenly distributing the buffer between
-    /// the provided descriptors.
+    /// Creates a new [`DmaRxStreamBuf`] and splits `buffer` across `descriptors`.
+    ///
+    /// Each descriptor's size is a multiple of the alignment that a receive transfer needs.
+    /// In PSRAM, that alignment is the default 16-byte block. The sizes differ by at most
+    /// one alignment unit.
+    ///
+    /// # Errors
+    ///
+    /// [`DmaBufError::InvalidAlignment`] when the address or the length of `buffer` is not a
+    /// multiple of the alignment.
+    ///
+    /// [`DmaBufError::InsufficientDescriptors`] when any of the following is true:
+    ///
+    /// - `descriptors` has fewer than four entries
+    /// - `buffer` has fewer alignment blocks than descriptors
+    /// - a descriptor would hold more than 4095 bytes
     pub fn new(
         mut descriptors: DmaAlignedMut<'static, [DmaDescriptor]>,
         mut buffer: DmaAlignedMut<'static, [u8]>,
@@ -1036,33 +1049,31 @@ impl DmaRxStreamBuf {
             return Err(DmaBufError::InsufficientDescriptors);
         }
 
-        // Evenly distribute the buffer between the descriptors.
-        let chunk_size = Some(buffer.len() / descriptors.len())
-            .filter(|x| *x <= 4095)
-            .ok_or(DmaBufError::InsufficientDescriptors)?;
+        let burst = BurstConfig::default();
+        burst.ensure_buffer_aligned(&buffer, TransferDirection::In)?;
+        let alignment = burst.min_alignment(&buffer, TransferDirection::In);
 
-        let mut chunks = buffer.chunks_exact_mut(chunk_size);
-        for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
-            desc.buffer = chunk.as_mut_ptr();
-            desc.set_size(chunk.len());
+        let blocks = buffer.len() / alignment;
+        let blocks_per_descriptor = blocks / descriptors.len();
+        let extra_blocks = blocks % descriptors.len();
+        let max_size = (blocks_per_descriptor + usize::from(extra_blocks != 0)) * alignment;
+        if blocks_per_descriptor == 0 || max_size > 4095 {
+            return Err(DmaBufError::InsufficientDescriptors);
         }
 
-        let remainder = chunks.into_remainder();
-
-        if !remainder.is_empty() {
-            // Append any excess to the last descriptor.
-            let last_descriptor = descriptors.last_mut().unwrap();
-            let size = last_descriptor.size() + remainder.len();
-            if size > 4095 {
-                return Err(DmaBufError::InsufficientDescriptors);
-            }
-            last_descriptor.set_size(size);
+        let mut rest = &mut buffer[..];
+        for (i, desc) in descriptors.iter_mut().enumerate() {
+            let size = (blocks_per_descriptor + usize::from(i < extra_blocks)) * alignment;
+            let (chunk, tail) = core::mem::take(&mut rest).split_at_mut(size);
+            desc.buffer = chunk.as_mut_ptr();
+            desc.set_size(size);
+            rest = tail;
         }
 
         Ok(Self {
             descriptors,
             buffer,
-            burst: BurstConfig::default(),
+            burst,
         })
     }
 
@@ -1092,12 +1103,15 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
         }
 
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        self.descriptors.writeback();
+        {
+            self.descriptors.writeback();
+            self.buffer.invalidate();
+        }
 
         Preparation {
             start: self.descriptors.as_mut_ptr(),
             #[cfg(dma_can_access_psram)]
-            accesses_psram: false,
+            accesses_psram: is_valid_psram_address(self.buffer.as_ptr() as usize),
             burst_transfer: self.burst,
 
             // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
@@ -1120,6 +1134,10 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
     fn from_view(view: Self::View) -> Self {
         view.buf
     }
+}
+
+fn offset_in_buffer(buffer: *const u8, ptr: *mut u8, offset: usize) -> usize {
+    ptr.addr().wrapping_sub(buffer.addr()) + offset
 }
 
 /// A view into a [DmaRxStreamBuf].
@@ -1269,6 +1287,13 @@ impl DmaRxStreamBufView {
         // There must be at least one descriptor.
         debug_assert!(!descriptors.is_empty());
 
+        // Descriptor lengths can differ.
+        let buffer_start = offset_in_buffer(
+            self.buf.buffer.as_ptr(),
+            descriptors[0].buffer,
+            self.descriptor_offset,
+        );
+
         if descriptors.len() == 1 {
             let last_descriptor = &descriptors[0];
             if last_descriptor.owner() == Owner::Dma {
@@ -1276,24 +1301,14 @@ impl DmaRxStreamBufView {
                 (&[], false)
             } else {
                 let length = last_descriptor.len() - self.descriptor_offset;
-                let chunk_size = last_descriptor.size();
-                let buffer_start = self.buf.buffer.len() - chunk_size + self.descriptor_offset;
-                #[cfg(soc_internal_memory_cached)]
-                if length != 0 {
-                    unsafe {
-                        crate::soc::cache_invalidate_addr(
-                            self.buf.buffer.as_ptr().add(buffer_start) as u32,
-                            length as u32,
-                        );
-                    }
-                }
+                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                cache_invalidate(&self.buf.buffer[buffer_start..][..length]);
                 (
                     &self.buf.buffer[buffer_start..][..length],
                     last_descriptor.flags.suc_eof(),
                 )
             }
         } else {
-            let chunk_size = descriptors[0].size();
             let mut found_eof = false;
 
             let mut number_of_contiguous_bytes = 0;
@@ -1313,25 +1328,11 @@ impl DmaRxStreamBufView {
                 }
             }
 
-            #[cfg(soc_internal_memory_cached)]
-            {
-                let buffer_start = chunk_size * self.descriptor_idx + self.descriptor_offset;
-                let buffer_len = number_of_contiguous_bytes - self.descriptor_offset;
-                if buffer_len != 0 {
-                    unsafe {
-                        crate::soc::cache_invalidate_addr(
-                            self.buf.buffer.as_ptr().add(buffer_start) as u32,
-                            buffer_len as u32,
-                        );
-                    }
-                }
-            }
+            let length = number_of_contiguous_bytes - self.descriptor_offset;
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            cache_invalidate(&self.buf.buffer[buffer_start..][..length]);
 
-            (
-                &self.buf.buffer[chunk_size * self.descriptor_idx..][..number_of_contiguous_bytes]
-                    [self.descriptor_offset..],
-                found_eof,
-            )
+            (&self.buf.buffer[buffer_start..][..length], found_eof)
         }
     }
 }
@@ -1462,12 +1463,8 @@ impl DmaTxStreamBuf {
         let (idx, offset) = mark_tx_stream_descriptors_ready(&mut self.descriptors, pre_filled);
         self.view_descriptor_idx = idx;
         self.view_descriptor_offset = offset;
-        #[cfg(soc_internal_memory_cached)]
-        if pre_filled != 0 {
-            unsafe {
-                crate::soc::cache_writeback_addr(self.buffer.as_ptr() as u32, pre_filled as u32);
-            }
-        }
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        cache_writeback(&self.buffer[..pre_filled]);
     }
 }
 
@@ -1605,7 +1602,7 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
         Preparation {
             start: self.descriptors.as_mut_ptr(),
             #[cfg(dma_can_access_psram)]
-            accesses_psram: false,
+            accesses_psram: is_valid_psram_address(self.buffer.as_ptr() as usize),
             burst_transfer: self.burst,
 
             // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
@@ -1662,10 +1659,11 @@ impl DmaTxStreamBufView {
 
     fn write_position(&self) -> usize {
         let desc = &self.buf.descriptors[self.descriptor_idx];
-        desc.buffer
-            .addr()
-            .wrapping_sub(self.buf.buffer.as_ptr().addr())
-            + self.descriptor_offset
+        offset_in_buffer(
+            self.buf.buffer.as_ptr(),
+            desc.buffer,
+            self.descriptor_offset,
+        )
     }
 
     /// Pushes a buffer into the stream buffer.
@@ -1677,15 +1675,8 @@ impl DmaTxStreamBufView {
             .min(self.buf.buffer.len())
             .max(dma_start);
         let bytes_pushed = f(&mut self.buf.buffer[dma_start..dma_end]).min(dma_end - dma_start);
-        #[cfg(soc_internal_memory_cached)]
-        if bytes_pushed != 0 {
-            unsafe {
-                crate::soc::cache_writeback_addr(
-                    self.buf.buffer.as_ptr().add(dma_start) as u32,
-                    bytes_pushed as u32,
-                );
-            }
-        }
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        cache_writeback(&self.buf.buffer[dma_start..][..bytes_pushed]);
 
         self.advance(bytes_pushed);
         bytes_pushed
@@ -1860,7 +1851,7 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
         Preparation {
             start: self.descriptor.as_mut_ptr(),
             #[cfg(dma_can_access_psram)]
-            accesses_psram: false,
+            accesses_psram: is_valid_psram_address(self.buffer.as_ptr() as usize),
             burst_transfer: BurstConfig::default(),
             // The DMA must not check the owner bit, as it is never set.
             check_owner: Some(false),
@@ -2126,6 +2117,24 @@ pub(crate) fn invalidate_received(data: NonNull<[u8]>) {
     if end > start {
         unsafe { crate::soc::cache_invalidate_addr(start as u32, (end - start) as u32) };
     }
+}
+
+#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+fn cache_writeback(data: &[u8]) {
+    let addr = data.as_ptr() as usize;
+    if !crate::dma::aligned::region_needs_cache_op(addr, data.len()) {
+        return;
+    }
+    unsafe { crate::soc::cache_writeback_addr(addr as u32, data.len() as u32) };
+}
+
+#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+fn cache_invalidate(data: &[u8]) {
+    let addr = data.as_ptr() as usize;
+    if !crate::dma::aligned::region_needs_cache_op(addr, data.len()) {
+        return;
+    }
+    unsafe { crate::soc::cache_invalidate_addr(addr as u32, data.len() as u32) };
 }
 
 #[cfg(dma_can_access_psram)]

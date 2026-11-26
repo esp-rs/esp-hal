@@ -7,20 +7,18 @@ mod tests {
     // using defmt's non-const assert. Doing so would result in a compile error.
     #[allow(unused_imports)]
     use defmt::*;
-    use esp_hal::{
-        dma::{
-            DmaBufError,
-            DmaDescriptor,
-            DmaRxBuffer,
-            DmaRxStreamBuf,
-            DmaRxStreamBufView,
-            DmaTxBuffer,
-            DmaTxStreamBuf,
-            DmaTxStreamBufView,
-            Owner,
-        },
-        dma_rx_stream_buffer,
-        dma_tx_stream_buffer,
+    use esp_hal::dma::{
+        DmaBufError,
+        DmaDescriptor,
+        DmaRxBuffer,
+        DmaRxStreamBuf,
+        DmaRxStreamBufView,
+        DmaTxBuffer,
+        DmaTxStreamBuf,
+        DmaTxStreamBufView,
+        Owner,
+        aligned::DmaAlignedMut,
+        descriptor_count,
     };
 
     fn chunk_size(descriptors: &[DmaDescriptor]) -> usize {
@@ -42,14 +40,38 @@ mod tests {
         descriptors[descriptor_index].set_owner(Owner::Cpu);
     }
 
-    // Having a single wrapper function means we don't allocate the static buffer multiple times.
+    const POOL_SIZE: usize = 16384;
+    const POOL_DESCRIPTORS: usize = 6;
+
+    // Each test runs after a reset and calls this once.
+    fn dma_buffers(
+        size: usize,
+        chunk_size: usize,
+    ) -> (
+        DmaAlignedMut<'static, [u8]>,
+        DmaAlignedMut<'static, [DmaDescriptor]>,
+    ) {
+        let (buffer, descriptors) =
+            esp_hal::dma_buffers_impl!(POOL_SIZE, POOL_SIZE.div_ceil(POOL_DESCRIPTORS));
+        let buffer = &mut buffer.into_inner()[..size];
+        let descriptors = &mut descriptors.into_inner()[..descriptor_count(size, chunk_size)];
+        // SAFETY: Both slices start at DMA-aligned statics. The bytes after each slice stay
+        // unused.
+        unsafe {
+            (
+                DmaAlignedMut::new_unchecked(buffer),
+                DmaAlignedMut::new_unchecked(descriptors),
+            )
+        }
+    }
+
     fn with_rx_stream_buffer(f: impl FnOnce(DmaRxStreamBuf)) {
-        let buf = dma_rx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        f(buf)
+        let (buffer, descriptors) = dma_buffers(BUFFER_SIZE, CHUNK_SIZE);
+        f(DmaRxStreamBuf::new(descriptors, buffer).unwrap())
     }
     fn with_tx_stream_buffer(f: impl FnOnce(DmaTxStreamBuf)) {
-        let buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        f(buf)
+        let (buffer, descriptors) = dma_buffers(BUFFER_SIZE, CHUNK_SIZE);
+        f(DmaTxStreamBuf::new(descriptors, buffer).unwrap())
     }
 
     fn with_rx_view(initial_data: &[u8], eof: bool, f: impl FnOnce(DmaRxStreamBufView)) {
@@ -136,16 +158,44 @@ mod tests {
 
     #[test]
     fn test_dma_rx_stream_buf_insufficient_descriptors_require_at_least_4() {
-        let (buffer, descriptors) = esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2);
+        let (buffer, descriptors) = dma_buffers(BUFFER_SIZE, CHUNK_SIZE * 2);
         match DmaRxStreamBuf::new(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
             _ => core::panic!("expected InsufficientDescriptors"),
         }
     }
 
+    fn assert_descriptors_cover_the_buffer(buf: DmaRxStreamBuf) {
+        let (descriptors, buffer) = buf.split();
+        let mut next = buffer.as_ptr();
+        for desc in descriptors.iter() {
+            hil_test::assert_eq!(desc.buffer.cast_const(), next);
+            hil_test::assert!(desc.size() <= 4095);
+            next = next.wrapping_add(desc.size());
+        }
+        hil_test::assert_eq!(next, buffer.as_ptr_range().end);
+    }
+
+    #[test]
+    fn test_dma_rx_stream_buf_descriptors_cover_the_buffer() {
+        // Chunk size 7 yields 6 descriptors. 40 is not a multiple of 6.
+        let (buffer, descriptors) = dma_buffers(40, 7);
+        hil_test::assert_eq!(descriptors.len(), 6);
+        assert_descriptors_cover_the_buffer(DmaRxStreamBuf::new(descriptors, buffer).unwrap());
+    }
+
+    #[test]
+    fn test_dma_rx_stream_buf_descriptors_stay_within_4095_bytes() {
+        // Chunk size 4091 yields 4 descriptors. At a 4-byte alignment, putting the
+        // excess on the last descriptor makes that descriptor 4100 bytes.
+        let (buffer, descriptors) = dma_buffers(16364, 4091);
+        hil_test::assert_eq!(descriptors.len(), 4);
+        assert_descriptors_cover_the_buffer(DmaRxStreamBuf::new(descriptors, buffer).unwrap());
+    }
+
     #[test]
     fn test_dma_tx_stream_buf_insufficient_descriptors_require_at_least_4() {
-        let (buffer, descriptors) = esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2);
+        let (buffer, descriptors) = dma_buffers(BUFFER_SIZE, CHUNK_SIZE * 2);
         match DmaTxStreamBuf::new(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
             _ => core::panic!("expected InsufficientDescriptors"),
@@ -414,17 +464,18 @@ mod tests {
 
     #[test]
     fn test_dma_tx_stream_buf_prefill() {
-        let mut buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        buf.push(&[0xffu8; CHUNK_SIZE * 2]);
+        with_tx_stream_buffer(|mut buf| {
+            buf.push(&[0xffu8; CHUNK_SIZE * 2]);
 
-        buf.prepare();
+            buf.prepare();
 
-        let (descriptors, _buffer) = buf.split();
-        core::assert!(matches!(descriptors[0].owner(), Owner::Dma));
-        core::assert!(matches!(descriptors[1].owner(), Owner::Dma));
-        // Unused descriptors stay CPU-owned so they can be filled before DMA sees them.
-        core::assert!(matches!(descriptors[2].owner(), Owner::Cpu));
-        core::assert!(matches!(descriptors[3].owner(), Owner::Cpu));
+            let (descriptors, _buffer) = buf.split();
+            core::assert!(matches!(descriptors[0].owner(), Owner::Dma));
+            core::assert!(matches!(descriptors[1].owner(), Owner::Dma));
+            // Unused descriptors stay CPU-owned so they can be filled before DMA sees them.
+            core::assert!(matches!(descriptors[2].owner(), Owner::Cpu));
+            core::assert!(matches!(descriptors[3].owner(), Owner::Cpu));
+        })
     }
 
     #[test]
