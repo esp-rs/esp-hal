@@ -10,24 +10,75 @@
 //! device.
 //!
 //! ## Overview
-//!
-//! esp-radio provides Wi-Fi, Bluetooth Low Energy (BLE), ESP-NOW and IEEE
-//! 802.15.4 drivers for Espressif microcontrollers. It builds on top of
-//! [esp-hal] and the vendor binary blobs to provide wireless connectivity in a
+#![cfg_attr(
+    all(
+        wifi_driver_supported,
+        bt_driver_supported,
+        ieee802154_driver_supported
+    ),
+    doc = "esp-radio provides Wi-Fi, Bluetooth Low Energy (BLE), ESP-NOW, and IEEE 802.15.4 \
+           drivers for Espressif microcontrollers."
+)]
+#![cfg_attr(
+    all(
+        wifi_driver_supported,
+        bt_driver_supported,
+        not(ieee802154_driver_supported)
+    ),
+    doc = "esp-radio provides Wi-Fi, Bluetooth Low Energy (BLE), and ESP-NOW drivers for \
+           Espressif microcontrollers."
+)]
+#![cfg_attr(
+    all(
+        wifi_driver_supported,
+        not(bt_driver_supported),
+        not(ieee802154_driver_supported)
+    ),
+    doc = "esp-radio provides Wi-Fi and ESP-NOW drivers for Espressif microcontrollers."
+)]
+#![cfg_attr(
+    all(
+        not(wifi_driver_supported),
+        bt_driver_supported,
+        ieee802154_driver_supported
+    ),
+    doc = "esp-radio provides Bluetooth Low Energy (BLE) and IEEE 802.15.4 drivers for \
+           Espressif microcontrollers."
+)]
+#![cfg_attr(
+    all(
+        not(wifi_driver_supported),
+        bt_driver_supported,
+        not(ieee802154_driver_supported)
+    ),
+    doc = "esp-radio provides Bluetooth Low Energy (BLE) drivers for Espressif microcontrollers."
+)]
+//! It builds on top of [esp-hal] and vendor binary blobs to provide wireless connectivity in a
 //! `no_std` environment.
 //!
-//! Wi-Fi and BLE require a dynamic memory allocator and a preemptive task
-//! scheduler at runtime. We recommend [`esp-alloc`] and [`esp-rtos`] for this,
-//! though any allocator or RTOS (such as Ariel OS) that implements the required
-//! interfaces will work.
 #![cfg_attr(
-    feature = "ieee802154",
-    doc = "<div class=\"warning\"><b>Hint:</b> The scheduler is not required for IEEE 802.15.4.</div>"
+    all(wifi_driver_supported, bt_driver_supported),
+    doc = "Wi-Fi and BLE require a dynamic memory allocator and a preemptive task scheduler at \
+           runtime."
 )]
-//! Drivers that don't currently have a stable API are marked as `unstable` in
+#![cfg_attr(
+    all(wifi_driver_supported, not(bt_driver_supported)),
+    doc = "Wi-Fi requires a dynamic memory allocator and a preemptive task scheduler at runtime."
+)]
+#![cfg_attr(
+    all(bt_driver_supported, not(wifi_driver_supported)),
+    doc = "BLE requires a dynamic memory allocator and a preemptive task scheduler at runtime."
+)]
+//! [`esp-alloc`] and [`esp-rtos`] are recommended for this, though any allocator or RTOS
+//! (such as Ariel OS) that implements the required interfaces can be used.
+//!
+#![cfg_attr(
+    ieee802154_driver_supported,
+    doc = "<div class=\"warning\"><b>Hint:</b> The scheduler is not required for IEEE 802.15.4.</div>\n\n"
+)]
+//! Drivers that do not currently have a stable API are marked as `unstable` in
 //! the documentation. Enabling the `unstable` feature on `esp-radio` requires
-//! you to also enable the `unstable` feature on `esp-hal` in the final binary
-//! crate.
+//! enabling the `unstable` feature on `esp-hal` in the final binary crate.
 //!
 //! ### Quick start
 //!
@@ -103,6 +154,60 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 //! opt-level = 3
 //! ```
 //! 
+//! ## Heap size
+//!
+//! The radio drivers allocate most of their buffers at runtime from the same heap as the rest of
+//! the application. With [`esp-alloc`] this is the global heap.
+#![cfg_attr(
+    soc_has_psram,
+    doc = "Allocations that require internal memory use only the internal-memory regions of the \
+           heap. Other allocations use the first region with available space, which can be PSRAM."
+)]
+#![cfg_attr(
+    all(soc_has_psram, wifi_driver_supported),
+    doc = "Wi-Fi data buffers require internal memory. Adding PSRAM to the heap does not reduce \
+           the internal memory that Wi-Fi requires at peak load."
+)]
+#![cfg_attr(
+    all(wifi_driver_supported, bt_driver_supported),
+    doc = "Radio memory usage is not constant. A Wi-Fi transmit burst or a burst of BLE traffic \
+           can temporarily require significantly more buffers than when idle."
+)]
+#![cfg_attr(
+    all(wifi_driver_supported, not(bt_driver_supported)),
+    doc = "Radio memory usage is not constant. A Wi-Fi transmit burst can temporarily require \
+           significantly more buffers than when idle."
+)]
+#![cfg_attr(
+    all(bt_driver_supported, not(wifi_driver_supported)),
+    doc = "Radio memory usage is not constant. A burst of BLE traffic can temporarily require \
+           significantly more buffers than when idle."
+)]
+//!
+#![cfg_attr(
+    bt_driver_supported,
+    doc = "When an allocation fails, BLE panics with an `out of memory` message that reports the \
+           free internal heap. The driver cannot drop the packet and continue, because losing an \
+           HCI packet leaves the host and controller out of synchronization until a reboot.\n\n"
+)]
+//! The heap must be sized for the peak usage of all components that allocate from it
+//! simultaneously: the radio drivers and the application. No single size fits every application,
+//! because peak memory consumption depends on the enabled radios, their configuration, network
+//! traffic, and application allocations. Peak usage can be measured under realistic load using
+//! the `internal-heap-stats` feature of [`esp-alloc`]. Applications must reserve additional
+//! headroom above the measured peak.
+#![cfg_attr(
+    all(wifi_driver_supported, feature = "wifi"),
+    doc = concat!(
+        "\n\n",
+        "Peak Wi-Fi memory consumption increases with the dynamic RX and TX buffer counts in ",
+        "[`wifi::ControllerConfig`]. The ",
+        "[Wi-Fi buffer usage](https://docs.espressif.com/projects/esp-idf/en/latest/",
+        chip!(),
+        "/api-guides/wifi-driver/wifi-performance-and-power-save.html#wifi-buffer-usage) ",
+        "section of the ESP-IDF documentation explains how to estimate it."
+    )
+)]
 //! ## Disabling logging
 //!
 //! `esp-radio` contains trace-level logging statements that may impact
