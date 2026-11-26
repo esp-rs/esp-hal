@@ -224,10 +224,17 @@ impl Info {
         });
     }
 
-    pub(crate) fn tx_start(&self) {
+    pub(crate) fn tx_start(&self, sample_period_cycles: u32) {
         self.regs().conf().modify(|_, w| w.tx_start().set_bit());
 
-        while self.regs().state().read().tx_idle().bit_is_set() {
+        // For up to one sample period after TX_START is set, TX_IDLE stays set. After this
+        // time, TX_IDLE is clear while TX sends and set when TX has sent all data. If an
+        // interrupt stops this core for longer than the transfer, TX_IDLE is set again before
+        // the loop reads it.
+        let start = xtensa_lx::timer::get_cycle_count();
+        while self.regs().state().read().tx_idle().bit_is_set()
+            && xtensa_lx::timer::get_cycle_count().wrapping_sub(start) < 2 * sample_period_cycles
+        {
             // wait
         }
     }

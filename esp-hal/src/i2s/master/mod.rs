@@ -1576,6 +1576,16 @@ impl<'d> I2s<'d, Blocking> {
                     #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
                     Config::Pdm(_) => DataFormat::Data16Channel16,
                 },
+                #[cfg(i2s_version = "1")]
+                sample_period_cycles: match config {
+                    Config::Tdm(c) => sample_period_cycles(c.sample_rate),
+                    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+                    Config::Pdm(c) => sample_period_cycles(match (c.tx, c.rx) {
+                        (Some(tx), _) => tx.clock.sample_rate,
+                        (None, Some(rx)) => rx.clock.sample_rate,
+                        (None, None) => unreachable!(),
+                    }),
+                },
             },
         })
     }
@@ -1602,6 +1612,8 @@ impl<'d> I2s<'d, Blocking> {
                 mclk_out_guard: self.i2s_tx.mclk_out_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.i2s_tx.data_format,
+                #[cfg(i2s_version = "1")]
+                sample_period_cycles: self.i2s_tx.sample_period_cycles,
             },
         }
     }
@@ -1715,6 +1727,14 @@ where
     }
 }
 
+/// The sample period in CPU cycles, rounded up.
+#[cfg(i2s_version = "1")]
+pub(crate) fn sample_period_cycles(sample_rate: Rate) -> u32 {
+    crate::clock::cpu_clock()
+        .as_hz()
+        .div_ceil(sample_rate.as_hz())
+}
+
 /// I2S TX channel.
 pub struct I2sTx<'d, Dm>
 where
@@ -1728,6 +1748,8 @@ where
     _mclk_out_guard: Option<I2sMclkOutGuard>,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
+    #[cfg(i2s_version = "1")]
+    sample_period_cycles: u32,
 }
 
 impl<Dm> core::fmt::Debug for I2sTx<'_, Dm>
@@ -1760,7 +1782,10 @@ where
             return Err((Error::DmaError(err), self, buffer));
         }
 
-        self.i2s.info().tx_start();
+        self.i2s.info().tx_start(
+            #[cfg(i2s_version = "1")]
+            self.sample_period_cycles,
+        );
 
         Ok(I2sTxDmaTransfer {
             i2s_tx: ManuallyDrop::new(self),
@@ -2052,6 +2077,8 @@ pub(crate) mod private {
         pub(crate) mclk_out_guard: Option<I2sMclkOutGuard>,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
+        #[cfg(i2s_version = "1")]
+        pub(crate) sample_period_cycles: u32,
     }
 
     impl<'d, Dm> TxCreator<'d, Dm>
@@ -2069,6 +2096,8 @@ pub(crate) mod private {
                 _mclk_out_guard: self.mclk_out_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
+                #[cfg(i2s_version = "1")]
+                sample_period_cycles: self.sample_period_cycles,
             }
         }
 

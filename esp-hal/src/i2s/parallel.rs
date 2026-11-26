@@ -363,7 +363,7 @@ impl<'d> I2sParallel<'d, Blocking> {
             tx_channel: channel,
             _guard: guard,
             _clk_guard: clk_guard,
-            sample_period_cycles: sample_period_cycles(frequency),
+            sample_period_cycles: crate::i2s::master::sample_period_cycles(frequency),
         }
     }
 
@@ -624,13 +624,6 @@ pub struct I2sClockDividers {
     pub numerator: u32,
 }
 
-/// The sample period in CPU cycles, rounded up.
-fn sample_period_cycles(sample_rate: Rate) -> u32 {
-    crate::clock::cpu_clock()
-        .as_hz()
-        .div_ceil(sample_rate.as_hz())
-}
-
 fn calculate_clock(
     sample_rate: Rate,
     data_bits: u8,
@@ -769,7 +762,7 @@ pub trait PrivateInstance: crate::private::Sealed {
 
         // Initialize I2S dev
         self.rx_reset();
-        self.tx_reset(sample_period_cycles(frequency));
+        self.tx_reset(crate::i2s::master::sample_period_cycles(frequency));
         self.rx_fifo_reset();
         self.tx_fifo_reset();
         self.rx_dma_reset();
