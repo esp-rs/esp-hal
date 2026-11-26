@@ -361,7 +361,7 @@ mod ctrlr_ll {
     /// Sets the page size of the PSRAM chip in bytes: 256, 512, 1024 or 2048.
     #[inline(always)]
     pub(crate) fn psram_ctrlr_ll_set_page_size(_mspi_id: u32, page_size: u32) {
-        assert!(matches!(page_size, 256 | 512 | 1024 | 2048));
+        assert_matches!(page_size, 256 | 512 | 1024 | 2048);
 
         // The register value is log2(page_size) - 8.
         SPI0::regs().smem_ecc_ctrl().modify(|_, w| unsafe {
