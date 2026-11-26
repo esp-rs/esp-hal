@@ -86,6 +86,14 @@ fn emit_linker_scripts(chip: Chip) -> Result<(), Box<dyn Error>> {
         copy_dir_all("ld/xtensa", &out)?;
     } else {
         copy_dir_all("ld/riscv", &out)?;
+        // The start-up first sets `mtvec` to `_pre_init_trap`. With a CLIC, the trap base
+        // ignores the low 6 bits of `mtvec`.
+        let align = if chip.contains("soc_has_clic") {
+            ". = ALIGN(64);"
+        } else {
+            ""
+        };
+        fs::write(out.join("pre_init_trap_align.x"), align)?;
     }
 
     copy_dir_all("ld/sections", &out)?;
