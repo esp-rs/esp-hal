@@ -365,6 +365,14 @@ impl RxRegisterAccess for AhbGdmaRxChannel<'_> {
             .modify(|_, w| w.mem_trans_en().bit(value));
     }
 
+    fn last_dscr_address(&self) -> usize {
+        self.ch()
+            .in_suc_eof_des_addr()
+            .read()
+            .in_suc_eof_des_addr()
+            .bits() as _
+    }
+
     fn async_handler(&self) -> Option<InterruptHandler> {
         self.0.info.handler_in
     }

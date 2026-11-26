@@ -211,6 +211,9 @@ pub trait RxRegisterAccess: RegisterAccess {
     #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, value: bool);
 
+    /// Inlink descriptor address when a successful EOF occurs on the Rx channel.
+    fn last_dscr_address(&self) -> usize;
+
     fn peripheral_interrupt(&self) -> Option<Interrupt>;
     fn async_handler(&self) -> Option<InterruptHandler>;
 }
