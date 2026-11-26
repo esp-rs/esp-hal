@@ -164,12 +164,7 @@ pub(super) fn booted_app_offset() -> Option<u32> {
     } else {
         drom.end - 1
     };
-    let offset = flash_mmu_entry_offset(entry);
-    // The ESP32-S31 bootloader that espflash 4.6 bundles is built for 32 KB pages, and maps the
-    // app at entry 511 instead of 1023.
-    #[cfg(feature = "esp32s31")]
-    let offset = offset.or_else(|| flash_mmu_entry_offset(511));
-    offset
+    flash_mmu_entry_offset(entry)
 }
 
 /// Reads the partition table.
