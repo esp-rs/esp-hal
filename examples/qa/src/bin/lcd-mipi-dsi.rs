@@ -151,7 +151,7 @@ fn main() -> ! {
         if report_start.elapsed() >= REPORT_INTERVAL {
             let elapsed_ms = report_start.elapsed().as_millis();
             let underrun = MIPI_DSI_BRIDGE::regs().int_raw().read().underrun().bit();
-            println!(
+            log::info!(
                 "lcd: frames_rendered={} elapsed_ms={} frames_per_s_x10={} underrun={} commit_timeouts={}",
                 frames,
                 elapsed_ms,
