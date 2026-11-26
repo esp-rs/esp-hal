@@ -1149,6 +1149,9 @@ pub enum WifiError {
 
     /// Station still in disconnect status.
     NotConnected,
+
+    /// Wi-Fi is already in use, for example by an ESP-NOW or sniffer instance.
+    InUse,
 }
 
 impl WifiError {
@@ -2938,7 +2941,7 @@ impl<'d> WifiController<'d> {
     /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
     /// currently in use.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust,no_run
     /// # {before_snippet}
@@ -2946,27 +2949,23 @@ impl<'d> WifiController<'d> {
     /// let sta = esp_radio::wifi::Interface::station();
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`WifiError::InUse`] when Wi-Fi is already in use, for example by an ESP-NOW or sniffer
+    /// instance from a dropped controller.
+    ///
+    /// Other [`WifiError`]s when the driver fails to initialize, or when applying the country
+    /// information or the initial configuration fails (see [`Self::set_config`]).
     pub fn new(
         device: crate::hal::peripherals::WIFI<'d>,
         config: ControllerConfig,
     ) -> Result<Self, WifiError> {
         config.validate();
 
-        event::enable_wifi_events(
-            WifiEvent::StationStart
-                | WifiEvent::StationStop
-                | WifiEvent::StationConnected
-                | WifiEvent::StationDisconnected
-                | WifiEvent::AccessPointStart
-                | WifiEvent::AccessPointStop
-                | WifiEvent::AccessPointStationConnected
-                | WifiEvent::AccessPointStationDisconnected
-                | WifiEvent::ScanDone,
-        );
-
         let radio_guard = RadioRefGuard::without_wake_lock();
 
-        let first = WIFI_REFCOUNT.try_increment(|| -> Result<(), WifiError> {
+        let first = WIFI_REFCOUNT.increment_if_unused(|| -> Result<(), WifiError> {
             unsafe {
                 internal::G_CONFIG = wifi_init_config_t {
                     osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
@@ -3032,13 +3031,20 @@ impl<'d> WifiController<'d> {
         })?;
 
         if !first {
-            warn!(
-                "Wi-Fi is already initialized; init-only ControllerConfig settings were ignored: \
-                 static_rx_buf_num, dynamic_rx_buf_num, static_tx_buf_num, dynamic_tx_buf_num, \
-                 rx_queue_size, tx_queue_size, rx_ba_win, espnow_max_encrypt_num, \
-                 ampdu_rx_enable, ampdu_tx_enable, amsdu_tx_enable"
-            );
+            return Err(WifiError::InUse);
         }
+
+        event::enable_wifi_events(
+            WifiEvent::StationStart
+                | WifiEvent::StationStop
+                | WifiEvent::StationConnected
+                | WifiEvent::StationDisconnected
+                | WifiEvent::AccessPointStart
+                | WifiEvent::AccessPointStop
+                | WifiEvent::AccessPointStationConnected
+                | WifiEvent::AccessPointStationDisconnected
+                | WifiEvent::ScanDone,
+        );
 
         let mut controller = WifiController {
             _guard: WifiRefGuard {
@@ -3284,15 +3290,9 @@ impl WifiController<'_> {
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
     ///
-    /// ## Errors
+    /// Changing the mode restarts Wi-Fi, which briefly pauses ESP-NOW and sniffer traffic.
     ///
-    /// Returns [`WifiError::InvalidArguments`] if the access point channel is not allowed in the
-    /// configured country (see [`ControllerConfig`]).
-    ///
-    /// If this function returns an error, the Wi-Fi mode is reset to `NULL` and
-    /// the controller is stopped.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust,no_run
     /// # {before_snippet}
@@ -3309,11 +3309,26 @@ impl WifiController<'_> {
     ///
     /// controller.set_config(&station_config)?;
     /// # {after_snippet}
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`WifiError::InvalidArguments`] when the access point channel is not allowed in the
+    /// configured country (see [`ControllerConfig`]).
+    ///
+    /// On error, the Wi-Fi mode is reset to `NULL` and the controller is stopped. While an ESP-NOW
+    /// or sniffer instance is alive, Wi-Fi keeps running instead if it was running: a failed mode
+    /// change returns to the previous mode, and settings applied before the error stay in effect.
     pub fn set_config(&mut self, conf: &Config) -> Result<(), WifiError> {
         // We/the driver might have applied a partial configuration so we better disable
         // AccessPoint/Station just in case the caller ignores the error we return here -
-        // they will run into further errors this way.
-        struct ResetModeOnDrop;
+        // they will run into further errors this way. ESP-NOW and sniffer instances hold the
+        // other Wi-Fi references and need Wi-Fi running, so while they are alive, Wi-Fi starts
+        // again in the previous mode if this call stopped it.
+        struct ResetModeOnDrop {
+            /// The mode to restore, if this call stopped Wi-Fi to change it.
+            restore_mode: Option<wifi_mode_t>,
+        }
         impl ResetModeOnDrop {
             /// Prevent resetting the Wi-Fi mode when the guard is dropped.
             fn defuse(self) {
@@ -3322,12 +3337,31 @@ impl WifiController<'_> {
         }
         impl Drop for ResetModeOnDrop {
             fn drop(&mut self) {
-                unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
-                unwrap!(WifiController::stop_impl());
+                if !WIFI_REFCOUNT.is_shared() {
+                    unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
+                    unwrap!(WifiController::stop_impl());
+                } else if let Some(mode) = self.restore_mode {
+                    esp_hal::if_unstable_hal! {
+                        sleep::set_station_only(mode == wifi_mode_t_WIFI_MODE_STA);
+                    }
+
+                    let restart =
+                        esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) }).and_then(|()| {
+                            // The mode is only `NULL` if an earlier failed call stopped Wi-Fi.
+                            if mode != wifi_mode_t_WIFI_MODE_NULL {
+                                WifiController::start_impl()?;
+                                WifiController::apply_scan_defaults(mode)?;
+                            }
+                            Ok(())
+                        });
+                    if let Err(e) = restart {
+                        warn!("Failed to restart Wi-Fi for ESP-NOW/sniffer: {:?}", e);
+                    }
+                }
             }
         }
 
-        let reset_mode_on_error = ResetModeOnDrop;
+        let mut reset_mode_on_error = ResetModeOnDrop { restore_mode: None };
 
         conf.validate()?;
 
@@ -3344,8 +3378,10 @@ impl WifiController<'_> {
             Config::EapStation(_) => wifi_mode_t_WIFI_MODE_STA,
         };
 
-        if previous_mode != mode {
+        let restart = previous_mode != mode;
+        if restart {
             Self::stop_impl()?;
+            reset_mode_on_error.restore_mode = Some(previous_mode);
         }
 
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
@@ -3378,27 +3414,11 @@ impl WifiController<'_> {
             sleep::set_station_only(mode == wifi_mode_t_WIFI_MODE_STA);
         }
 
-        if previous_mode != mode {
-            set_access_point_state(WifiAccessPointState::Starting);
-            set_station_state(WifiStationState::Starting);
+        if restart {
+            Self::start_impl()?;
+            reset_mode_on_error.restore_mode = None;
 
-            // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
-            esp_wifi_result!(unsafe { esp_wifi_start() })?;
-
-            // Default for all scans, including connect scans. Requires a started station.
-            // `wifi_start_scan` only overrides the active or passive time for a single scan and
-            // the driver restores these defaults when a scan finishes.
-            if mode != wifi_mode_t_WIFI_MODE_AP {
-                let params = wifi_scan_default_params_t {
-                    scan_time: wifi_scan_time_t {
-                        active: wifi_active_scan_time_t { min: 0, max: 0 },
-                        // Covers one typical beacon interval (102.4 ms).
-                        passive: 120,
-                    },
-                    home_chan_dwell_time: 0,
-                };
-                esp_wifi_result!(unsafe { esp_wifi_set_scan_parameters(&params) })?;
-            }
+            Self::apply_scan_defaults(mode)?;
         }
 
         reset_mode_on_error.defuse();
@@ -3524,6 +3544,33 @@ ignored."
     #[instability::unstable]
     pub fn set_max_tx_power(&mut self, power: i8) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
+    }
+
+    fn start_impl() -> Result<(), WifiError> {
+        set_access_point_state(WifiAccessPointState::Starting);
+        set_station_state(WifiStationState::Starting);
+
+        // `esp_wifi_start` is actually not async - i.e. we get the event before it returns
+        esp_wifi_result!(unsafe { esp_wifi_start() })
+    }
+
+    /// Sets the defaults for all scans, including connect scans. Requires a started station.
+    fn apply_scan_defaults(mode: wifi_mode_t) -> Result<(), WifiError> {
+        if mode == wifi_mode_t_WIFI_MODE_AP {
+            return Ok(());
+        }
+
+        // `wifi_start_scan` only overrides the active or passive time for a single scan and
+        // the driver restores these defaults when a scan finishes.
+        let params = wifi_scan_default_params_t {
+            scan_time: wifi_scan_time_t {
+                active: wifi_active_scan_time_t { min: 0, max: 0 },
+                // Covers one typical beacon interval (102.4 ms).
+                passive: 120,
+            },
+            home_chan_dwell_time: 0,
+        };
+        esp_wifi_result!(unsafe { esp_wifi_set_scan_parameters(&params) })
     }
 
     fn stop_impl() -> Result<(), WifiError> {
