@@ -175,10 +175,18 @@ pub(crate) fn cache_writeback_all() {
 #[doc(hidden)]
 #[crate::ram]
 pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    super::CACHE_SYNC_LOCK
+        .lock(|| invalidate_cache_addr_unprotected(CACHE_MAP_L1_DCACHE, addr, size));
+}
+
+/// Invalidates the caches in `map` over `addr..addr + size`.
+///
+/// The function takes no lock and is inlined, so that the code-in-PSRAM start-up can call it before
+/// the code is in PSRAM.
+#[inline(always)]
+pub(crate) fn invalidate_cache_addr_unprotected(map: u32, addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
     }
-    super::CACHE_SYNC_LOCK.lock(|| unsafe {
-        Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE, addr, size);
-    });
+    unsafe { Cache_Invalidate_Addr(map, addr, size) };
 }

@@ -20,13 +20,21 @@ const FLASH_ENTRIES: u32 = property!("mmu.entry_num");
 const IMAGE_MAGIC: u32 = 0xE9;
 
 /// Why the start-up stopped. The value is the exit code, or the value in `a0`.
+///
+/// Each chip-specific code has the cfg of the hardware that its check uses.
 #[repr(u32)]
 pub(crate) enum StopCode {
+    /// The MPLL cannot clock PSRAM at 200 MHz.
+    #[cfg(soc_has_clock_node_mpll_clk)]
+    MpllRate    = 0x101,
+    /// PSRAM reports an unknown size.
+    #[cfg(psram_octal_spi)]
+    UnknownSize = 0x102,
     /// The last flash MMU entry does not map the app, or no entry is free.
-    NoMmuEntry = 0x301,
+    NoMmuEntry  = 0x301,
     /// A segment is not word-sized, is out of order or overlaps, or lies past the end of PSRAM.
     #[cfg(psram_separate_window)]
-    BadSegment = 0x402,
+    BadSegment  = 0x402,
 }
 
 /// Stops the start-up with a [`StopCode`].

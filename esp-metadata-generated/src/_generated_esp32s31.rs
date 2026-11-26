@@ -638,7 +638,7 @@ macro_rules! property {
         false
     };
     ("psram.supports_code_in_psram") => {
-        false
+        true
     };
     ("psram.separate_window") => {
         true
@@ -1883,6 +1883,14 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// fn configure_mpll_clk_early_impl(_clocks: &mut ClockTree, _config: MpllClkConfig) {
+///     todo!()
+/// }
+///
+/// fn enable_mpll_clk_early_impl(_clocks: &mut ClockTree) {
+///     todo!()
+/// }
+///
 /// // RC_FAST_CLK
 ///
 /// fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -2402,6 +2410,18 @@ macro_rules! for_each_sw_interrupt {
 ///     ) {
 ///         todo!()
 ///     }
+///
+///     fn configure_function_clock_early_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _config: PsramFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+///
+///     fn enable_function_clock_early_impl(self, _clocks: &mut ClockTree) {
+///         todo!()
+///     }
 /// }
 /// ```
 macro_rules! define_clock_tree_types {
@@ -2495,6 +2515,7 @@ macro_rules! define_clock_tree_types {
             _500,
         }
         impl MpllClkConfig {
+            #[cfg_attr(code_in_psram, inline(always))]
             pub fn value(&self) -> u32 {
                 match self {
                     MpllClkConfig::_400 => 400000000,
@@ -3317,6 +3338,16 @@ macro_rules! define_clock_tree_types {
             pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                 CLOCK_TREE.with(f)
             }
+            /// Returns the clock tree without taking the lock, for the early-init functions.
+            ///
+            /// # Safety
+            ///
+            /// The safety rules of `esp_sync::NonReentrantMutex::as_mut_unchecked` apply.
+            #[cfg(code_in_psram)]
+            #[inline(always)]
+            pub(crate) unsafe fn unlocked() -> &'static mut ClockTree {
+                unsafe { CLOCK_TREE.as_mut_unchecked() }
+            }
             /// Returns the current configuration of the MPLL_CLK clock tree node
             pub fn mpll_clk(&self) -> Option<MpllClkConfig> {
                 self.mpll_clk
@@ -3879,6 +3910,26 @@ macro_rules! define_clock_tree_types {
         }
         pub fn mpll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
+        }
+        #[cfg(code_in_psram)]
+        /// Configures `MPLL_CLK` before `main`, as `configure_mpll_clk` does. See
+        /// `ClockTree::unlocked`.
+        #[inline(always)]
+        pub(crate) fn mpll_clk_early_init(clocks: &mut ClockTree, config: MpllClkConfig) {
+            clocks.mpll_clk = Some(config);
+            MPLL_CLK_FREQ_CACHE.store(config.value(), ::core::sync::atomic::Ordering::Release);
+            configure_mpll_clk_early_impl(clocks, config);
+        }
+        #[cfg(code_in_psram)]
+        /// Requests `MPLL_CLK` before `main`, as `request_mpll_clk` does. See
+        /// `ClockTree::unlocked`.
+        #[inline(always)]
+        pub(crate) fn request_mpll_clk_early(clocks: &mut ClockTree) {
+            let first = clocks.mpll_clk_refcount == 0;
+            clocks.mpll_clk_refcount = clocks.mpll_clk_refcount.saturating_add(1);
+            if first {
+                enable_mpll_clk_early_impl(clocks);
+            }
         }
         pub fn request_rc_fast_clk(clocks: &mut ClockTree) {
             trace!("Requesting RC_FAST_CLK");
@@ -5905,6 +5956,43 @@ macro_rules! define_clock_tree_types {
             }
             pub fn function_clock_source_frequency(source: PsramFunctionClockConfig) -> u32 {
                 Self::function_clock_config_frequency(source)
+            }
+            #[cfg(code_in_psram)]
+            /// Selects `XTAL_CLK` for `PSRAM_FUNCTION_CLOCK` and requests `PSRAM_FUNCTION_CLOCK`
+            /// before `main`, as `configure_function_clock` and `request_function_clock` do. See
+            /// `ClockTree::unlocked`.
+            #[inline(always)]
+            pub(crate) fn function_clock_early_init_xtal(self, clocks: &mut ClockTree) {
+                clocks.psram_function_clock[self as usize] = Some(PsramFunctionClockConfig::Xtal);
+                PSRAM_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .store(40000000, ::core::sync::atomic::Ordering::Release);
+                self.configure_function_clock_early_impl(clocks, PsramFunctionClockConfig::Xtal);
+                let first = clocks.psram_function_clock_refcount[self as usize] == 0;
+                clocks.psram_function_clock_refcount[self as usize] =
+                    clocks.psram_function_clock_refcount[self as usize].saturating_add(1);
+                if first {
+                    self.enable_function_clock_early_impl(clocks);
+                }
+            }
+            #[cfg(code_in_psram)]
+            /// Selects `MPLL_CLK` for `PSRAM_FUNCTION_CLOCK` and requests `PSRAM_FUNCTION_CLOCK`
+            /// before `main`, as `configure_function_clock` and `request_function_clock` do. See
+            /// `ClockTree::unlocked`.
+            #[inline(always)]
+            pub(crate) fn function_clock_early_init_mpll(self, clocks: &mut ClockTree) {
+                clocks.psram_function_clock[self as usize] = Some(PsramFunctionClockConfig::Mpll);
+                PSRAM_FUNCTION_CLOCK_FREQ_CACHE[self as usize].store(
+                    MPLL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+                self.configure_function_clock_early_impl(clocks, PsramFunctionClockConfig::Mpll);
+                let first = clocks.psram_function_clock_refcount[self as usize] == 0;
+                clocks.psram_function_clock_refcount[self as usize] =
+                    clocks.psram_function_clock_refcount[self as usize].saturating_add(1);
+                if first {
+                    request_mpll_clk_early(clocks);
+                    self.enable_function_clock_early_impl(clocks);
+                }
             }
         }
         /// Clock tree configuration.

@@ -24,9 +24,12 @@ name with them:
   size check. It defines `ESP_HAL_INSTRUCTION_CACHE_SIZE`, `ESP_HAL_DATA_CACHE_SIZE` and
   `ESP_HAL_L2_CACHE_SIZE` (bytes of RAM used as cache) and, on the ESP32,
   `ESP_HAL_BT_RESERVED_DRAM`.
+  It also defines `ESP_HAL_CODE_IN_PSRAM`, 1 when `.text` and `.rodata` run from PSRAM.
 - `esp_hal_rwtext.x` / `esp_hal_rwdata.x`: input sections that esp-hal's configuration places in
   RAM. They contain input section descriptions only.
 - `esp_hal_rwtext_sections.x`: output sections in `RWTEXT` that esp-hal defines.
+  With code in PSRAM, it also places `.init` and `.hal_main` in `BOOT_FLASH`, and `.abort` in
+  `RWTEXT`.
 - `esp_hal_rwtext_radio.x` / `esp_hal_text_radio.x`: input sections of the Espressif radio blobs
   that go in RAM and in flash. They contain input section descriptions only.
 

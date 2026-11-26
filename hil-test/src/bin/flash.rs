@@ -3,6 +3,9 @@
 //! Assumes a certain (i.e. default) partition table layout.
 //% CHIP_FILTER: flash_driver_supported
 //% FEATURES: unstable
+//% FEATURES(code_in_flash):
+//% CHIP_FILTER(code_in_psram): flash_driver_supported && psram_supports_code_in_psram
+//% ENV(code_in_psram): ESP_HAL_CONFIG_CODE_IN_PSRAM=true
 //% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "--cfg=__test_flash" ]
 //% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "--cfg=__test_flash" ]
 //% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = ["-Z", "stack-protector=all"]

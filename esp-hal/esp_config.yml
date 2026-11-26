@@ -233,7 +233,7 @@ options:
       does not encrypt PSRAM yet."
     default:
       - value: false
-    active: "false"
+    active: "psram_supports_code_in_psram"
 
   - name: clear-crypto-secrets
     description: "Clear secret material (keys, exponents, intermediate results) from

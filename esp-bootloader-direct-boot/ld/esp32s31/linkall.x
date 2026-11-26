@@ -1,6 +1,8 @@
 INCLUDE "esp_hal_config.x"
 INCLUDE "direct_boot_memory.x"
 
+ASSERT(ESP_HAL_CODE_IN_PSRAM == 0, "esp-bootloader-direct-boot does not support the code-in-psram option of esp-hal")
+
 /* esp-hal region aliases */
 REGION_ALIAS("ROTEXT", ROM);
 REGION_ALIAS("RODATA", ROM);

@@ -5,6 +5,9 @@
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 // Just below 512 KiB, so that only the second-level rounding of TLSF needs the next size class.
 //% ENV(tlsf): ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION=524256
+// This configuration runs the tests with the heap in the PSRAM after the code.
+//% CHIP_FILTER(code_in_psram): psram_supports_code_in_psram
+//% ENV(code_in_psram): ESP_HAL_CONFIG_CODE_IN_PSRAM=true
 // The default 64KB leaves nothing to reclaim, see the dcache_reclaimed tests below.
 //% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
 //% FEATURES: unstable esp-alloc/nightly
@@ -35,7 +38,15 @@ mod tests {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
         hil_test::init_logger!(p);
-        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+        let psram = esp_hal::psram::Psram::new(p.PSRAM, Default::default());
+        // With code in PSRAM, the code takes the start of PSRAM, and the heap gets the rest.
+        let heap = psram.raw_parts().1;
+        if cfg!(code_in_psram) {
+            assert!(psram.size() > heap);
+        } else {
+            assert_eq!(psram.size(), heap);
+        }
+        esp_alloc::psram_allocator!(&psram);
     }
 
     // alloc::vec::Vec tests

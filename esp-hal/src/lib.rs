@@ -180,7 +180,13 @@ fn main() -> ! {
 //! With `-Z stack-protector`, the code of these operations is instrumented too. If it detects
 //! stack corruption while the caches are suspended, the panic handler cannot run, because it lives
 //! in flash, and the chip locks up instead of reporting the corruption.
-//!
+#![cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "",
+    doc = "The `code-in-psram` option needs this level in every build, because its start-up runs",
+    doc = "in every firmware. The build stops at `opt-level` 0 or 1."
+)]
+#![doc = ""]
 //! ## Don't use `core::mem::forget`
 //!
 //! You should never use `core::mem::forget` on any type defined in [esp crates].

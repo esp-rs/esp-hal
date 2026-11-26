@@ -1,14 +1,15 @@
-//! The ESP32-S31 retime calls some functions here with the caches suspended. They are
-//! `inline(always)` for it, and must not panic or log.
+//! With `code-in-psram`, the start-up calls functions here before the code is in PSRAM. The
+//! ESP32-S31 retime calls some functions here with the caches suspended. Both sets are
+//! `inline(always)`, and must not panic or log.
 
 use crate::{
-    clock::ll::PsramInstance,
     pac::{generic::Reg, iomux_mspi_pin::psram_d_pin0::PSRAM_D_PIN0_SPEC},
     peripherals::{IOMUX_MSPI_PIN, MEMSPI2, MEMSPI3},
-    psram::{EXTMEM_ORIGIN, PsramTimingParams},
+    psram::PsramTimingParams,
 };
 
 /// Detect PSRAM size by reading mode register MR2 via MSPI1.
+#[cfg(not(code_in_psram))]
 pub(super) fn psram_detect_size(speed_params: &PsramTimingParams) -> usize {
     try_psram_detect_size(speed_params).unwrap_or_else(|mr2| {
         // unknown -> EV Board default
@@ -20,6 +21,7 @@ pub(super) fn psram_detect_size(speed_params: &PsramTimingParams) -> usize {
 /// Reads the PSRAM size from mode register MR2 via MSPI1.
 ///
 /// Returns `Err` with MR2 when its density field is not one of the known sizes.
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn try_psram_detect_size(speed_params: &PsramTimingParams) -> Result<usize, u8> {
     let (mr2, _mr3) = psram_mr_read(speed_params, MR_ADDR_MR2_MR3);
     match mr2 & 0x7 {
@@ -32,6 +34,7 @@ pub(super) fn try_psram_detect_size(speed_params: &PsramTimingParams) -> Result<
     }
 }
 
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn write_psram_mmu_entry(entry_id: u32, page: u16) {
     MEMSPI2::regs()
         .mmu_item_index()
@@ -55,6 +58,7 @@ pub(super) fn write_psram_mmu_entry(entry_id: u32, page: u16) {
 ///   - bit  10    : `SOC_MMU_ACCESS_PSRAM` (selects PSRAM vs flash)
 ///   - bit  11    : `SOC_MMU_PSRAM_VALID`
 ///   - bit  12    : `SOC_MMU_PSRAM_SENSITIVE` (set only when cache encryption is on)
+#[cfg(not(code_in_psram))]
 pub(super) fn mmu_map_psram(size: usize) {
     const MMU_PAGE_SIZE: usize = property!("mmu.page_size");
 
@@ -70,7 +74,7 @@ pub(super) fn mmu_map_psram(size: usize) {
     }
 
     // Invalidate the newly mapped PSRAM window.
-    unsafe { crate::soc::cache_invalidate_addr(EXTMEM_ORIGIN as u32, size as u32) };
+    unsafe { crate::soc::cache_invalidate_addr(crate::psram::EXTMEM_ORIGIN as u32, size as u32) };
 }
 
 /// Configures PSRAM_MSPI0 (AXI cache) for (OCT or HEX)/DDR access.
@@ -142,8 +146,9 @@ pub(super) fn configure_psram_mspi(timing: &PsramTimingParams, is_hex: bool) {
 }
 
 /// Sets bus-clock divider for both PSRAM_MSPI0 and PSRAM_MSPI1.
+#[cfg(not(code_in_psram))]
 pub(super) fn set_bus_clock(clock: u32) -> bool {
-    let source_mhz = PsramInstance::Psram.function_clock_frequency() / 1_000_000;
+    let source_mhz = crate::clock::ll::PsramInstance::Psram.function_clock_frequency() / 1_000_000;
     let set = set_bus_clock_from(source_mhz, clock);
     if !set {
         error!(
@@ -285,6 +290,7 @@ pub(crate) mod low_speed {
 }
 
 /// Enables DLL timing calibration for both controllers.
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn enable_dll() {
     MEMSPI2::regs()
         .timing_cali()
@@ -298,7 +304,9 @@ pub(super) fn enable_dll() {
 ///
 /// Mirrors IDF `mspi_timing_ll_pin_drv_set(2)` +
 /// `mspi_timing_ll_enable_dqs(true)`.
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn psram_pad_init(_is_hex: bool) {
+    #[cfg_attr(code_in_psram, inline(always))]
     fn init_pin_drv(reg: &Reg<PSRAM_D_PIN0_SPEC>) {
         reg.modify(|_, w| unsafe { w.drv().bits(2) });
     }
@@ -345,6 +353,7 @@ pub(super) fn psram_pad_init(_is_hex: bool) {
 /// Sets PSRAM CS timing on the AXI controller's SMEM_AC register.
 /// SMEM_CS_SETUP=1, SMEM_CS_HOLD=1, setup_time=N-1,
 /// hold_time=N-1, hold_delay=N-1, split_trans_en=1.
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn set_cs_timing() {
     /// CS timing constants (matches IDF AP_OCT_PSRAM_CS_*). Independent of
     /// `SpiRamFreq` -- IDF uses the same values across all speed branches.
@@ -424,6 +433,7 @@ pub(super) fn retime_mr_registers(old: &PsramTimingParams, new: &PsramTimingPara
 /// MR0: drive_str[1:0], read_latency[4:2], lt[5]
 /// MR4: wr_latency[7:5]
 /// MR8: bl[1:0], bt[2], rbx[3], x16[6].
+#[cfg_attr(code_in_psram, inline(always))]
 pub(super) fn init_mr_registers(timing: &PsramTimingParams, is_hex: bool) {
     // Read+modify+write MR0 (preserve MR1 high byte).
     let (mut mr0, mr1) = psram_mr_read(timing, MR_ADDR_MR0_MR1);

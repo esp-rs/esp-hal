@@ -40,7 +40,9 @@ the MPLL then moves to the timing for the new rate. For about 2 ms the other cor
 core's interrupts are masked. During the change, the other core must not request, release or
 configure a clock in a critical section or an interrupt handler, for example by creating or dropping
 a driver: it would wait for the clock tree lock and never park. Ethernet and SDMMC set fixed
-dividers from the MPLL rate and do not follow a change.
+dividers from the MPLL rate and do not follow a change. With `code-in-psram`, PSRAM runs from the
+MPLL at 400 MHz from start-up, so 500 MHz in `ClockConfig::mpll_clk` is such a change in
+`esp_hal::init`.
 "#
 )]
 //! ## Examples

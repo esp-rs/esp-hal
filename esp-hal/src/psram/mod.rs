@@ -102,6 +102,14 @@ pub(crate) fn psram_range() -> Range<usize> {
     if end < start { 0..0 } else { start..end }
 }
 
+/// Returns whether PSRAM holds anything that must survive a sleep: the heap, or with code in
+/// PSRAM the code, even when the heap is empty.
+#[allow(unused, reason = "only the sleep code of some chips calls it")]
+#[inline(always)]
+pub(crate) fn in_use() -> bool {
+    cfg!(code_in_psram) || !psram_range().is_empty()
+}
+
 /// # Safety
 ///
 /// Must only be called once.
@@ -134,6 +142,11 @@ pub(crate) fn adopt_started_psram() {
 
 impl Psram {
     /// Initializes PSRAM.
+    #[cfg_attr(
+        psram_supports_code_in_psram,
+        doc = "\n\nWith `code-in-psram`, PSRAM is already started before `esp_hal::init`. `new`",
+        doc = "logs a warning if `config` is not the default, and PSRAM does not change."
+    )]
     pub fn new(
         peri: PSRAM<'static>,
         #[cfg_attr(code_in_psram, allow(unused_mut))] mut config: PsramConfig,
@@ -167,6 +180,11 @@ impl Psram {
 
     /// Returns the size of PSRAM in bytes: the detected size, or the size that the configuration
     /// sets. Returns 0 if PSRAM did not start.
+    #[cfg_attr(
+        psram_supports_code_in_psram,
+        doc = "\n\nWith `code-in-psram`, the range from [`Self::raw_parts`] is smaller, because",
+        doc = "the start-up uses the beginning of PSRAM for the code."
+    )]
     #[instability::unstable]
     pub fn size(&self) -> usize {
         cfg_select! {
