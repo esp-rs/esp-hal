@@ -1043,7 +1043,7 @@ mod tests {
                 "reception ended before the stop"
             );
         }
-        let count = reception.stop();
+        let count = reception.stop().unwrap();
         tx_loop.stop().unwrap();
 
         assert!(count >= 3);
@@ -1064,6 +1064,47 @@ mod tests {
         );
     }
 
+    // Stopping a reception whose buffer filled up reports the error.
+    #[test]
+    fn rmt_live_rx_stop_buffer_too_small(mut ctx: Context) {
+        let conf = LoopbackConfig {
+            write_stop_code: false,
+            end_marker: EndMarkerConfig::None,
+            ..Default::default()
+        };
+        let pattern = generate_tx_data(&conf);
+        let mut tx_data = vec![PulseCode::new(Level::Low, 1500, Level::Low, 1500)];
+        tx_data.extend_from_slice(&pattern);
+
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config()).unwrap();
+        let (rx_pin, tx_pin) = pins(&mut ctx.pin);
+        let mut tx = rmt
+            .tx_channel(tx_1!(), conf.tx_config())
+            .unwrap()
+            .with_pin(tx_pin);
+        let mut rx = rmt
+            .rx_channel(rx_1!(), conf.rx_config())
+            .unwrap()
+            .with_pin(rx_pin);
+
+        let mut rx_data = vec![PulseCode::end_marker(); 3];
+        let tx_loop = tx.transmit_loop(&tx_data, LoopMode::Infinite).unwrap();
+
+        let mut reception = rx.start_receive(&mut rx_data);
+        while reception.received().len() < 3 {
+            assert!(
+                reception.poll().is_none(),
+                "reception ended before the stop"
+            );
+        }
+        // A few more codes arrive, but the frame does not end yet.
+        Delay::new().delay_millis(2);
+        let result = reception.stop();
+        tx_loop.stop().unwrap();
+
+        assert_eq!(result, Err(RxError::BufferTooSmall));
+    }
+
     // Stopping or dropping a reception that has not received an edge returns at once, and the
     // channel works afterwards.
     #[test]
@@ -1081,7 +1122,7 @@ mod tests {
             .with_pin(rx_pin);
 
         let mut rx_data = vec![PulseCode::end_marker(); conf.tx_len];
-        assert_eq!(rx.start_receive(&mut rx_data).stop(), 0);
+        assert_eq!(rx.start_receive(&mut rx_data).stop(), Ok(0));
         drop(rx.start_receive(&mut rx_data));
 
         let tx_data = generate_tx_data(&conf);

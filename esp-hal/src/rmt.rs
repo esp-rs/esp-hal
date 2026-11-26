@@ -1784,18 +1784,29 @@ impl RxReception<'_> {
     /// The reception stops immediately, before the idle threshold. The codes that the hardware
     /// completed before this call are copied into the buffer. The buffer contains an end marker
     /// only if the reception ended before this call.
+    ///
+    /// # Errors
+    ///
+    /// [`RxError::BufferTooSmall`] if the buffer filled up before this call, or
+    /// [`RxError::Overrun`] if the reception ended with an overrun before this call.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     #[instability::unstable]
-    pub fn stop(mut self) -> usize {
+    pub fn stop(mut self) -> Result<usize, RxError> {
         let reception = &mut self.reception;
-        if reception.guard.is_active() && reception.poll(true).is_none() {
+        if reception.guard.is_active() {
+            if let Some(result) = reception.poll(true) {
+                return result;
+            }
             let raw = reception.raw;
             raw.stop_rx(true);
             raw.update();
             raw.unlisten_rx_interrupt(EnumSet::all());
             reception.guard.set_completed();
         }
-        reception.reader.total
+        match reception.reader.state {
+            ReaderState::Error(err) => Err(err),
+            _ => Ok(reception.reader.total),
+        }
     }
 }
 
