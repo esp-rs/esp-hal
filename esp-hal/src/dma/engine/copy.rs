@@ -332,6 +332,14 @@ impl RxRegisterAccess for CopyDmaRxChannel<'_> {
     #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, _value: bool) {}
 
+    fn last_dscr_address(&self) -> usize {
+        self.regs()
+            .in_eof_des_addr()
+            .read()
+            .in_suc_eof_des_addr()
+            .bits() as usize
+    }
+
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         None
     }

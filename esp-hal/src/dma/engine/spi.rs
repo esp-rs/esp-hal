@@ -379,6 +379,14 @@ impl RxRegisterAccess for SpiDmaRxChannel<'_> {
             .modify(|_, w| w.mem_trans_en().bit(en));
     }
 
+    fn last_dscr_address(&self) -> usize {
+        self.regs()
+            .in_suc_eof_des_addr()
+            .read()
+            .dma_in_suc_eof_des_addr()
+            .bits() as usize
+    }
+
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         Some(self.0.info().peripheral_interrupt)
     }

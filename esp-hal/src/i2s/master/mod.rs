@@ -502,7 +502,9 @@ where
 {
     /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
-        self.completed || self.i2s_rx.i2s.info().is_rx_done()
+        self.completed
+            || self.i2s_rx.i2s.info().is_rx_done()
+            || self.i2s_rx.rx_channel.has_eof_on_last_descriptor()
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
@@ -547,10 +549,8 @@ where
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     pub async fn wait_async(mut self) -> (Result<(), DmaError>, I2sRx<'d, Async>, Buf::Final) {
         if !self.completed {
-            // we treat DescriptorEmpty as rx transfer is done
-            if let Err(err) = DmaRxFuture::new_with_config(
+            if let Err(err) = DmaRxFuture::new_until_end_of_chain(
                 &mut self.i2s_rx.rx_channel,
-                enum_set!(DmaRxInterrupt::DescriptorEmpty),
                 enum_set!(DmaRxInterrupt::ErrorEof | DmaRxInterrupt::DescriptorError),
             )
             .await
@@ -576,10 +576,8 @@ where
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     pub async fn wait_for_done_async(&mut self) -> Result<(), DmaError> {
         if !self.completed {
-            // we treat DescriptorEmpty as rx transfer is done
-            DmaRxFuture::new_with_config(
+            DmaRxFuture::new_until_end_of_chain(
                 &mut self.i2s_rx.rx_channel,
-                enum_set!(DmaRxInterrupt::DescriptorEmpty),
                 enum_set!(DmaRxInterrupt::ErrorEof | DmaRxInterrupt::DescriptorError),
             )
             .await?;

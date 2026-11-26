@@ -62,7 +62,14 @@ mod tests {
     use esp_hal::{
         Async,
         delay::Delay,
-        dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, DmaTxStreamBuf, aligned::InternalMemory},
+        dma::{
+            BurstConfig,
+            DmaDescriptor,
+            DmaRxBuf,
+            DmaTxBuf,
+            DmaTxStreamBuf,
+            aligned::InternalMemory,
+        },
         dma_rx_stream_buffer,
         dma_tx_stream_buffer,
         gpio::{AnyPin, NoPin, Pin},
@@ -86,6 +93,19 @@ mod tests {
     }
 
     const BUFFER_SIZE: usize = 2000;
+
+    // Internal burst makes the 8000 B read buffers 4092 B descriptors. On chips with a 12-bit
+    // `rx_eof_num`, the I2S raises its EOF about 4 KB into the read, so in the last descriptor.
+    const RX_BURST_CONFIGS: [BurstConfig; 2] = [
+        BurstConfig::DEFAULT,
+        cfg_select! {
+            dma_can_access_psram => BurstConfig {
+                external_memory: esp_hal::dma::ExternalBurstConfig::DEFAULT,
+                internal_memory: esp_hal::dma::InternalBurstConfig::Enabled,
+            },
+            _ => BurstConfig::Enabled,
+        },
+    ];
 
     #[derive(Clone)]
     struct SampleSource {
@@ -430,28 +450,32 @@ mod tests {
             .with_din(din)
             .build();
 
-        for _ in 0..10 {
-            let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
-            let (res, i2s_rx_back, done_rx) = rx_transfer.wait();
-            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        for burst in RX_BURST_CONFIGS {
+            rx_buffer.set_burst_config(burst).unwrap();
 
-            assert!(done_rx.number_of_received_bytes() != 0);
+            for _ in 0..10 {
+                let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+                let (res, i2s_rx_back, done_rx) = rx_transfer.wait();
+                assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
 
-            let mut tmp = [0u8; 8000];
-            let read = done_rx.read_received_data(&mut tmp);
+                assert!(done_rx.number_of_received_bytes() != 0);
 
-            // I2S RX might not fill each buffer for every descriptor - so the read byte count might
-            // be less than the buffer size, but it should never be zero if the transfer
-            // completed successfully.
-            assert!(read != 0);
+                let mut tmp = [0u8; 8000];
+                let read = done_rx.read_received_data(&mut tmp);
 
-            let l = read - read % 4;
-            for chunk in tmp[..l].chunks(4) {
-                assert_eq!(chunk, [1, 0, 254, 255]);
+                // I2S RX might not fill each buffer for every descriptor - so the read byte count
+                // might be less than the buffer size, but it should never be zero if the transfer
+                // completed successfully.
+                assert!(read != 0);
+
+                let l = read - read % 4;
+                for chunk in tmp[..l].chunks(4) {
+                    assert_eq!(chunk, [1, 0, 254, 255]);
+                }
+
+                i2s_rx = i2s_rx_back;
+                rx_buffer = done_rx;
             }
-
-            i2s_rx = i2s_rx_back;
-            rx_buffer = done_rx;
         }
     }
 
@@ -491,30 +515,34 @@ mod tests {
             .with_din(din)
             .build();
 
-        for _ in 0..10 {
-            let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
-            rx_transfer.wait_for_done_async().await.unwrap();
-            assert_eq!(rx_transfer.is_done(), true);
-            let (res, i2s_rx_back, done_rx) = rx_transfer.wait_async().await;
-            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        for burst in RX_BURST_CONFIGS {
+            rx_buffer.set_burst_config(burst).unwrap();
 
-            assert!(done_rx.number_of_received_bytes() != 0);
+            for _ in 0..10 {
+                let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+                rx_transfer.wait_for_done_async().await.unwrap();
+                assert_eq!(rx_transfer.is_done(), true);
+                let (res, i2s_rx_back, done_rx) = rx_transfer.wait_async().await;
+                assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
 
-            let mut tmp = [0u8; 8000];
-            let read = done_rx.read_received_data(&mut tmp);
+                assert!(done_rx.number_of_received_bytes() != 0);
 
-            // I2S RX might not fill each buffer for every descriptor - so the read byte count might
-            // be less than the buffer size, but it should never be zero if the transfer
-            // completed successfully.
-            assert!(read != 0);
+                let mut tmp = [0u8; 8000];
+                let read = done_rx.read_received_data(&mut tmp);
 
-            let l = read - read % 4;
-            for chunk in tmp[..l].chunks(4) {
-                assert_eq!(chunk, [1, 0, 254, 255]);
+                // I2S RX might not fill each buffer for every descriptor - so the read byte count
+                // might be less than the buffer size, but it should never be zero if the transfer
+                // completed successfully.
+                assert!(read != 0);
+
+                let l = read - read % 4;
+                for chunk in tmp[..l].chunks(4) {
+                    assert_eq!(chunk, [1, 0, 254, 255]);
+                }
+
+                i2s_rx = i2s_rx_back;
+                rx_buffer = done_rx;
             }
-
-            i2s_rx = i2s_rx_back;
-            rx_buffer = done_rx;
         }
     }
 

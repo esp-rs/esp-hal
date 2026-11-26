@@ -1152,6 +1152,22 @@ where
             .contains(DmaRxInterrupt::SuccessfulEof)
     }
 
+    /// Returns whether an EOF closed the last descriptor of the chain.
+    ///
+    /// The DMA stops and does not trigger [`DmaRxInterrupt::DescriptorEmpty`].
+    #[cfg_attr(not(i2s_driver_supported), expect(dead_code))]
+    pub(crate) fn has_eof_on_last_descriptor(&self) -> bool {
+        self.is_done() && self.last_eof_descriptor_ends_chain()
+    }
+
+    /// Must only be called after an EOF of the current transfer.
+    fn last_eof_descriptor_ends_chain(&self) -> bool {
+        let descriptor = self.rx_impl.last_dscr_address() as *const DmaDescriptor;
+        // SAFETY: after an EOF of the current transfer, the DMA has stored the address of one of
+        // the transfer's descriptors, which stay alive until the transfer ends.
+        unsafe { (*descriptor).next.is_null() }
+    }
+
     pub(crate) fn clear_interrupts(&self) {
         self.rx_impl.clear_all();
     }
@@ -1643,6 +1659,7 @@ pub(crate) mod asynch {
         pub(crate) rx: &'a mut ChannelRx<Async, CH>,
         success_interrupts: EnumSet<DmaRxInterrupt>,
         failure_interrupts: EnumSet<DmaRxInterrupt>,
+        eof_on_last_descriptor: bool,
         _wake_lock: WakeLock,
     }
 
@@ -1659,6 +1676,7 @@ pub(crate) mod asynch {
                         | DmaRxInterrupt::DescriptorEmpty
                         | DmaRxInterrupt::ErrorEof
                 ),
+                eof_on_last_descriptor: false,
                 _wake_lock: WakeLock::new(),
             }
         }
@@ -1673,8 +1691,43 @@ pub(crate) mod asynch {
                 rx,
                 success_interrupts,
                 failure_interrupts,
+                eof_on_last_descriptor: false,
                 _wake_lock: WakeLock::new(),
             }
+        }
+
+        /// Creates a future that completes on [`DmaRxInterrupt::DescriptorEmpty`], or when an
+        /// EOF closes the last descriptor.
+        #[cfg_attr(not(i2s_driver_supported), expect(unused))]
+        pub fn new_until_end_of_chain(
+            rx: &'a mut ChannelRx<Async, CH>,
+            failure_interrupts: EnumSet<DmaRxInterrupt>,
+        ) -> Self {
+            Self {
+                rx,
+                success_interrupts: enum_set!(DmaRxInterrupt::DescriptorEmpty),
+                failure_interrupts,
+                eof_on_last_descriptor: true,
+                _wake_lock: WakeLock::new(),
+            }
+        }
+
+        fn listened_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
+            let mut interrupts = self.success_interrupts | self.failure_interrupts;
+            if self.eof_on_last_descriptor {
+                interrupts |= DmaRxInterrupt::SuccessfulEof;
+            }
+            interrupts
+        }
+
+        fn has_eof_on_last_descriptor(&self, interrupts: EnumSet<DmaRxInterrupt>) -> bool {
+            if !self.eof_on_last_descriptor || !interrupts.contains(DmaRxInterrupt::SuccessfulEof) {
+                return false;
+            }
+            // Clear the EOF before reading its descriptor address: a later EOF raises the
+            // interrupt again instead of being lost.
+            self.rx.clear_in(DmaRxInterrupt::SuccessfulEof);
+            self.rx.last_eof_descriptor_ends_chain()
         }
     }
 
@@ -1691,7 +1744,9 @@ pub(crate) mod asynch {
             let interrupts = self.rx.pending_in_interrupts();
             let result = if !interrupts.is_disjoint(self.failure_interrupts) {
                 Err(DmaError::DescriptorError)
-            } else if !interrupts.is_disjoint(self.success_interrupts) {
+            } else if !interrupts.is_disjoint(self.success_interrupts)
+                || self.has_eof_on_last_descriptor(interrupts)
+            {
                 Ok(())
             } else {
                 // The interrupt may become pending before we register the waker and start
@@ -1699,8 +1754,7 @@ pub(crate) mod asynch {
                 // constraint we have is that the waker must be registered before we start
                 // listening.
                 self.rx.waker().register(cx.waker());
-                self.rx
-                    .listen_in(self.success_interrupts | self.failure_interrupts);
+                self.rx.listen_in(self.listened_interrupts());
 
                 return Poll::Pending;
             };
@@ -1716,8 +1770,7 @@ pub(crate) mod asynch {
         CH: DmaRxChannel,
     {
         fn drop(&mut self) {
-            self.rx
-                .unlisten_in(self.success_interrupts | self.failure_interrupts);
+            self.rx.unlisten_in(self.listened_interrupts());
         }
     }
 

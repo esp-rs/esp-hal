@@ -376,6 +376,14 @@ impl RxRegisterAccess for CryptoDmaRxChannel<'_> {
         self.regs().conf().modify(|_, w| w.mem_trans_en().bit(en));
     }
 
+    fn last_dscr_address(&self) -> usize {
+        self.regs()
+            .in_suc_eof_des_addr()
+            .read()
+            .in_suc_eof_des_addr()
+            .bits() as usize
+    }
+
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         // We don't know if the channel is used by AES or SHA, so interrupt handler
         // setup is the responsibility of the peripheral driver.
