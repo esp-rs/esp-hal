@@ -30,6 +30,15 @@
 //! You will see the `gpio_interrupt` example gets booted from OTA1 ("Loaded app
 //! from partition at offset 0x210000")
 //!
+//! Application rollback is separate from switching the active slot. It
+//! requires a second-stage bootloader built with
+//! `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`. ESP-IDF leaves that option
+//! disabled, and the bootloader `espflash` writes follows that default.
+//!
+//! This example sets the image state to `New`, then to `Valid`. The
+//! application must do that when the option is enabled. With the default
+//! bootloader, an image that crashes stays selected and starts again.
+//!
 //! See <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html>
 
 //% CHIP_FILTER: flash_driver_supported
@@ -79,15 +88,12 @@ fn main() -> ! {
         esp_bootloader_esp_idf::partitions::AppPartitionSubType::Factory
     };
 
-    log::info!(
-        "current image state {:?} (only relevant if the bootloader was built with auto-rollback support)",
-        ota.current_ota_state()
-    );
+    log::info!("current image state {:?}", ota.current_ota_state());
     log::info!("currently selected partition {:?}", current);
 
-    // Mark the current slot as VALID - this is only needed if the bootloader was
-    // built with auto-rollback support. The default pre-compiled bootloader in
-    // espflash is NOT.
+    // Confirm the running image. The bootloader requires this when it is
+    // built with `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`. The bootloader
+    // `espflash` writes leaves that option disabled. See `OtaImageState`.
     if let Ok(state) = ota.current_ota_state() {
         if state == esp_bootloader_esp_idf::ota::OtaImageState::New
             || state == esp_bootloader_esp_idf::ota::OtaImageState::PendingVerify
@@ -140,6 +146,9 @@ fn main() -> ! {
                     .unwrap();
             }
 
+            // `New` is the state a rollback-enabled bootloader changes to
+            // `PendingVerify` on the next boot. The default `espflash`
+            // bootloader leaves `New` unchanged.
             log::info!("Changing OTA slot and setting the state to NEW");
 
             ota.activate_next_partition().unwrap();
