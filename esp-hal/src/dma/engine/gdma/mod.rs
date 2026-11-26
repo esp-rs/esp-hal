@@ -30,13 +30,22 @@ for_each_dma_engine! {
     };
 }
 
-/// Configuration of an AHB GDMA channel.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct AhbGdmaConfig {
-    /// The channel priority.
-    priority: AhbPriority,
+for_each_dma_engine! {
+    (
+        "AHB_GDMA",
+        internal = [$($internal:ident),+],
+        external = [$($external:ident),*],
+        external_default = $external_default:ident
+    ) => {
+        declare_engine_config!(
+            /// Configuration of an AHB GDMA channel.
+            AhbGdmaConfig, "an AHB GDMA channel", Ahb,
+            internal = [$($internal),+],
+            external = [$($external),*],
+            external_default = $external_default,
+            priority = AhbPriority
+        );
+    };
 }
 
 /// Immutable per-channel metadata owned by each `DMA_CH*` singleton.

@@ -7,19 +7,27 @@ mod tests {
     // using defmt's non-const assert. Doing so would result in a compile error.
     #[allow(unused_imports)]
     use defmt::*;
-    use esp_hal::dma::{
-        DmaBufError,
-        DmaDescriptor,
-        DmaRxBuffer,
-        DmaRxStreamBuf,
-        DmaRxStreamBufView,
-        DmaTxBuffer,
-        DmaTxStreamBuf,
-        DmaTxStreamBufView,
-        Owner,
-        aligned::DmaAlignedMut,
-        descriptor_count,
+    use esp_hal::{
+        dma::{
+            BurstSize,
+            DmaAlignmentError,
+            DmaBufError,
+            DmaDescriptor,
+            DmaRxBuf,
+            DmaRxBuffer,
+            DmaRxStreamBuf,
+            DmaRxStreamBufView,
+            DmaTxBuffer,
+            DmaTxStreamBuf,
+            DmaTxStreamBufView,
+            Owner,
+            max_compatible_chunk_size,
+        },
+        dma_rx_buffer,
+        dma_tx_buffer,
     };
+
+    use crate::dma_pool::dma_buffer;
 
     fn chunk_size(descriptors: &[DmaDescriptor]) -> usize {
         descriptors[0].size()
@@ -40,37 +48,12 @@ mod tests {
         descriptors[descriptor_index].set_owner(Owner::Cpu);
     }
 
-    const POOL_SIZE: usize = 16384;
-    const POOL_DESCRIPTORS: usize = 6;
-
-    // Each test runs after a reset and calls this once.
-    fn dma_buffers(
-        size: usize,
-        chunk_size: usize,
-    ) -> (
-        DmaAlignedMut<'static, [u8]>,
-        DmaAlignedMut<'static, [DmaDescriptor]>,
-    ) {
-        let (buffer, descriptors) =
-            esp_hal::dma_buffers_impl!(POOL_SIZE, POOL_SIZE.div_ceil(POOL_DESCRIPTORS));
-        let buffer = &mut buffer.into_inner()[..size];
-        let descriptors = &mut descriptors.into_inner()[..descriptor_count(size, chunk_size)];
-        // SAFETY: Both slices start at DMA-aligned statics. The bytes after each slice stay
-        // unused.
-        unsafe {
-            (
-                DmaAlignedMut::new_unchecked(buffer),
-                DmaAlignedMut::new_unchecked(descriptors),
-            )
-        }
-    }
-
     fn with_rx_stream_buffer(f: impl FnOnce(DmaRxStreamBuf)) {
-        let (buffer, descriptors) = dma_buffers(BUFFER_SIZE, CHUNK_SIZE);
+        let (buffer, descriptors) = dma_buffer(BUFFER_SIZE, CHUNK_SIZE);
         f(DmaRxStreamBuf::new(descriptors, buffer).unwrap())
     }
     fn with_tx_stream_buffer(f: impl FnOnce(DmaTxStreamBuf)) {
-        let (buffer, descriptors) = dma_buffers(BUFFER_SIZE, CHUNK_SIZE);
+        let (buffer, descriptors) = dma_buffer(BUFFER_SIZE, CHUNK_SIZE);
         f(DmaTxStreamBuf::new(descriptors, buffer).unwrap())
     }
 
@@ -137,6 +120,48 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn test_dma_rx_buf_min_burst_set_length_keeps_alignment() {
+        let (buffer, descriptors) =
+            dma_buffer(256, max_compatible_chunk_size(Some(BurstSize::Size64)));
+        let mut buf = DmaRxBuf::new_with_min_burst(descriptors, buffer, BurstSize::Size64).unwrap();
+        buf.set_length(200);
+    }
+
+    #[test]
+    fn test_dma_buf_macro_burst_alignment() {
+        // A buffer from the macro is aligned to the minimum burst, and guarantees it.
+        let mut rx_buf = dma_rx_buffer!(256, burst = Size64).unwrap();
+        core::assert!((rx_buf.as_slice().as_ptr() as usize).is_multiple_of(64));
+        core::assert_eq!(rx_buf.prepare().burst_align, Some(BurstSize::Size64));
+
+        // Transmit buffers need no aligned length.
+        let mut tx_buf = dma_tx_buffer!(200, burst = Size64).unwrap();
+        core::assert!((tx_buf.as_slice().as_ptr() as usize).is_multiple_of(64));
+        core::assert_eq!(tx_buf.prepare().burst_align, Some(BurstSize::Size64));
+    }
+
+    #[test]
+    fn test_dma_rx_buf_min_burst_rejects_unaligned_length() {
+        let (buffer, descriptors) =
+            dma_buffer(200, max_compatible_chunk_size(Some(BurstSize::Size64)));
+        match DmaRxBuf::new_with_min_burst(descriptors, buffer, BurstSize::Size64) {
+            Err(DmaBufError::InvalidAlignment(DmaAlignmentError::Size)) => (),
+            _ => core::panic!("expected InvalidAlignment(Size)"),
+        }
+    }
+
+    // Without a minimum burst, a receive length that is not a multiple of 4 guarantees no burst
+    // alignment. The ESP32 needs word-aligned receive buffers.
+    #[test]
+    #[cfg(not(esp32))]
+    fn test_dma_rx_buf_unaligned_length_has_no_burst_alignment() {
+        let (buffer, descriptors) = dma_buffer(255, max_compatible_chunk_size(None));
+        let mut rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
+        core::assert_eq!(rx_buf.prepare().burst_align, None);
+    }
+
+    #[test]
     fn test_dma_rx_stream_buf_new() {
         with_rx_stream_buffer(|buf| {
             let (descriptors, buffer) = buf.split();
@@ -158,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_dma_rx_stream_buf_insufficient_descriptors_require_at_least_4() {
-        let (buffer, descriptors) = dma_buffers(BUFFER_SIZE, CHUNK_SIZE * 2);
+        let (buffer, descriptors) = dma_buffer(BUFFER_SIZE, CHUNK_SIZE * 2);
         match DmaRxStreamBuf::new(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
             _ => core::panic!("expected InsufficientDescriptors"),
@@ -179,7 +204,7 @@ mod tests {
     #[test]
     fn test_dma_rx_stream_buf_descriptors_cover_the_buffer() {
         // Chunk size 7 yields 6 descriptors. 40 is not a multiple of 6.
-        let (buffer, descriptors) = dma_buffers(40, 7);
+        let (buffer, descriptors) = dma_buffer(40, 7);
         hil_test::assert_eq!(descriptors.len(), 6);
         assert_descriptors_cover_the_buffer(DmaRxStreamBuf::new(descriptors, buffer).unwrap());
     }
@@ -188,14 +213,14 @@ mod tests {
     fn test_dma_rx_stream_buf_descriptors_stay_within_4095_bytes() {
         // Chunk size 4091 yields 4 descriptors. At a 4-byte alignment, putting the
         // excess on the last descriptor makes that descriptor 4100 bytes.
-        let (buffer, descriptors) = dma_buffers(16364, 4091);
+        let (buffer, descriptors) = dma_buffer(16364, 4091);
         hil_test::assert_eq!(descriptors.len(), 4);
         assert_descriptors_cover_the_buffer(DmaRxStreamBuf::new(descriptors, buffer).unwrap());
     }
 
     #[test]
     fn test_dma_tx_stream_buf_insufficient_descriptors_require_at_least_4() {
-        let (buffer, descriptors) = dma_buffers(BUFFER_SIZE, CHUNK_SIZE * 2);
+        let (buffer, descriptors) = dma_buffer(BUFFER_SIZE, CHUNK_SIZE * 2);
         match DmaTxStreamBuf::new(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
             _ => core::panic!("expected InsufficientDescriptors"),

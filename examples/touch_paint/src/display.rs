@@ -10,7 +10,7 @@ use allocator_api2::alloc::Allocator;
 use esp_alloc::DmaCompatibleExternalMemory;
 use esp_hal::{
     Blocking,
-    dma::{BurstConfig, DmaDescriptor, DmaTxBuffer, Owner, Preparation, aligned::DmaAlignedMut},
+    dma::{DmaDescriptor, DmaTxBuffer, Owner, Preparation, aligned::DmaAlignedMut},
     gpio::Level,
     lcd_cam::{
         LcdCam,
@@ -189,7 +189,7 @@ unsafe impl DmaTxBuffer for CircularFrameBuf {
         Preparation {
             start: self.descriptors.as_mut_ptr(),
             accesses_psram: true,
-            burst_transfer: BurstConfig::default(),
+            burst_align: None,
             check_owner: Some(false),
             auto_write_back: false,
         }

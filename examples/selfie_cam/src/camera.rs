@@ -24,7 +24,7 @@ use embassy_time::{Duration, Timer};
 use esp_hal::{
     Async,
     Blocking,
-    dma::{BurstConfig, DmaDescriptor, DmaRxBuffer, Owner, Preparation, aligned::DmaAlignedMut},
+    dma::{DmaDescriptor, DmaRxBuffer, Owner, Preparation, aligned::DmaAlignedMut},
     handler,
     i2c::master::{Error, I2c},
     interrupt::{self, Priority},
@@ -399,7 +399,7 @@ unsafe impl DmaRxBuffer for FirstChain {
         Preparation {
             start: self.0,
             accesses_psram: true,
-            burst_transfer: BurstConfig::default(),
+            burst_align: None,
             check_owner: Some(false),
             auto_write_back: true,
         }

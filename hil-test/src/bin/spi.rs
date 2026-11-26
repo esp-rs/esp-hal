@@ -220,15 +220,24 @@ fn count_edges(buf: &[u8]) -> i16 {
 #[cfg(all(dma_can_access_psram, feature = "unstable"))]
 extern crate alloc;
 
-// $align must be a compile-time const: dma_descriptors_impl! emits a static
-// whose array size depends on it, and statics cannot depend on runtime values.
+// $burst names a burst size: dma_descriptors_impl! emits a static whose array size depends on
+// it, and statics cannot depend on runtime values.
 #[cfg(all(dma_can_access_psram, feature = "unstable"))]
 macro_rules! run_loopback_test {
-    ($spi:expr, $align:expr) => {{
+    ($spi:expr, $burst:ident) => {{
         use defmt::error;
+        use esp_hal::{
+            dma::BurstSize,
+            spi::master::{DmaConfig, DmaExternalBurst},
+        };
         const PSRAM_DMA_BUFFER_SIZE: usize = 8192;
-        let layout =
-            core::alloc::Layout::from_size_align(PSRAM_DMA_BUFFER_SIZE, $align as usize).unwrap();
+        const ALIGN: usize = BurstSize::$burst.bytes();
+
+        let mut spi = $spi;
+        spi.apply_dma_config(&DmaConfig::default().with_external_burst(DmaExternalBurst::$burst))
+            .unwrap();
+
+        let layout = core::alloc::Layout::from_size_align(PSRAM_DMA_BUFFER_SIZE, ALIGN).unwrap();
         let buffer = unsafe {
             let ptr = alloc::alloc::alloc(layout);
             if ptr.is_null() {
@@ -238,16 +247,16 @@ macro_rules! run_loopback_test {
             core::slice::from_raw_parts_mut(ptr, PSRAM_DMA_BUFFER_SIZE)
         };
 
-        const DMA_CHUNK_SIZE: usize = 4096 - $align as usize;
+        const DMA_CHUNK_SIZE: usize = 4096 - ALIGN;
         let descriptors = esp_hal::dma_descriptors_impl!(PSRAM_DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
-        let dma_tx_buf = esp_hal::dma::DmaTxBuf::new_with_config(
+        let dma_tx_buf = esp_hal::dma::DmaTxBuf::new_with_min_burst(
             descriptors,
             unsafe { esp_hal::dma::aligned::DmaAlignedMut::new_unchecked(buffer) },
-            $align,
+            BurstSize::$burst,
         )
         .unwrap();
         let dma_rx_buf = esp_hal::dma_rx_buffer!(PSRAM_DMA_BUFFER_SIZE).unwrap();
-        psram_run_loopback($spi, dma_tx_buf, dma_rx_buf);
+        psram_run_loopback(spi, dma_tx_buf, dma_rx_buf);
     }};
 }
 
@@ -289,12 +298,14 @@ fn psram_run_loopback(
     }
 }
 
-// $align must be a compile-time const for the same reason as run_loopback_test!.
+// $burst names a burst size for the same reason as run_loopback_test!.
 #[cfg(all(esp32s3, feature = "unstable"))]
 macro_rules! dma_alloc_tx_buffer {
-    ($size:expr, $align:expr) => {{
+    ($size:expr, $burst:ident) => {{
         use defmt::error;
-        let layout = core::alloc::Layout::from_size_align($size, $align as usize).unwrap();
+        use esp_hal::dma::BurstSize;
+        const ALIGN: usize = BurstSize::$burst.bytes();
+        let layout = core::alloc::Layout::from_size_align($size, ALIGN).unwrap();
         let buffer = unsafe {
             let ptr = alloc::alloc::alloc(layout);
             if ptr.is_null() {
@@ -304,12 +315,12 @@ macro_rules! dma_alloc_tx_buffer {
             core::slice::from_raw_parts_mut(ptr, $size)
         };
 
-        const DMA_CHUNK_SIZE: usize = 4096 - $align as usize;
+        const DMA_CHUNK_SIZE: usize = 4096 - ALIGN;
         let descriptors = esp_hal::dma_descriptors_impl!($size, DMA_CHUNK_SIZE);
-        esp_hal::dma::DmaTxBuf::new_with_config(
+        esp_hal::dma::DmaTxBuf::new_with_min_burst(
             descriptors,
             unsafe { esp_hal::dma::aligned::DmaAlignedMut::new_unchecked(buffer) },
-            $align,
+            BurstSize::$burst,
         )
     }};
 }
@@ -1416,13 +1427,11 @@ mod tests {
 mod psram_dma {
     use esp_hal::{
         dma::{
-            BurstConfig,
+            BurstSize,
             CHUNK_SIZE,
             DmaRxBuffer,
             DmaRxStreamBuf,
             DmaTxStreamBuf,
-            ExternalBurstConfig,
-            InternalBurstConfig,
             aligned::DmaAlignedMut,
         },
         spi::master::{Spi, SpiDma},
@@ -1464,18 +1473,19 @@ mod psram_dma {
 
     #[test]
     fn test_psram_tx_loopback_size16(ctx: Context) {
-        run_loopback_test!(ctx.spi, ExternalBurstConfig::Size16);
+        run_loopback_test!(ctx.spi, Size16);
     }
 
     #[test]
+    #[cfg(not(dma_psram_max_burst = "16"))]
     fn test_psram_tx_loopback_size32(ctx: Context) {
-        run_loopback_test!(ctx.spi, ExternalBurstConfig::Size32);
+        run_loopback_test!(ctx.spi, Size32);
     }
 
     #[test]
-    #[cfg(not(esp32s2))]
+    #[cfg(not(any(dma_psram_max_burst = "16", dma_psram_max_burst = "32")))]
     fn test_psram_tx_loopback_size64(ctx: Context) {
-        run_loopback_test!(ctx.spi, ExternalBurstConfig::Size64);
+        run_loopback_test!(ctx.spi, Size64);
     }
 
     #[test]
@@ -1494,15 +1504,11 @@ mod psram_dma {
             core::slice::from_raw_parts_mut(ptr.add(OFFSET), SIZE)
         };
 
+        // The default PSRAM burst is 32 B, or the PSRAM limit if that is smaller.
         let descriptors = esp_hal::dma_descriptors_impl!(SIZE, CHUNK_SIZE);
-        let dma_tx_buf = esp_hal::dma::DmaTxBuf::new_with_config(
-            descriptors,
-            unsafe { esp_hal::dma::aligned::DmaAlignedMut::new_unchecked(buffer) },
-            BurstConfig {
-                external_memory: ExternalBurstConfig::DEFAULT,
-                internal_memory: InternalBurstConfig::Enabled,
-            },
-        )
+        let dma_tx_buf = esp_hal::dma::DmaTxBuf::new(descriptors, unsafe {
+            esp_hal::dma::aligned::DmaAlignedMut::new_unchecked(buffer)
+        })
         .unwrap();
         let dma_rx_buf = esp_hal::dma_rx_buffer!(SIZE).unwrap();
         psram_run_loopback(ctx.spi, dma_tx_buf, dma_rx_buf);
@@ -1610,9 +1616,7 @@ mod psram_dma {
         for descriptor in descriptors.iter() {
             assert_eq!(descriptor.buffer.cast_const(), next);
             assert!(
-                descriptor
-                    .size()
-                    .is_multiple_of(ExternalBurstConfig::DEFAULT as usize),
+                descriptor.size().is_multiple_of(BurstSize::Size16.bytes()),
                 "size {}",
                 descriptor.size()
             );
@@ -1629,7 +1633,6 @@ mod psram_dma {
 mod half_duplex_write_psram {
     use esp_hal::{
         Blocking,
-        dma::ExternalBurstConfig,
         dma_rx_buffer,
         gpio::{Flex, interconnect::InputSignal},
         pcnt::{channel::EdgeMode, unit::Unit},
@@ -1682,8 +1685,7 @@ mod half_duplex_write_psram {
     #[test]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
-        const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size32;
-        let mut dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT).unwrap();
+        let mut dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, Size32).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
@@ -1727,9 +1729,7 @@ mod half_duplex_write_psram {
     #[test]
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
-        const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size32;
-
-        let dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT).unwrap();
+        let dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, Size32).unwrap();
         let dma_rx_buf = dma_rx_buffer!(1).unwrap();
 
         let unit = ctx.pcnt_unit;

@@ -10,10 +10,11 @@ use crate::{
     Blocking,
     DriverMode,
     dma::{
-        BurstConfig,
+        BurstSize,
         Channel,
         ChannelRx,
         ChannelTx,
+        DmaAlignmentError,
         DmaChannel,
         DmaConfigError,
         DmaDescriptor,
@@ -210,9 +211,9 @@ where
         self,
         rx_descriptors: &'d mut [DmaDescriptor],
         tx_descriptors: &'d mut [DmaDescriptor],
-        config: BurstConfig,
+        min: Option<BurstSize>,
     ) -> Result<SimpleMem2Mem<'d, Blocking, E>, DmaError> {
-        SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors, config)
+        SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors, min)
     }
 }
 
@@ -561,7 +562,7 @@ where
     E: Mem2MemEngine,
 {
     state: State<'d, Dm, E>,
-    config: BurstConfig,
+    min: Option<BurstSize>,
 }
 
 enum State<'d, Dm: DriverMode, E: Mem2MemEngine> {
@@ -583,11 +584,15 @@ where
     E: Mem2MemEngine,
 {
     /// Creates a new [SimpleMem2Mem].
+    ///
+    /// With `min`, the transfers require buffers that are aligned to `min`, so that the buffers
+    /// do not limit a burst up to that size. Configure the burst with
+    /// [`Mem2Mem::apply_dma_config`].
     pub fn new(
         mem2mem: Mem2Mem<'d, Dm, E>,
         rx_descriptors: &'d mut [DmaDescriptor],
         tx_descriptors: &'d mut [DmaDescriptor],
-        config: BurstConfig,
+        min: Option<BurstSize>,
     ) -> Result<Self, DmaError> {
         if rx_descriptors.is_empty() || tx_descriptors.is_empty() {
             return Err(DmaError::OutOfDescriptors);
@@ -600,7 +605,7 @@ where
 
         Ok(Self {
             state: State::Idle(mem2mem, rx_descriptors, tx_descriptors),
-            config,
+            min,
         })
     }
 }
@@ -627,6 +632,18 @@ where
         let rx_buffer = DmaAlignedMut::new(unsafe {
             core::slice::from_raw_parts_mut(rx_buffer.as_mut_ptr(), rx_buffer.len())
         })?;
+
+        if let Some(min) = self.min {
+            let min = min.bytes();
+            if !(rx_buffer.as_ptr() as usize).is_multiple_of(min)
+                || !(tx_buffer.as_ptr() as usize).is_multiple_of(min)
+            {
+                return Err(DmaError::InvalidAlignment(DmaAlignmentError::Address));
+            }
+            if !rx_buffer.len().is_multiple_of(min) {
+                return Err(DmaError::InvalidAlignment(DmaAlignmentError::Size));
+            }
+        }
 
         let State::Idle(mem2mem, mut rx_descriptors, mut tx_descriptors) =
             core::mem::replace(&mut self.state, State::InUse)
@@ -657,7 +674,10 @@ where
         // and every other chip.
 
         let dma_rx_buf = unwrap!(
-            DmaRxBuf::new_with_config(rx_descriptors, rx_buffer, self.config),
+            match self.min {
+                Some(min) => DmaRxBuf::new_with_min_burst(rx_descriptors, rx_buffer, min),
+                None => DmaRxBuf::new(rx_descriptors, rx_buffer),
+            },
             "There's no way to get the descriptors back yet"
         );
 
@@ -675,7 +695,10 @@ where
         };
 
         let dma_tx_buf = unwrap!(
-            DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, self.config),
+            match self.min {
+                Some(min) => DmaTxBuf::new_with_min_burst(tx_descriptors, tx_buffer, min),
+                None => DmaTxBuf::new(tx_descriptors, tx_buffer),
+            },
             "There's no way to get the descriptors back yet"
         );
 

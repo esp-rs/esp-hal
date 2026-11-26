@@ -27,7 +27,6 @@ use crate::{
         write_words,
     },
     dma::{
-        BurstConfig,
         DmaDescriptor,
         DmaRxBuffer,
         DmaTxBuffer,
@@ -505,7 +504,7 @@ impl<'a> Chain<'a> {
         }
         NoBuffer(Preparation {
             start: self.descriptors.as_mut_ptr(),
-            burst_transfer: BurstConfig::DEFAULT,
+            burst_align: None,
             check_owner: None,
             auto_write_back: rx,
             #[cfg(dma_can_access_psram)]

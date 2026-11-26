@@ -41,10 +41,23 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        self.ch()
-            .out_conf0()
-            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
+        self.ch().out_conf0().modify(|_, w| {
+            w.out_data_burst_en()
+                .bit(internal >= BurstSize::Size4 as u8)
+        });
+        cfg_select! {
+            dma_ext_mem_configurable_block_size => {
+                if psram {
+                    self.ch().out_conf1().modify(|_, w| unsafe {
+                        w.out_ext_mem_bk_size().bits(ext_mem_block_size(external))
+                    });
+                }
+            }
+            _ => {
+                let _ = (external, psram);
+            }
+        }
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
@@ -93,13 +106,6 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
         self.ch()
             .out_conf1()
             .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.ch()
-            .out_conf1()
-            .modify(|_, w| unsafe { w.out_ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]
@@ -276,6 +282,10 @@ impl AhbGdmaRxChannel<'_> {
 impl RegisterAccess for AhbGdmaRxChannel<'_> {
     type Config = AhbGdmaConfig;
 
+    // The TRMs' "Accessing Internal Memory" sections: receive bursts need word-aligned buffers.
+    // PSRAM receive buffers need the block alignment.
+    const NEEDS_ALIGNED_BURST: bool = true;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -288,10 +298,22 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
         self.ch()
             .in_conf0()
-            .modify(|_, w| w.in_data_burst_en().bit(burst_mode.is_burst_enabled()));
+            .modify(|_, w| w.in_data_burst_en().bit(internal >= BurstSize::Size4 as u8));
+        cfg_select! {
+            dma_ext_mem_configurable_block_size => {
+                if psram {
+                    self.ch().in_conf1().modify(|_, w| unsafe {
+                        w.in_ext_mem_bk_size().bits(ext_mem_block_size(external))
+                    });
+                }
+            }
+            _ => {
+                let _ = (external, psram);
+            }
+        }
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
@@ -338,13 +360,6 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
         self.ch()
             .in_conf1()
             .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.ch()
-            .in_conf1()
-            .modify(|_, w| unsafe { w.in_ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]

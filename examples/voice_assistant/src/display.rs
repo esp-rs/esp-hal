@@ -33,7 +33,6 @@ use esp_alloc::ExternalMemory;
 use esp_hal::{
     Blocking,
     dma::{
-        BurstConfig,
         DmaDescriptor,
         DmaTxBuffer,
         Owner,
@@ -315,7 +314,7 @@ unsafe impl DmaTxBuffer for BounceRing {
         Preparation {
             start: self.descriptors.as_mut_ptr(),
             accesses_psram: false,
-            burst_transfer: BurstConfig::default(),
+            burst_align: None,
             // The DMA never hands the descriptors back, so it must not check their owner.
             check_owner: Some(false),
             auto_write_back: false,

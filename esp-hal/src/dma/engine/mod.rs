@@ -2,7 +2,7 @@ use enumset::{EnumSet, EnumSetType};
 
 use crate::{
     asynch::AtomicWaker,
-    dma::{BurstConfig, DmaRxInterrupt, DmaTxInterrupt},
+    dma::{DmaConfigError, DmaRxInterrupt, DmaTxInterrupt},
     interrupt::InterruptHandler,
     peripherals::Interrupt,
     private::{Internal, Sealed},
@@ -34,6 +34,261 @@ macro_rules! priority_enum {
                 Self::Priority0
             }
         }
+    };
+}
+
+/// The configuration of a DMA engine, as the channel uses it.
+#[doc(hidden)]
+pub trait DmaEngineConfig: Copy + Default + crate::private::Sealed {
+    /// The log2 of the buffer alignment that the internal RAM burst needs.
+    fn internal_burst_log2(&self) -> u8;
+
+    /// The log2 of the buffer alignment that the PSRAM burst needs.
+    fn external_burst_log2(&self) -> u8;
+
+    /// Checks the conditions that the types cannot express.
+    fn validate(&self) -> Result<(), DmaConfigError>;
+}
+
+/// The discriminant of a burst type variant: the log2 of the buffer alignment that it needs.
+macro_rules! burst_log2 {
+    (Disabled) => {
+        0
+    };
+    (Enabled) => {
+        2
+    };
+    (Size4) => {
+        2
+    };
+    (Size8) => {
+        3
+    };
+    (Size16) => {
+        4
+    };
+    (Size32) => {
+        5
+    };
+    (Size64) => {
+        6
+    };
+    (Size128) => {
+        7
+    };
+}
+
+macro_rules! burst_doc {
+    (Disabled) => {
+        "Single transfers."
+    };
+    (Enabled) => {
+        "Burst transfers. A receive buffer needs 4-byte alignment to use them."
+    };
+    (Size4) => {
+        "Bursts of 4 bytes."
+    };
+    (Size8) => {
+        "Bursts of up to 8 bytes."
+    };
+    (Size16) => {
+        "Bursts of up to 16 bytes."
+    };
+    (Size32) => {
+        "Bursts of up to 32 bytes."
+    };
+    (Size64) => {
+        "Bursts of up to 64 bytes."
+    };
+    (Size128) => {
+        "Bursts of up to 128 bytes."
+    };
+}
+
+// Unused on chips with a configurable PSRAM block size.
+#[allow(unused_macros)]
+macro_rules! is_on_off {
+    (Disabled, Enabled) => {
+        true
+    };
+    ($($variant:ident),*) => {
+        false
+    };
+}
+
+macro_rules! burst_type {
+    ($(#[$attr:meta])* $name:ident, default = $default:ident, [$($variant:ident),+]) => {
+        $(#[$attr])*
+        ///
+        /// The variants are the bursts that the engine can use on this chip. Convert a value
+        /// into a [`BurstSize`](crate::dma::BurstSize) to create a buffer that does not limit
+        /// the burst.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[non_exhaustive]
+        #[repr(u8)]
+        pub enum $name {
+            $(
+                #[doc = burst_doc!($variant)]
+                $variant = burst_log2!($variant),
+            )+
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::$default
+            }
+        }
+
+        impl From<$name> for crate::dma::BurstSize {
+            fn from(burst: $name) -> Self {
+                crate::dma::BurstSize::from_log2(burst as u8)
+            }
+        }
+    };
+}
+
+/// Declares an engine configuration and the burst types of its fields.
+// Unused on chips whose only engine is the copy DMA.
+#[allow(unused_macros)]
+macro_rules! declare_engine_config {
+    (
+        $(#[$attr:meta])*
+        $config:ident, $engine:literal, $prefix:ident,
+        internal = [$first:ident $(, $internal:ident)*],
+        external = [],
+        external_default = $external_default:ident
+        $(, priority = $priority:ident)?
+    ) => {
+        paste::paste! {
+            burst_type!(
+                #[doc = concat!("Data burst of ", $engine, " for buffers in internal RAM.")]
+                [<$prefix InternalBurst>],
+                default = $first,
+                [$first $(, $internal)*]
+            );
+
+            $(#[$attr])*
+            #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            #[non_exhaustive]
+            pub struct $config {
+                /// The largest data burst for buffers in internal RAM.
+                internal_burst: [<$prefix InternalBurst>],
+
+                $(
+                    /// The channel priority.
+                    priority: $priority,
+                )?
+            }
+
+            impl crate::private::Sealed for $config {}
+
+            impl crate::dma::DmaEngineConfig for $config {
+                fn internal_burst_log2(&self) -> u8 {
+                    self.internal_burst as u8
+                }
+
+                fn external_burst_log2(&self) -> u8 {
+                    0
+                }
+
+                fn validate(&self) -> Result<(), crate::dma::DmaConfigError> {
+                    Ok(())
+                }
+            }
+        }
+    };
+    (
+        $(#[$attr:meta])*
+        $config:ident, $engine:literal, $prefix:ident,
+        internal = [$first:ident $(, $internal:ident)*],
+        external = [$($external:ident),+],
+        external_default = $external_default:ident
+        $(, priority = $priority:ident)?
+    ) => {
+        paste::paste! {
+            burst_type!(
+                #[doc = concat!("Data burst of ", $engine, " for buffers in internal RAM.")]
+                [<$prefix InternalBurst>],
+                default = $first,
+                [$first $(, $internal)*]
+            );
+
+            burst_type!(
+                #[doc = concat!("Data burst of ", $engine, " for buffers in PSRAM.")]
+                ///
+                /// The default is 32 bytes, or the largest size if the PSRAM accepts less. With flash
+                /// encryption enabled, the burst must be at least 16 bytes.
+                #[cfg_attr(
+                    esp32s2,
+                    doc = "",
+                    doc = "The ESP32-S2 PSRAM accepts only 16-byte bursts. With 64-byte bursts \
+                        the DMA moves only the first 32 bytes of each block, and with 32-byte \
+                        bursts a full-duplex SPI transfer with both buffers in PSRAM can lose \
+                        data."
+                )]
+                [<$prefix ExternalBurst>],
+                default = $external_default,
+                [$($external),+]
+            );
+
+            $(#[$attr])*
+            #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            #[non_exhaustive]
+            pub struct $config {
+                /// The largest data burst for buffers in internal RAM.
+                internal_burst: [<$prefix InternalBurst>],
+
+                /// The largest data burst for buffers in PSRAM.
+                external_burst: [<$prefix ExternalBurst>],
+
+                $(
+                    /// The channel priority.
+                    priority: $priority,
+                )?
+            }
+
+            impl crate::private::Sealed for $config {}
+
+            impl crate::dma::DmaEngineConfig for $config {
+                fn internal_burst_log2(&self) -> u8 {
+                    self.internal_burst as u8
+                }
+
+                fn external_burst_log2(&self) -> u8 {
+                    self.external_burst as u8
+                }
+
+                fn validate(&self) -> Result<(), crate::dma::DmaConfigError> {
+                    if self.external_burst_log2() < burst_log2!(Size16)
+                        && crate::efuse::flash_encryption()
+                    {
+                        return Err(crate::dma::DmaConfigError::UnsupportedBurstSize);
+                    }
+                    Ok(())
+                }
+            }
+        }
+    };
+}
+
+for_each_dma_engine! {
+    (burst $( (
+        $engine:tt,
+        internal = [$($internal:ident),+],
+        external = [$($external:ident),*],
+        external_default = $external_default:ident
+    ) ),*) => {
+        /// The largest burst on this chip that needs an aligned buffer, in bytes.
+        ///
+        /// On/off data burst bits need 4-byte aligned receive buffers. A configurable PSRAM block
+        /// size needs receive buffers aligned to the block.
+        pub(crate) const MAX_ALIGNED_BURST: usize = cfg_select! {
+            dma_ext_mem_configurable_block_size => property!("dma.psram_max_burst"),
+            _ => if false $(|| is_on_off!($($internal),+))* { 4 } else { 1 },
+        };
     };
 }
 
@@ -87,32 +342,48 @@ macro_rules! engine_config {
 }
 pub(crate) use engine_config;
 
-/// Declares the `DmaConfig` alias of a driver module, and `DmaPriority` on engines with
-/// priority registers.
+/// Declares the `DmaConfig` alias of a driver module and the aliases of its field types.
 macro_rules! driver_dma_config {
-    (@config $engine:tt) => {
+    (@config $engine:tt, $prefix:ident) => {
         /// The DMA configuration type of this driver's DMA engine.
         ///
         /// `apply_dma_config` applies this configuration.
         #[instability::unstable]
         pub type DmaConfig = $crate::dma::engine_config!($engine);
+
+        paste::paste! {
+            /// The internal RAM burst type of this driver's DMA engine.
+            #[instability::unstable]
+            pub type DmaInternalBurst = $crate::dma::[<$prefix InternalBurst>];
+
+            /// The PSRAM burst type of this driver's DMA engine.
+            #[cfg(dma_can_access_psram)]
+            #[instability::unstable]
+            pub type DmaExternalBurst = $crate::dma::[<$prefix ExternalBurst>];
+        }
     };
     ("AHB_GDMA") => {
-        $crate::dma::driver_dma_config!(@config "AHB_GDMA");
+        $crate::dma::driver_dma_config!(@config "AHB_GDMA", Ahb);
 
         /// The channel priority type of this driver's DMA engine.
         #[instability::unstable]
         pub type DmaPriority = $crate::dma::AhbPriority;
     };
     ("AXI_GDMA") => {
-        $crate::dma::driver_dma_config!(@config "AXI_GDMA");
+        $crate::dma::driver_dma_config!(@config "AXI_GDMA", Axi);
 
         /// The channel priority type of this driver's DMA engine.
         #[instability::unstable]
         pub type DmaPriority = $crate::dma::AxiPriority;
     };
-    ($engine:tt) => {
-        $crate::dma::driver_dma_config!(@config $engine);
+    ("SPI_DMA") => {
+        $crate::dma::driver_dma_config!(@config "SPI_DMA", SpiDma);
+    };
+    ("I2S_DMA") => {
+        $crate::dma::driver_dma_config!(@config "I2S_DMA", I2sDma);
+    };
+    ("CRYPTO_DMA") => {
+        $crate::dma::driver_dma_config!(@config "CRYPTO_DMA", CryptoDma);
     };
 }
 pub(crate) use driver_dma_config;
@@ -150,7 +421,11 @@ for_each_peripheral! {
 #[doc(hidden)]
 pub trait RegisterAccess: Sealed {
     /// The configuration type of the channel's DMA engine.
-    type Config: Copy + Default;
+    type Config: DmaEngineConfig;
+
+    /// Whether a data burst needs a buffer that is aligned to it. A transfer then lowers the
+    /// burst to the alignment that the buffer guarantees.
+    const NEEDS_ALIGNED_BURST: bool = false;
 
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard>;
@@ -158,9 +433,12 @@ pub trait RegisterAccess: Sealed {
     /// Resets the state machine of the channel and FIFO pointer.
     fn reset(&self);
 
-    /// Enables or disables INCR burst transfer for channel reading
-    /// accessing data in internal RAM.
-    fn set_burst_mode(&self, burst_mode: BurstConfig);
+    /// Sets the data burst of a transfer.
+    ///
+    /// `internal` and `external` are the log2 of the buffer alignment that the bursts for
+    /// internal RAM and for PSRAM need (the discriminants of the engine burst types, or lower).
+    /// `psram` is true when the transfer accesses PSRAM.
+    fn set_burst(&self, internal: u8, external: u8, psram: bool);
 
     /// Enables or disables burst transfer for channel reading
     /// descriptors in internal RAM.
@@ -187,9 +465,6 @@ pub trait RegisterAccess: Sealed {
     /// Configures the bit to enable checking the owner attribute of the
     /// descriptor.
     fn set_check_owner(&self, check_owner: Option<bool>);
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize);
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool;
@@ -265,7 +540,7 @@ pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {}
 /// A description of a DMA Channel.
 pub trait DmaChannel: Sized + crate::private::Sealed {
     /// The configuration type of the channel's DMA engine.
-    type Config: Copy + Default;
+    type Config: DmaEngineConfig;
 
     /// A description of the RX half of a DMA Channel.
     type Rx: DmaRxChannel<Config = Self::Config> + From<Self>;

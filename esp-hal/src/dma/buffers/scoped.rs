@@ -10,7 +10,8 @@ use super::*;
 pub(crate) struct ScopedDmaTxBuf<'a> {
     descriptors: DescriptorSet<'a>,
     buffer: DmaAlignedMut<'a, [u8]>,
-    burst: BurstConfig,
+    alignment: BurstAlignment,
+    burst_align: Option<BurstSize>,
 }
 
 impl<'a> ScopedDmaTxBuf<'a> {
@@ -19,10 +20,19 @@ impl<'a> ScopedDmaTxBuf<'a> {
         descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
         buffer: DmaAlignedMut<'a, [u8]>,
     ) -> Result<Self, DmaBufError> {
-        Self::new_with_config(descriptors, buffer, BurstConfig::default())
+        Self::new_with_alignment(descriptors, buffer, BurstAlignment::NATURAL)
     }
 
-    /// Creates a new [ScopedDmaTxBuf] with a caller-chosen minimum alignment.
+    /// Creates a new [ScopedDmaTxBuf] that guarantees an alignment of at least `min`.
+    pub fn new_with_min_burst(
+        descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
+        buffer: DmaAlignedMut<'a, [u8]>,
+        min: BurstSize,
+    ) -> Result<Self, DmaBufError> {
+        Self::new_with_alignment(descriptors, buffer, BurstAlignment(Some(min)))
+    }
+
+    /// Creates a new [ScopedDmaTxBuf] with the given alignment rules.
     ///
     /// There must be enough descriptors for the provided buffer.
     /// Depending on alignment requirements, each descriptor can handle at most
@@ -30,43 +40,26 @@ impl<'a> ScopedDmaTxBuf<'a> {
     ///
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
-    pub fn new_with_config(
+    fn new_with_alignment(
         descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
         buffer: DmaAlignedMut<'a, [u8]>,
-        config: impl Into<BurstConfig>,
+        alignment: BurstAlignment,
     ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
             descriptors: DescriptorSet::new(descriptors)?,
             buffer,
-            burst: BurstConfig::default(),
+            alignment,
+            burst_align: None,
         };
 
         let capacity = buf.capacity();
-        buf.configure(config, capacity)?;
+        buf.set_length_fallible(capacity)?;
+
+        let max_chunk_size = alignment.max_chunk_size_for(&buf.buffer, TransferDirection::Out);
+        buf.descriptors
+            .link_with_buffer(&mut buf.buffer, max_chunk_size)?;
 
         Ok(buf)
-    }
-
-    fn configure(
-        &mut self,
-        burst: impl Into<BurstConfig>,
-        length: usize,
-    ) -> Result<(), DmaBufError> {
-        let burst = burst.into();
-        self.set_length_fallible(length, burst)?;
-
-        let max_chunk_size = burst.max_chunk_size_for(&self.buffer, TransferDirection::Out);
-        self.descriptors
-            .link_with_buffer(&mut self.buffer, max_chunk_size)?;
-
-        self.burst = burst;
-        Ok(())
-    }
-
-    /// Configures the DMA to use burst transfers to access this buffer.
-    pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
-        let len = self.len();
-        self.configure(burst, len)
     }
 
     /// Consumes the buf, returning the descriptors and buffer.
@@ -88,13 +81,16 @@ impl<'a> ScopedDmaTxBuf<'a> {
             .sum::<usize>()
     }
 
-    fn set_length_fallible(&mut self, len: usize, burst: BurstConfig) -> Result<(), DmaBufError> {
+    fn set_length_fallible(&mut self, len: usize) -> Result<(), DmaBufError> {
         if len > self.capacity() {
             return Err(DmaBufError::BufferTooSmall);
         }
-        burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::Out)?;
+        let alignment = self.alignment;
+        let data = &self.buffer[..len];
+        alignment.ensure_buffer_compatible(data, TransferDirection::Out)?;
+        self.burst_align = alignment.guarantee(data.as_ptr() as usize, len, TransferDirection::Out);
 
-        let max_chunk_size = burst.max_chunk_size_for(&self.buffer, TransferDirection::Out);
+        let max_chunk_size = alignment.max_chunk_size_for(&self.buffer, TransferDirection::Out);
         self.descriptors.set_tx_length(len, max_chunk_size)?;
 
         // This only needs to be done once (after every significant length change) as
@@ -114,7 +110,7 @@ impl<'a> ScopedDmaTxBuf<'a> {
     /// The number of bytes in data must be less than or equal to the buffer
     /// size.
     pub fn set_length(&mut self, len: usize) {
-        unwrap!(self.set_length_fallible(len, self.burst))
+        unwrap!(self.set_length_fallible(len))
     }
 
     /// Fills the TX buffer with the bytes provided in `data` and reset the
@@ -156,7 +152,7 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
             start: self.descriptors.head(),
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
-            burst_transfer: self.burst,
+            burst_align: self.burst_align,
             check_owner: None,
             auto_write_back: false,
         }
@@ -181,7 +177,8 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
 pub(crate) struct ScopedDmaRxBuf<'a> {
     descriptors: DescriptorSet<'a>,
     buffer: DmaAlignedMut<'a, [u8]>,
-    burst: BurstConfig,
+    alignment: BurstAlignment,
+    burst_align: Option<BurstSize>,
 }
 
 impl<'a> ScopedDmaRxBuf<'a> {
@@ -190,10 +187,19 @@ impl<'a> ScopedDmaRxBuf<'a> {
         descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
         buffer: DmaAlignedMut<'a, [u8]>,
     ) -> Result<Self, DmaBufError> {
-        Self::new_with_config(descriptors, buffer, BurstConfig::default())
+        Self::new_with_alignment(descriptors, buffer, BurstAlignment::NATURAL)
     }
 
-    /// Creates a new [ScopedDmaRxBuf] from some descriptors and a buffer.
+    /// Creates a new [ScopedDmaRxBuf] that guarantees an alignment of at least `min`.
+    pub fn new_with_min_burst(
+        descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
+        buffer: DmaAlignedMut<'a, [u8]>,
+        min: BurstSize,
+    ) -> Result<Self, DmaBufError> {
+        Self::new_with_alignment(descriptors, buffer, BurstAlignment(Some(min)))
+    }
+
+    /// Creates a new [ScopedDmaRxBuf] with the given alignment rules.
     ///
     /// There must be enough descriptors for the provided buffer.
     /// Depending on alignment requirements, each descriptor can handle at most
@@ -201,42 +207,26 @@ impl<'a> ScopedDmaRxBuf<'a> {
     ///
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
-    pub fn new_with_config(
+    fn new_with_alignment(
         descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
         buffer: DmaAlignedMut<'a, [u8]>,
-        config: impl Into<BurstConfig>,
+        alignment: BurstAlignment,
     ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
             descriptors: DescriptorSet::new(descriptors)?,
             buffer,
-            burst: BurstConfig::default(),
+            alignment,
+            burst_align: None,
         };
 
-        buf.configure(config, buf.capacity())?;
+        let capacity = buf.capacity();
+        buf.set_length_fallible(capacity)?;
+
+        let max_chunk_size = alignment.max_chunk_size_for(&buf.buffer, TransferDirection::In);
+        buf.descriptors
+            .link_with_buffer(&mut buf.buffer, max_chunk_size)?;
 
         Ok(buf)
-    }
-
-    fn configure(
-        &mut self,
-        burst: impl Into<BurstConfig>,
-        length: usize,
-    ) -> Result<(), DmaBufError> {
-        let burst = burst.into();
-        self.set_length_fallible(length, burst)?;
-
-        let max_chunk_size = burst.max_chunk_size_for(&self.buffer, TransferDirection::In);
-        self.descriptors
-            .link_with_buffer(&mut self.buffer, max_chunk_size)?;
-
-        self.burst = burst;
-        Ok(())
-    }
-
-    /// Configures the DMA to use burst transfers to access this buffer.
-    pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
-        let len = self.len();
-        self.configure(burst, len)
     }
 
     /// Consumes the buf, returning the descriptors and buffer.
@@ -259,16 +249,22 @@ impl<'a> ScopedDmaRxBuf<'a> {
             .sum::<usize>()
     }
 
-    fn set_length_fallible(&mut self, len: usize, burst: BurstConfig) -> Result<(), DmaBufError> {
+    fn set_length_fallible(&mut self, len: usize) -> Result<(), DmaBufError> {
         if len > self.capacity() {
             return Err(DmaBufError::BufferTooSmall);
         }
-        burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::In)?;
+        let alignment = self.alignment;
+        let data = &self.buffer[..len];
+        alignment.ensure_buffer_compatible(data, TransferDirection::In)?;
+        let burst_align = alignment.guarantee(data.as_ptr() as usize, len, TransferDirection::In);
 
         self.descriptors.set_rx_length(
             len,
-            burst.max_chunk_size_for(&self.buffer[..len], TransferDirection::In),
-        )
+            alignment.max_chunk_size_for(&self.buffer[..len], TransferDirection::In),
+        )?;
+        self.burst_align = burst_align;
+
+        Ok(())
     }
 
     /// Resets the descriptors to only receive `len` amount of bytes into this
@@ -277,7 +273,7 @@ impl<'a> ScopedDmaRxBuf<'a> {
     /// The number of bytes in data must be less than or equal to the buffer
     /// size.
     pub fn set_length(&mut self, len: usize) {
-        unwrap!(self.set_length_fallible(len, self.burst));
+        unwrap!(self.set_length_fallible(len));
     }
 
     /// Returns the entire underlying buffer as a slice that can be read.
@@ -378,7 +374,7 @@ unsafe impl<'a> DmaRxBuffer for ScopedDmaRxBuf<'a> {
             start: self.descriptors.head(),
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
-            burst_transfer: self.burst,
+            burst_align: self.burst_align,
             check_owner: None,
             auto_write_back: true,
         }

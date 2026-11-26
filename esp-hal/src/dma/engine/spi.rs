@@ -1,11 +1,13 @@
 use enumset::EnumSet;
 use portable_atomic::Ordering;
 
+#[cfg(dma_ext_mem_configurable_block_size)]
+use crate::dma::ext_mem_block_size;
 use crate::{
     RegisterToggle,
     asynch::AtomicWaker,
     dma::{
-        BurstConfig,
+        BurstSize,
         DmaChannel,
         DmaRxChannel,
         DmaRxInterrupt,
@@ -21,13 +23,25 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
-/// Configuration of an SPI DMA channel.
-///
-/// These channels have no priority registers.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct SpiDmaConfig {}
+for_each_dma_engine! {
+    (
+        "SPI_DMA",
+        internal = [$($internal:ident),+],
+        external = [$($external:ident),*],
+        external_default = $external_default:ident
+    ) => {
+        declare_engine_config!(
+            /// Configuration of an SPI DMA channel.
+            ///
+            /// These channels have no priority registers. Only transmit transfers use
+            /// `internal_burst`.
+            SpiDmaConfig, "an SPI DMA channel", SpiDma,
+            internal = [$($internal),+],
+            external = [$($external),*],
+            external_default = $external_default
+        );
+    };
+}
 
 /// Immutable per-channel metadata.
 #[doc(hidden)]
@@ -109,10 +123,23 @@ impl RegisterAccess for SpiDmaTxChannel<'_> {
         self.regs().dma_conf().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        self.regs()
-            .dma_conf()
-            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
+        self.regs().dma_conf().modify(|_, w| {
+            cfg_select! {
+                dma_ext_mem_configurable_block_size => {
+                    if psram {
+                        unsafe {
+                            w.ext_mem_bk_size().bits(ext_mem_block_size(external));
+                        }
+                    }
+                }
+                _ => {
+                    let _ = (external, psram);
+                }
+            }
+            w.out_data_burst_en()
+                .bit(internal >= BurstSize::Size4 as u8)
+        });
     }
 
     fn apply_config(&self, _config: &SpiDmaConfig) {}
@@ -151,13 +178,6 @@ impl RegisterAccess for SpiDmaTxChannel<'_> {
         if check_owner == Some(true) {
             panic!("SPI DMA does not support checking descriptor ownership");
         }
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
-        self.regs()
-            .dma_conf()
-            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]
@@ -293,6 +313,9 @@ impl InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannel<'_> {
 impl RegisterAccess for SpiDmaRxChannel<'_> {
     type Config = SpiDmaConfig;
 
+    // PSRAM receive buffers need the block alignment.
+    const NEEDS_ALIGNED_BURST: bool = true;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         cfg_select! {
@@ -314,7 +337,20 @@ impl RegisterAccess for SpiDmaRxChannel<'_> {
         self.regs().dma_conf().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst(&self, _internal: u8, external: u8, psram: bool) {
+        cfg_select! {
+            dma_ext_mem_configurable_block_size => {
+                if psram {
+                    self.regs().dma_conf().modify(|_, w| unsafe {
+                        w.ext_mem_bk_size().bits(ext_mem_block_size(external))
+                    });
+                }
+            }
+            _ => {
+                let _ = (external, psram);
+            }
+        }
+    }
 
     fn apply_config(&self, _config: &SpiDmaConfig) {}
 
@@ -352,13 +388,6 @@ impl RegisterAccess for SpiDmaRxChannel<'_> {
         if check_owner == Some(true) {
             panic!("SPI DMA does not support checking descriptor ownership");
         }
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
-        self.regs()
-            .dma_conf()
-            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]

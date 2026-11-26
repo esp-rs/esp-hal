@@ -5,9 +5,9 @@ use crate::{
     RegisterToggle,
     asynch::AtomicWaker,
     dma::{
-        BurstConfig,
         DmaChannel,
-        DmaExtMemBKSize,
+        DmaConfigError,
+        DmaEngineConfig,
         DmaRxChannel,
         DmaRxInterrupt,
         DmaTxChannel,
@@ -25,11 +25,27 @@ use crate::{
 
 /// Configuration of the ESP32-S2 copy DMA channel.
 ///
-/// This channel has no priority register.
+/// This channel has no options.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct CopyDmaConfig {}
+
+impl crate::private::Sealed for CopyDmaConfig {}
+
+impl DmaEngineConfig for CopyDmaConfig {
+    fn internal_burst_log2(&self) -> u8 {
+        0
+    }
+
+    fn external_burst_log2(&self) -> u8 {
+        0
+    }
+
+    fn validate(&self) -> Result<(), DmaConfigError> {
+        Ok(())
+    }
+}
 
 /// Immutable per-channel metadata.
 #[doc(hidden)]
@@ -101,7 +117,7 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         self.regs().conf().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst(&self, _internal: u8, _external: u8, _psram: bool) {}
 
     fn apply_config(&self, _config: &CopyDmaConfig) {}
 
@@ -135,11 +151,6 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Copy DMA does not support checking descriptor ownership");
         }
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
-        // not supported
     }
 
     #[cfg(dma_can_access_psram)]
@@ -277,7 +288,7 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         self.regs().conf().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst(&self, _internal: u8, _external: u8, _psram: bool) {}
 
     fn apply_config(&self, _config: &CopyDmaConfig) {}
 
@@ -311,11 +322,6 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Copy DMA does not support checking descriptor ownership");
         }
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
-        // not supported
     }
 
     #[cfg(dma_can_access_psram)]

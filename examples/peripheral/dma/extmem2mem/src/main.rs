@@ -12,7 +12,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{BurstConfig, ExternalBurstConfig, Mem2Mem},
+    dma::{BurstSize, Mem2Mem},
     dma_descriptors_chunk_size,
     main,
     time::Duration,
@@ -66,19 +66,10 @@ fn main() -> ! {
         _ => Mem2Mem::new(peripherals.DMA_CH0),
     };
 
+    // The DMA bursts up to 32 bytes from and to PSRAM by default. Buffers aligned to 32 bytes do
+    // not limit the burst.
     let mut mem2mem = mem2mem
-        .with_descriptors(
-            rx_descriptors,
-            tx_descriptors,
-            BurstConfig {
-                external_memory: cfg_select! {
-                    // ExternalBurstConfig::Size64 is not available on ESP32-S2.
-                    feature = "esp32s2" => ExternalBurstConfig::Size32,
-                    _ => ExternalBurstConfig::Size64,
-                },
-                internal_memory: Default::default(),
-            },
-        )
+        .with_descriptors(rx_descriptors, tx_descriptors, Some(BurstSize::Size32))
         .unwrap();
 
     for i in 0..core::mem::size_of_val(extram_buffer) {

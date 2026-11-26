@@ -38,6 +38,10 @@ mod delay_async;
 #[cfg(dma_driver_supported)]
 mod dma_macros;
 
+#[path = "misc_non_drivers/dma_pool.rs"]
+#[cfg(dma_driver_supported)]
+mod dma_pool;
+
 #[path = "misc_non_drivers/dma_buffers.rs"]
 #[cfg(dma_driver_supported)]
 mod dma_buffers;

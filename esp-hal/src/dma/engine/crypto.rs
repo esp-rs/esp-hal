@@ -5,9 +5,8 @@ use crate::{
     RegisterToggle,
     asynch::AtomicWaker,
     dma::{
-        BurstConfig,
+        BurstSize,
         DmaChannel,
-        DmaExtMemBKSize,
         DmaPeripheral,
         DmaRxChannel,
         DmaRxInterrupt,
@@ -17,19 +16,32 @@ use crate::{
         RegisterAccess,
         RxRegisterAccess,
         TxRegisterAccess,
+        ext_mem_block_size,
     },
     interrupt::InterruptHandler,
     peripherals::{DMA_CRYPTO, Interrupt},
     system::{Peripheral, PeripheralGuard},
 };
 
-/// Configuration of the ESP32-S2 crypto DMA channel.
-///
-/// This channel has no priority register.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct CryptoDmaConfig {}
+for_each_dma_engine! {
+    (
+        "CRYPTO_DMA",
+        internal = [$($internal:ident),+],
+        external = [$($external:ident),*],
+        external_default = $external_default:ident
+    ) => {
+        declare_engine_config!(
+            /// Configuration of the ESP32-S2 crypto DMA channel.
+            ///
+            /// This channel has no priority register. Only transmit transfers use
+            /// `internal_burst`.
+            CryptoDmaConfig, "the crypto DMA channel", CryptoDma,
+            internal = [$($internal),+],
+            external = [$($external),*],
+            external_default = $external_default
+        );
+    };
+}
 
 /// Immutable per-channel metadata.
 #[doc(hidden)]
@@ -99,10 +111,16 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
         });
     }
 
-    fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        self.regs()
-            .conf()
-            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
+        self.regs().conf().modify(|_, w| {
+            w.out_data_burst_en()
+                .bit(internal >= BurstSize::Size4 as u8)
+        });
+        if psram {
+            self.regs()
+                .conf1()
+                .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(ext_mem_block_size(external)) });
+        }
     }
 
     fn apply_config(&self, _config: &CryptoDmaConfig) {}
@@ -153,13 +171,6 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Crypto DMA does not support checking descriptor ownership");
         }
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.regs()
-            .conf1()
-            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]
@@ -288,6 +299,9 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
 impl RegisterAccess for CryptoDmaRxChannel<'_> {
     type Config = CryptoDmaConfig;
 
+    // PSRAM receive buffers need the block alignment.
+    const NEEDS_ALIGNED_BURST: bool = true;
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CryptoDma))
@@ -301,7 +315,13 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
         });
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst(&self, _internal: u8, external: u8, psram: bool) {
+        if psram {
+            self.regs()
+                .conf1()
+                .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(ext_mem_block_size(external)) });
+        }
+    }
 
     fn apply_config(&self, _config: &CryptoDmaConfig) {}
 
@@ -351,13 +371,6 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Crypto DMA does not support checking descriptor ownership");
         }
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.regs()
-            .conf1()
-            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]

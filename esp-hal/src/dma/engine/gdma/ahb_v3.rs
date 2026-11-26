@@ -10,6 +10,14 @@ cfg_select! {
     }
 }
 
+// `*_data_burst_mode_sel`: 0 single, 1 INCR4 (16 B), 2 INCR8 (32 B), 3 INCR16 (64 B).
+// The field selects the burst for internal memory and for PSRAM. There is no enable bit.
+const fn data_burst_mode(internal: u8, external: u8, psram: bool) -> u8 {
+    let burst = if psram { external } else { internal };
+    // The 8-byte step does not exist: 4 B is mode 0, 16 B is mode 1.
+    burst.saturating_sub(BurstSize::Size8 as u8)
+}
+
 impl AhbGdmaTxChannel<'_> {
     #[inline(always)]
     pub(super) fn ch(&self) -> &gdma_pac::ch::CH {
@@ -37,8 +45,11 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {
-        // Burst mode is always enabled
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
+        self.ch().out_conf0().modify(|_, w| unsafe {
+            w.out_data_burst_mode_sel()
+                .bits(data_burst_mode(internal, external, psram))
+        });
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
@@ -240,8 +251,11 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {
-        // Burst mode is always enabled
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
+        self.ch().in_conf0().modify(|_, w| unsafe {
+            w.in_data_burst_mode_sel()
+                .bits(data_burst_mode(internal, external, psram))
+        });
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
