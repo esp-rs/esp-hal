@@ -17,6 +17,12 @@ pub struct TrngSource<'d> {
 
 impl<'d> TrngSource<'d> {
     /// Enables the SAR ADC entropy source.
+    #[cfg_attr(
+        esp32,
+        doc = r"
+
+The entropy source also uses I2S0. Do not use I2S0 while the `TrngSource` is active."
+    )]
     // TODO: this is not final. A single ADC channel should be sufficient.
     #[instability::unstable]
     pub fn new(_rng: RNG<'d>, _adc: ADC1<'d>) -> Self {
