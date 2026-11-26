@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v1.2.3] - 2026-11-26
+
+### Fixed
+
+- ESP32-S3 binaries now link with the rustc 1.99 Xtensa toolchain. (#6943)
+- ESP32-P4, ESP32-S31: fixed configuring analog pins with numbers above GPIO32 (#6369)
+- ESP32-S31: Timer clock sources are now correctly configured (#6366)
+
 ## [v1.2.2] - 2026-09-18
 
 ### Changed
@@ -1912,4 +1920,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0-rc.0...esp-hal-v1.2.0
 [v1.2.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0...esp-hal-v1.2.1
 [v1.2.2]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.1...esp-hal-v1.2.2
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.2...HEAD
+[v1.2.3]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.2...esp-hal-v1.2.3
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.3...HEAD
