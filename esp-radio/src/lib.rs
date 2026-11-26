@@ -10,68 +10,50 @@
 //! device.
 //!
 //! ## Overview
-#![cfg_attr(
+#![doc = cfg_select! {
     all(
         wifi_driver_supported,
         bt_driver_supported,
         ieee802154_driver_supported
-    ),
-    doc = "esp-radio provides Wi-Fi, Bluetooth Low Energy (BLE), ESP-NOW, and IEEE 802.15.4 \
-           drivers for Espressif microcontrollers."
-)]
-#![cfg_attr(
-    all(
-        wifi_driver_supported,
-        bt_driver_supported,
-        not(ieee802154_driver_supported)
-    ),
-    doc = "esp-radio provides Wi-Fi, Bluetooth Low Energy (BLE), and ESP-NOW drivers for \
-           Espressif microcontrollers."
-)]
-#![cfg_attr(
-    all(
-        wifi_driver_supported,
-        not(bt_driver_supported),
-        not(ieee802154_driver_supported)
-    ),
-    doc = "esp-radio provides Wi-Fi and ESP-NOW drivers for Espressif microcontrollers."
-)]
-#![cfg_attr(
-    all(
-        not(wifi_driver_supported),
-        bt_driver_supported,
-        ieee802154_driver_supported
-    ),
-    doc = "esp-radio provides Bluetooth Low Energy (BLE) and IEEE 802.15.4 drivers for \
-           Espressif microcontrollers."
-)]
-#![cfg_attr(
-    all(
-        not(wifi_driver_supported),
-        bt_driver_supported,
-        not(ieee802154_driver_supported)
-    ),
-    doc = "esp-radio provides Bluetooth Low Energy (BLE) drivers for Espressif microcontrollers."
-)]
+    ) => {
+        "esp-radio provides Wi-Fi, Bluetooth Low Energy (BLE), ESP-NOW, and IEEE 802.15.4 \
+         drivers for Espressif microcontrollers."
+    }
+    all(wifi_driver_supported, bt_driver_supported) => {
+        "esp-radio provides Wi-Fi, Bluetooth Low Energy (BLE), and ESP-NOW drivers for \
+         Espressif microcontrollers."
+    }
+    all(wifi_driver_supported, not(ieee802154_driver_supported)) => {
+        "esp-radio provides Wi-Fi and ESP-NOW drivers for Espressif microcontrollers."
+    }
+    all(bt_driver_supported, ieee802154_driver_supported) => {
+        "esp-radio provides Bluetooth Low Energy (BLE) and IEEE 802.15.4 drivers for \
+         Espressif microcontrollers."
+    }
+    bt_driver_supported => {
+        "esp-radio provides Bluetooth Low Energy (BLE) drivers for Espressif microcontrollers."
+    }
+    _ => ""
+}]
 //! It builds on top of [esp-hal] and vendor binary blobs to provide wireless connectivity in a
 //! `no_std` environment.
-//!
-#![cfg_attr(
-    all(wifi_driver_supported, bt_driver_supported),
-    doc = "Wi-Fi and BLE require a dynamic memory allocator and a preemptive task scheduler at \
-           runtime."
-)]
-#![cfg_attr(
-    all(wifi_driver_supported, not(bt_driver_supported)),
-    doc = "Wi-Fi requires a dynamic memory allocator and a preemptive task scheduler at runtime."
-)]
-#![cfg_attr(
-    all(bt_driver_supported, not(wifi_driver_supported)),
-    doc = "BLE requires a dynamic memory allocator and a preemptive task scheduler at runtime."
-)]
+#![doc = ""]
+#![doc = cfg_select! {
+    all(wifi_driver_supported, bt_driver_supported) => {
+        "Wi-Fi and BLE require a dynamic memory allocator and a preemptive task scheduler at \
+         runtime."
+    }
+    wifi_driver_supported => {
+        "Wi-Fi requires a dynamic memory allocator and a preemptive task scheduler at runtime."
+    }
+    bt_driver_supported => {
+        "BLE requires a dynamic memory allocator and a preemptive task scheduler at runtime."
+    }
+    _ => ""
+}]
 //! [`esp-alloc`] and [`esp-rtos`] are recommended for this, though any allocator or RTOS
 //! (such as Ariel OS) that implements the required interfaces can be used.
-//!
+#![doc = ""]
 #![cfg_attr(
     ieee802154_driver_supported,
     doc = "<div class=\"warning\"><b>Hint:</b> The scheduler is not required for IEEE 802.15.4.</div>\n\n"
@@ -168,21 +150,21 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
     doc = "Wi-Fi data buffers require internal memory. Adding PSRAM to the heap does not reduce \
            the internal memory that Wi-Fi requires at peak load."
 )]
-#![cfg_attr(
-    all(wifi_driver_supported, bt_driver_supported),
-    doc = "Radio memory usage is not constant. A Wi-Fi transmit burst or a burst of BLE traffic \
-           can temporarily require significantly more buffers than when idle."
-)]
-#![cfg_attr(
-    all(wifi_driver_supported, not(bt_driver_supported)),
-    doc = "Radio memory usage is not constant. A Wi-Fi transmit burst can temporarily require \
-           significantly more buffers than when idle."
-)]
-#![cfg_attr(
-    all(bt_driver_supported, not(wifi_driver_supported)),
-    doc = "Radio memory usage is not constant. A burst of BLE traffic can temporarily require \
-           significantly more buffers than when idle."
-)]
+#![doc = cfg_select! {
+    all(wifi_driver_supported, bt_driver_supported) => {
+        "Radio memory usage is not constant. A Wi-Fi transmit burst or a burst of BLE traffic \
+         can temporarily require significantly more buffers than when idle."
+    }
+    wifi_driver_supported => {
+        "Radio memory usage is not constant. A Wi-Fi transmit burst can temporarily require \
+         significantly more buffers than when idle."
+    }
+    bt_driver_supported => {
+        "Radio memory usage is not constant. A burst of BLE traffic can temporarily require \
+         significantly more buffers than when idle."
+    }
+    _ => ""
+}]
 //!
 #![cfg_attr(
     bt_driver_supported,
