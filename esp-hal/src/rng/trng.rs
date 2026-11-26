@@ -6,6 +6,8 @@ static TRNG_ENABLED: AtomicUsize = AtomicUsize::new(0);
 static TRNG_USERS: AtomicUsize = AtomicUsize::new(0);
 
 use super::Rng;
+#[cfg(rng_trng_requires_i2s0)]
+use crate::peripherals::I2S0;
 use crate::peripherals::{ADC1, RNG};
 
 /// Ensures random numbers are cryptographically secure.
@@ -13,22 +15,33 @@ use crate::peripherals::{ADC1, RNG};
 pub struct TrngSource<'d> {
     _rng: RNG<'d>,
     _adc: ADC1<'d>,
+    #[cfg(rng_trng_requires_i2s0)]
+    _i2s: I2S0<'d>,
 }
 
 impl<'d> TrngSource<'d> {
     /// Enables the SAR ADC entropy source.
     #[cfg_attr(
-        esp32,
+        rng_trng_requires_i2s0,
         doc = r"
 
-The entropy source also uses I2S0. Do not use I2S0 while the `TrngSource` is active."
+The entropy source also uses I2S0 to run the SAR ADC."
     )]
     // TODO: this is not final. A single ADC channel should be sufficient.
     #[instability::unstable]
-    pub fn new(_rng: RNG<'d>, _adc: ADC1<'d>) -> Self {
+    pub fn new(
+        _rng: RNG<'d>,
+        _adc: ADC1<'d>,
+        #[cfg(rng_trng_requires_i2s0)] _i2s: I2S0<'d>,
+    ) -> Self {
         crate::soc::trng::ensure_randomness();
         unsafe { Self::increase_entropy_source_counter() }
-        Self { _rng, _adc }
+        Self {
+            _rng,
+            _adc,
+            #[cfg(rng_trng_requires_i2s0)]
+            _i2s,
+        }
     }
 
     /// Increases the internal entropy source counter.
@@ -136,6 +149,10 @@ pub enum TrngError {
 
 #[cfg_attr(docsrs, procmacros::doc_replace(
     "analog_pin" => gpio_for_signal!(ADC1_CH3),
+    "trng_source_args" => {
+        cfg(rng_trng_requires_i2s0) => "peripherals.RNG, peripherals.ADC1.reborrow(), peripherals.I2S0",
+        _ => "peripherals.RNG, peripherals.ADC1.reborrow()"
+    },
 ))]
 /// True Random Number Generator (TRNG)
 ///
@@ -159,7 +176,7 @@ pub enum TrngError {
 /// let mut buf = [0u8; 16];
 ///
 /// // ADC is not available from now
-/// let trng_source = TrngSource::new(peripherals.RNG, peripherals.ADC1.reborrow());
+/// let trng_source = TrngSource::new(__trng_source_args__);
 ///
 /// let trng = Trng::try_new()?;
 ///

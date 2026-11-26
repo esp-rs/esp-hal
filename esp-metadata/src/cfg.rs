@@ -1054,6 +1054,9 @@ driver_configs![
                 apb_cycle_wait_num: u32,
                 #[serde(default)]
                 trng_supported: bool,
+                // true if the TRNG entropy source runs the SAR ADC through I2S0
+                #[serde(default)]
+                trng_requires_i2s0: bool,
                 // true if RNG is not its own peripheral - triggers a different register naming scheme
                 #[serde(default)]
                 is_lp_sys: bool,

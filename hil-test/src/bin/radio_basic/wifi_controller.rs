@@ -20,7 +20,10 @@ mod tests {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
-        let _source = esp_hal::rng::TrngSource::new(p.RNG, p.ADC1);
+        let _source = cfg_select! {
+            rng_trng_requires_i2s0 => esp_hal::rng::TrngSource::new(p.RNG, p.ADC1, p.I2S0),
+            _ => esp_hal::rng::TrngSource::new(p.RNG, p.ADC1),
+        };
 
         let _controller = esp_radio::wifi::WifiController::new(p.WIFI, Default::default()).unwrap();
     }

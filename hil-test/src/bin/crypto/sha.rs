@@ -165,7 +165,12 @@ mod tests {
 
         Context {
             #[cfg(rng_trng_supported)]
-            _rng_source: TrngSource::new(peripherals.RNG, peripherals.ADC1),
+            _rng_source: cfg_select! {
+                rng_trng_requires_i2s0 => {
+                    TrngSource::new(peripherals.RNG, peripherals.ADC1, peripherals.I2S0)
+                }
+                _ => TrngSource::new(peripherals.RNG, peripherals.ADC1),
+            },
             sha: Sha::new(peripherals.SHA),
         }
     }
@@ -434,7 +439,12 @@ mod work_queue_tests {
         Context {
             sha: ShaBackend::new(peripherals.SHA),
             #[cfg(rng_trng_supported)]
-            _rng_source: TrngSource::new(peripherals.RNG, peripherals.ADC1),
+            _rng_source: cfg_select! {
+                rng_trng_requires_i2s0 => {
+                    TrngSource::new(peripherals.RNG, peripherals.ADC1, peripherals.I2S0)
+                }
+                _ => TrngSource::new(peripherals.RNG, peripherals.ADC1),
+            },
         }
     }
 

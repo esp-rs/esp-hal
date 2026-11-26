@@ -292,6 +292,7 @@ output_lines = 24
 [device.rng]
 support_status = { status = "partial", issue = 5979 }
 trng_supported = true
+trng_requires_i2s0 = true
 apb_cycle_wait_num = 16 # TODO
 
 [device.sleep]
