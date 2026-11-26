@@ -76,7 +76,7 @@ system_clocks = { clock_tree = [
         ] },
     ] },
     { group = "UART", clocks = [
-        { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk / (div_num + 1)", params = { sclk = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "PLL_F48M", outputs = "PLL_F48M_CLK" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },

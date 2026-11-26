@@ -3992,7 +3992,6 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.uart_function_clock_refcount[self as usize],
                 ) {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.uart_function_clock[self as usize]).sclk {
                         UartFunctionClockSclk::PllF48m => request_pll_f48m_clk(clocks),
                         UartFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
@@ -4007,7 +4006,6 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.uart_function_clock_refcount[self as usize],
                 ) {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.uart_function_clock[self as usize]).sclk {
                         UartFunctionClockSclk::PllF48m => release_pll_f48m_clk(clocks),
