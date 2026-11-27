@@ -773,14 +773,14 @@ mod systimer {
         Blocking,
         delay::Delay,
         handler,
-        time::Duration,
+        time::{Duration, Instant},
         timer::{
             OneShotTimer,
             PeriodicTimer,
             systimer::{Alarm, SystemTimer, Unit},
         },
     };
-    use portable_atomic::{AtomicUsize, Ordering};
+    use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
 
     static ALARM_TARGET: Mutex<RefCell<Option<OneShotTimer<'static, Blocking>>>> =
         Mutex::new(RefCell::new(None));
@@ -790,6 +790,7 @@ mod systimer {
     struct Context {
         alarm0: Alarm<'static>,
         alarm1: Alarm<'static>,
+        alarm2: Alarm<'static>,
     }
 
     #[handler(priority = esp_hal::interrupt::Priority::min())]
@@ -853,6 +854,7 @@ mod systimer {
         Context {
             alarm0: systimer.alarm0,
             alarm1: systimer.alarm1,
+            alarm2: systimer.alarm2,
         }
     }
 
@@ -912,6 +914,71 @@ mod systimer {
 
         // We'll end the test in the interrupt handler.
         loop {}
+    }
+
+    static ALARM_START: Mutex<RefCell<Option<OneShotTimer<'static, Blocking>>>> =
+        Mutex::new(RefCell::new(None));
+    static ARMED: AtomicBool = AtomicBool::new(false);
+
+    #[handler(priority = esp_hal::interrupt::Priority::min())]
+    fn stop_target_alarm() {
+        let armed = ARMED.swap(false, Ordering::Relaxed);
+        critical_section::with(|cs| {
+            let mut alarm = ALARM_TARGET.borrow_ref_mut(cs);
+            let alarm = alarm.as_mut().unwrap();
+            alarm.clear_interrupt();
+            alarm.stop();
+            let mut start = ALARM_START.borrow_ref_mut(cs);
+            let start = start.as_mut().unwrap();
+            start.schedule(Duration::from_micros(40)).unwrap();
+        });
+        hil_test::assert!(armed, "a stopped alarm fired");
+        COUNTER.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[handler(priority = esp_hal::interrupt::Priority::min())]
+    fn start_target_alarm() {
+        let armed = ARMED.swap(true, Ordering::Relaxed);
+        critical_section::with(|cs| {
+            let mut start = ALARM_START.borrow_ref_mut(cs);
+            start.as_mut().unwrap().clear_interrupt();
+            let mut alarm = ALARM_TARGET.borrow_ref_mut(cs);
+            let alarm = alarm.as_mut().unwrap();
+            alarm.schedule(Duration::from_micros(10)).unwrap();
+        });
+        hil_test::assert!(!armed, "a started alarm did not fire");
+    }
+
+    // Fails if thread code that resets an alarm writes back the enable bit of an alarm that an
+    // interrupt handler starts or stops at the same time.
+    #[test]
+    fn alarm_fires_once_per_start_during_resets(ctx: Context) {
+        let mut alarm0 = OneShotTimer::new(ctx.alarm0);
+        let mut alarm1 = OneShotTimer::new(ctx.alarm1);
+        let mut alarm2 = OneShotTimer::new(ctx.alarm2);
+
+        critical_section::with(|cs| {
+            alarm0.set_interrupt_handler(stop_target_alarm);
+            alarm0.listen();
+            alarm1.set_interrupt_handler(start_target_alarm);
+            alarm1.listen();
+            alarm1.schedule(Duration::from_micros(40)).unwrap();
+
+            ALARM_TARGET.borrow_ref_mut(cs).replace(alarm0);
+            ALARM_START.borrow_ref_mut(cs).replace(alarm1);
+        });
+
+        // A critical section around this `schedule` would hide the fault.
+        let end = Instant::now() + Duration::from_millis(100);
+        while Instant::now() < end {
+            alarm2.schedule(Duration::from_secs(1)).unwrap();
+        }
+        let count = COUNTER.load(Ordering::Relaxed);
+        Delay::new().delay_ms(1);
+        hil_test::assert!(
+            COUNTER.load(Ordering::Relaxed) > count,
+            "the alarms stopped"
+        );
     }
 
     #[test]

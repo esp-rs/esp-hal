@@ -625,9 +625,11 @@ impl super::Timer for Alarm<'_> {
             .modify(|_, w| unsafe { w.xtal_step().bits(0x1) });
 
         #[cfg(not(esp32s2))]
-        SYSTIMER::regs()
-            .conf()
-            .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
+        CONF_LOCK.lock(|| {
+            SYSTIMER::regs()
+                .conf()
+                .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
+        });
     }
 
     fn is_running(&self) -> bool {
@@ -868,6 +870,8 @@ pub mod etm {
     }
 
     pub(super) fn enable_etm() {
-        SYSTIMER::regs().conf().modify(|_, w| w.etm_en().set_bit());
+        CONF_LOCK.lock(|| {
+            SYSTIMER::regs().conf().modify(|_, w| w.etm_en().set_bit());
+        });
     }
 }
