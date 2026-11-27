@@ -11,11 +11,15 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
     let clock = driver.info.clock_instance;
 
     let source_clk = I2cInstance::function_clock_source_frequency(sclk);
+    let div_num: u8 = (source_clk / bus_freq / 1024)
+        .try_into()
+        .map_err(|_| ConfigError::FrequencyOutOfRange)?;
 
     ClockTree::with(|clocks| {
-        let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
-
-        clock.configure_function_clock(clocks, I2cFunctionClockConfig::new(sclk, clkm_div - 1));
+        clock.configure_function_clock(
+            clocks,
+            I2cFunctionClockConfig::new(sclk, u32::from(div_num)),
+        );
     });
 
     let sclk_freq: u32 = clock.function_clock_frequency();
@@ -27,7 +31,9 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
     // much scl_wait_high will faster the frequency according to some
     // hardware behaviors.
     let scl_wait_high = if bus_freq >= 80 * 1000 {
-        half_cycle / 2 - 2
+        (half_cycle / 2)
+            .checked_sub(2)
+            .ok_or(ConfigError::FrequencyOutOfRange)?
     } else {
         half_cycle / 4
     };
