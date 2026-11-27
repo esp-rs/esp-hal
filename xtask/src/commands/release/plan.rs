@@ -15,7 +15,7 @@ use strum::IntoEnumIterator;
 use crate::{
     Package,
     Version,
-    cargo::CargoToml,
+    cargo::{CargoToml, related_crates, related_crates_cb},
     commands::{
         VersionBump,
         checker::min_package_update,
@@ -545,33 +545,6 @@ fn commits_since_tag(workspace: &Path, package_path: &Path, tag: &str) -> usize 
     let output = String::from_utf8_lossy(&commits.stdout);
 
     output.lines().filter(|l| !l.trim().is_empty()).count()
-}
-
-/// Collects dependencies recursively, based on a callback that provides direct dependencies.
-///
-/// This is an implementation detail of the `related_crates` function, separate for testing
-/// purposes.
-fn related_crates_cb(
-    package: Package,
-    direct_dependencies: &impl Fn(Package) -> Vec<Package>,
-) -> Vec<Package> {
-    let mut packages = vec![package];
-
-    for dep in direct_dependencies(package) {
-        for dep in related_crates_cb(dep, direct_dependencies) {
-            if !packages.contains(&dep) {
-                packages.push(dep);
-            }
-        }
-    }
-
-    packages
-}
-
-fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
-    related_crates_cb(package, &|p| {
-        CargoToml::new(workspace, p).unwrap().repo_dependencies()
-    })
 }
 
 /// Build a map from each published package to the published packages that
