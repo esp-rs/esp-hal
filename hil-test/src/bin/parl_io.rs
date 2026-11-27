@@ -590,17 +590,6 @@ mod tests {
         let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
         let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
-        // Without DMA burst, the ESP32-C6 RX DMA falls behind 16 lines at 20 MHz while TX DMA
-        // runs. The RX FIFO then overwrites unread samples and sets no overflow flag.
-        let burst = cfg_select! {
-            dma_can_access_psram => {
-                esp_hal::dma::BurstConfig::from(esp_hal::dma::InternalBurstConfig::Enabled)
-            }
-            _ => esp_hal::dma::BurstConfig::Enabled,
-        };
-        dma_rx_buf.set_burst_config(burst).unwrap();
-        dma_tx_buf.set_burst_config(burst).unwrap();
-
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
         let [
@@ -641,7 +630,8 @@ mod tests {
 
         // RX times out with 16 lines at `MAX_CLK_RATE`.
         // With `BitPackOrder::Lsb`, RX swaps each pair of 16-bit samples.
-        let pio_tx = pio
+        #[cfg_attr(not(parl_io_dma_engine = "AHB_GDMA"), allow(unused_mut))]
+        let mut pio_tx = pio
             .tx
             .with_config(
                 tx_pins,
@@ -652,7 +642,8 @@ mod tests {
                     .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap();
-        let pio_rx = pio
+        #[cfg_attr(not(parl_io_dma_engine = "AHB_GDMA"), allow(unused_mut))]
+        let mut pio_rx = pio
             .rx
             .with_config(
                 rx_pins,
@@ -662,6 +653,18 @@ mod tests {
                     .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap();
+
+        // Without DMA burst, the ESP32-C6 RX DMA falls behind 16 lines at 20 MHz while TX DMA
+        // runs. The RX FIFO then overwrites unread samples and sets no overflow flag. AXI GDMA
+        // always bursts.
+        #[cfg(parl_io_dma_engine = "AHB_GDMA")]
+        {
+            use esp_hal::parl_io::{DmaConfig, DmaInternalBurst};
+
+            let config = DmaConfig::default().with_internal_burst(DmaInternalBurst::Enabled);
+            pio_tx.apply_dma_config(&config).unwrap();
+            pio_rx.apply_dma_config(&config).unwrap();
+        }
 
         for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
             *b = i as u8;

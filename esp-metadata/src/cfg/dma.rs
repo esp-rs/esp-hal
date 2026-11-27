@@ -72,9 +72,9 @@ pub struct DmaEngineDef {
     #[serde(default)]
     pub max_priority: Option<u32>,
 
-    /// Configurable internal RAM burst sizes, when they differ from external RAM.
+    /// Configurable internal RAM burst sizes, when they differ from external RAM. `[0, 4]` means
+    /// that burst can only be turned on or off.
     #[serde(default)]
-    #[expect(dead_code)]
     pub internal_ram_burst_sizes: Vec<u32>,
 
     /// Configurable burst sizes, when supported. An empty list means the engine cannot access
@@ -99,6 +99,39 @@ impl DmaEngineDef {
     fn can_access_psram(&self) -> bool {
         !self.burst_sizes.is_empty()
     }
+
+    /// The variants of the engine's internal RAM burst type.
+    fn internal_burst_variants(&self) -> Vec<proc_macro2::Ident> {
+        if self.internal_ram_burst_sizes.is_empty() {
+            self.burst_sizes
+                .iter()
+                .map(|size| burst_variant(*size))
+                .collect()
+        } else {
+            vec![format_ident!("Disabled"), format_ident!("Enabled")]
+        }
+    }
+
+    /// The variants of the engine's PSRAM burst type: its burst sizes up to the PSRAM limit.
+    fn external_burst_variants(&self, psram_max_burst: Option<u32>) -> Vec<proc_macro2::Ident> {
+        let Some(max) = psram_max_burst else {
+            return vec![];
+        };
+        self.burst_sizes
+            .iter()
+            .filter(|size| **size <= max)
+            .map(|size| burst_variant(*size))
+            .collect()
+    }
+
+    /// The default PSRAM burst: 32 bytes, or the PSRAM limit if that is smaller.
+    fn external_burst_default(&self, psram_max_burst: Option<u32>) -> proc_macro2::Ident {
+        burst_variant(psram_max_burst.map_or(32, |max| max.min(32)))
+    }
+}
+
+fn burst_variant(size: u32) -> proc_macro2::Ident {
+    format_ident!("Size{size}")
 }
 
 /// The largest burst the PSRAM controller accepts from DMA, in bytes.
@@ -108,7 +141,12 @@ pub struct PsramMaxBurst(Option<u32>);
 
 impl GenericProperty for PsramMaxBurst {
     fn cfgs(&self) -> Option<Vec<String>> {
-        self.0.map(|_| vec!["dma.can_access_psram".to_string()])
+        self.0.map(|max| {
+            vec![
+                "dma.can_access_psram".to_string(),
+                format!("dma.psram_max_burst=\"{max}\""),
+            ]
+        })
     }
 
     fn property_macro_branches(&self) -> TokenStream {
@@ -127,11 +165,49 @@ impl GenericProperty for PsramMaxBurst {
 /// All DMA engines on a device.
 #[derive(Debug, Default, Clone, serde::Deserialize)]
 #[serde(transparent)]
-pub struct DmaEngines(pub Vec<DmaEngineDef>);
+pub struct DmaEngines {
+    pub(crate) engines: Vec<DmaEngineDef>,
+
+    /// A copy of `[device.dma] psram_max_burst`, which limits the PSRAM burst types.
+    #[serde(skip)]
+    psram_max_burst: Option<u32>,
+}
 
 impl DmaEngines {
+    pub(crate) fn set_psram_max_burst(&mut self, psram_max_burst: PsramMaxBurst) {
+        self.psram_max_burst = psram_max_burst.0;
+    }
+
+    pub(crate) fn validate_bursts(&self) -> Result<()> {
+        for engine in &self.engines {
+            ensure!(
+                engine.internal_ram_burst_sizes.is_empty()
+                    || engine.internal_ram_burst_sizes == [0, 4],
+                "DMA engine '{}': internal_ram_burst_sizes must be [0, 4] or absent",
+                engine.name
+            );
+            for size in &engine.burst_sizes {
+                ensure!(
+                    size.is_power_of_two() && (4..=128).contains(size),
+                    "DMA engine '{}': burst size {size} is not a power of two in 4..=128",
+                    engine.name
+                );
+            }
+
+            let external = engine.external_burst_variants(self.psram_max_burst);
+            ensure!(
+                external.is_empty()
+                    || external.contains(&engine.external_burst_default(self.psram_max_burst)),
+                "DMA engine '{}': the default PSRAM burst must be a valid burst size",
+                engine.name
+            );
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn validate_mem2mem(&self, requires_peripheral: bool) -> Result<()> {
-        for engine in &self.0 {
+        for engine in &self.engines {
             let mut seen_ids = std::collections::HashSet::new();
             for channel in &engine.channels {
                 if !channel.mem2mem {
@@ -167,7 +243,7 @@ impl DmaEngines {
     }
 
     pub(crate) fn validate_psram(&self, psram_max_burst: PsramMaxBurst) -> Result<()> {
-        for engine in &self.0 {
+        for engine in &self.engines {
             for channel in &engine.channels {
                 match channel.can_access_psram {
                     Some(true) => bail!(
@@ -191,7 +267,7 @@ impl DmaEngines {
                 "psram_max_burst = {max} is not a power of two"
             );
             ensure!(
-                self.0.iter().any(|engine| engine
+                self.engines.iter().any(|engine| engine
                     .channels
                     .iter()
                     .any(|channel| channel.can_access_psram(engine))),
@@ -206,14 +282,14 @@ impl DmaEngines {
 impl GenericProperty for DmaEngines {
     fn cfgs(&self) -> Option<Vec<String>> {
         let mut cfgs: Vec<String> = self
-            .0
+            .engines
             .iter()
             .flat_map(|e| e.channels.iter())
             .map(|ch| format!("soc_has_{}", ch.name.to_lowercase()))
             .collect();
 
         if self
-            .0
+            .engines
             .iter()
             .flat_map(|e| e.channels.iter())
             .any(|ch| ch.mem2mem)
@@ -223,7 +299,7 @@ impl GenericProperty for DmaEngines {
 
         // Emit a DMA-support cfg symbol for each unique driver listed in any engine.
         let mut seen = std::collections::HashSet::new();
-        for engine in &self.0 {
+        for engine in &self.engines {
             for driver in &engine.drivers {
                 if seen.insert(driver.clone()) {
                     cfgs.push(format!("{}.supports_dma", driver));
@@ -243,6 +319,7 @@ impl GenericProperty for DmaEngines {
 
         let mut engines = vec![];
         let mut priorities = vec![];
+        let mut bursts = vec![];
         let mut engine_channels = vec![];
         let mut engine_any_channels = vec![];
         let mut psram = vec![];
@@ -259,13 +336,25 @@ impl GenericProperty for DmaEngines {
         // Accumulates engine name tokens per driver, in engine declaration order.
         let mut driver_engines: BTreeMap<&str, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
 
-        for engine in self.0.iter() {
+        for engine in self.engines.iter() {
             let engine_name = engine.name.as_str();
             engines.push(quote! { #engine_name });
 
             if let Some(max_priority) = engine.max_priority {
                 let levels = (0..=max_priority).map(number);
                 priorities.push(quote! { #engine_name, #(#levels),* });
+            }
+
+            let internal = engine.internal_burst_variants();
+            if !internal.is_empty() {
+                let external = engine.external_burst_variants(self.psram_max_burst);
+                let external_default = engine.external_burst_default(self.psram_max_burst);
+                bursts.push(quote! {
+                    #engine_name,
+                    internal = [#(#internal),*],
+                    external = [#(#external),*],
+                    external_default = #external_default
+                });
             }
 
             let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
@@ -390,7 +479,11 @@ impl GenericProperty for DmaEngines {
 
         let dma_engines_macro = generate_for_each_macro(
             "dma_engine",
-            &[("all", &engines), ("priority", &priorities)],
+            &[
+                ("all", &engines),
+                ("priority", &priorities),
+                ("burst", &bursts),
+            ],
         );
 
         // Always emit for_each_dma_channel_peri_pair! so drivers can call it

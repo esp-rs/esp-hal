@@ -20,15 +20,28 @@ for_each_dma_engine! {
     ("AXI_GDMA", $($level:literal),+) => {
         priority_enum!(AxiPriority, "AXI GDMA", $($level),+);
     };
+    (
+        "AXI_GDMA",
+        internal = [$($internal:ident),+],
+        external = [$($external:ident),*],
+        external_default = $external_default:ident
+    ) => {
+        declare_engine_config!(
+            /// Configuration of an AXI GDMA channel.
+            AxiGdmaConfig, "an AXI GDMA channel", Axi,
+            internal = [$($internal),+],
+            external = [$($external),*],
+            external_default = $external_default,
+            priority = AxiPriority
+        );
+    };
 }
 
-/// Configuration of an AXI GDMA channel.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct AxiGdmaConfig {
-    /// The channel priority.
-    priority: AxiPriority,
+// `*_burst_size_sel`: 0 to 4 select 8 to 128 B. The field selects the burst for internal memory
+// and for PSRAM.
+const fn burst_size_sel(internal: u8, external: u8, psram: bool) -> u8 {
+    let burst = if psram { external } else { internal };
+    burst.saturating_sub(BurstSize::Size8 as u8)
 }
 
 /// Immutable per-channel metadata owned by each `AXI_DMA_CH*` singleton.
@@ -147,8 +160,12 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, en| w.out_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
+        self.ch().out_conf0().modify(|_, w| unsafe {
+            w.out_burst_size_sel()
+                .bits(burst_size_sel(internal, external, psram))
+        });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
@@ -339,8 +356,12 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, en| w.in_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
+        self.ch().in_conf0().modify(|_, w| unsafe {
+            w.in_burst_size_sel()
+                .bits(burst_size_sel(internal, external, psram))
+        });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()

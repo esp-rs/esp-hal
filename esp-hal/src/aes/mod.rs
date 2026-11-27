@@ -389,6 +389,7 @@ pub mod dma {
             DmaConfigError,
             DmaDescriptor,
             DmaEligiblePeripheral,
+            DmaEngineConfig,
             DmaError,
             DmaRxBuffer,
             DmaTxBuffer,
@@ -878,6 +879,7 @@ pub mod dma {
         /// [`DmaConfigError`] when the channel cannot apply the configuration.
         #[instability::unstable]
         pub fn apply_dma_config(&mut self, config: &DmaConfig) -> Result<(), DmaConfigError> {
+            config.validate()?;
             self.dma_config = *config;
             Ok(())
         }

@@ -13,7 +13,7 @@ use core::{
 use embassy_time::Instant;
 use esp_hal::{
     Blocking,
-    dma::{BurstConfig, DmaDescriptor, DmaTxBuffer, Owner, Preparation},
+    dma::{DmaDescriptor, DmaTxBuffer, Owner, Preparation},
     gpio::Level,
     handler,
     interrupt::{self, Priority},
@@ -278,7 +278,7 @@ unsafe impl DmaTxBuffer for BounceChain {
         Preparation {
             start: self.descriptors.as_mut_ptr(),
             accesses_psram: false,
-            burst_transfer: BurstConfig::default(),
+            burst_align: None,
             check_owner: Some(false),
             auto_write_back: false,
         }

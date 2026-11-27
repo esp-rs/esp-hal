@@ -312,12 +312,26 @@ pub const CHUNK_SIZE: usize = 4092;
 /// // RX and TX buffers are 32000 bytes - passing only one parameter makes RX
 /// // and TX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000, 32000);
+///
+/// // Buffers aligned to 64 bytes, for `DmaRxBuf::new_with_min_burst`.
+/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
+///     dma_buffers!(32000, 32000, burst = Size64);
 /// # {after_snippet}
 /// ```
 #[macro_export]
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_buffers {
+    ($rx_size:expr, $tx_size:expr, burst = $burst:ident) => {{
+        let (rx_buf, rx_desc) = $crate::dma_buffers_impl!($rx_size, burst = $burst);
+        let (tx_buf, tx_desc) = $crate::dma_buffers_impl!($tx_size, burst = $burst);
+        (
+            rx_buf.into_inner(),
+            rx_desc.into_inner(),
+            tx_buf.into_inner(),
+            tx_desc.into_inner(),
+        )
+    }};
     ($rx_size:expr, $tx_size:expr) => {
         $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
@@ -422,6 +436,17 @@ macro_rules! dma_descriptors_chunk_size {
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_buffers_impl {
+    // Before the `$chunk_size` arm: `burst = Size64` also parses as an expression.
+    ($size:expr, burst = $burst:ident) => {{
+        (
+            $crate::dma_burst_aligned_buffer!($burst, $size),
+            $crate::dma_descriptors_impl!(
+                $size,
+                $crate::dma::max_compatible_chunk_size(Some($crate::dma::BurstSize::$burst))
+            ),
+        )
+    }};
+
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         let rx = $crate::dma_buffers_impl!($rx_size, $chunk_size);
         let tx = $crate::dma_buffers_impl!($tx_size, $chunk_size);
@@ -445,11 +470,50 @@ macro_rules! dma_buffers_impl {
     }};
 
     ($size:expr) => {
-        $crate::dma_buffers_impl!(
-            $size,
-            $crate::dma::BurstConfig::DEFAULT.max_compatible_chunk_size()
-        )
+        $crate::dma_buffers_impl!($size, $crate::dma::max_compatible_chunk_size(None))
     };
+}
+
+/// Declares a static buffer that is aligned to a burst size, and returns a `DmaAlignedMut` to it.
+#[doc(hidden)]
+#[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+macro_rules! dma_burst_aligned_buffer {
+    (Size4, $size:expr) => {
+        $crate::dma_burst_aligned_buffer!(@align 4, $size)
+    };
+    (Size8, $size:expr) => {
+        $crate::dma_burst_aligned_buffer!(@align 8, $size)
+    };
+    (Size16, $size:expr) => {
+        $crate::dma_burst_aligned_buffer!(@align 16, $size)
+    };
+    (Size32, $size:expr) => {
+        $crate::dma_burst_aligned_buffer!(@align 32, $size)
+    };
+    (Size64, $size:expr) => {
+        $crate::dma_burst_aligned_buffer!(@align 64, $size)
+    };
+    (Size128, $size:expr) => {
+        $crate::dma_burst_aligned_buffer!(@align 128, $size)
+    };
+    (@align $align:literal, $size:expr) => {{
+        #[repr(C, align($align))]
+        struct BurstAligned([u8; { $size }]);
+
+        #[allow(unused_braces)]
+        static mut BUFFER: $crate::dma::aligned::InternalMemory<BurstAligned> =
+            $crate::dma::aligned::InternalMemory::new(BurstAligned([0; $size]));
+
+        // SAFETY: The ConstStaticCell in the descriptor part ensures there will only be a single
+        // mutable reference to this buffer. `InternalMemory` places and aligns the buffer for
+        // DMA, and the burst alignment only adds to that.
+        unsafe {
+            let aligned = BUFFER.get_mut().into_inner();
+            $crate::dma::aligned::DmaAlignedMut::new_unchecked(&mut aligned.0).unsize()
+        }
+    }};
 }
 
 #[doc(hidden)]
@@ -511,12 +575,24 @@ macro_rules! dma_descriptor_count {
 /// use esp_hal::dma_rx_buffer;
 ///
 /// let rx_buf = dma_rx_buffer!(32000)?;
+///
+/// // A buffer that guarantees 64-byte bursts.
+/// let rx_buf = dma_rx_buffer!(32000, burst = Size64)?;
 /// # {after_snippet}
 /// ```
 #[macro_export]
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_rx_buffer {
+    ($rx_size:expr, burst = $burst:ident) => {{
+        let (rx_buffer, rx_descriptors) = $crate::dma_buffers_impl!($rx_size, burst = $burst);
+
+        $crate::dma::DmaRxBuf::new_with_min_burst(
+            rx_descriptors,
+            rx_buffer,
+            $crate::dma::BurstSize::$burst,
+        )
+    }};
     ($rx_size:expr) => {{
         let (rx_buffer, rx_descriptors) = $crate::dma_buffers_impl!($rx_size);
 
@@ -536,12 +612,24 @@ macro_rules! dma_rx_buffer {
 /// use esp_hal::dma_tx_buffer;
 ///
 /// let tx_buf = dma_tx_buffer!(32000)?;
+///
+/// // A buffer that guarantees 64-byte bursts.
+/// let tx_buf = dma_tx_buffer!(32000, burst = Size64)?;
 /// # {after_snippet}
 /// ```
 #[macro_export]
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_tx_buffer {
+    ($tx_size:expr, burst = $burst:ident) => {{
+        let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size, burst = $burst);
+
+        $crate::dma::DmaTxBuf::new_with_min_burst(
+            tx_descriptors,
+            tx_buffer,
+            $crate::dma::BurstSize::$burst,
+        )
+    }};
     ($tx_size:expr) => {{
         let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size);
 
@@ -681,11 +769,20 @@ impl From<DmaBufError> for DmaError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum DmaConfigError {}
+pub enum DmaConfigError {
+    /// The burst size is not usable on this device: `external_burst` is below 16 bytes while
+    /// flash encryption is enabled.
+    UnsupportedBurstSize,
+}
 
 impl core::fmt::Display for DmaConfigError {
-    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match *self {}
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            DmaConfigError::UnsupportedBurstSize => write!(
+                f,
+                "The PSRAM burst must be at least 16 bytes while flash encryption is enabled"
+            ),
+        }
     }
 }
 
@@ -908,29 +1005,30 @@ impl<'a> DescriptorSet<'a> {
     }
 }
 
-/// Blocks size for transfers to/from PSRAM.
+/// Encodes a PSRAM burst as an `ext_mem_bk_size` value: 0 for 16 bytes, 1 for 32 bytes and 2
+/// for 64 bytes.
+///
+/// `burst` is the log2 of the burst. Values below 16 bytes encode the 16-byte block.
 #[cfg(dma_ext_mem_configurable_block_size)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DmaExtMemBKSize {
-    /// External memory block size of 16 bytes.
-    Size16 = 0,
-    /// External memory block size of 32 bytes.
-    Size32 = 1,
-    /// External memory block size of 64 bytes.
-    Size64 = 2,
+pub(crate) const fn ext_mem_block_size(burst: u8) -> u8 {
+    // The S2 EDMA only transfers the first 32 bytes of each 64-byte block, so the ESP32-S2 burst
+    // type has no 64-byte variant.
+    burst.saturating_sub(BurstSize::Size16 as u8)
 }
 
-#[cfg(dma_ext_mem_configurable_block_size)]
-impl From<ExternalBurstConfig> for DmaExtMemBKSize {
-    fn from(size: ExternalBurstConfig) -> Self {
-        match size {
-            ExternalBurstConfig::Size16 => DmaExtMemBKSize::Size16,
-            ExternalBurstConfig::Size32 => DmaExtMemBKSize::Size32,
-            // The S2 EDMA only transfers the first 32 bytes of each 64-byte block.
-            #[cfg(not(esp32s2))]
-            ExternalBurstConfig::Size64 => DmaExtMemBKSize::Size64,
-        }
+fn write_burst<CH: RegisterAccess>(channel: &CH, config: &CH::Config, preparation: &Preparation) {
+    let mut internal = config.internal_burst_log2();
+    let mut external = config.external_burst_log2();
+    if CH::NEEDS_ALIGNED_BURST {
+        let align = preparation.burst_align.map_or(0, |b| b as u8);
+        internal = internal.min(align);
+        external = external.min(align);
     }
+    let psram = cfg_select! {
+        dma_can_access_psram => preparation.accesses_psram,
+        _ => false,
+    };
+    channel.set_burst(internal, external, psram);
 }
 
 // DMA receive channel
@@ -945,6 +1043,7 @@ where
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
     cpu_frequency_lock: Option<CpuFrequencyLock>,
+    config: CH::Config,
 }
 
 impl<CH> ChannelRx<Blocking, CH>
@@ -960,8 +1059,9 @@ where
         #[cfg(dma_supports_mem2mem)]
         rx_impl.set_mem2mem_mode(false);
 
+        let config = CH::Config::default();
         rx_impl.set_descr_burst_mode(true);
-        rx_impl.apply_config(&Default::default());
+        rx_impl.apply_config(&config);
 
         if let Some(interrupt) = rx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
@@ -975,6 +1075,7 @@ where
             _phantom: PhantomData,
             _guard,
             cpu_frequency_lock: None,
+            config,
         }
     }
 
@@ -989,6 +1090,7 @@ where
             _phantom: PhantomData,
             _guard: self._guard,
             cpu_frequency_lock: self.cpu_frequency_lock,
+            config: self.config,
         }
     }
 
@@ -1020,6 +1122,7 @@ where
             _phantom: PhantomData,
             _guard: self._guard,
             cpu_frequency_lock: self.cpu_frequency_lock,
+            config: self.config,
         }
     }
 }
@@ -1031,7 +1134,9 @@ where
 {
     /// Applies the engine configuration to the channel.
     pub(crate) fn apply_config(&mut self, config: &CH::Config) -> Result<(), DmaConfigError> {
+        config.validate()?;
         self.rx_impl.apply_config(config);
+        self.config = *config;
         Ok(())
     }
 
@@ -1044,10 +1149,7 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_ext_mem_configurable_block_size)]
-        self.rx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
-        self.rx_impl.set_burst_mode(preparation.burst_transfer);
+        write_burst(&self.rx_impl, &self.config, &preparation);
         self.rx_impl.set_check_owner(preparation.check_owner);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
@@ -1203,6 +1305,7 @@ where
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
     cpu_frequency_lock: Option<CpuFrequencyLock>,
+    config: CH::Config,
 }
 
 impl<CH> ChannelTx<Blocking, CH>
@@ -1213,8 +1316,9 @@ where
     pub fn new(tx_impl: CH) -> Self {
         let _guard = tx_impl.enable();
 
+        let config = CH::Config::default();
         tx_impl.set_descr_burst_mode(true);
-        tx_impl.apply_config(&Default::default());
+        tx_impl.apply_config(&config);
 
         if let Some(interrupt) = tx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
@@ -1227,6 +1331,7 @@ where
             _phantom: PhantomData,
             _guard,
             cpu_frequency_lock: None,
+            config,
         }
     }
 
@@ -1241,6 +1346,7 @@ where
             _phantom: PhantomData,
             _guard: self._guard,
             cpu_frequency_lock: self.cpu_frequency_lock,
+            config: self.config,
         }
     }
 
@@ -1272,6 +1378,7 @@ where
             _phantom: PhantomData,
             _guard: self._guard,
             cpu_frequency_lock: self.cpu_frequency_lock,
+            config: self.config,
         }
     }
 }
@@ -1299,7 +1406,9 @@ where
 
     /// Applies the engine configuration to the channel.
     pub(crate) fn apply_config(&mut self, config: &CH::Config) -> Result<(), DmaConfigError> {
+        config.validate()?;
         self.tx_impl.apply_config(config);
+        self.config = *config;
         Ok(())
     }
 
@@ -1312,10 +1421,7 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_ext_mem_configurable_block_size)]
-        self.tx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
-        self.tx_impl.set_burst_mode(preparation.burst_transfer);
+        write_burst(&self.tx_impl, &self.config, &preparation);
         self.tx_impl.set_check_owner(preparation.check_owner);
         self.tx_impl
             .set_auto_write_back(preparation.auto_write_back);

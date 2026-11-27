@@ -497,7 +497,7 @@ macro_rules! property {
         false
     };
     ("dma.psram_max_burst") => {
-        32
+        16
     };
     ("interrupts.status_registers") => {
         3
@@ -1084,8 +1084,18 @@ macro_rules! for_each_dma_engine {
         _for_each_inner_dma_engine!(("I2S_DMA"));
         _for_each_inner_dma_engine!(("CRYPTO_DMA"));
         _for_each_inner_dma_engine!(("COPY_DMA"));
+        _for_each_inner_dma_engine!(("SPI_DMA", internal = [Disabled, Enabled], external
+        = [Size16], external_default = Size16)); _for_each_inner_dma_engine!(("I2S_DMA",
+        internal = [Disabled, Enabled], external = [Size16], external_default = Size16));
+        _for_each_inner_dma_engine!(("CRYPTO_DMA", internal = [Disabled, Enabled],
+        external = [Size16], external_default = Size16));
         _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA"), ("CRYPTO_DMA"),
         ("COPY_DMA"))); _for_each_inner_dma_engine!((priority));
+        _for_each_inner_dma_engine!((burst("SPI_DMA", internal = [Disabled, Enabled],
+        external = [Size16], external_default = Size16), ("I2S_DMA", internal =
+        [Disabled, Enabled], external = [Size16], external_default = Size16),
+        ("CRYPTO_DMA", internal = [Disabled, Enabled], external = [Size16],
+        external_default = Size16)));
     };
 }
 #[macro_export]

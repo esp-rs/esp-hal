@@ -126,8 +126,10 @@ resolution = 8
 [device.dma]
 support_status = "partial"
 ext_mem_configurable_block_size = true
-# With 64 B blocks, the DMA moves only the first 32 bytes of each block.
-psram_max_burst = 32
+# With 64 B blocks, the DMA moves only the first 32 bytes of each block. With 32 B blocks, a
+# full-duplex SPI transfer with both buffers in PSRAM loses data after a transfer that used a
+# larger block. ESP-IDF uses only 16 B blocks.
+psram_max_burst = 16
 engines = [
     {
         name = "SPI_DMA",

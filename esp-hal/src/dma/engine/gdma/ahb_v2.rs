@@ -16,10 +16,12 @@ cfg_select! {
 
 // `*_data_burst_mode_sel`: 0 single, 1 INCR4 (16 B), 2 INCR8 (32 B), 3 INCR16 (64 B).
 // The field selects the burst for internal memory and for PSRAM.
-// The C5 and C61 PSRAM controllers accept bursts of at most 32 B.
-// Only the P4 has a `*_data_burst_en` bit.
-const fn data_burst_mode_sel(enabled: bool) -> u8 {
-    if enabled { 2 } else { 0 }
+// Only the P4 has a `*_data_burst_en` bit. ESP-IDF sets it for every burst, and a 4-byte burst
+// is the bit with mode 0, so esp-hal always sets it.
+const fn data_burst_mode(internal: u8, external: u8, psram: bool) -> u8 {
+    let burst = if psram { external } else { internal };
+    // The 8-byte step does not exist: 4 B is mode 0, 16 B is mode 1.
+    burst.saturating_sub(BurstSize::Size8 as u8)
 }
 
 impl AhbGdmaTxChannel<'_> {
@@ -49,14 +51,13 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        let enabled = burst_mode.is_burst_enabled();
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
         self.ch().out_conf0().modify(|_, w| {
             #[cfg(esp32p4)]
-            w.out_data_burst_en().bit(enabled);
+            w.out_data_burst_en().set_bit();
             unsafe {
                 w.out_data_burst_mode_sel()
-                    .bits(data_burst_mode_sel(enabled))
+                    .bits(data_burst_mode(internal, external, psram))
             }
         });
     }
@@ -259,14 +260,13 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        let enabled = burst_mode.is_burst_enabled();
+    fn set_burst(&self, internal: u8, external: u8, psram: bool) {
         self.ch().in_conf0().modify(|_, w| {
             #[cfg(esp32p4)]
-            w.in_data_burst_en().bit(enabled);
+            w.in_data_burst_en().set_bit();
             unsafe {
                 w.in_data_burst_mode_sel()
-                    .bits(data_burst_mode_sel(enabled))
+                    .bits(data_burst_mode(internal, external, psram))
             }
         });
     }

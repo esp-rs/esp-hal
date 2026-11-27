@@ -28,7 +28,7 @@ use esp_alloc::DmaCompatibleExternalMemory;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{DmaTxBuf, ExternalBurstConfig, aligned::DmaAlignedMut},
+    dma::{BurstSize, DmaTxBuf, aligned::DmaAlignedMut},
     dma_rx_buffer,
     main,
     spi::{
@@ -42,12 +42,9 @@ use log::*;
 esp_bootloader_esp_idf::esp_app_desc!();
 
 const DMA_BUFFER_SIZE: usize = 8192;
-const DMA_ALIGNMENT: ExternalBurstConfig = cfg_select! {
-    // ExternalBurstConfig::Size64 is not available on
-    // ESP32-S2.
-    feature = "esp32s2" => ExternalBurstConfig::Size32,
-    _ => ExternalBurstConfig::Size64,
-};
+// The SPI DMA bursts up to 32 bytes from PSRAM by default. A buffer aligned to the burst does not
+// limit it.
+const DMA_ALIGNMENT: BurstSize = BurstSize::Size32;
 
 #[main]
 fn main() -> ! {
@@ -80,9 +77,9 @@ fn main() -> ! {
         DmaCompatibleExternalMemory,
     ));
 
-    const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
+    const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT.bytes();
     let descriptors = esp_hal::dma_descriptors_impl!(DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
-    let mut dma_tx_buf = DmaTxBuf::new_with_config(
+    let mut dma_tx_buf = DmaTxBuf::new_with_min_burst(
         descriptors,
         DmaAlignedMut::new(buffer).unwrap().unsize(),
         DMA_ALIGNMENT,

@@ -82,9 +82,13 @@ fn load_device_config(relative_path: &str) -> Config {
         })
         .unwrap();
 
-    let config: Config = toml::from_str(&content)
+    let mut config: Config = toml::from_str(&content)
         .with_context(|| format!("Failed to parse device configuration: {}", path.display()))
         .unwrap();
+
+    if let Some(dma) = config.device.peri_config.dma.as_mut() {
+        dma.engines.set_psram_max_burst(dma.psram_max_burst);
+    }
 
     config
         .validate()
@@ -518,6 +522,7 @@ impl Config {
             dma.engines
                 .validate_mem2mem(dma.mem2mem_requires_peripheral)?;
             dma.engines.validate_psram(dma.psram_max_burst)?;
+            dma.engines.validate_bursts()?;
         }
 
         if let Some(adc) = &self.device.peri_config.adc
@@ -852,7 +857,7 @@ This pin may be available with certain limitations. Check your hardware to make 
         }
 
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
-            for engine in dma.engines.0.iter() {
+            for engine in dma.engines.engines.iter() {
                 for channel in engine.channels.iter() {
                     let ch_name = format_ident!("{}", channel.name);
                     let singleton_doc = format!("{} peripheral singleton", channel.name);
@@ -1015,7 +1020,7 @@ This pin may be available with certain limitations. Check your hardware to make 
         }
 
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
-            for engine in dma.engines.0.iter() {
+            for engine in dma.engines.engines.iter() {
                 use convert_case::{Case, Casing};
                 let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
                 let any_channel = format_ident!("{channel}Channel");

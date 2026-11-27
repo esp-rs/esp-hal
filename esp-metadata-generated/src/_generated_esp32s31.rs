@@ -1446,10 +1446,19 @@ macro_rules! for_each_dma_engine {
         _for_each_inner_dma_engine!(("AXI_GDMA"));
         _for_each_inner_dma_engine!(("AHB_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
         12, 13, 14, 15)); _for_each_inner_dma_engine!(("AXI_GDMA", 0, 1, 2, 3, 4, 5, 6,
-        7, 8, 9, 10, 11, 12, 13, 14, 15)); _for_each_inner_dma_engine!((all("AHB_GDMA"),
-        ("AXI_GDMA"))); _for_each_inner_dma_engine!((priority("AHB_GDMA", 0, 1, 2, 3, 4,
-        5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15), ("AXI_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8,
-        9, 10, 11, 12, 13, 14, 15)));
+        7, 8, 9, 10, 11, 12, 13, 14, 15)); _for_each_inner_dma_engine!(("AHB_GDMA",
+        internal = [Size4, Size16, Size32, Size64], external = [Size4, Size16, Size32,
+        Size64], external_default = Size32)); _for_each_inner_dma_engine!(("AXI_GDMA",
+        internal = [Size8, Size16, Size32, Size64, Size128], external = [Size8, Size16,
+        Size32, Size64, Size128], external_default = Size32));
+        _for_each_inner_dma_engine!((all("AHB_GDMA"), ("AXI_GDMA")));
+        _for_each_inner_dma_engine!((priority("AHB_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+        10, 11, 12, 13, 14, 15), ("AXI_GDMA", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+        13, 14, 15))); _for_each_inner_dma_engine!((burst("AHB_GDMA", internal = [Size4,
+        Size16, Size32, Size64], external = [Size4, Size16, Size32, Size64],
+        external_default = Size32), ("AXI_GDMA", internal = [Size8, Size16, Size32,
+        Size64, Size128], external = [Size8, Size16, Size32, Size64, Size128],
+        external_default = Size32)));
     };
 }
 #[macro_export]

@@ -63,7 +63,7 @@ mod tests {
         Async,
         delay::Delay,
         dma::{
-            BurstConfig,
+            BurstSize,
             DmaDescriptor,
             DmaRxBuf,
             DmaTxBuf,
@@ -94,18 +94,19 @@ mod tests {
 
     const BUFFER_SIZE: usize = 2000;
 
-    // Internal burst makes the 8000 B read buffers 4092 B descriptors. On chips with a 12-bit
-    // `rx_eof_num`, the I2S raises its EOF about 4 KB into the read, so in the last descriptor.
-    const RX_BURST_CONFIGS: [BurstConfig; 2] = [
-        BurstConfig::DEFAULT,
-        cfg_select! {
-            dma_can_access_psram => BurstConfig {
-                external_memory: esp_hal::dma::ExternalBurstConfig::DEFAULT,
-                internal_memory: esp_hal::dma::InternalBurstConfig::Enabled,
-            },
-            _ => BurstConfig::Enabled,
-        },
-    ];
+    // A 4-byte minimum burst makes the 8000 B read buffers 4092 B descriptors. On chips with a
+    // 12-bit `rx_eof_num`, the I2S raises its EOF about 4 KB into the read, so in the last
+    // descriptor.
+    const RX_MIN_BURSTS: [Option<BurstSize>; 2] = [None, Some(BurstSize::Size4)];
+
+    fn with_min_burst(buffer: DmaRxBuf, min: Option<BurstSize>) -> DmaRxBuf {
+        let (descriptors, buffer) = buffer.split();
+        match min {
+            Some(min) => DmaRxBuf::new_with_min_burst(descriptors, buffer, min),
+            None => DmaRxBuf::new(descriptors, buffer),
+        }
+        .unwrap()
+    }
 
     #[derive(Clone)]
     struct SampleSource {
@@ -450,8 +451,8 @@ mod tests {
             .with_din(din)
             .build();
 
-        for burst in RX_BURST_CONFIGS {
-            rx_buffer.set_burst_config(burst).unwrap();
+        for min_burst in RX_MIN_BURSTS {
+            rx_buffer = with_min_burst(rx_buffer, min_burst);
 
             for _ in 0..10 {
                 let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
@@ -515,8 +516,8 @@ mod tests {
             .with_din(din)
             .build();
 
-        for burst in RX_BURST_CONFIGS {
-            rx_buffer.set_burst_config(burst).unwrap();
+        for min_burst in RX_MIN_BURSTS {
+            rx_buffer = with_min_burst(rx_buffer, min_burst);
 
             for _ in 0..10 {
                 let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
