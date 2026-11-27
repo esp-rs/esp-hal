@@ -455,6 +455,9 @@ unstable_driver! {
     pub mod mipi_dsi;
 }
 
+#[cfg(all(feature = "unstable", mipi_dsi_driver_supported))]
+pub(crate) mod mipi_dphy_power;
+
 /// State of the CPU saved when entering exception or interrupt
 #[instability::unstable]
 #[cfg(feature = "rt")]
