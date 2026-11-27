@@ -323,14 +323,7 @@ impl PhyState {
         if self.ref_count == 0 {
             #[cfg(phy_backed_up_digital_register_count_is_set)]
             self.backup_digital_regs();
-            unsafe {
-                // Disable PHY and RF.
-                sys::include::phy_close_rf();
-
-                // Power down PHY temperature sensor.
-                #[cfg(not(esp32))]
-                sys::include::phy_xpd_tsens();
-            }
+            power_down_rf();
             #[cfg(esp32)]
             {
                 self.phy_clock_state_transition_timestamp = Instant::now();
@@ -340,6 +333,31 @@ impl PhyState {
             // after we record the value. This shouldn't be too bad though.
         }
     }
+}
+
+/// Disables the PHY and the RF, and powers down the PHY temperature sensor.
+fn power_down_rf() {
+    unsafe {
+        sys::include::phy_close_rf();
+        #[cfg(not(esp32))]
+        sys::include::phy_xpd_tsens();
+    }
+}
+
+/// Powers down the RF before a deep sleep, if a radio still uses the PHY.
+///
+/// esp-hal calls this at deep-sleep entry, because the sleep configuration does not power down the
+/// RF. The reference count stays as it is, because the wake resets the chip.
+///
+/// See <https://github.com/espressif/esp-idf/blob/ad20ded62a2d67a26e501fdc1905f43ba7ad6c81/components/esp_phy/src/phy_init.c#L887-L896>.
+#[cfg(soc_has_wifi)]
+#[unsafe(no_mangle)]
+extern "C" fn __esp_phy_deep_sleep_prepare() {
+    PHY_STATE.with(|phy_state| {
+        if phy_state.ref_count > 0 {
+            power_down_rf();
+        }
+    });
 }
 
 fn is_reset_from_deepsleep() -> bool {

@@ -35,6 +35,9 @@ PROVIDE(hal_main = main);
 /* Called right before `main`. A bootloader support crate may define it. */
 PROVIDE(__esp_bootloader_init = __esp_bootloader_default_init);
 
+/* Called before a deep sleep. esp-phy may define it to power down the RF. */
+PROVIDE(__esp_phy_deep_sleep_prepare = __esp_phy_default_deep_sleep_prepare);
+
 /* Default exception handler. By default, the exception handler is abort.
    Users can override this alias by defining the symbol themselves */
 PROVIDE(ExceptionHandler = abort);

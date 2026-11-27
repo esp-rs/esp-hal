@@ -270,6 +270,10 @@ impl<'d> LowPower<'d> {
     /// reach the deep-sleep current, and it cannot know their earlier configuration. Configure
     /// those pads again if this function returns. ESP-IDF has the same limit in
     /// `esp_deep_sleep_try_to_start`.
+    ///
+    /// Sleep entry also powers down the RF of a radio that still runs, and a rejected request does
+    /// not power it up again. Shut the radio down before this call if it has to work after a
+    /// rejection. ESP-IDF has the same limit.
     #[cfg_attr(
         cpu_retention = "software",
         doc = "\n\nDeep sleep shares the entry code of light sleep. See [Optimization \
@@ -489,6 +493,14 @@ impl<'d> LowPower<'d> {
             return false;
         }
 
+        // After the software checks that can stop the sleep, so that the radio keeps working when
+        // one of them does. The RF power-down needs the PLL clock, which `sleep_transition` stops.
+        // See <https://github.com/espressif/esp-idf/blob/ad20ded62a2d67a26e501fdc1905f43ba7ad6c81/components/esp_sleep/sleep_modes.c#L997-L1002>.
+        #[cfg(sleep_deep_sleep)]
+        if kind == SleepKind::Deep {
+            unsafe { __esp_phy_deep_sleep_prepare() };
+        }
+
         // A deep sleep keeps what `RtcSleepConfig::deep` asked for, because the wake resets the
         // chip and keeps no CPU state to lose.
         #[cfg(supports_cpu_power_down)]
@@ -580,6 +592,17 @@ impl<'d> LowPower<'d> {
         false
     }
 }
+
+#[cfg(all(sleep_deep_sleep, feature = "rt"))]
+unsafe extern "C" {
+    /// Powers down the RF of a running radio before a deep sleep. `hal-defaults.x` maps it to
+    /// `__esp_phy_default_deep_sleep_prepare` unless esp-phy defines it.
+    fn __esp_phy_deep_sleep_prepare();
+}
+
+#[cfg(all(sleep_deep_sleep, feature = "rt"))]
+#[unsafe(export_name = "__esp_phy_default_deep_sleep_prepare")]
+extern "C" fn esp_phy_default_deep_sleep_prepare() {}
 
 /// Requests the sleep, and returns whether the hardware rejected the request.
 ///
