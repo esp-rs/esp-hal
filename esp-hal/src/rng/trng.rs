@@ -122,6 +122,7 @@ The entropy source also uses I2S0 to run the SAR ADC."
             return Err(self);
         }
 
+        crate::soc::trng::revert_trng();
         core::mem::forget(self);
         Ok(())
     }
