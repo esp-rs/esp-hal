@@ -257,8 +257,9 @@ fn psram_run_loopback(
     mut dma_tx_buf: esp_hal::dma::DmaTxBuf,
     mut dma_rx_buf: esp_hal::dma::DmaRxBuf,
 ) {
+    // Bytes 512 B apart differ, so data read from the wrong PSRAM page does not match.
     for (i, v) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-        *v = (i % 256) as u8;
+        *v = (i ^ (i >> 8)) as u8;
     }
 
     let mut spi = spi;
@@ -1414,7 +1415,7 @@ mod tests {
 #[embedded_test::tests(default_timeout = 10)]
 mod psram_dma {
     use esp_hal::{
-        dma::ExternalBurstConfig,
+        dma::{BurstConfig, CHUNK_SIZE, ExternalBurstConfig, InternalBurstConfig},
         spi::master::{Spi, SpiDma},
     };
     use hil_test as _;
@@ -1466,6 +1467,36 @@ mod psram_dma {
     #[cfg(not(esp32s2))]
     fn test_psram_tx_loopback_size64(ctx: Context) {
         run_loopback_test!(ctx.spi, ExternalBurstConfig::Size64);
+    }
+
+    #[test]
+    fn test_psram_tx_burst_crosses_page(ctx: Context) {
+        const SIZE: usize = 2048;
+        const PAGE: usize = 512;
+        // 20 B before a 512 B boundary, so a 32 B burst crosses a PSRAM page every 512 B.
+        const OFFSET: usize = PAGE - 20;
+
+        let layout = core::alloc::Layout::from_size_align(OFFSET + SIZE, PAGE).unwrap();
+        let buffer = unsafe {
+            let ptr = alloc::alloc::alloc(layout);
+            if ptr.is_null() {
+                alloc::alloc::handle_alloc_error(layout);
+            }
+            core::slice::from_raw_parts_mut(ptr.add(OFFSET), SIZE)
+        };
+
+        let descriptors = esp_hal::dma_descriptors_impl!(SIZE, CHUNK_SIZE);
+        let dma_tx_buf = esp_hal::dma::DmaTxBuf::new_with_config(
+            descriptors,
+            unsafe { esp_hal::dma::aligned::DmaAlignedMut::new_unchecked(buffer) },
+            BurstConfig {
+                external_memory: ExternalBurstConfig::DEFAULT,
+                internal_memory: InternalBurstConfig::Enabled,
+            },
+        )
+        .unwrap();
+        let dma_rx_buf = esp_hal::dma_rx_buffer!(SIZE).unwrap();
+        psram_run_loopback(ctx.spi, dma_tx_buf, dma_rx_buf);
     }
 }
 

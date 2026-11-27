@@ -350,6 +350,28 @@ mod ctrlr_ll {
         });
     }
 
+    /// Enables splitting a PSRAM access that crosses a page of the PSRAM chip.
+    #[inline(always)]
+    pub(crate) fn psram_ctrlr_ll_enable_split_trans(_mspi_id: u32, enable: bool) {
+        SPI0::regs()
+            .smem_ac()
+            .modify(|_, w| w.smem_split_trans_en().bit(enable));
+    }
+
+    /// The page size of the PSRAM chip. The discriminant is the `smem_page_size` value.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub(crate) enum PsramPageSize {
+        Size512  = 1,
+        Size1024 = 2,
+    }
+
+    #[inline(always)]
+    pub(crate) fn psram_ctrlr_ll_set_page_size(_mspi_id: u32, page_size: PsramPageSize) {
+        SPI0::regs()
+            .smem_ecc_ctrl()
+            .modify(|_, w| unsafe { w.smem_page_size().bits(page_size as u8) });
+    }
+
     #[inline(always)]
     pub(crate) fn psram_ctrlr_ll_set_read_mode(mspi_id: u32, read_mode: CommandMode) {
         assert!(mspi_id == 0);
