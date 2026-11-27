@@ -49,6 +49,8 @@ use esp_hal::{
         RxConfig,
         RxError,
         RxInstance,
+        RxProgress,
+        RxReception,
         TxChannel,
         TxConfig,
         TxError,
@@ -633,6 +635,20 @@ fn do_rmt_blocking_rx(ctx: &mut Context, pattern_len: usize, tx_blocks: u8, rx_b
     check_data_eq(&conf, &expected, &rx_data, rx_res);
 }
 
+// Polls `reception` into `buf` until the reception ends, and returns the number of codes.
+fn poll_until_done(
+    reception: &mut RxReception<'_>,
+    buf: &mut [PulseCode],
+) -> Result<usize, RxError> {
+    let mut total = 0;
+    loop {
+        match reception.poll(&mut buf[total..])? {
+            RxProgress::Receiving(n) => total += n,
+            RxProgress::Done(n) => return Ok(total + n),
+        }
+    }
+}
+
 // Receives one repetition of a loop transmission with `RxChannel::start_receive`, and checks
 // that the codes read while the reception runs are a prefix of the final data.
 fn do_rmt_live_rx(ctx: &mut Context, pattern_len: usize, tx_blocks: u8) {
@@ -669,15 +685,18 @@ fn do_rmt_live_rx(ctx: &mut Context, pattern_len: usize, tx_blocks: u8) {
     let mut rx_data = vec![PulseCode::end_marker(); pattern_len];
     let tx_loop = tx.transmit_loop(&tx_data, LoopMode::Infinite).unwrap();
 
-    let mut reception = rx.start_receive(&mut rx_data);
+    let mut reception = rx.start_receive();
+    let mut total = 0;
     let mut live_len = 0;
     let rx_res = loop {
-        if let Some(result) = reception.poll() {
-            break result;
+        match reception.poll(&mut rx_data[total..]) {
+            Ok(RxProgress::Receiving(n)) => total += n,
+            Ok(RxProgress::Done(n)) => break Ok(total + n),
+            Err(err) => break Err(err),
         }
-        let received = reception.received();
-        if received.len() > live_len {
-            live_len = received.len();
+        if total > live_len {
+            live_len = total;
+            let received = &rx_data[..total];
             for (idx, (&code_tx, &code_rx)) in core::iter::zip(&received_form, received).enumerate()
             {
                 assert!(
@@ -1036,14 +1055,15 @@ mod tests {
         let mut rx_data = vec![PulseCode::end_marker(); conf.tx_len];
         let tx_loop = tx.transmit_loop(&tx_data, LoopMode::Infinite).unwrap();
 
-        let mut reception = rx.start_receive(&mut rx_data);
-        while reception.received().len() < 3 {
-            assert!(
-                reception.poll().is_none(),
-                "reception ended before the stop"
-            );
+        let mut reception = rx.start_receive();
+        let mut count = 0;
+        while count < 3 {
+            let Ok(RxProgress::Receiving(n)) = reception.poll(&mut rx_data[count..]) else {
+                panic!("reception ended before the stop");
+            };
+            count += n;
         }
-        let count = reception.stop().unwrap();
+        reception.stop();
         tx_loop.stop().unwrap();
 
         assert!(count >= 3);
@@ -1064,9 +1084,9 @@ mod tests {
         );
     }
 
-    // Stopping a reception whose buffer filled up reports the error.
+    // A poll whose new codes do not fit into the buffer reports the error, and keeps reporting it.
     #[test]
-    fn rmt_live_rx_stop_buffer_too_small(mut ctx: Context) {
+    fn rmt_live_rx_buffer_too_small(mut ctx: Context) {
         let conf = LoopbackConfig {
             write_stop_code: false,
             end_marker: EndMarkerConfig::None,
@@ -1087,22 +1107,24 @@ mod tests {
             .unwrap()
             .with_pin(rx_pin);
 
+        // The frame is much longer than the buffer.
         let mut rx_data = vec![PulseCode::end_marker(); 3];
         let tx_loop = tx.transmit_loop(&tx_data, LoopMode::Infinite).unwrap();
 
-        let mut reception = rx.start_receive(&mut rx_data);
-        while reception.received().len() < 3 {
-            assert!(
-                reception.poll().is_none(),
-                "reception ended before the stop"
-            );
-        }
-        // A few more codes arrive, but the frame does not end yet.
-        Delay::new().delay_millis(2);
-        let result = reception.stop();
+        let mut reception = rx.start_receive();
+        let mut count = 0;
+        let result = loop {
+            match reception.poll(&mut rx_data[count..]) {
+                Ok(RxProgress::Receiving(n)) => count += n,
+                other => break other,
+            }
+        };
+        let again = reception.poll(&mut rx_data[..]);
+        reception.stop();
         tx_loop.stop().unwrap();
 
         assert_eq!(result, Err(RxError::BufferTooSmall));
+        assert_eq!(again, Err(RxError::BufferTooSmall));
     }
 
     // Stopping or dropping a reception that has not received an edge returns at once, and the
@@ -1122,18 +1144,14 @@ mod tests {
             .with_pin(rx_pin);
 
         let mut rx_data = vec![PulseCode::end_marker(); conf.tx_len];
-        assert_eq!(rx.start_receive(&mut rx_data).stop(), Ok(0));
-        drop(rx.start_receive(&mut rx_data));
+        rx.start_receive().stop();
+        drop(rx.start_receive());
 
         let tx_data = generate_tx_data(&conf);
         let rx_res = {
-            let mut reception = rx.start_receive(&mut rx_data);
+            let mut reception = rx.start_receive();
             tx.transmit(&tx_data).unwrap();
-            loop {
-                if let Some(result) = reception.poll() {
-                    break result;
-                }
-            }
+            poll_until_done(&mut reception, &mut rx_data)
         };
         check_data_eq(&conf, &tx_data, &rx_data, rx_res);
     }

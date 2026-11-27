@@ -1715,16 +1715,16 @@ impl<'a, Dm: DriverMode> RxChannel<'a, Dm> {
     pub fn receive(&mut self, buf: &mut [PulseCode]) -> Result<usize, RxError> {
         let mut reception = Reception::start(self.raw, buf, false);
         loop {
-            if let Some(result) = reception.poll(false) {
+            if let Some(result) = reception.poll() {
                 return result;
             }
         }
     }
 
-    /// Starts receiving one frame into `buf`.
+    /// Starts receiving one frame.
     ///
-    /// Returns an [`RxReception`] that can be used to read the codes while the frame arrives and to
-    /// stop the reception early.
+    /// Returns an [`RxReception`] that copies the codes out while the frame arrives, see
+    /// [`RxReception::poll`].
     #[cfg_attr(
         any(esp32, esp32s2),
         doc = "",
@@ -1733,11 +1733,31 @@ impl<'a, Dm: DriverMode> RxChannel<'a, Dm> {
     )]
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     #[instability::unstable]
-    pub fn start_receive<'b>(&'b mut self, buf: &'b mut [PulseCode]) -> RxReception<'b> {
+    pub fn start_receive(&mut self) -> RxReception<'_> {
+        let raw = self.raw;
+        raw.clear_rx_interrupts(EnumSet::all());
+        raw.start_receive(true, raw.memsize());
+
         RxReception {
-            reception: Reception::start(self.raw, buf, false),
+            raw,
+            reader: RmtReader::new(),
+            guard: RxGuard::new(raw),
+            _channel: PhantomData,
         }
     }
+}
+
+/// Progress of an [`RxReception`], see [`RxReception::poll`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum RxProgress {
+    /// The reception continues. Contains the number of codes that the call copied.
+    Receiving(usize),
+
+    /// The reception has ended and all codes have been copied. Contains the number of codes that
+    /// the call copied.
+    Done(usize),
 }
 
 /// A reception in progress, see [`RxChannel::start_receive`].
@@ -1747,67 +1767,72 @@ impl<'a, Dm: DriverMode> RxChannel<'a, Dm> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct RxReception<'d> {
-    reception: Reception<'d>,
+pub struct RxReception<'c> {
+    raw: DynChannelAccess<Rx>,
+    reader: RmtReader,
+    guard: RxGuard,
+    _channel: PhantomData<&'c mut ()>,
 }
 
 impl RxReception<'_> {
-    /// Copies the received codes into the buffer and returns the result once the reception has
-    /// ended.
+    /// Copies the codes received since the previous call into `buf`.
     ///
-    /// Returns `None` while the reception continues. Use [`Self::received`] to read the codes.
+    /// Returns [`RxProgress::Done`] once the reception has ended and every code has been copied.
     ///
     /// The hardware makes a [`PulseCode`] available only when both of its pulses are complete.
-    /// Thus, the last pulse can be missing until the next edge on the input. When the reception
-    /// has ended, the buffer contains all codes, including the end marker.
+    /// Thus, the last pulse can be missing until the next edge on the input. The last code of a
+    /// frame contains the end marker.
     ///
     /// # Errors
     ///
-    /// [`RxError::BufferTooSmall`] or [`RxError::Overrun`].
+    /// [`RxError::BufferTooSmall`] if the new codes do not fit into `buf`, or
+    /// [`RxError::Overrun`]. Once an error is returned, every further call returns it. The
+    /// contents of `buf` are unspecified after an error.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     #[instability::unstable]
-    pub fn poll(&mut self) -> Option<Result<usize, RxError>> {
-        self.reception.poll(true)
+    pub fn poll(&mut self, buf: &mut [PulseCode]) -> Result<RxProgress, RxError> {
+        if let ReaderState::Error(err) = self.reader.state {
+            return Err(err);
+        }
+
+        let raw = self.raw;
+        if self.guard.is_active() {
+            match raw.get_rx_status() {
+                Some(event @ (Event::End | Event::Error)) => {
+                    // See `Reception::poll`.
+                    raw.stop_rx(false);
+                    raw.update();
+                    self.guard.set_completed();
+
+                    if event == Event::Error || !self.reader.end_is_valid(raw) {
+                        self.reader.state = ReaderState::Error(RxError::Overrun);
+                        return Err(RxError::Overrun);
+                    }
+                }
+                #[cfg(rmt_has_rx_wrap)]
+                Some(Event::Threshold) => raw.clear_rx_interrupts(Event::Threshold),
+                _ => {}
+            }
+        }
+
+        let (count, max_count) = self.reader.copy(buf, raw);
+        if count < max_count {
+            self.reader.state = ReaderState::Error(RxError::BufferTooSmall);
+            Err(RxError::BufferTooSmall)
+        } else if self.guard.is_active() {
+            Ok(RxProgress::Receiving(count))
+        } else {
+            Ok(RxProgress::Done(count))
+        }
     }
 
-    /// Returns the pulse codes in the buffer.
+    /// Stops the reception, the same as dropping it.
     ///
-    /// [`Self::poll`] copies new codes from the hardware into the buffer.
+    /// The reception stops immediately, before the idle threshold. Codes that were not copied by
+    /// [`Self::poll`] are lost.
     #[inline]
     #[instability::unstable]
-    pub fn received(&self) -> &[PulseCode] {
-        &self.reception.data[..self.reception.reader.total]
-    }
-
-    /// Stops the reception and returns the number of received pulse codes.
-    ///
-    /// The reception stops immediately, before the idle threshold. The codes that the hardware
-    /// completed before this call are copied into the buffer. The buffer contains an end marker
-    /// only if the reception ended before this call.
-    ///
-    /// # Errors
-    ///
-    /// [`RxError::BufferTooSmall`] if the buffer filled up before this call, or
-    /// [`RxError::Overrun`] if the reception ended with an overrun before this call.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    #[instability::unstable]
-    pub fn stop(mut self) -> Result<usize, RxError> {
-        let reception = &mut self.reception;
-        if reception.guard.is_active() {
-            if let Some(result) = reception.poll(true) {
-                return result;
-            }
-            let raw = reception.raw;
-            raw.stop_rx(true);
-            raw.update();
-            raw.unlisten_rx_interrupt(EnumSet::all());
-            reception.guard.set_completed();
-        }
-        match reception.reader.state {
-            ReaderState::Error(err) => Err(err),
-            _ => Ok(reception.reader.total),
-        }
-    }
+    pub fn stop(self) {}
 }
 
 impl<'a> RxChannel<'a, Async> {
@@ -1867,10 +1892,9 @@ impl<'d> Reception<'d> {
         self.reader.read(&mut rest, self.raw, final_)
     }
 
-    // Reads the channel RAM if needed, or always if `live` is set. Returns the result once the
-    // reception has ended.
+    // Reads the channel RAM if needed. Returns the result once the reception has ended.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn poll(&mut self, live: bool) -> Option<Result<usize, RxError>> {
+    fn poll(&mut self) -> Option<Result<usize, RxError>> {
         let raw = self.raw;
         let result = match raw.get_rx_status() {
             // Read all available data also on error
@@ -1896,12 +1920,7 @@ impl<'d> Reception<'d> {
                 self.read(false);
                 return None;
             }
-            _ => {
-                if live {
-                    self.read(false);
-                }
-                return None;
-            }
+            _ => return None,
         };
 
         self.guard.set_completed();
@@ -1924,7 +1943,7 @@ impl core::future::Future for RxFuture<'_> {
 
         WAKER[raw.channel() as usize].register(ctx.waker());
 
-        match reception.poll(false) {
+        match reception.poll() {
             Some(result) => Poll::Ready(result),
             None => {
                 // The interrupt handler disables the threshold interrupt when it fires.
