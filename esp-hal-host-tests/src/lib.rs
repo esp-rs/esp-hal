@@ -15,6 +15,7 @@ macro_rules! debug {
 }
 
 mod ipc;
+mod sdio_slave;
 
 // The included files name their dependencies as `crate::` items.
 #[path = "../../esp-rtos/src/run_queue.rs"]

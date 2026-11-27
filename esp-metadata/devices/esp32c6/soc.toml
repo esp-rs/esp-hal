@@ -92,6 +92,7 @@ peripherals = [
     { name = "RNG", pac = "LP_PERI" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SLC", interrupts = { ch0 = "SLC0", ch1 = "SLC1" } },
     { name = "SLCHOST" },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "SPI0" },
@@ -421,7 +422,7 @@ instances = {
     },
 }
 [device.sd_slave]
-support_status = "not_supported"
+support_status = "partial"
 [device.twai]
 support_status = { status = "partial", issue = 6781 }
 [device.usb_serial_jtag]

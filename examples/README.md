@@ -8,6 +8,8 @@ To check if a device is compatible with a given example, check the features in t
 
 For more information regarding the examples, refer to the `README.md` file in any of the subdirectories within the `examples/` directory.
 
+The [paired SDIO host and slave example](peripheral/sdio/README.md) uses an ESP32-P4 and ESP32-C6, with reference wiring for Espressif's development board and the corresponding Waveshare variant.
+
 ## Building Examples
 
 Build all examples for a given device:

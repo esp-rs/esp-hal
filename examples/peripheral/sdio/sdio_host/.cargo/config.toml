@@ -1,0 +1,6 @@
+[target.'cfg(target_arch = "riscv32")']
+runner = "espflash flash --monitor"
+rustflags = ["-C", "link-arg=-Tlinkall.x", "-C", "force-frame-pointers"]
+
+[unstable]
+build-std = ["core", "alloc"]

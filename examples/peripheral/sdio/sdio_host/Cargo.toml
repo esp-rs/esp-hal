@@ -1,0 +1,25 @@
+[package]
+name = "sdio-host"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+esp-backtrace = { path = "../../../../esp-backtrace", features = ["panic-handler", "println"] }
+esp-bootloader-esp-idf = { path = "../../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../../esp-hal", features = ["log-04", "unstable"] }
+esp-println = { path = "../../../../esp-println", features = ["log-04"] }
+sdio = "0.5"
+
+[features]
+esp32p4 = [
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-hal/esp32p4",
+]
+
+[profile.release]
+debug = true
+debug-assertions = true
+lto = "fat"
+codegen-units = 1
