@@ -103,11 +103,15 @@ pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
 // PLL_F96M_CLK
 
 fn enable_pll_f96m_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    // The HP_ACTIVE bits keep the BBPLL powered after a sleep.
     if en {
         PMU::regs().imm_hp_ck_power().write(|w| {
             w.tie_high_xpd_bbpll().set_bit();
             w.tie_high_xpd_bbpll_i2c().set_bit()
         });
+        PMU::regs()
+            .imm_hp_ck_power()
+            .write(|w| w.tie_high_global_bbpll_icg().set_bit());
     } else {
         PMU::regs()
             .imm_hp_ck_power()
@@ -117,6 +121,10 @@ fn enable_pll_f96m_clk_impl(_clocks: &mut ClockTree, en: bool) {
             w.tie_low_xpd_bbpll_i2c().set_bit()
         });
     }
+    PMU::regs().hp_active_hp_ck_power().modify(|_, w| {
+        w.hp_active_xpd_bbpll().bit(en);
+        w.hp_active_xpd_bbpll_i2c().bit(en)
+    });
 
     PCR::regs()
         .pll_div_clk_en()
@@ -190,6 +198,8 @@ fn configure_iomux_function_clock_impl(
 
 fn enable_xtal_x2_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // The frequency doubler is a separate circuit, it does not depend on the BBPLL.
+    //
+    // The HP_ACTIVE bit keeps the doubler powered after a sleep.
     if en {
         PMU::regs().imm_hp_ck_power().write(|w| {
             w.tie_low_xpd_xtalx2().clear_bit();
@@ -209,6 +219,9 @@ fn enable_xtal_x2_clk_impl(_clocks: &mut ClockTree, en: bool) {
             w.tie_low_global_xtalx2_icg().set_bit()
         });
     }
+    PMU::regs()
+        .hp_active_xtal()
+        .modify(|_, w| w.hp_active_xpd_xtalx2().bit(en));
 }
 
 // RC_FAST_CLK

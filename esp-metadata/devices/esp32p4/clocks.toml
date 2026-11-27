@@ -301,7 +301,11 @@ peripheral_clocks = { templates = [
     # USB -- reset is via LP-domain registers, leave rst as no-op here.
     { name = "UsbFs",  template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "usb_otg11", rst_template = "{{no_rst}}" } },
     { name = "UsbHs",  template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "usb_otg20", rst_template = "{{no_rst}}" } },
-    { name = "UsbDevice", template_params = { clk_en_template = "{{apb_clk_template}}", rst_template = "{{no_rst}}" }, keep_enabled = "keep_usb_serial_jtag_enabled" },
+    # APB gate in HP_SYS_CLKRST; 48 MHz PHY clock and reset in LP_AON_CLKRST.
+    { name = "UsbDevice", template_params = {
+        clk_en_template = "{{apb_clk_template}} crate::peripherals::LP_AON_CLKRST::regs().lp_aonclkrst_hp_usb_clkrst_ctrl0().modify(|_, w| w.lp_aonclkrst_usb_device_48m_clk_en().bit(enable));",
+        rst_template = "crate::peripherals::LP_AON_CLKRST::regs().lp_aonclkrst_hp_usb_clkrst_ctrl1().modify(|_, w| w.lp_aonclkrst_rst_en_usb_device().bit(reset));"
+    }, keep_enabled = "keep_usb_serial_jtag_enabled" },
     # Connectivity -- EMAC and SDMMC reset live in dedicated registers, no HP_RST_EN gate.
     { name = "Emac",  template_params = { clk_en_template = "{{sys_clk_template}}", rst_template = "{{no_rst}}" } },
     { name = "SdioHost", template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "sdmmc", rst_template = "crate::peripherals::LP_AON_CLKRST::regs().lp_aonclkrst_hp_sdmmc_emac_rst_ctrl().modify(|_, w| w.lp_aonclkrst_rst_en_sdmmc().bit(reset));" } },

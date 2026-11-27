@@ -41,9 +41,19 @@ impl Sleep {
     /// draws less current than a light sleep that keeps the domain powered. The saving costs the
     /// memory, and it adds the save and the restore to the sleep and the wake.
     ///
-    /// Every light sleep after this call powers the CPU domain down. Nothing turns it off again,
-    /// because the memory stays with the driver for the life of the program.
-    ///
+    /// After this call, light sleep powers the CPU domain down. Nothing turns it off again, because
+    /// the memory stays with the driver for the life of the program.
+    #[cfg_attr(
+        sleep_keeps_cpu_powered_for_usb_serial_jtag,
+        doc = "\n\nOnly a light sleep that keeps USB Serial/JTAG connected to a host keeps the CPU domain powered. See the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option of esp-hal."
+    )]
+    #[cfg_attr(
+        all(
+            sleep_keeps_usb_serial_jtag,
+            not(sleep_keeps_cpu_powered_for_usb_serial_jtag)
+        ),
+        doc = "\n\nOnly a light sleep that keeps USB Serial/JTAG connected to a host while a debugger is attached keeps the CPU domain powered. See the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option of esp-hal."
+    )]
     /// # Errors
     ///
     /// Returns [`CpuRetentionMemoryError`] if a buffer is installed already, or if `memory` is

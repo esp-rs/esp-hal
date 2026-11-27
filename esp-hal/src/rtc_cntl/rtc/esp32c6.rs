@@ -198,8 +198,8 @@ const ICG_MODEM_CODE_ACTIVE: u8 = 2;
 
 pub(crate) const ICG_NOGATING_SLEEP: u8 = 1 << ICG_MODEM_CODE_SLEEP;
 
-const HP_SYSCLK_XTAL: u8 = 0;
-const HP_SYSCLK_PLL: u8 = 1;
+pub(crate) const HP_SYSCLK_XTAL: u8 = 0;
+pub(crate) const HP_SYSCLK_PLL: u8 = 1;
 
 bitfield::bitfield! {
     #[derive(Clone, Copy, Default)]

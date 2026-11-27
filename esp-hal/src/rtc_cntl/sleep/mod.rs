@@ -13,6 +13,49 @@
 //!    * `touch`
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
+#![doc = cfg_select! {
+    sleep_keeps_usb_serial_jtag => r#"
+## USB Serial/JTAG
+
+The `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option, enabled by default, keeps USB
+Serial/JTAG connected to a USB host across light sleep, so that the console and the debugger keep
+working. When the option is disabled, every light sleep disconnects USB Serial/JTAG from the host.
+"#,
+    soc_has_usb_device => r#"
+## USB Serial/JTAG
+
+Light sleep cannot keep USB Serial/JTAG running on this chip, so every light sleep disconnects it
+from the host. The `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option, enabled by default,
+makes light sleep refuse to start while a host is connected, so that the console and the debugger
+keep working. When the option is disabled, light sleep also starts while a host is connected.
+"#,
+    _ => "",
+}]
+#![doc = cfg_select! {
+    sleep_keeps_cpu_powered_for_usb_serial_jtag => r#"
+
+While a host is connected, light sleep keeps USB Serial/JTAG running and the CPU powered, even if
+CPU power-down is enabled, which increases the light-sleep current.
+"#,
+    sleep_keeps_usb_serial_jtag => r#"
+
+While a host is connected, light sleep keeps USB Serial/JTAG running, which increases the
+light-sleep current. While a debugger is attached, such a light sleep also keeps the CPU powered.
+"#,
+    _ => "",
+}]
+#![doc = cfg_select! {
+    sleep_keeps_jtag_clocks_for_debugger => r#"
+While a debugger is attached, such a light sleep also keeps the clocks that JTAG needs. The debug
+module stays active after the debugger disconnects, so the higher current remains until the next
+chip reset.
+"#,
+    all(sleep_keeps_usb_serial_jtag, not(sleep_keeps_cpu_powered_for_usb_serial_jtag)) => r#"
+The debug module stays active after the debugger disconnects, so the higher current remains until
+the next chip reset.
+"#,
+    _ => "",
+}]
 
 use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 
@@ -107,6 +150,8 @@ impl WakeupWaits {
 
 #[cfg(soc_has_pmu)]
 pub(crate) mod pmu_common;
+#[cfg(soc_has_usb_device)]
+mod usb_serial_jtag;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
@@ -149,11 +194,16 @@ pub enum LightSleep {
     ///
     /// The refusal holds until the state that caused it changes, so a second call refuses too.
     /// Wait for an interrupt instead.
+    #[cfg_attr(
+        all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)),
+        doc = "\n\nA USB host connected to USB Serial/JTAG also refuses the sleep, unless the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option is disabled. The disconnect of the host raises no interrupt, so a caller must try the sleep again after a delay."
+    )]
     Refused,
 }
 
 #[cfg(supports_cpu_power_down)]
 use crate::rtc_cntl::cpu_retention;
+
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
 /// The wakeup-enable mask survives a deep-sleep wake, so here it still holds the request of the run
@@ -165,8 +215,8 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     // changes a path.
     gpio::wakeup::record_wakeup();
 
-    // Release the pads after a deep-sleep wake only, and only if the previous
-    // run armed an IO wake source.
+    // Release the pads after a deep-sleep wake if the previous run armed an IO wake source. A USB
+    // reset during light sleep has the same reset reason and also needs the release.
     if super::reset_reason(crate::system::Cpu::ProCpu) == Some(super::SocResetReason::CoreDeepSleep)
         && gpio::wakeup::wake_enabled()
     {
@@ -176,6 +226,21 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     RtcSleepConfig::base_settings(rtc);
 
     set_mask(0);
+}
+
+/// Returns whether the last reset was a wakeup from deep sleep.
+///
+/// On a chip that keeps USB Serial/JTAG running in light sleep, a USB reset during a light sleep
+/// has the same reset reason. The sleep mode that the sleep code leaves for the ROM tells the two
+/// apart.
+pub(crate) fn woke_from_deep_sleep() -> bool {
+    let deep_sleep_reset = super::reset_reason(crate::system::Cpu::ProCpu)
+        == Some(super::SocResetReason::CoreDeepSleep);
+
+    cfg_select! {
+        sleep_keeps_usb_serial_jtag => deep_sleep_reset && pmu_common::last_sleep_was_deep(),
+        _ => deep_sleep_reset,
+    }
 }
 
 /// Low-power management.
@@ -304,6 +369,10 @@ impl<'d> LowPower<'d> {
     /// neither case. For the caller, a rejected sleep and a very short sleep have the same
     /// result.
     #[cfg_attr(
+        all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)),
+        doc = "\n\nThe function refuses the sleep while a USB host is connected to USB Serial/JTAG, unless the `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` option is disabled."
+    )]
+    #[cfg_attr(
         cpu_retention = "software",
         doc = "\n\nLight sleep suspends the caches. See [Optimization \
                level](crate#optimization-level) for the build requirement."
@@ -346,6 +415,11 @@ impl<'d> LowPower<'d> {
         config: RtcSleepConfig,
         may_sleep: Option<fn() -> bool>,
     ) -> LightSleep {
+        #[cfg(all(soc_has_usb_device, not(sleep_keeps_usb_serial_jtag)))]
+        if cfg!(keep_usb_serial_jtag_connected) && usb_serial_jtag::host_connected() {
+            return LightSleep::Refused;
+        }
+
         if self.sleep(config, SleepKind::Light, true, may_sleep) {
             LightSleep::Refused
         } else {
@@ -431,6 +505,12 @@ impl<'d> LowPower<'d> {
         let rtc = Rtc::new(unsafe { crate::peripherals::RTC_TIMER::steal() });
 
         let mut config = config;
+        // Before `set_sleep_kind`, which picks the power-down flags from it.
+        #[cfg(sleep_keeps_usb_serial_jtag)]
+        {
+            config.keep_usb_serial_jtag =
+                kind == SleepKind::Light && usb_serial_jtag::keep_in_light_sleep();
+        }
         config.set_sleep_kind(kind);
         #[cfg(modem_retention = "regdma")]
         crate::rtc_cntl::regdma::prepare_sleep(kind == SleepKind::Light);
@@ -454,6 +534,7 @@ impl<'d> LowPower<'d> {
         // it. A buffer that another core installs during this sleep serves the next one.
         #[cfg(supports_cpu_power_down)]
         let retention_buffer = match kind {
+            SleepKind::Light if usb_keeps_cpu_powered(&config) => None,
             SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
             SleepKind::Deep => None,
         };
@@ -581,6 +662,26 @@ impl<'d> LowPower<'d> {
     }
 }
 
+/// Returns whether a light sleep with this configuration keeps the CPU powered for USB
+/// Serial/JTAG.
+///
+/// On some chips, a powered-down CPU does not reliably come back from a sleep that keeps USB
+/// Serial/JTAG connected. On the others, such a sleep keeps the CPU powered while a debugger is
+/// attached, because powering it down loses the debug module.
+#[cfg(all(supports_cpu_power_down, feature = "rt"))]
+fn usb_keeps_cpu_powered(config: &RtcSleepConfig) -> bool {
+    cfg_select! {
+        sleep_keeps_cpu_powered_for_usb_serial_jtag => config.keep_usb_serial_jtag,
+        sleep_keeps_usb_serial_jtag => {
+            config.keep_usb_serial_jtag && crate::debugger::debugger_connected()
+        }
+        _ => {
+            let _ = config;
+            false
+        }
+    }
+}
+
 /// Requests the sleep, and returns whether the hardware rejected the request.
 ///
 /// This part switches the CPU clock, and it can suspend the caches or power down the CPU. The code
@@ -607,6 +708,8 @@ fn sleep_transition(
         cpu_retention::prepare_cpu_retention(retention_buffer);
 
         let saved = config.start_sleep(wakeup_mask, reject_mask);
+        #[cfg(soc_has_usb_device)]
+        let usb_serial_jtag = usb_serial_jtag::disconnect_for_sleep(config, kind);
         // After the CPU clock switch, because the RC_FAST disable path writes `CK8M_WAIT`.
         #[cfg(not(soc_has_pmu))]
         wakeup_waits.write();
@@ -649,6 +752,10 @@ fn sleep_transition(
         }
 
         config.finish_sleep();
+        #[cfg(soc_has_usb_device)]
+        if let Some(usb_serial_jtag) = usb_serial_jtag {
+            usb_serial_jtag.reconnect();
+        }
         saved.restore();
 
         rejected

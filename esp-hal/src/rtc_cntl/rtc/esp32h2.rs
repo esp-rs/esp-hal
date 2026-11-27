@@ -5,8 +5,9 @@ use crate::{
     soc::{clocks::ClockConfig, regi2c},
 };
 
-// `backup_clk_sel` uses `SOC_CPU_CLK_SRC_*`, where XTAL = 0.
-const HP_SYSCLK_XTAL: u8 = 0;
+// `dig_sys_clk_sel` and `backup_clk_sel` use `SOC_CPU_CLK_SRC_*`.
+pub(crate) const HP_SYSCLK_XTAL: u8 = 0;
+pub(crate) const HP_SYSCLK_PLL: u8 = 1;
 
 // `backup_mode` is `PMU_HP_RETENTION_REGDMA_CONFIG(dir, entry)`: the direction in bit 2, where 1
 // is the backup, then the REGDMA entry.
@@ -160,6 +161,8 @@ bitfield::bitfield! {
 
     pub bool, i2c_iso_en   , set_i2c_iso_en   : 26;
     pub bool, i2c_retention, set_i2c_retention: 27;
+    pub bool, xpd_bb_i2c   , set_xpd_bb_i2c   : 28;
+    pub bool, xpd_bbpll_i2c, set_xpd_bbpll_i2c: 29;
     pub bool, xpd_bbpll    , set_xpd_bbpll    : 30;
 }
 

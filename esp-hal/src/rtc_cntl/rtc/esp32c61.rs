@@ -204,8 +204,8 @@ const ICG_MODEM_CODE_ACTIVE: u8 = 2;
 
 // ESP32-C61 `dig_sysclk_sel`/`backup_clk_sel` use `SOC_CPU_CLK_SRC_*`:
 // XTAL = 0, RC_FAST = 1, PLL_F160M = 2, PLL_F240M = 3.
-const HP_SYSCLK_XTAL: u8 = 0;
-const HP_SYSCLK_PLL: u8 = 2;
+pub(crate) const HP_SYSCLK_XTAL: u8 = 0;
+pub(crate) const HP_SYSCLK_PLL: u8 = 2;
 
 bitfield::bitfield! {
     #[derive(Clone, Copy, Default)]

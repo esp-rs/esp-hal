@@ -1,5 +1,6 @@
 //% FEATURES: esp-radio esp-radio/wifi esp-hal/unstable
 //% CHIP_FILTER: wifi_driver_supported && sleep_driver_supported
+//% ENV-IF(esp32c3 || esp32s3): ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED=false
 
 #![no_std]
 #![no_main]

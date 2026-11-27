@@ -19,9 +19,12 @@ const ICG_MODEM_CODE_ACTIVE: u8 = 2;
 const PMU_CLK_SRC_XTAL: u8 = 0;
 const PMU_CLK_SRC_XTAL_X2: u8 = 2;
 const PMU_CLK_SRC_PLL: u8 = 3;
+pub(crate) const HP_SYSCLK_XTAL: u8 = PMU_CLK_SRC_XTAL;
+pub(crate) const HP_SYSCLK_PLL: u8 = PMU_CLK_SRC_PLL;
 
-// `PMU_ICG_FUNC_ENA_HPBUS` of esp-idf `pmu_icg_mapping.h`.
+// `PMU_ICG_FUNC_ENA_HPBUS` and `PMU_ICG_FUNC_ENA_HPCORE` of esp-idf `pmu_icg_mapping.h`.
 const ICG_FUNC_ENA_HPBUS: u32 = 1 << 15;
+pub(crate) const ICG_FUNC_ENA_HPCORE: u32 = 1 << 17;
 
 const fn hp_retention_regdma_config(dir: u8, entry: u8) -> u8 {
     (((dir) << 4) | (entry & 0xf)) & 0x1f
