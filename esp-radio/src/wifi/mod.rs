@@ -3351,7 +3351,8 @@ impl WifiController<'_> {
                         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) }).and_then(|()| {
                             // The mode is only `NULL` if an earlier failed call stopped Wi-Fi.
                             if mode != wifi_mode_t_WIFI_MODE_NULL {
-                                WifiController::start_impl(self.promiscuous)?;
+                                WifiController::start_impl()?;
+                                WifiController::restore_promiscuous(self.promiscuous)?;
                                 WifiController::apply_scan_defaults(mode)?;
                             }
                             Ok(())
@@ -3384,9 +3385,12 @@ impl WifiController<'_> {
         };
 
         let restart = previous_mode != mode;
+        let mut promiscuous = false;
         if restart {
-            reset_mode_on_error.promiscuous = Self::stop_impl()?;
+            esp_wifi_result!(unsafe { esp_wifi_get_promiscuous(&mut promiscuous) })?;
+            Self::stop_impl()?;
             reset_mode_on_error.restore_mode = Some(previous_mode);
+            reset_mode_on_error.promiscuous = promiscuous;
         }
 
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
@@ -3420,8 +3424,9 @@ impl WifiController<'_> {
         }
 
         if restart {
-            Self::start_impl(reset_mode_on_error.promiscuous)?;
+            Self::start_impl()?;
             reset_mode_on_error.restore_mode = None;
+            Self::restore_promiscuous(promiscuous)?;
 
             Self::apply_scan_defaults(mode)?;
         }
@@ -3551,18 +3556,20 @@ ignored."
         esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
     }
 
-    fn start_impl(promiscuous: bool) -> Result<(), WifiError> {
+    fn start_impl() -> Result<(), WifiError> {
         set_access_point_state(WifiAccessPointState::Starting);
         set_station_state(WifiStationState::Starting);
 
         // `esp_wifi_start` is actually not async - i.e. we get the event before it returns
-        esp_wifi_result!(unsafe { esp_wifi_start() })?;
+        esp_wifi_result!(unsafe { esp_wifi_start() })
+    }
 
-        if promiscuous && let Err(e) = esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(true) }) {
-            warn!("Failed to restore promiscuous mode: {:?}", e);
+    /// Turns promiscuous mode on again if it was on, because `esp_wifi_stop` turns it off.
+    fn restore_promiscuous(enabled: bool) -> Result<(), WifiError> {
+        if !enabled {
+            return Ok(());
         }
-
-        Ok(())
+        esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(true) })
     }
 
     /// Sets the defaults for all scans, including connect scans. Requires a started station.
@@ -3584,17 +3591,11 @@ ignored."
         esp_wifi_result!(unsafe { esp_wifi_set_scan_parameters(&params) })
     }
 
-    /// Returns whether promiscuous mode was on, because `esp_wifi_stop` turns it off.
-    fn stop_impl() -> Result<bool, WifiError> {
-        let mut promiscuous = false;
-        esp_wifi_result!(unsafe { esp_wifi_get_promiscuous(&mut promiscuous) })?;
-
+    fn stop_impl() -> Result<(), WifiError> {
         set_access_point_state(WifiAccessPointState::Stopping);
         set_station_state(WifiStationState::Stopping);
 
-        esp_wifi_result!(unsafe { esp_wifi_stop() })?;
-
-        Ok(promiscuous)
+        esp_wifi_result!(unsafe { esp_wifi_stop() })
     }
 
     fn connect_impl(&mut self) -> Result<(), WifiError> {

@@ -9,15 +9,24 @@ mod tests {
         sta::StationConfig,
     };
 
-    // esp-radio has no getter for promiscuous mode.
+    const WIFI_MODE_STA: u32 = 1;
+
+    // esp-radio has no getters for promiscuous mode and the Wi-Fi mode.
     unsafe extern "C" {
         fn esp_wifi_get_promiscuous(en: *mut bool) -> i32;
+        fn esp_wifi_get_mode(mode: *mut u32) -> i32;
     }
 
     fn promiscuous_mode() -> bool {
         let mut enabled = false;
         assert_eq!(unsafe { esp_wifi_get_promiscuous(&mut enabled) }, 0);
         enabled
+    }
+
+    fn wifi_mode() -> u32 {
+        let mut mode = 0;
+        assert_eq!(unsafe { esp_wifi_get_mode(&mut mode) }, 0);
+        mode
     }
 
     #[init]
@@ -65,6 +74,7 @@ mod tests {
             )),
             Err(WifiError::InvalidArguments)
         );
+        assert_eq!(wifi_mode(), WIFI_MODE_STA);
 
         assert!(promiscuous_mode());
     }
