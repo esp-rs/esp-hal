@@ -19,6 +19,7 @@ use super::{
 use crate::{
     interrupt::ipc::{Ipc, IpcRequest},
     peripherals::{IPC, LPWR},
+    private::panic_free,
     ram,
     rtc_cntl::sleep::{LowPower, RtcSleepConfig, SleepKind},
     system::{Cpu, multi_core::park},
@@ -106,7 +107,7 @@ fn save_and_wait() {
 
     // The wake stub writes this word while the compiler believes that nothing did.
     // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
-    let pmufunc = unsafe { device_regs::load_word(&raw const (*frame).pmufunc) };
+    let pmufunc = unsafe { panic_free::load_word(&raw const (*frame).pmufunc) };
     if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
         // The CPU domain can lose power from here on. This core then comes back through the wake
         // stub, after the PRO CPU released it from reset. This core does not arm the wake stub:

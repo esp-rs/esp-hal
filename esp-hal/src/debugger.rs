@@ -1,6 +1,7 @@
 //! Debugger utilities
 
 /// Returns whether a debugger is connected.
+#[inline(always)]
 pub fn debugger_connected() -> bool {
     cfg_select! {
         xtensa => xtensa_lx::is_debugger_attached(),
