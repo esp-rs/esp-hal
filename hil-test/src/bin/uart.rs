@@ -1466,9 +1466,7 @@ mod new_tests {
     }
 
     fn for_each_uart_pair(mut f: impl FnMut(usize, usize)) {
-        // https://github.com/esp-rs/esp-hal/issues/6138
-        let uart_count = if cfg!(esp32) { 2 } else { UART_COUNT };
-        for (tx_num, rx_num) in (0..uart_count).map(|i| (i, (i + 1) % uart_count)) {
+        for (tx_num, rx_num) in (0..UART_COUNT).map(|i| (i, (i + 1) % UART_COUNT)) {
             f(tx_num, rx_num);
         }
     }

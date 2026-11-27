@@ -751,12 +751,7 @@ impl core::fmt::Display for ConfigError {
 }
 
 impl<'d> UartTx<'d, Blocking> {
-    #[procmacros::doc_replace(
-        "note" => {
-            cfg(esp32) => "**esp32-specific ⚠️**: `UART2` is not recommended for use.",
-            _ => ""
-        }
-    )]
+    #[procmacros::doc_replace]
     /// Creates a new UART TX instance in [`Blocking`] mode.
     ///
     /// # Examples
@@ -940,12 +935,18 @@ where
         self
     }
 
+    #[procmacros::doc_replace(
+        "esp32_note" => {
+            cfg(esp32) => "On the ESP32, `UART1` and `UART2` do not discard the data. If you do not call [`Self::flush`] first, the transmitter sends the old data with the new configuration, and the receiver can get corrupted data.",
+            _ => ""
+        }
+    )]
     /// Changes the configuration.
     ///
     /// Do not call this function while a transmission is in progress. The function discards
     /// the data that the transmitter did not send yet, and the TX line goes low for a short
     /// time. A receiver reports that pulse as an error. Call [`Self::flush`] first, to let
-    /// the transmitter send the remaining data.
+    /// the transmitter send the remaining data. __esp32_note__
     ///
     /// # Errors
     ///
@@ -1086,12 +1087,7 @@ where
 }
 
 impl<'d> UartRx<'d, Blocking> {
-    #[procmacros::doc_replace(
-        "note" => {
-            cfg(esp32) => "**esp32-specific ⚠️**: `UART2` is not recommended for use.",
-            _ => ""
-        }
-    )]
+    #[procmacros::doc_replace]
     /// Creates a new UART RX instance in [`Blocking`] mode.
     ///
     /// # Examples
@@ -1522,12 +1518,7 @@ where
 }
 
 impl<'d> Uart<'d, Blocking> {
-    #[procmacros::doc_replace(
-        "note" => {
-            cfg(esp32) => "**esp32-specific ⚠️**: `UART2` is not recommended for use.",
-            _ => ""
-        }
-    )]
+    #[procmacros::doc_replace]
     /// Creates a new UART instance in [`Blocking`] mode.
     ///
     /// # Examples
@@ -2137,13 +2128,18 @@ where
         self.rx.read(buf)
     }
 
-    #[procmacros::doc_replace]
+    #[procmacros::doc_replace(
+        "esp32_note" => {
+            cfg(esp32) => "On the ESP32, `UART1` and `UART2` do not discard the data. If you do not call [`Self::flush`] first, the transmitter sends the old data with the new configuration, and the receiver can get corrupted data.",
+            _ => ""
+        }
+    )]
     /// Changes the configuration.
     ///
     /// Do not call this function while a transmission is in progress. The function discards
     /// the data that the transmitter did not send yet, and the TX line goes low for a short
     /// time. A receiver reports that pulse as an error. Call [`Self::flush`] first, to let
-    /// the transmitter send the remaining data.
+    /// the transmitter send the remaining data. __esp32_note__
     ///
     /// # Examples
     ///
