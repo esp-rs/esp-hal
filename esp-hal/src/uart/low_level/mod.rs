@@ -691,10 +691,28 @@ impl Info {
         version::change_flow_control(self, sw_flow_ctrl, hw_flow_ctrl);
     }
 
+    /// Whether the FIFO reset bits of this instance leave a FIFO with wrong pointers.
+    ///
+    /// On the ESP32, the FIFO reset bits of `UART1` also reset the FIFO read pointers of
+    /// `UART2`. The FIFO reset bits of `UART2` reset its FIFO write pointers, but not its FIFO
+    /// read pointers.
+    fn has_shared_fifo_reset(&self) -> bool {
+        cfg!(esp32) && !matches!(self.peripheral, crate::system::Peripheral::Uart0)
+    }
+
     pub(super) fn rxfifo_reset(&self) {
         fn rxfifo_rst(reg_block: &RegisterBlock, enable: bool) {
             reg_block.conf0().modify(|_, w| w.rxfifo_rst().bit(enable));
             sync_regs(reg_block);
+        }
+
+        if self.has_shared_fifo_reset() {
+            // Reading every byte moves the read pointer to the write pointer.
+            // See <https://github.com/espressif/esp-idf/blob/ad20ded62a2d67a26e501fdc1905f43ba7ad6c81/components/esp_hal_uart/esp32/include/hal/uart_ll.h#L444-L479>.
+            while self.rx_fifo_count() > 0 {
+                self.read_next_from_fifo();
+            }
+            return;
         }
 
         rxfifo_rst(self.regs(), true);
@@ -705,6 +723,12 @@ impl Info {
         fn txfifo_rst(reg_block: &RegisterBlock, enable: bool) {
             reg_block.conf0().modify(|_, w| w.txfifo_rst().bit(enable));
             sync_regs(reg_block);
+        }
+
+        if self.has_shared_fifo_reset() {
+            // Software cannot remove bytes from the TX FIFO. The transmitter sends the remaining
+            // bytes.
+            return;
         }
 
         txfifo_rst(self.regs(), true);

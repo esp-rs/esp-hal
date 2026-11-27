@@ -751,12 +751,7 @@ impl core::fmt::Display for ConfigError {
 }
 
 impl<'d> UartTx<'d, Blocking> {
-    #[procmacros::doc_replace(
-        "note" => {
-            cfg(esp32) => "**esp32-specific ⚠️**: `UART2` is not recommended for use.",
-            _ => ""
-        }
-    )]
+    #[procmacros::doc_replace]
     /// Creates a new UART TX instance in [`Blocking`] mode.
     ///
     /// # Examples
@@ -940,12 +935,17 @@ where
         self
     }
 
+    #[procmacros::doc_replace(
+        "unsent_data" => {
+            cfg(esp32) => "On `UART0`, the function discards the data that the transmitter did not send yet, and the TX line goes low for a short time. A receiver reports that pulse as an error. On `UART1` and `UART2`, the function does not change the data that the transmitter did not send yet.",
+            _ => "The function discards the data that the transmitter did not send yet, and the TX line goes low for a short time. A receiver reports that pulse as an error."
+        }
+    )]
     /// Changes the configuration.
     ///
-    /// Do not call this function while a transmission is in progress. The function discards
-    /// the data that the transmitter did not send yet, and the TX line goes low for a short
-    /// time. A receiver reports that pulse as an error. Call [`Self::flush`] first, to let
-    /// the transmitter send the remaining data.
+    /// Do not call this function while a transmission is in progress.
+    /// __unsent_data__
+    /// Call [`Self::flush`] first, to let the transmitter send the remaining data.
     ///
     /// # Errors
     ///
@@ -1086,12 +1086,7 @@ where
 }
 
 impl<'d> UartRx<'d, Blocking> {
-    #[procmacros::doc_replace(
-        "note" => {
-            cfg(esp32) => "**esp32-specific ⚠️**: `UART2` is not recommended for use.",
-            _ => ""
-        }
-    )]
+    #[procmacros::doc_replace]
     /// Creates a new UART RX instance in [`Blocking`] mode.
     ///
     /// # Examples
@@ -1522,12 +1517,7 @@ where
 }
 
 impl<'d> Uart<'d, Blocking> {
-    #[procmacros::doc_replace(
-        "note" => {
-            cfg(esp32) => "**esp32-specific ⚠️**: `UART2` is not recommended for use.",
-            _ => ""
-        }
-    )]
+    #[procmacros::doc_replace]
     /// Creates a new UART instance in [`Blocking`] mode.
     ///
     /// # Examples
@@ -2137,13 +2127,17 @@ where
         self.rx.read(buf)
     }
 
-    #[procmacros::doc_replace]
+    #[procmacros::doc_replace(
+        "unsent_data" => {
+            cfg(esp32) => "On `UART0`, the function discards the data that the transmitter did not send yet, and the TX line goes low for a short time. A receiver reports that pulse as an error. On `UART1` and `UART2`, the transmitter sends that data with the new configuration, and a receiver can get corrupted data.",
+            _ => "The function discards the data that the transmitter did not send yet, and the TX line goes low for a short time. A receiver reports that pulse as an error."
+        }
+    )]
     /// Changes the configuration.
     ///
-    /// Do not call this function while a transmission is in progress. The function discards
-    /// the data that the transmitter did not send yet, and the TX line goes low for a short
-    /// time. A receiver reports that pulse as an error. Call [`Self::flush`] first, to let
-    /// the transmitter send the remaining data.
+    /// Do not call this function while a transmission is in progress.
+    /// __unsent_data__
+    /// Call [`Self::flush`] first, to let the transmitter send the remaining data.
     ///
     /// # Examples
     ///
@@ -2328,7 +2322,8 @@ where
 
         enable_register_sync(self.regs());
 
-        // Applying config also resets Tx/Rx FIFOs
+        // Applying the config also empties the RX FIFO, and resets the TX FIFO where the
+        // hardware can.
         self.apply_config(&config)?;
 
         // Don't wait after transmissions by default,
