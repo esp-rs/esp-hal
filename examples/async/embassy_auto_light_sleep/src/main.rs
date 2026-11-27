@@ -12,11 +12,9 @@
 //! observe the chip waking from light sleep via the timer (`WakeupSource::Timer`)
 //! or via the BOOT button (`WakeupSource::Gpio`).
 //!
-//! The USB Serial/JTAG console and a debugger keep working across light sleep
-//! while a USB host is connected, at a higher sleep current. ESP32-C3 and
-//! ESP32-S3 stay awake instead. A debugger connects only while the chip is
-//! awake. Set `ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_CONNECTED` to `false` to
-//! disconnect the console in light sleep.
+//! Use the UART port for this example. A USB host on USB Serial/JTAG keeps
+//! more of the chip powered in light sleep, and ESP32-C3 and ESP32-S3 stay
+//! awake while a host is connected.
 
 //% CHIP_FILTER: sleep_driver_supported && sleep_light_sleep
 
@@ -147,14 +145,8 @@ async fn wake_lock_demo() {
 async fn main(spawner: Spawner) {
     let p = esp_hal::init(esp_hal::Config::default());
 
-    cfg_select! {
-        any(feature = "esp32", feature = "esp32c2", feature = "esp32s2") => {
-            esp_log::init_uart!(p);
-        }
-        _ => {
-            esp_log::init_usb!(p);
-        }
-    }
+    // Log on UART0's default TX pin.
+    esp_log::init_uart!(p);
 
     let timg0 = TimerGroup::new(p.TIMG0);
 
