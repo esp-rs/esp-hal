@@ -31,8 +31,8 @@ task.
   `documentation/PULL-REQUESTS.md` and apply it.
 - Never edit a `CHANGELOG.md` file, even though crates ship one. They are updated from PR
   descriptions at the end of the release cycle. Put changelog and migration entries in the PR body.
-- Never edit `esp-metadata-generated/`. Make metadata changes in `esp-metadata/`, run
-  `cargo update-metadata`, and commit both.
+- Never edit `esp-metadata-generated/` (except the hand-written `src/linker_scripts.rs`). Make
+  metadata changes in `esp-metadata/`, run `cargo update-metadata`, and commit both.
 - Library crates never enable `unstable`, they use `requires-unstable`. Features starting with `__`
   are for this repo's crates only, never for examples, tests or users.
 - Xtensa chips (`esp32`, `esp32s2`, `esp32s3`) need the `esp` toolchain. xtask picks it

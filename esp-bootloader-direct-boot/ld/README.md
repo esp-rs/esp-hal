@@ -1,8 +1,9 @@
 # Linker scripts
 
 These scripts lay the application out for direct boot and follow the contract for bootloader
-support crates in `esp-bootloader-esp-idf/ld/README.md`. `build.rs` copies them into `OUT_DIR`
+support crates in `esp-bootloader-esp-idf/ld/README.md`. `build.rs` renders them into `OUT_DIR`
 and puts that directory on the linker search path; the application passes `-Tlinkall.x` as usual.
+The renderer evaluates `#IF` and `${...}` against the chip's esp-metadata symbols.
 Every file except `linkall.x` starts with `direct_boot_`, so none shares a name with a file from
 esp-hal's `OUT_DIR`.
 

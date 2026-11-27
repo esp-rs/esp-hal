@@ -1,9 +1,4 @@
-use std::{
-    env,
-    error::Error,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{env, error::Error, fs, path::PathBuf};
 
 use esp_config::generate_config_from_yaml_definition;
 use esp_metadata_generated::{Chip, assert_unique_features};
@@ -57,13 +52,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Copies the linker scripts describing the memory layout the ESP-IDF 2nd-stage bootloader expects
+/// Renders the linker scripts describing the memory layout the ESP-IDF 2nd-stage bootloader expects
 /// into `OUT_DIR`. They include `hal-defaults.x` and the `esp_hal_*.x` fragments from esp-hal's
 /// `OUT_DIR`, so no file here may share a name with one there.
 fn emit_linker_scripts(chip: Chip) -> Result<(), Box<dyn Error>> {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
 
+    let renderer = chip.linker_script_renderer();
     if chip.is_xtensa() {
         let (irtc, drtc) = if chip == Chip::Esp32s3 {
             ("rtc_fast_seg", "rtc_fast_seg")
@@ -83,36 +79,12 @@ fn emit_linker_scripts(chip: Chip) -> Result<(), Box<dyn Error>> {
         );
 
         fs::write(out.join("alias.x"), alias)?;
-        copy_dir_all("ld/xtensa", &out)?;
+        renderer.render_dir("ld/xtensa", &out)?;
     } else {
-        copy_dir_all("ld/riscv", &out)?;
-        // The start-up first sets `mtvec` to `_pre_init_trap`. With a CLIC, the trap base
-        // ignores the low 6 bits of `mtvec`.
-        let align = if chip.contains("soc_has_clic") {
-            ". = ALIGN(64);"
-        } else {
-            ""
-        };
-        fs::write(out.join("pre_init_trap_align.x"), align)?;
+        renderer.render_dir("ld/riscv", &out)?;
     }
+    renderer.render_dir("ld/sections", &out)?;
+    renderer.render_dir(format!("ld/{}", chip.name()), &out)?;
 
-    copy_dir_all("ld/sections", &out)?;
-    copy_dir_all(format!("ld/{}", chip.name()), &out)?;
-
-    Ok(())
-}
-
-fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
-    fs::create_dir_all(&dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let dst = dst.as_ref().join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_dir_all(entry.path(), dst)?;
-        } else {
-            println!("cargo:rerun-if-changed={}", entry.path().display());
-            fs::copy(entry.path(), dst)?;
-        }
-    }
     Ok(())
 }

@@ -19,9 +19,10 @@ check-configs = [
 clippy-configs = [] # don't waste time on this
 
 [dependencies]
+somni-template = { version = "0.3.2", optional = true }
 
 [features]
-build-script = []
+build-script = ["dep:somni-template"]
 _device-selected = []
 esp32   = ["_device-selected"]
 esp32c2 = ["_device-selected"]
