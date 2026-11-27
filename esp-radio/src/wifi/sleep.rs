@@ -118,5 +118,7 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
         // otherwise. If a later hook refuses the sleep, the exit hook restores them.
         #[cfg(all(supports_modem_power_down, feature = "unstable"))]
         super::mac_bb::power_down();
+        #[cfg(all(esp32c6, feature = "unstable"))]
+        super::modem_state::clear_rf_flag();
     }
 }

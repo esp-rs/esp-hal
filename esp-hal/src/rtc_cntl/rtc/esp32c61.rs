@@ -606,7 +606,8 @@ impl HpSystemInit {
         let mut power = HpSysPower::default();
         power.dig_power.set_vdd_spi_pd_en(false);
         power.dig_power.set_wifi_pd_en(false);
-        power.dig_power.set_cpu_pd_en(true);
+        // Light sleep enters the modem state, and it saves the CPU context only with CPU retention.
+        power.dig_power.set_cpu_pd_en(false);
         power.dig_power.set_aon_pd_en(false);
         power.dig_power.set_top_pd_en(false);
         power.dig_power.set_mem_pd_en(0);
@@ -621,8 +622,10 @@ impl HpSystemInit {
         power.xtal.set_xpd_xtal(true);
 
         let mut clock = SystemClockParam {
-            icg_func: 0,
-            icg_apb: 0,
+            // The SARADC clocks stay on, because the PHY link powers the temperature sensor up in
+            // the modem state.
+            icg_func: 1 << 20,
+            icg_apb: 1 << 9,
             ..SystemClockParam::default()
         };
         clock.icg_modem.set_code(ICG_MODEM_CODE_MODEM);

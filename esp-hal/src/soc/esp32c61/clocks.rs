@@ -143,6 +143,7 @@ fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // Digital part - The target SPLL is fixed to 480MHz, do nothing.
 
     // Analog part
+    regi2c::enable_master_clock();
     I2C_ANA_MST::regs().ana_conf0().modify(|_, w| {
         w.bbpll_stop_force_high().clear_bit();
         w.bbpll_stop_force_low().set_bit()

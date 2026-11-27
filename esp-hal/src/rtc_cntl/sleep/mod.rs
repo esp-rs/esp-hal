@@ -519,6 +519,17 @@ impl<'d> LowPower<'d> {
         }
 
         let reject_mask = if allow_reject { reject_mask() } else { 0 };
+        // The Wi-Fi beacon source means that the Wi-Fi modem uses the PMU modem state. A light
+        // sleep that starts while the modem wakes up must fail, even when the caller allows no
+        // rejection.
+        #[cfg(supports_modem_state)]
+        let reject_mask = if kind == SleepKind::Light
+            && wakeup_mask & (1 << WakeupSource::WifiBeacon as u32) != 0
+        {
+            reject_mask | (1 << property!("sleep.modem_state_reject_bit"))
+        } else {
+            reject_mask
+        };
 
         // Each core saves itself, and a parked core saves nothing on its own.
         #[cfg(all(cpu_retention = "software", multi_core))]
