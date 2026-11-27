@@ -1415,10 +1415,19 @@ mod tests {
 #[embedded_test::tests(default_timeout = 10)]
 mod psram_dma {
     use esp_hal::{
-        dma::{BurstConfig, CHUNK_SIZE, ExternalBurstConfig, InternalBurstConfig},
+        dma::{
+            BurstConfig,
+            CHUNK_SIZE,
+            DmaRxBuffer,
+            DmaRxStreamBuf,
+            DmaTxStreamBuf,
+            ExternalBurstConfig,
+            InternalBurstConfig,
+            aligned::DmaAlignedMut,
+        },
         spi::master::{Spi, SpiDma},
     };
-    use hil_test as _;
+    use hil_test::{assert, assert_eq};
 
     use super::*;
 
@@ -1497,6 +1506,119 @@ mod psram_dma {
         .unwrap();
         let dma_rx_buf = esp_hal::dma_rx_buffer!(SIZE).unwrap();
         psram_run_loopback(ctx.spi, dma_tx_buf, dma_rx_buf);
+    }
+
+    const STREAM_SIZE: usize = 4096;
+
+    // 3968 / 5 = 793, which is not a multiple of the default PSRAM block.
+    const RX_STREAM_SIZE: usize = 31 * 128;
+    const RX_STREAM_CHUNK: usize = 800;
+
+    // 128 bytes covers every PSRAM cache line. The P4 L2 line can be 128 bytes.
+    const PSRAM_ALLOC_ALIGN: usize = 128;
+
+    // The buffer starts as zeros. The pattern has no zero byte, so a missed write is visible.
+    fn stream_pattern(i: usize) -> u8 {
+        (i % 251) as u8 + 1
+    }
+
+    fn assert_stream_pattern(data: &[u8], start: usize) {
+        for (i, byte) in data.iter().enumerate() {
+            assert_eq!(*byte, stream_pattern(start + i), "index {}", start + i);
+        }
+    }
+
+    fn psram_buffer(size: usize) -> DmaAlignedMut<'static, [u8]> {
+        let layout = core::alloc::Layout::from_size_align(size, PSRAM_ALLOC_ALIGN).unwrap();
+        let buffer = unsafe {
+            let ptr = alloc::alloc::alloc_zeroed(layout);
+            if ptr.is_null() {
+                alloc::alloc::handle_alloc_error(layout);
+            }
+            core::slice::from_raw_parts_mut(ptr, size)
+        };
+        let mut buffer = DmaAlignedMut::new(buffer).unwrap();
+        // The zeros stay in the cache. A later write that skips write-back leaves
+        // the zeros in PSRAM.
+        buffer.writeback();
+        buffer
+    }
+
+    // `DmaTxStreamBuf` needs auto write-back, which SPI DMA does not have.
+    #[test]
+    #[cfg(not(spi_master_dma_engine = "SPI_DMA"))]
+    fn test_psram_tx_stream_buf(ctx: Context) {
+        let descriptors = esp_hal::dma_descriptors_impl!(STREAM_SIZE, STREAM_SIZE / 4);
+        let mut tx = DmaTxStreamBuf::new(descriptors, psram_buffer(STREAM_SIZE)).unwrap();
+        let pushed = tx.push_with(|buf| {
+            for (i, byte) in buf.iter_mut().enumerate() {
+                *byte = stream_pattern(i);
+            }
+            buf.len()
+        });
+        assert_eq!(pushed, STREAM_SIZE);
+
+        let rx = esp_hal::dma_rx_buffer!(STREAM_SIZE).unwrap();
+        let transfer = ctx
+            .spi
+            .transfer_buffers(STREAM_SIZE, rx, STREAM_SIZE, tx)
+            .map_err(|e| e.0)
+            .unwrap();
+        let (_, (rx, _)) = transfer.wait();
+
+        assert_stream_pattern(rx.as_slice(), 0);
+    }
+
+    #[test]
+    fn test_psram_rx_stream_buf(ctx: Context) {
+        let descriptors = esp_hal::dma_descriptors_impl!(RX_STREAM_SIZE, RX_STREAM_CHUNK);
+        let rx = DmaRxStreamBuf::new(descriptors, psram_buffer(RX_STREAM_SIZE)).unwrap();
+
+        let mut tx = esp_hal::dma_tx_buffer!(RX_STREAM_SIZE).unwrap();
+        for (i, byte) in tx.as_mut_slice().iter_mut().enumerate() {
+            *byte = stream_pattern(i);
+        }
+        let transfer = ctx
+            .spi
+            .transfer_buffers(RX_STREAM_SIZE, rx, RX_STREAM_SIZE, tx)
+            .map_err(|e| e.0)
+            .unwrap();
+        let (_, (rx, _)) = transfer.wait();
+
+        let mut view = rx.into_view();
+        let mut received = 0;
+        loop {
+            let data = view.peek();
+            if data.is_empty() {
+                break;
+            }
+            assert_stream_pattern(data, received);
+            let len = data.len();
+            received += len;
+            view.consume(len);
+        }
+        assert_eq!(received, RX_STREAM_SIZE);
+    }
+
+    #[test]
+    fn test_psram_rx_stream_buf_chunks_are_block_aligned(_ctx: Context) {
+        let descriptors = esp_hal::dma_descriptors_impl!(RX_STREAM_SIZE, RX_STREAM_CHUNK);
+        assert_eq!(descriptors.len(), 5);
+        let rx = DmaRxStreamBuf::new(descriptors, psram_buffer(RX_STREAM_SIZE)).unwrap();
+        let (descriptors, buffer) = rx.split();
+        let mut next = buffer.as_ptr();
+        for descriptor in descriptors.iter() {
+            assert_eq!(descriptor.buffer.cast_const(), next);
+            assert!(
+                descriptor
+                    .size()
+                    .is_multiple_of(ExternalBurstConfig::DEFAULT as usize),
+                "size {}",
+                descriptor.size()
+            );
+            next = next.wrapping_add(descriptor.size());
+        }
+        assert_eq!(next, buffer.as_ptr_range().end);
     }
 }
 
