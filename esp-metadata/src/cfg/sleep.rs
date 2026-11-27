@@ -35,8 +35,8 @@ pub(crate) struct SleepRetentionProperties {
     /// transition, so software saves and restores them in the extra entry, while the PLL runs.
     #[serde(default)]
     regdma_bt_needs_pll: bool,
-    /// The bit of the reject mask that keeps the chip out of light sleep while the Wi-Fi modem
-    /// uses the PMU modem state.
+    /// The bit of the reject mask that rejects a light sleep that starts while the Wi-Fi modem
+    /// wakes up.
     ///
     /// In the modem state, the CPU sleeps while the modem wakes up for the beacons of the access
     /// point. The bit also drives the `supports_modem_state` cfg.

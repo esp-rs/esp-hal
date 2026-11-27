@@ -10,8 +10,8 @@
 //! On chips other than the ESP32, ESP32-C2 and ESP32-S2, the example installs Wi-Fi retention
 //! memory, so light sleep also powers the Wi-Fi MAC and baseband down.
 //!
-//! On chips with the PMU modem state, set the ENHANCED_LIGHT_SLEEP env variable to enable enhanced
-//! light sleep. The modem then receives beacons while the CPU sleeps.
+//! On chips with the PMU modem state, set `ENHANCED_LIGHT_SLEEP` to `true` to enable enhanced light
+//! sleep. The modem then receives beacons while the CPU sleeps.
 //!
 //! The console is on the UART, because USB Serial/JTAG stops across sleep.
 
@@ -54,6 +54,9 @@ const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
+
+#[cfg(supports_modem_state)]
+const ENHANCED_LIGHT_SLEEP: bool = false;
 
 cfg_select! {
     supports_modem_power_down => {
@@ -101,7 +104,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let config = ControllerConfig::default().with_initial_config(station_config);
     #[cfg(supports_modem_state)]
-    let config = config.with_enhanced_light_sleep(option_env!("ENHANCED_LIGHT_SLEEP").is_some());
+    let config = config.with_enhanced_light_sleep(ENHANCED_LIGHT_SLEEP);
 
     let wifi_interface = Interface::station();
     let mut controller = WifiController::new(peripherals.WIFI, config).unwrap();

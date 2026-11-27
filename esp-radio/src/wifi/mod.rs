@@ -2527,8 +2527,8 @@ pub(crate) mod xarxa {
 #[cfg_attr(
     supports_modem_state,
     doc = "",
-    doc = "With [`ControllerConfig::with_enhanced_light_sleep`], the modem also receives beacons \
-           while the CPU stays in light sleep."
+    doc = "With [`ControllerConfig::with_enhanced_light_sleep`], the modem receives beacons while \
+           the CPU stays in light sleep."
 )]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

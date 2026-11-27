@@ -13,8 +13,8 @@
 //! which has a `next` pointer for each entry.
 //!
 //! In the PMU modem state, the CPU sleeps while the Wi-Fi modem receives the beacons of the access
-//! point. The PMU runs `MODEM_ENTRY` between the sleep and the modem state, entry 2 from the modem
-//! to the active state, and the PHY link of `PHY_ENTRY` to turn the RF on and off.
+//! point. The PMU runs `MODEM_ENTRY` from the sleep to the modem state, and entry 2 from the modem
+//! to the active state. In the modem state, the PHY link of `PHY_ENTRY` turns the RF on and off.
 //! The PHY driver runs the PHY link too, with `run_phy_link`.
 
 use core::{cell::UnsafeCell, ptr::NonNull};
@@ -30,7 +30,7 @@ const ENTRIES: usize = property!("sleep.regdma_list_count");
 /// The entry that the PMU runs between the active and the sleep state.
 pub const SLEEP_ENTRY: u32 = 1 << 0;
 
-/// The entry that the PMU runs between the sleep and the modem state.
+/// The entry that the PMU runs from the sleep to the modem state.
 #[cfg(supports_modem_state)]
 pub const MODEM_ENTRY: u32 = 1 << 1;
 
@@ -40,8 +40,8 @@ pub const EXTRA_ENTRY: u32 = 1 << 3;
 
 /// The PHY link, which turns the RF on and off: in the modem state, and with [`run_phy_link`].
 ///
-/// On chips with four entries, the PHY link is a list of its own, which the PAU starts from its
-/// Wi-Fi MAC link address.
+/// On chips where the head has no branch for the PHY link, the PHY link is a list of its own,
+/// which the PAU starts from its Wi-Fi MAC link address.
 #[cfg(supports_modem_state)]
 pub const PHY_ENTRY: u32 = 1 << 4;
 
@@ -646,8 +646,9 @@ fn set_backup(enabled: bool) {
         w.hp_modem2active_backup_en().bit(enabled);
         w.hp_sleep2active_backup_en().bit(enabled)
     });
-    // ESP-IDF leaves the backup off from the modem state to sleep. On that transition, the Wi-Fi
-    // MAC starts the REGDMA itself.
+    // From the modem state to sleep, the Wi-Fi MAC starts the REGDMA itself, so the backup of the
+    // PMU stays off.
+    // See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_hw_support/port/esp32c5/pmu_param.c#L330>.
     pmu.hp_sleep_backup()
         .modify(|_, w| w.hp_active2sleep_backup_en().bit(enabled));
     #[cfg(supports_modem_state)]

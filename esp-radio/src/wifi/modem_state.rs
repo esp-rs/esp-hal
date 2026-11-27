@@ -7,8 +7,8 @@
 //! the access point has frames for the station.
 //!
 //! When the chip wakes up from the modem state, the RF is on already, and the PHY driver keeps it.
-//! Otherwise, the PHY driver also runs the PHY link to turn the RF on and off, so that the nodes of
-//! the link hold the state of the RF for the next modem state.
+//! Otherwise, the PHY driver turns the RF on and off with the PHY link too, because the modem state
+//! can turn the RF on only after the PHY link turned it off.
 
 use core::{ffi::c_int, mem::MaybeUninit, ptr::NonNull};
 
@@ -128,7 +128,7 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 wait_on(0x0f, SET_CHAN_ST, CHAN_DONE, CHAN_DONE),
                 write_on(0x10, WIFI_BB_CFG, WIFI_BB_EN, WIFI_BB_EN),
                 write_on(0x11, AGC_CONF, 0, AGC_DIS),
-                // The PMU unblocks the receiver.
+                // Unblocks the receiver.
                 write_on(0x12, WDEVTXQ_BLOCK, 0, RX_BLOCK),
                 // Turns the RF off.
                 write_off(0x13, AGC_CONF, AGC_DIS, AGC_DIS),
@@ -142,7 +142,7 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 write_off(0x1b, RF_PWR, 0, RF_PWR_ON),
                 write_off(0x1c, ANA_CONF0, 0x4, 0xc),
                 write_off(0x1d, LPCON_CLK_CONF, 0, I2C_MST_EN),
-                // The PMU blocks the receiver.
+                // Blocks the receiver.
                 write_off(0x1e, PMU_DATE, !0, RX_BLOCK_DONE),
                 wait_off(0x1f, PMU_DATE, !0, RX_BLOCK_DONE),
                 wait_off(0x20, WDEVTXQ_BLOCK, 0, RX_BLOCK_DONE),
@@ -150,6 +150,7 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 write_off(0x22, PMU_DATE, !0, RX_BLOCK_DONE),
                 wait_off(0x23, PMU_DATE, !0, RX_BLOCK_DONE),
                 wait_off(0x24, WDEVTXQ_BLOCK, 0, RX_BLOCK_DONE),
+                // The analog wait time of the PMU wakeup.
                 write_on(0x25, WAKEUP_CNTL7, 0x0020_0000, 0xffff_0000),
                 write_off(0x26, WAKEUP_CNTL7, 0x0973_0000, 0xffff_0000),
             ]
@@ -190,7 +191,7 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 wait_on(0x0e, SET_CHAN_ST, CHAN_DONE, CHAN_DONE),
                 write_on(0x0f, WIFI_BB_CFG, WIFI_BB_EN, WIFI_BB_EN),
                 write_on(0x10, AGC_CONF, 0, AGC_DIS),
-                // The PMU unblocks the receiver.
+                // Unblocks the receiver.
                 write_on(0x11, WDEVTXQ_BLOCK, 0, RX_BLOCK),
                 // Turns the RF off.
                 write_off(0x12, AGC_CONF, AGC_DIS, AGC_DIS),
@@ -204,7 +205,7 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 write_off(0x1a, RF_PWR, 0, RF_PWR_ON),
                 write_off(0x1b, ANA_CONF0, 0x4, 0xc),
                 write_off(0x1c, LPCON_CLK_CONF, 0, I2C_MST_EN),
-                // The PMU blocks the receiver.
+                // Blocks the receiver.
                 write_off(0x1d, PMU_DATE, !0, RX_BLOCK_DONE),
                 wait_off(0x1e, PMU_DATE, !0, RX_BLOCK_DONE),
                 wait_off(0x1f, WDEVTXQ_BLOCK, 0, RX_BLOCK_DONE),
@@ -212,6 +213,7 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 write_off(0x21, PMU_DATE, !0, RX_BLOCK_DONE),
                 wait_off(0x22, PMU_DATE, !0, RX_BLOCK_DONE),
                 wait_off(0x23, WDEVTXQ_BLOCK, 0, RX_BLOCK_DONE),
+                // The analog wait time of the PMU wakeup.
                 write_on(0x24, WAKEUP_CNTL7, 0x0020_0000, 0xffff_0000),
                 write_off(0x25, WAKEUP_CNTL7, 0x0973_0000, 0xffff_0000),
             ]
@@ -247,7 +249,7 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 wait_on(0x0a, SET_CHAN_ST, CHAN_DONE, CHAN_DONE),
                 write_on(0x0b, WIFI_BB_CFG, WIFI_BB_EN, WIFI_BB_EN),
                 write_on(0x0c, AGC_CONF, 0, AGC_DIS),
-                // The PMU unblocks the receiver.
+                // Unblocks the receiver.
                 write_on(0x0d, WDEVTXQ_BLOCK, 0, RX_BLOCK),
                 // Turns the RF off.
                 write_off(0x0e, AGC_CONF, AGC_DIS, AGC_DIS),
@@ -259,10 +261,11 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 write_off(0x14, RF_PWR, 0, RF_PWR_ON),
                 write_off(0x15, ANA_CONF0, 0x4, 0xc),
                 write_off(0x16, LPCON_CLK_CONF, 0, I2C_MST_EN),
-                // The PMU blocks the receiver.
+                // Blocks the receiver.
                 wait_off(0x17, WDEVTXQ_BLOCK, 0, RX_BLOCK_DONE),
                 write_off(0x18, WDEVTXQ_BLOCK, RX_BLOCK, RX_BLOCK),
                 wait_off(0x19, WDEVTXQ_BLOCK, 0, RX_BLOCK_DONE),
+                // The analog wait time of the PMU wakeup.
                 write_on(0x1a, WAKEUP_CNTL7, 0x0020_0000, 0xffff_0000),
                 write_off(0x1b, WAKEUP_CNTL7, 0x0973_0000, 0xffff_0000),
             ]
@@ -295,7 +298,7 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 wait_on(0x08, SET_CHAN_ST, CHAN_DONE, CHAN_DONE),
                 write_on(0x09, WIFI_BB_CFG, WIFI_BB_EN, WIFI_BB_EN),
                 write_on(0x0a, AGC_CONF, 0, AGC_DIS),
-                // The PMU unblocks the receiver.
+                // Unblocks the receiver.
                 write_on(0x0b, WDEVTXQ_BLOCK, 0, RX_BLOCK),
                 // Turns the RF off.
                 write_off(0x0c, AGC_CONF, AGC_DIS, AGC_DIS),
@@ -307,10 +310,11 @@ const fn phy_link(rf_on: u32, rf_off: u32) -> [LinkConfig; PHY_LINK_LENGTH] {
                 write_off(0x12, RF_PWR, 0, RF_PWR_ON),
                 write_off(0x13, ANA_CONF0, 0x4, 0xc),
                 write_off(0x14, LPCON_CLK_CONF, 0, I2C_MST_EN),
-                // The PMU blocks the receiver.
+                // Blocks the receiver.
                 wait_off(0x15, WDEVTXQ_BLOCK, 0, RX_BLOCK_DONE),
                 write_off(0x16, WDEVTXQ_BLOCK, RX_BLOCK, RX_BLOCK),
                 wait_off(0x17, WDEVTXQ_BLOCK, 0, RX_BLOCK_DONE),
+                // The analog wait time of the PMU wakeup.
                 write_on(0x18, WAKEUP_CNTL7, 0x0020_0000, 0xffff_0000),
                 write_off(0x19, WAKEUP_CNTL7, 0x0973_0000, 0xffff_0000),
             ]
@@ -337,13 +341,12 @@ const I2C_MASTER_CLOCK_NODES: &[(u16, bool, bool)] = cfg_select! {
 
 /// The system clocks of the modem state, before the radios restore.
 ///
-/// Unlike ESP-IDF, the nodes leave the AHB divider alone. Wi-Fi needs the CPU clock from the PLL,
-/// and light sleep keeps the AHB divider of that clock, so AHB_CLK stays at 40 MHz or below on the
-/// PLL of the modem state.
+/// AHB_CLK must stay at 40 MHz or below in the modem state. Wi-Fi needs the CPU clock from the PLL,
+/// and light sleep keeps the AHB divider of that clock, so no node sets the divider.
 // See `sleep_clock.c` of each chip in
 // <https://github.com/espressif/esp-idf/tree/4d80c1b29ae/components/esp_hw_support/lowpower/port>.
 const MODEM_STATE_CLOCK: &[LinkConfig] = cfg_select! {
-    // The light sleep of esp-hal powers the BBPLL down. The nodes power it up and calibrate it.
+    // Light sleep powers the BBPLL down. The nodes power it up and calibrate it.
     esp32s31 => &[
         LinkConfig::write(0x0600, 0x2070_40f4, 0x1100_0000, 0x1100_0000, MODEM_ENTRY),
         LinkConfig::write(0x0601, 0x2070_40f4, 0x0010_0000, 0x0010_0000, MODEM_ENTRY),
@@ -414,8 +417,7 @@ static MEMORY: NonReentrantMutex<Option<Box<[MaybeUninit<u32>], InternalMemory>>
 /// registers when the PHY is already off, and the modem state restores them.
 static PHY_CLOCK: NonReentrantMutex<Option<PhyClockGuard<'static>>> = NonReentrantMutex::new(None);
 
-/// Whether the PHY link turned the RF off at least once, so that its nodes hold the state of the
-/// RF.
+/// Whether the PHY link turned the RF off at least once.
 static LINK_DONE: AtomicBool = AtomicBool::new(false);
 
 /// Builds the PHY link and the clock nodes of the modem state, and lets the blob use the modem
@@ -509,6 +511,7 @@ fn destroy_modules() {
 ///
 /// On the ESP32-C6, the flag can stay set after the modem state, and the PHY would then not wake
 /// up the next time.
+// See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_phy/src/phy_init.c#L270-L280>.
 #[cfg(esp32c6)]
 pub(super) fn clear_rf_flag() {
     if unsafe { pm_mac_modem_rf_already_enabled() } {
@@ -523,11 +526,13 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     }
 }
 
-// See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_phy/src/phy_init.c#L282-L400>.
+// See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_phy/src/phy_init.c#L302-L334>
+// and <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_phy/src/phy_init.c#L391-L407>.
 
 fn rf_turn_on() -> bool {
     if unsafe { pm_mac_modem_rf_already_enabled() } {
-        // The modem state turned the RF on, except for the temperature sensor.
+        // The modem state turned the RF on. The temperature sensor needs another power-up after
+        // the modem state.
         power_up_temperature_sensor();
         return true;
     }
@@ -548,8 +553,10 @@ fn run_phy_link(backup: bool) -> bool {
     for &(id, ..) in I2C_MASTER_CLOCK_NODES {
         regdma::set_skip(Module::PhyLink, id, true, true);
     }
-    // The blob asks for the Wi-Fi MAC trigger while the MAC waits for the REGDMA to clear its
-    // modem sleep flag. See WIFI-7246 in ESP-IDF.
+    // The chip can wake up from the modem state before the REGDMA turned the RF off, and the modem
+    // sleep flag of the MAC stays set. For that case, the blob asks for the Wi-Fi MAC trigger,
+    // which clears the flag.
+    // See <https://github.com/espressif/esp-idf/blob/4d80c1b29ae/components/esp_phy/src/phy_init.c#L314-L324>.
     let wifi_mac = cfg_select! {
         any(esp32c5, esp32s31) => unsafe { pm_get_wifimac_regdma_link_selection() },
         _ => false,

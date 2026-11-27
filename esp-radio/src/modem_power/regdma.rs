@@ -12,8 +12,8 @@ use esp_hal::rtc_cntl::regdma::{self, LinkConfig, LinkMemory, Module, SLEEP_ENTR
 
 use crate::compat::malloc::InternalMemory;
 
-/// The entries that restore the modem domain: on the way out of light sleep, and in the PMU modem
-/// state where the chip has it.
+/// The entries of the nodes of the modem domain. Light sleep saves and restores the nodes, and the
+/// PMU modem state, where the chip has it, restores them too.
 pub(crate) const RETENTION_ENTRIES: u32 = cfg_select! {
     supports_modem_state => SLEEP_ENTRY | regdma::MODEM_ENTRY,
     _ => SLEEP_ENTRY,
@@ -49,7 +49,7 @@ const CLOCK_MODEM: &[LinkConfig] = cfg_select! {
         ),
         registers(0x0201, 0x2010_9c00, 10),
         registers(0x0300, 0x2010_f000, 21),
-        // The modem state needs the clock gates of the modem bus open.
+        // The modem state switches the modem clock to the PLL.
         LinkConfig::write(0xfe00, 0x2058_7180, 0x100, 0x100, regdma::MODEM_ENTRY),
         LinkConfig::write(0xfe01, 0x2058_71e0, 0x15, 0xff, regdma::MODEM_ENTRY),
         LinkConfig::write(0xfe02, 0x2058_71e0, 0x1d, 0xff, regdma::MODEM_ENTRY),
