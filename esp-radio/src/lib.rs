@@ -264,14 +264,10 @@ mod coex_utils;
 mod fmt;
 pub(crate) mod reg_access;
 
-#[cfg(any(feature = "wifi", feature = "ble"))]
-use embassy_sync::lazy_lock::LazyLock;
 use esp_hal as hal;
 #[instability::unstable]
 pub use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-#[cfg(any(feature = "wifi", feature = "ble"))]
-use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphoreKind};
 #[cfg(any(feature = "wifi", all(feature = "ble", supports_modem_power_down)))]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
@@ -472,52 +468,57 @@ pub(crate) fn deinit() {
 static MODEM_DOMAIN_REFCOUNT: Refcount = Refcount::new();
 
 /// Take a reference to the modem power domain, powering it up if this is the first one.
-///
-/// Also calibrates the PHY, if it has not been calibrated since power-up.
 pub(crate) fn acquire_modem_domain() {
-    with_bring_up_lock(|| {
-        MODEM_DOMAIN_REFCOUNT.increment(|| {
-            // Ungate the modem clocks first: `enable_wifi_power_domain` pulses the
-            // modem reset, which is ineffective while the clocks are gated — and
-            // esp-phy's clock guard has gated them again by the time we re-init.
-            // (ESP-IDF never gates these clocks, so its power-up reset always lands.)
-            radio_clocks::init_radio_clocks();
+    MODEM_DOMAIN_REFCOUNT.increment(|| {
+        // Ungate the modem clocks first: `enable_wifi_power_domain` pulses the
+        // modem reset, which is ineffective while the clocks are gated — and
+        // esp-phy's clock guard has gated them again by the time we re-init.
+        // (ESP-IDF never gates these clocks, so its power-up reset always lands.)
+        radio_clocks::init_radio_clocks();
 
-            crate::common_adapter::enable_wifi_power_domain();
-        });
-
-        // Every radio acquires the modem domain before it uses the PHY, so no radio uses the PHY
-        // while it calibrates here.
-        if esp_phy::last_calibration_result().is_none() {
-            drop(esp_phy::enable_phy());
-        }
+        crate::common_adapter::enable_wifi_power_domain();
     });
 }
 
-/// Serializes radio bring-up, which calibrates the PHY with interrupts enabled, except on the
-/// ESP32 and ESP32-S2.
+/// Calibrate the PHY, if it has not been calibrated since power-up.
 ///
-/// Threads block on a scheduler mutex instead of spinning on a [`Refcount`], which would starve a
-/// lower-priority thread that calibrates.
+/// Every radio calls this after it acquires the modem domain and before it uses the PHY.
 ///
-/// Builds with only IEEE 802.15.4 do not link a scheduler, and bring up a single radio.
-fn with_bring_up_lock<R>(f: impl FnOnce() -> R) -> R {
-    #[cfg(any(feature = "wifi", feature = "ble"))]
+/// The calibration runs with interrupts enabled, except on the ESP32 and ESP32-S2. Threads that
+/// arrive meanwhile block on a scheduler mutex, so none of them uses the PHY while it calibrates.
+/// Only builds with two radios need the mutex. Wi-Fi excludes IEEE 802.15.4, so one is BLE.
+pub(crate) fn calibrate_phy() {
+    // Guards can be cloned in interrupt context, where the mutex cannot be taken. The PHY stays
+    // calibrated once it is, so those clones return here.
+    if esp_phy::last_calibration_result().is_some() {
+        return;
+    }
+
+    let calibrate = || {
+        if esp_phy::last_calibration_result().is_none() {
+            drop(esp_phy::enable_phy());
+        }
+    };
+
+    #[cfg(all(feature = "ble", any(feature = "wifi", feature = "ieee802154")))]
     {
+        use embassy_sync::lazy_lock::LazyLock;
+        use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphoreKind};
+
         static LOCK: LazyLock<SemaphoreHandle> =
-            LazyLock::new(|| SemaphoreHandle::new(SemaphoreKind::RecursiveMutex));
+            LazyLock::new(|| SemaphoreHandle::new(SemaphoreKind::Mutex));
 
         if preempt::initialized() {
             let lock = LOCK.get();
             lock.take(None);
-            let result = f();
+            calibrate();
             lock.give();
-            return result;
+            return;
         }
     }
 
     // Without the scheduler, there is no other thread to keep out.
-    f()
+    calibrate();
 }
 
 /// Release a reference to the modem power domain, powering it down if this was the last one.
@@ -604,9 +605,8 @@ impl RadioRefGuard {
     fn create(wake_lock: bool) -> Self {
         debug!("Creating RadioRefGuard");
 
-        // `init` may calibrate the PHY. Other threads wait on the lock, not in the spinning
-        // `RADIO_REFCOUNT`.
-        with_bring_up_lock(|| RADIO_REFCOUNT.increment(init));
+        RADIO_REFCOUNT.increment(init);
+        calibrate_phy();
         if wake_lock {
             esp_hal::if_unstable_hal! {
                 esp_hal::rtc_cntl::WakeLock::acquire();
