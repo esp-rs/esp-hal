@@ -16,9 +16,8 @@ pub(super) enum ReaderState {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(super) struct RmtReader {
-    // The position in channel RAM to continue reading from; must be either
-    // 0 or half the available RAM size if there's further data.
-    // The position may be invalid if there's no data left.
+    // The position in channel RAM to continue reading from, i.e. the next code
+    // that has not been copied out yet. The position may be invalid if there's no data left.
     offset: u16,
 
     pub total: usize,
@@ -37,8 +36,10 @@ impl RmtReader {
 
     // Copy from the hardware buffer to `data`, advancing the `data` slice accordingly.
     //
-    // If `final_` is set, read a full buffer length, potentially wrapping around. Otherwise, fetch
-    // half the buffer's length.
+    // Copies every code up to the hardware write pointer, potentially wrapping around. The write
+    // pointer only advances past codes whose both halves are written.
+    //
+    // If `final_` is set, the receiver has stopped, and the data must end in an end marker.
     //
     // The return value is only valuable if `final_` is set.
     // In that case `true` indicates that the read completed successfully, while `false` indicates
@@ -56,38 +57,77 @@ impl RmtReader {
             return true;
         }
 
+        if final_ && !self.end_is_valid(raw) {
+            return false;
+        }
+
+        let (count, max_count) = self.copy(data, raw);
+
+        // The panic can never trigger since count <= data.len()!
+        data.split_off_mut(..count).unwrap();
+
+        if count < max_count {
+            // `data` exhausted
+            self.state = ReaderState::Error(RxError::BufferTooSmall);
+        } else if final_ {
+            // Caller indicated that we're done
+            self.state = ReaderState::Done;
+        }
+
+        true
+    }
+
+    // self.offset -> next code we would read
+    // hw_offset -> next code the hardware would write
+    // => If both are the same, there is nothing new.
+    #[inline(always)]
+    fn available(&self, memsize: usize, hw_offset: usize) -> usize {
+        let offset = self.offset as usize;
+        (if offset <= hw_offset { 0 } else { memsize }) + hw_offset - offset
+    }
+
+    // Whether the stopped receiver ended without an overrun. Call it before copying the codes that
+    // are left after the receiver stopped.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    pub(super) fn end_is_valid(&self, raw: DynChannelAccess<Rx>) -> bool {
+        let memsize = raw.memsize().codes();
+        let hw_offset = raw.hw_offset();
+
+        // Nothing was received.
+        if self.total == 0 && self.available(memsize, hw_offset) == 0 {
+            return true;
+        }
+
+        // Without rx wrap, the receiver stops when the channel RAM is full, without an end marker.
+        // It is not documented whether the write pointer then reads 0 or `memsize`.
+        if !property!("rmt.has_rx_wrap") && (hw_offset == 0 || hw_offset == memsize) {
+            return true;
+        }
+
+        // Otherwise the last code the hardware wrote must contain the end marker.
+        let last = if hw_offset == 0 {
+            memsize - 1
+        } else {
+            hw_offset - 1
+        };
+        // SAFETY: `last < memsize`, so the read stays in this channel's RAM.
+        unsafe { raw.channel_ram_start().add(last).read_volatile() }.is_end_marker()
+    }
+
+    // Copies the codes up to the hardware write pointer into `data`, as many as fit.
+    //
+    // Returns the number of copied codes and the number of available codes.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    pub(super) fn copy(
+        &mut self,
+        data: &mut [PulseCode],
+        raw: DynChannelAccess<Rx>,
+    ) -> (usize, usize) {
         let ram_start = raw.channel_ram_start();
         let memsize = raw.memsize().codes();
         let offset = self.offset as usize;
 
-        let max_count = if final_ {
-            let hw_offset = raw.hw_offset();
-
-            // self.offset -> next code we would read
-            // hw_offset -> next code the hardware would write
-            // => If both are the same, we're done, max_count = 0
-            let max_count = (if offset <= hw_offset { 0 } else { memsize }) + hw_offset - offset;
-
-            if !(max_count == 0 && self.total == 0
-                    // We always enable wrapping if it is available. If it's unavailable, rx might
-                    // stop when the buffer is full, without an end marker present!
-                    // (Checking for two value of hw_offset here, because it's not documented what
-                    // happens with the pointer in that case.)
-                    || !property!("rmt.has_rx_wrap") && (hw_offset == 0 || hw_offset == memsize)
-                    || unsafe {
-                        raw.channel_ram_start()
-                            .add(hw_offset.checked_sub(1).unwrap_or(memsize - 1))
-                            .read_volatile()
-                    }
-                    .is_end_marker())
-            {
-                return false;
-            }
-
-            max_count
-        } else {
-            memsize / 2
-        };
+        let max_count = self.available(memsize, raw.hw_offset());
 
         let count = data.len().min(max_count);
         let mut count0 = count.min(memsize - offset);
@@ -121,32 +161,15 @@ impl RmtReader {
             ram_ptr = ram_start;
         }
 
-        // Update offset as
-        //
-        // | offset      | new offset  |
-        // | ----------- + ----------- |
-        // | 0           | memsize / 2 |
-        // | memsize / 2 | 0           |
-        //
-        // If `count < max_count` or if `final_` is set, the new offset will not correspond to
-        // where we stopped reading, but the new offset will not be used again since further calls
-        // will immediately return due to `self.state != Active`.
-        self.offset = (memsize / 2) as u16 - self.offset;
+        // Without rx wrap, the hardware stops at the end of the channel RAM, so the offset does
+        // not wrap either. Wrapping it would read the RAM again.
+        self.offset = if property!("rmt.has_rx_wrap") {
+            (offset + count) % memsize
+        } else {
+            offset + count
+        } as u16;
         self.total += count;
 
-        // The panic can never trigger since count <= data.len()!
-        data.split_off_mut(..count).unwrap();
-
-        if count < max_count {
-            // `data` exhausted
-            self.state = ReaderState::Error(RxError::BufferTooSmall);
-        } else if final_ {
-            // Caller indicated that we're done
-            self.state = ReaderState::Done;
-        }
-
-        debug_assert!(self.offset == 0 || self.offset as usize == memsize / 2);
-
-        true
+        (count, max_count)
     }
 }

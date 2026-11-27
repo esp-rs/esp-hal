@@ -49,6 +49,8 @@ use esp_hal::{
         RxConfig,
         RxError,
         RxInstance,
+        RxProgress,
+        RxReception,
         TxChannel,
         TxConfig,
         TxError,
@@ -633,6 +635,85 @@ fn do_rmt_blocking_rx(ctx: &mut Context, pattern_len: usize, tx_blocks: u8, rx_b
     check_data_eq(&conf, &expected, &rx_data, rx_res);
 }
 
+// Polls `reception` into `buf` until the reception ends, and returns the number of codes.
+fn poll_until_done(
+    reception: &mut RxReception<'_>,
+    buf: &mut [PulseCode],
+) -> Result<usize, RxError> {
+    let mut total = 0;
+    loop {
+        match reception.poll(&mut buf[total..])? {
+            RxProgress::Receiving(n) => total += n,
+            RxProgress::Done(n) => return Ok(total + n),
+        }
+    }
+}
+
+// Receives one repetition of a loop transmission with `RxChannel::start_receive`, and checks
+// that the codes read while the reception runs are a prefix of the final data.
+fn do_rmt_live_rx(ctx: &mut Context, pattern_len: usize, tx_blocks: u8) {
+    let conf = LoopbackConfig {
+        tx_len: pattern_len,
+        write_stop_code: false,
+        end_marker: EndMarkerConfig::None,
+        ..Default::default()
+    };
+    let pattern = generate_tx_data(&conf);
+    let mut tx_data = vec![PulseCode::new(Level::Low, 1500, Level::Low, 1500)];
+    tx_data.extend_from_slice(&pattern);
+
+    // The last code ends with the idle level of the next repetition.
+    let mut expected = pattern.clone();
+    expected[pattern_len - 1] = expected[pattern_len - 1].with_length2(1100).unwrap();
+    // The receiver stores that idle level as an end marker.
+    let mut received_form = pattern.clone();
+    received_form[pattern_len - 1] = received_form[pattern_len - 1].with_length2(0).unwrap();
+
+    let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config()).unwrap();
+    let (rx_pin, tx_pin) = pins(&mut ctx.pin);
+    let mut tx = match tx_blocks {
+        1 => rmt.tx_channel(tx_1!(), conf.tx_config()),
+        _ => rmt.tx_channel(tx_2!(), conf.tx_config()),
+    }
+    .unwrap()
+    .with_pin(tx_pin);
+    let mut rx = rmt
+        .rx_channel(rx_1!(), conf.rx_config())
+        .unwrap()
+        .with_pin(rx_pin);
+
+    let mut rx_data = vec![PulseCode::end_marker(); pattern_len];
+    let tx_loop = tx.transmit_loop(&tx_data, LoopMode::Infinite).unwrap();
+
+    let mut reception = rx.start_receive();
+    let mut total = 0;
+    let mut live_len = 0;
+    let rx_res = loop {
+        match reception.poll(&mut rx_data[total..]) {
+            Ok(RxProgress::Receiving(n)) => total += n,
+            Ok(RxProgress::Done(n)) => break Ok(total + n),
+            Err(err) => break Err(err),
+        }
+        if total > live_len {
+            live_len = total;
+            let received = &rx_data[..total];
+            for (idx, (&code_tx, &code_rx)) in core::iter::zip(&received_form, received).enumerate()
+            {
+                assert!(
+                    pulse_code_matches(code_tx, code_rx, conf.tolerance),
+                    "live rx/tx code mismatch at {}",
+                    idx
+                );
+            }
+        }
+    };
+    drop(reception);
+    tx_loop.stop().unwrap();
+
+    assert!(live_len > 0, "no codes before the reception ended");
+    check_data_eq(&conf, &expected, &rx_data, rx_res);
+}
+
 struct Context {
     rmt: RMT<'static>,
     pin: AnyPin<'static>,
@@ -928,6 +1009,152 @@ mod tests {
     #[test]
     fn rmt_blocking_rx_wrap(mut ctx: Context) {
         do_rmt_blocking_rx(&mut ctx, CHANNEL_RAM_SIZE * 3 / 2, 2, 1);
+    }
+
+    #[test]
+    fn rmt_live_rx(mut ctx: Context) {
+        do_rmt_live_rx(&mut ctx, CHANNEL_RAM_SIZE / 2, 1);
+    }
+
+    // The frame fills the channel RAM exactly. Without rx wrap, the hardware stops at the end of
+    // the RAM.
+    #[test]
+    fn rmt_live_rx_exact_fit(mut ctx: Context) {
+        do_rmt_live_rx(&mut ctx, CHANNEL_RAM_SIZE, 2);
+    }
+
+    // The frame is longer than the channel RAM, so the live reads mix with the threshold reads.
+    #[cfg(rmt_has_rx_wrap)]
+    #[test]
+    fn rmt_live_rx_wrap(mut ctx: Context) {
+        do_rmt_live_rx(&mut ctx, CHANNEL_RAM_SIZE * 3 / 2, 2);
+    }
+
+    // Stopping a reception keeps the codes received so far and nothing beyond them.
+    #[test]
+    fn rmt_live_rx_stop(mut ctx: Context) {
+        let conf = LoopbackConfig {
+            write_stop_code: false,
+            end_marker: EndMarkerConfig::None,
+            ..Default::default()
+        };
+        let pattern = generate_tx_data(&conf);
+        let mut tx_data = vec![PulseCode::new(Level::Low, 1500, Level::Low, 1500)];
+        tx_data.extend_from_slice(&pattern);
+
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config()).unwrap();
+        let (rx_pin, tx_pin) = pins(&mut ctx.pin);
+        let mut tx = rmt
+            .tx_channel(tx_1!(), conf.tx_config())
+            .unwrap()
+            .with_pin(tx_pin);
+        let mut rx = rmt
+            .rx_channel(rx_1!(), conf.rx_config())
+            .unwrap()
+            .with_pin(rx_pin);
+
+        let mut rx_data = vec![PulseCode::end_marker(); conf.tx_len];
+        let tx_loop = tx.transmit_loop(&tx_data, LoopMode::Infinite).unwrap();
+
+        let mut reception = rx.start_receive();
+        let mut count = 0;
+        while count < 3 {
+            let Ok(RxProgress::Receiving(n)) = reception.poll(&mut rx_data[count..]) else {
+                panic!("reception ended before the stop");
+            };
+            count += n;
+        }
+        reception.stop();
+        tx_loop.stop().unwrap();
+
+        assert!(count >= 3);
+        assert!(count < conf.tx_len - 2, "reception was not stopped early");
+        for (idx, (&code_tx, &code_rx)) in core::iter::zip(&pattern, &rx_data[..count]).enumerate()
+        {
+            assert!(
+                pulse_code_matches(code_tx, code_rx, conf.tolerance),
+                "rx/tx code mismatch at {}",
+                idx
+            );
+        }
+        assert!(
+            rx_data[count..]
+                .iter()
+                .all(|c| *c == PulseCode::end_marker()),
+            "rx buffer unexpectedly overwritten beyond the stop"
+        );
+    }
+
+    // A poll whose new codes do not fit into the buffer reports the error, and keeps reporting it.
+    #[test]
+    fn rmt_live_rx_buffer_too_small(mut ctx: Context) {
+        let conf = LoopbackConfig {
+            write_stop_code: false,
+            end_marker: EndMarkerConfig::None,
+            ..Default::default()
+        };
+        let pattern = generate_tx_data(&conf);
+        let mut tx_data = vec![PulseCode::new(Level::Low, 1500, Level::Low, 1500)];
+        tx_data.extend_from_slice(&pattern);
+
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config()).unwrap();
+        let (rx_pin, tx_pin) = pins(&mut ctx.pin);
+        let mut tx = rmt
+            .tx_channel(tx_1!(), conf.tx_config())
+            .unwrap()
+            .with_pin(tx_pin);
+        let mut rx = rmt
+            .rx_channel(rx_1!(), conf.rx_config())
+            .unwrap()
+            .with_pin(rx_pin);
+
+        // The frame is much longer than the buffer.
+        let mut rx_data = vec![PulseCode::end_marker(); 3];
+        let tx_loop = tx.transmit_loop(&tx_data, LoopMode::Infinite).unwrap();
+
+        let mut reception = rx.start_receive();
+        let mut count = 0;
+        let result = loop {
+            match reception.poll(&mut rx_data[count..]) {
+                Ok(RxProgress::Receiving(n)) => count += n,
+                other => break other,
+            }
+        };
+        let again = reception.poll(&mut rx_data[..]);
+        reception.stop();
+        tx_loop.stop().unwrap();
+
+        assert_eq!(result, Err(RxError::BufferTooSmall));
+        assert_eq!(again, Err(RxError::BufferTooSmall));
+    }
+
+    // Stopping or dropping a reception that has not received an edge returns at once, and the
+    // channel works afterwards.
+    #[test]
+    fn rmt_live_rx_stop_before_first_edge(mut ctx: Context) {
+        let conf = LoopbackConfig::default();
+        let rmt = Rmt::new(ctx.rmt.reborrow(), conf.rmt_config()).unwrap();
+        let (rx_pin, tx_pin) = pins(&mut ctx.pin);
+        let mut tx = rmt
+            .tx_channel(tx_1!(), conf.tx_config())
+            .unwrap()
+            .with_pin(tx_pin);
+        let mut rx = rmt
+            .rx_channel(rx_1!(), conf.rx_config())
+            .unwrap()
+            .with_pin(rx_pin);
+
+        let mut rx_data = vec![PulseCode::end_marker(); conf.tx_len];
+        rx.start_receive().stop();
+        drop(rx.start_receive());
+
+        let tx_data = generate_tx_data(&conf);
+        let rx_res = {
+            let mut reception = rx.start_receive();
+            tx.transmit(&tx_data).unwrap();
+            poll_until_done(&mut reception, &mut rx_data)
+        };
+        check_data_eq(&conf, &tx_data, &rx_data, rx_res);
     }
 
     #[test]

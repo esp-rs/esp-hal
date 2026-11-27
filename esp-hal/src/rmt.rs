@@ -1720,6 +1720,119 @@ impl<'a, Dm: DriverMode> RxChannel<'a, Dm> {
             }
         }
     }
+
+    /// Starts receiving one frame.
+    ///
+    /// Returns an [`RxReception`] that copies the codes out while the frame arrives, see
+    /// [`RxReception::poll`].
+    #[cfg_attr(
+        any(esp32, esp32s2),
+        doc = "",
+        doc = "A frame cannot be longer than the channel RAM on this chip.",
+        doc = ""
+    )]
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[instability::unstable]
+    pub fn start_receive(&mut self) -> RxReception<'_> {
+        let raw = self.raw;
+        raw.clear_rx_interrupts(EnumSet::all());
+        raw.start_receive(true, raw.memsize());
+
+        RxReception {
+            raw,
+            reader: RmtReader::new(),
+            guard: RxGuard::new(raw),
+            _channel: PhantomData,
+        }
+    }
+}
+
+/// Progress of an [`RxReception`], see [`RxReception::poll`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum RxProgress {
+    /// The reception continues. Contains the number of codes that the call copied.
+    Receiving(usize),
+
+    /// The reception has ended and all codes have been copied. Contains the number of codes that
+    /// the call copied.
+    Done(usize),
+}
+
+/// A reception in progress, see [`RxChannel::start_receive`].
+///
+/// Dropping it stops the reception.
+#[must_use = "dropping the reception stops it"]
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub struct RxReception<'c> {
+    raw: DynChannelAccess<Rx>,
+    reader: RmtReader,
+    guard: RxGuard,
+    _channel: PhantomData<&'c mut ()>,
+}
+
+impl RxReception<'_> {
+    /// Copies the codes received since the previous call into `buf`.
+    ///
+    /// Returns [`RxProgress::Done`] once the reception has ended and every code has been copied.
+    ///
+    /// The hardware makes a [`PulseCode`] available only when both of its pulses are complete.
+    /// Thus, the last pulse can be missing until the next edge on the input. The last code of a
+    /// frame contains the end marker.
+    ///
+    /// # Errors
+    ///
+    /// [`RxError::BufferTooSmall`] if the new codes do not fit into `buf`, or
+    /// [`RxError::Overrun`]. Once an error is returned, every further call returns it. The
+    /// contents of `buf` are unspecified after an error.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[instability::unstable]
+    pub fn poll(&mut self, buf: &mut [PulseCode]) -> Result<RxProgress, RxError> {
+        if let ReaderState::Error(err) = self.reader.state {
+            return Err(err);
+        }
+
+        let raw = self.raw;
+        if self.guard.is_active() {
+            match raw.get_rx_status() {
+                Some(event @ (Event::End | Event::Error)) => {
+                    // See `Reception::poll`.
+                    raw.stop_rx(false);
+                    raw.update();
+                    self.guard.set_completed();
+
+                    if event == Event::Error || !self.reader.end_is_valid(raw) {
+                        self.reader.state = ReaderState::Error(RxError::Overrun);
+                        return Err(RxError::Overrun);
+                    }
+                }
+                #[cfg(rmt_has_rx_wrap)]
+                Some(Event::Threshold) => raw.clear_rx_interrupts(Event::Threshold),
+                _ => {}
+            }
+        }
+
+        let (count, max_count) = self.reader.copy(buf, raw);
+        if count < max_count {
+            self.reader.state = ReaderState::Error(RxError::BufferTooSmall);
+            Err(RxError::BufferTooSmall)
+        } else if self.guard.is_active() {
+            Ok(RxProgress::Receiving(count))
+        } else {
+            Ok(RxProgress::Done(count))
+        }
+    }
+
+    /// Stops the reception, the same as dropping it.
+    ///
+    /// The reception stops immediately, before the idle threshold. Codes that were not copied by
+    /// [`Self::poll`] are lost.
+    #[inline]
+    #[instability::unstable]
+    pub fn stop(self) {}
 }
 
 impl<'a> RxChannel<'a, Async> {
@@ -1746,9 +1859,12 @@ impl<Dm: DriverMode> Drop for RxChannel<'_, Dm> {
 }
 
 // A reception in progress: reads the channel RAM and checks the result.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct Reception<'d> {
     raw: DynChannelAccess<Rx>,
     reader: RmtReader,
+    // `data[..reader.total]` holds the received codes.
     data: &'d mut [PulseCode],
     guard: RxGuard,
 }
@@ -1770,6 +1886,12 @@ impl<'d> Reception<'d> {
         }
     }
 
+    #[inline(always)]
+    fn read(&mut self, final_: bool) -> bool {
+        let mut rest = &mut self.data[self.reader.total..];
+        self.reader.read(&mut rest, self.raw, final_)
+    }
+
     // Reads the channel RAM if needed. Returns the result once the reception has ended.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(&mut self) -> Option<Result<usize, RxError>> {
@@ -1784,7 +1906,7 @@ impl<'d> Reception<'d> {
                 raw.update();
 
                 // `RmtReader::read()` returns immediately if the reader is already done.
-                if !self.reader.read(&mut self.data, raw, true) || event == Event::Error {
+                if !self.read(true) || event == Event::Error {
                     Err(RxError::Overrun)
                 } else if let ReaderState::Error(err) = self.reader.state {
                     Err(err)
@@ -1795,7 +1917,7 @@ impl<'d> Reception<'d> {
             #[cfg(rmt_has_rx_wrap)]
             Some(Event::Threshold) => {
                 raw.clear_rx_interrupts(Event::Threshold);
-                self.reader.read(&mut self.data, raw, false);
+                self.read(false);
                 return None;
             }
             _ => return None,
@@ -1903,6 +2025,10 @@ impl RxGuard {
     fn set_completed(&mut self) {
         self.raw = None;
         self._cpu_frequency_lock = None;
+    }
+
+    fn is_active(&self) -> bool {
+        self.raw.is_some()
     }
 }
 
@@ -3082,6 +3208,13 @@ mod chip_specific {
             if force {
                 if !rmt.chconf1(ch).read().rx_en().bit() {
                     // Don't lock up trying to stop rx when we didn't start in the first place
+                    return;
+                }
+
+                // With `rx_en` cleared, the receiver cannot start a frame. If it has not started
+                // one yet, it never raises `End` or `Error`.
+                rmt.chconf1(ch).modify(|_, w| w.rx_en().clear_bit());
+                if rmt.chstatus(ch).read().state().bits() == 0 {
                     return;
                 }
 
