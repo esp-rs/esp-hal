@@ -1,11 +1,12 @@
 //! Helper functions for TRNG functionality
 
+use crate::system::{Peripheral, PeripheralClockControl};
+
 /// Enables true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     let rtc_cntl = crate::peripherals::LPWR::regs();
     let sens = crate::peripherals::SENS::regs();
-    let dport = crate::peripherals::DPORT::regs();
     let apb_ctrl = crate::peripherals::APB_CTRL::regs();
     let i2s0 = crate::peripherals::I2S0::regs();
 
@@ -17,14 +18,10 @@ pub(crate) fn ensure_randomness() {
         sens.sar_start_force()
             .modify(|_, w| w.sar2_en_test().set_bit());
 
-        // periph_module_enable(PERIPH_I2S0_MODULE);
-        dport
-            .perip_clk_en()
-            .modify(|_, w| w.i2c_ext0_clk_en().set_bit());
-
-        dport
-            .perip_rst_en()
-            .modify(|_, w| w.i2c_ext0_rst().clear_bit());
+        // I2S0 clocks the SAR ADC conversions that feed the RNG.
+        if PeripheralClockControl::enable(Peripheral::I2s0) {
+            PeripheralClockControl::reset(Peripheral::I2s0);
+        }
 
         sens.sar_start_force()
             .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());
@@ -93,7 +90,7 @@ pub(crate) fn ensure_randomness() {
             .apb_saradc_ctrl()
             .modify(|_, w| w.saradc_data_to_i2s().set_bit());
 
-        i2s0.conf2().modify(|_, w| w.camera_en().set_bit());
+        i2s0.conf2().modify(|_, w| w.camera_en().clear_bit());
 
         i2s0.conf2().modify(|_, w| w.lcd_en().set_bit());
 
@@ -155,4 +152,6 @@ pub(crate) fn revert_trng() {
             .apb_saradc_fsm()
             .modify(|_, w| w.saradc_start_wait().bits(8));
     }
+
+    PeripheralClockControl::disable(Peripheral::I2s0);
 }

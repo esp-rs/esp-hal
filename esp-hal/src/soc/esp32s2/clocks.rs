@@ -271,7 +271,13 @@ fn configure_apll_clk_impl(
 fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
     const CLK_LL_RC_FAST_ENABLE_WAIT_DEFAULT: u8 = 5;
     const CLK_LL_RC_FAST_WAIT_DEFAULT: u8 = 20;
-    LPWR::regs().clk_conf().modify(|_, w| w.enb_ck8m().bit(!en));
+    LPWR::regs().clk_conf().modify(|_, w| {
+        w.enb_ck8m().bit(!en);
+        // The RNG samples RC_FAST through the digital gate for entropy. The gate is off after
+        // reset.
+        // See <https://github.com/espressif/esp-idf/blob/ad20ded62a2d67a26e501fdc1905f43ba7ad6c81/components/bootloader_support/src/bootloader_random_esp32s2.c#L38-L40>.
+        w.dig_clk8m_en().bit(en)
+    });
     LPWR::regs().timer1().modify(|_, w| unsafe {
         w.ck8m_wait().bits(if en {
             CLK_LL_RC_FAST_ENABLE_WAIT_DEFAULT
