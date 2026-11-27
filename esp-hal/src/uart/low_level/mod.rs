@@ -691,11 +691,12 @@ impl Info {
         version::change_flow_control(self, sw_flow_ctrl, hw_flow_ctrl);
     }
 
-    /// Whether the FIFO reset bits of this instance corrupt the FIFOs of this instance or of
-    /// another instance.
+    /// Whether the FIFO reset bits of this instance leave a FIFO with wrong pointers.
+    ///
+    /// On the ESP32, the FIFO reset bits of `UART1` also reset the FIFO read pointers of
+    /// `UART2`. The FIFO reset bits of `UART2` reset its FIFO write pointers, but not its FIFO
+    /// read pointers.
     fn has_shared_fifo_reset(&self) -> bool {
-        // On the ESP32, the FIFO reset bits of UART1 also reset the FIFO read pointers of UART2.
-        // The FIFO reset bits of UART2 do not reset its own FIFO read pointers.
         cfg!(esp32) && !matches!(self.peripheral, crate::system::Peripheral::Uart0)
     }
 
