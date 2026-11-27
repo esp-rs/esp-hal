@@ -15,7 +15,11 @@
 // MUST be the first module
 mod fmt;
 
-use core::{cell::UnsafeCell, marker::PhantomData};
+use core::{
+    cell::UnsafeCell,
+    marker::PhantomData,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 // The macros exist and can use log-04, but they aren't used currently. To keep
 // fmt.rs copy-paste friendly, we just ignore the unused dependency.
@@ -390,6 +394,99 @@ unsafe impl embassy_sync_08::blocking_mutex::raw::RawMutex for RawMutex {
     fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
         self.inner.lock(f)
     }
+}
+
+/// A [`RawMutex`] that keeps its restore state, and counts nested acquisitions.
+///
+/// This lock is meant for C code that does not pass the restore state from the acquire to the
+/// release. Only the outermost release gives the mutex back.
+pub struct CountingLock {
+    lock: RawMutex,
+    nesting: AtomicU32,
+    token: AtomicU32,
+}
+
+impl Default for CountingLock {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CountingLock {
+    /// Creates a new lock.
+    #[inline]
+    pub const fn new() -> Self {
+        Self {
+            lock: RawMutex::new(),
+            nesting: AtomicU32::new(0),
+            token: AtomicU32::new(0),
+        }
+    }
+
+    /// Acquires the lock.
+    ///
+    /// # Safety
+    ///
+    /// - Each acquisition must be paired with a [`Self::release`] on the same core.
+    /// - The caller must ensure to release the locks in the reverse order they were acquired.
+    #[inline(always)]
+    pub unsafe fn acquire(&self) {
+        // The counters are only accessed with the mutex held, so they need no read-modify-write
+        // atomics, which some chips lack.
+        let token = unsafe { self.lock.acquire() };
+        let nesting = self.nesting();
+        self.nesting.store(nesting + 1, Ordering::Relaxed);
+        if nesting == 0 {
+            self.token.store(token.inner(), Ordering::Relaxed);
+        } else {
+            // A nested acquisition gets a reentry token, and its release keeps the mutex.
+            unsafe { self.lock.release(token) };
+        }
+    }
+
+    /// Releases the lock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the lock is not acquired.
+    ///
+    /// # Safety
+    ///
+    /// - Each release must be paired with an earlier [`Self::acquire`] on the same core.
+    /// - The caller must ensure to release the locks in the reverse order they were acquired.
+    #[inline(always)]
+    pub unsafe fn release(&self) {
+        let nesting = self.nesting();
+        if nesting == 0 {
+            panic_release_not_acquired();
+        }
+        self.nesting.store(nesting - 1, Ordering::Relaxed);
+        if nesting == 1 {
+            let token = self.token.load(Ordering::Relaxed);
+            unsafe { self.lock.release(RestoreState::new(token)) };
+        }
+    }
+
+    /// Returns the number of acquisitions that are not released yet.
+    #[inline(always)]
+    pub fn nesting(&self) -> u32 {
+        self.nesting.load(Ordering::Relaxed)
+    }
+
+    /// Runs the callback with this lock locked.
+    ///
+    /// The callback may run inside a [`Self::acquire`]/[`Self::release`] pair on the same core.
+    #[inline(always)]
+    pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.lock.lock(f)
+    }
+}
+
+#[inline(never)]
+#[cold]
+fn panic_release_not_acquired() -> ! {
+    panic!("CountingLock released without being acquired");
 }
 
 /// A non-reentrant (panicking) mutex.

@@ -1,6 +1,7 @@
 use core::{ptr::NonNull, task::Poll};
 
 use esp_phy::PhyInitGuard;
+use esp_sync::CountingLock;
 use portable_atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use super::Config;
@@ -9,7 +10,6 @@ use crate::sys::include;
 use crate::{
     asynch::AtomicWaker,
     compat::common::{str_from_c, task_core},
-    counting_lock::CountingLock,
     hal::ram,
     sys::{c_types::*, include::*},
 };

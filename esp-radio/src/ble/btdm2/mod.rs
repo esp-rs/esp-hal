@@ -15,6 +15,7 @@ use core::{
 };
 
 use esp_phy::PhyInitGuard;
+use esp_sync::CountingLock;
 
 use super::{Config, in_isr};
 use crate::{
@@ -36,7 +37,6 @@ use crate::{
         },
         semaphore,
     },
-    counting_lock::CountingLock,
     hal::ram,
     sys::{
         c_types::{c_char, c_void},

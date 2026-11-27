@@ -916,7 +916,7 @@ pub(crate) fn pmu_sleep_finish(saved: &SavedState) {
     if let Some(mpll_mhz) = saved.mpll_mhz {
         // The MPLL must have power before the rate is set.
         clocks::set_mpll_power(true);
-        clocks::set_mpll_frequency(mpll_mhz);
+        clocks::set_mpll_frequency_unlocked(mpll_mhz);
         if psram {
             set_psram_clock_for_sleep(false);
         }

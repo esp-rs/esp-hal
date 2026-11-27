@@ -163,4 +163,94 @@ mod init_tests {
 
         drop(wifi);
     }
+
+    #[test]
+    #[cfg(all(soc_has_wifi, not(any(esp32, esp32s2))))]
+    fn interrupts_run_while_the_phy_calibrates(p: Peripherals) {
+        use embassy_time::{Duration, Instant, Timer};
+        use portable_atomic::{AtomicU32, Ordering};
+
+        static LONGEST_GAP_US: AtomicU32 = AtomicU32::new(0);
+
+        #[embassy_executor::task]
+        async fn measure_gaps() {
+            let mut last = Instant::now();
+            loop {
+                Timer::after(Duration::from_millis(1)).await;
+                let now = Instant::now();
+                LONGEST_GAP_US.fetch_max((now - last).as_micros() as u32, Ordering::Relaxed);
+                last = now;
+            }
+        }
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
+        let spawner = EXECUTOR
+            .init(InterruptExecutor::new(p.FROM_CPU_INTR2))
+            .start(Priority::Priority3);
+        spawner.spawn(measure_gaps().unwrap());
+
+        let _controller = esp_radio::wifi::WifiController::new(p.WIFI, Default::default()).unwrap();
+
+        let longest_gap_us = LONGEST_GAP_US.load(Ordering::Relaxed);
+        hil_test::assert!(
+            longest_gap_us < 20_000,
+            "Interrupts were blocked for {} us",
+            longest_gap_us
+        );
+    }
+
+    // Wi-Fi starts in a higher-priority thread while BLE calibrates. It must wait, and its clocks
+    // must survive the calibration's clock restore.
+    #[test]
+    #[timeout(6)]
+    #[cfg(all(
+        soc_has_wifi,
+        soc_has_bt,
+        soc_has_modem_syscon,
+        feature = "esp-radio-unstable"
+    ))]
+    fn wifi_waits_for_ble_calibration(p: Peripherals) {
+        use esp_hal::peripherals::MODEM_SYSCON;
+        use esp_rtos::{CurrentThreadHandle, thread::ThreadSpawner};
+
+        // `clk_wifibb_*_en`, which the calibration enables. Wi-Fi does not enable
+        // `clk_wifibb_80x1_en` (bit 7) on the ESP32-S31.
+        const WIFI_BASEBAND_CLOCKS: u32 = 0x1ff & !(1 << 7);
+        fn wifi_baseband_clocks() -> u32 {
+            MODEM_SYSCON::regs().clk_conf1().read().bits() & WIFI_BASEBAND_CLOCKS
+        }
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        // Reset and earlier tests leave them on.
+        MODEM_SYSCON::regs()
+            .clk_conf1()
+            .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BASEBAND_CLOCKS) });
+
+        let wifi = p.WIFI;
+        let wifi_thread = ThreadSpawner::new(16384).with_priority(10).spawn(move || {
+            // Waits up to 2 s for the calibration, which enables the Wi-Fi baseband clocks.
+            let started_during_calibration = (0..4000).any(|_| {
+                CurrentThreadHandle::get().delay(esp_hal::time::Duration::from_micros(500));
+                wifi_baseband_clocks() == WIFI_BASEBAND_CLOCKS
+            });
+
+            let controller =
+                esp_radio::wifi::WifiController::new(wifi, Default::default()).unwrap();
+            (controller, started_during_calibration)
+        });
+
+        let _connector = BleConnector::new(p.BT, Default::default()).unwrap();
+        let ((_controller, started_during_calibration), _) = wifi_thread.join();
+
+        hil_test::assert!(
+            started_during_calibration,
+            "The calibration did not let the Wi-Fi thread run"
+        );
+        hil_test::assert_eq!(wifi_baseband_clocks(), WIFI_BASEBAND_CLOCKS);
+    }
 }

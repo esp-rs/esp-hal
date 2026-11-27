@@ -326,11 +326,6 @@ mod asynch;
 mod compat;
 #[cfg(any(esp32h4, esp32s31))]
 mod compiler_rt_abi;
-#[cfg(any(
-    all(feature = "ble", any(bt_controller = "btdm", bt_controller = "btdm2")),
-    all(feature = "wifi", feature = "unstable", modem_retention = "backup_dma"),
-))]
-mod counting_lock;
 mod interrupt_dispatch;
 #[cfg(all(
     supports_modem_power_down,
@@ -485,6 +480,47 @@ pub(crate) fn acquire_modem_domain() {
     });
 }
 
+/// Calibrate the PHY, if it has not been calibrated since power-up.
+///
+/// Every radio calls this after it acquires the modem domain and before it uses the PHY.
+///
+/// The calibration runs with interrupts enabled, except on the ESP32 and ESP32-S2. Threads that
+/// arrive meanwhile block on a scheduler mutex, so none of them uses the PHY while it calibrates.
+/// Only builds with two radios need the mutex. Wi-Fi excludes IEEE 802.15.4, so one is BLE.
+pub(crate) fn calibrate_phy() {
+    // Guards can be cloned in interrupt context, where the mutex cannot be taken. The PHY stays
+    // calibrated once it is, so those clones return here.
+    if esp_phy::last_calibration_result().is_some() {
+        return;
+    }
+
+    let calibrate = || {
+        if esp_phy::last_calibration_result().is_none() {
+            drop(esp_phy::enable_phy());
+        }
+    };
+
+    #[cfg(all(feature = "ble", any(feature = "wifi", feature = "ieee802154")))]
+    {
+        use embassy_sync::lazy_lock::LazyLock;
+        use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphoreKind};
+
+        static LOCK: LazyLock<SemaphoreHandle> =
+            LazyLock::new(|| SemaphoreHandle::new(SemaphoreKind::Mutex));
+
+        if preempt::initialized() {
+            let lock = LOCK.get();
+            lock.take(None);
+            calibrate();
+            lock.give();
+            return;
+        }
+    }
+
+    // Without the scheduler, there is no other thread to keep out.
+    calibrate();
+}
+
 /// Release a reference to the modem power domain, powering it down if this was the last one.
 pub(crate) fn release_modem_domain() {
     MODEM_DOMAIN_REFCOUNT.decrement(|| {
@@ -570,6 +606,7 @@ impl RadioRefGuard {
         debug!("Creating RadioRefGuard");
 
         RADIO_REFCOUNT.increment(init);
+        calibrate_phy();
         if wake_lock {
             esp_hal::if_unstable_hal! {
                 esp_hal::rtc_cntl::WakeLock::acquire();

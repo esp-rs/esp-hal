@@ -6,9 +6,10 @@
 
 use allocator_api2::boxed::Box;
 use enumset::EnumSet;
+use esp_sync::CountingLock;
 
 use super::{Radio, STATE};
-use crate::{compat::malloc::InternalMemory, counting_lock::CountingLock};
+use crate::compat::malloc::InternalMemory;
 
 unsafe extern "C" {
     fn phy_freq_mem_backup(backup: bool, mem: *mut u32);

@@ -333,18 +333,24 @@ pub(crate) fn set_mpll_power(on: bool) {
 /// MPLL = XTAL * (fb_div + 1) / (ref_div + 1), with ref_div 1.
 ///
 /// Ref: [IDF `clk_ll_mpll_set_config` (esp32s31)](https://github.com/espressif/esp-idf/blob/27506a49bc919926f546e325d5f5334ba23db316/components/esp_hal_clock/esp32s31/include/hal/clk_tree_ll.h#L527-L545)
+pub(crate) fn set_mpll_frequency(mpll_mhz: u32) {
+    crate::rom::regi2c::REGI2C_LOCK.lock(|| set_mpll_frequency_unlocked(mpll_mhz));
+}
+
+/// [`set_mpll_frequency`] without taking the analog I2C lock. The caller must hold
+/// [`REGI2C_LOCK`](crate::rom::regi2c::REGI2C_LOCK).
 ///
 /// Light sleep calls this function with the caches suspended, so the function must be inlined.
 #[inline(always)]
-pub(crate) fn set_mpll_frequency(mpll_mhz: u32) {
+pub(crate) fn set_mpll_frequency_unlocked(mpll_mhz: u32) {
     // Analog settings IDF writes before each calibration.
-    regi2c::I2C_MPLL_IR_CAL_EXT_CAP.write_field(3);
-    regi2c::I2C_MPLL_IR_CAL_ENX_CAP.write_field(1);
+    regi2c::I2C_MPLL_IR_CAL_EXT_CAP.write_field_unlocked(3);
+    regi2c::I2C_MPLL_IR_CAL_ENX_CAP.write_field_unlocked(1);
     LP_AON_CLK_RST::regs()
         .mspi_div()
         .modify(|_, w| unsafe { w.mspi_fb_div().bits(9) });
-    regi2c::I2C_MPLL_DHREF.write_field(3);
-    regi2c::I2C_MPLL_IR_CAL_ENX_CAP.write_field(0);
+    regi2c::I2C_MPLL_DHREF.write_field_unlocked(3);
+    regi2c::I2C_MPLL_IR_CAL_ENX_CAP.write_field_unlocked(0);
 
     // Calibration starts before the divider is written, and stops after the PLL reports that it
     // ended.

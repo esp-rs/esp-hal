@@ -32,6 +32,9 @@ pub(crate) fn pre_init() {
         .func_ctrl()
         .write(|w| unsafe { w.bits(0) });
 
+    // Before the first analog I2C access.
+    regi2c::configure_master_clock();
+
     // The RNG's clocks and its sampling logic are off after reset, and the driver has no way to
     // request them - `Peripheral::KEEP_ENABLED` only prevents the clock from being disabled later.
     // Run the same sequence as ESP-IDF's `rng_ll_enable` so that reads return random data.

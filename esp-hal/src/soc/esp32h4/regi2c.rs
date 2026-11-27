@@ -107,17 +107,36 @@ fn slave_select_bit(block: u8) -> u32 {
     }
 }
 
-fn regi2c_enable_block(block: u8) -> usize {
-    // esp-idf only asserts that the master clock is running (the modem clock driver turns it on),
-    // so enable it here. The clock is also lost across sleep with the top domain powered down,
-    // which needs the ICG bitmaps that the sleep code will have to set up.
-    MODEM_SYSCON::regs()
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
-    MODEM_LPCON::regs()
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
+/// Enables and selects the clock of the analog I2C master.
+///
+/// Every analog I2C access needs this clock, and esp-hal does not rely on the bootloader to set
+/// it. The PHY gates `clk_i2c_mst_en`, and `clk_i2c_mst_fo` keeps the clock running. When light
+/// sleep powers the modem domain down, the modem retention restores these bits.
+///
+/// See <https://github.com/espressif/esp-idf/blob/4dbfecac7e3/components/bootloader_support/src/esp32h4/bootloader_esp32h4.c#L105-L107>.
+pub(crate) fn configure_master_clock() {
+    // `PMU_HP_ICG_MODEM_CODE_MODEM` is 1 and `PMU_HP_ICG_MODEM_CODE_ACTIVE` is 2.
+    const ICG_BITMAP: u8 = (1 << 1) | (1 << 2);
 
+    crate::rom::regi2c::REGI2C_LOCK.lock(|| {
+        let lpcon = MODEM_LPCON::regs();
+        lpcon.clk_conf_power_st().modify(|r, w| unsafe {
+            w.clk_i2c_mst_st_map()
+                .bits(r.clk_i2c_mst_st_map().bits() | ICG_BITMAP);
+            w.clk_lp_apb_st_map()
+                .bits(r.clk_lp_apb_st_map().bits() | ICG_BITMAP)
+        });
+        lpcon.clk_conf().modify(|_, w| w.clk_i2c_mst_en().set_bit());
+        lpcon
+            .clk_conf_force_on()
+            .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
+        MODEM_SYSCON::regs()
+            .clk_conf()
+            .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+    });
+}
+
+fn regi2c_enable_block(block: u8) -> usize {
     let select_bit = slave_select_bit(block);
 
     // A set bit means the slave is wired to I2C0, a clear bit means I2C1.

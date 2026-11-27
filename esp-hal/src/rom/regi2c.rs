@@ -1,4 +1,44 @@
+use esp_sync::CountingLock;
+
 use crate::soc::regi2c::{regi2c_read, regi2c_write};
+
+/// Serializes accesses to the analog I2C master, which esp-hal shares with the PHY library.
+pub(crate) static REGI2C_LOCK: CountingLock = CountingLock::new();
+
+/// Locks the analog I2C master, for callers outside esp-hal that access it.
+///
+/// The lock disables interrupts on the calling core. Calls nest, and only the outermost
+/// [`regi2c_exit_critical`] releases the lock and restores the interrupt state.
+///
+/// # Safety
+///
+/// - Each call must be paired with a [`regi2c_exit_critical`] on the same core.
+/// - The caller must release this lock and all other locks, including critical sections, in the
+///   reverse order it acquired them. Otherwise a release restores the interrupt state while a lock
+///   taken later still needs interrupts disabled.
+#[cfg(feature = "rt")]
+#[crate::ram]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn regi2c_enter_critical() {
+    unsafe { REGI2C_LOCK.acquire() };
+}
+
+/// Unlocks the analog I2C master locked by [`regi2c_enter_critical`].
+///
+/// # Panics
+///
+/// Panics if the lock is not acquired.
+///
+/// # Safety
+///
+/// - Each call must be paired with an earlier [`regi2c_enter_critical`] on the same core.
+/// - The release order must follow the rules of [`regi2c_enter_critical`].
+#[cfg(feature = "rt")]
+#[crate::ram]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn regi2c_exit_critical() {
+    unsafe { REGI2C_LOCK.release() };
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -12,19 +52,34 @@ impl RegI2cMaster {
         Self { master, host_id }
     }
 
-    // The ESP32-S31 light sleep sets the MPLL with the caches suspended, through the RAM `read` and
-    // `write` in `soc::esp32s31::regi2c`. The accessors in this file must then be inlined into the
-    // RAM caller. On other chips, the accessors end in flash or ROM code anyway, and inlining only
-    // copies them into each call site.
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn write(&self, reg: u8, data: u8) {
-        regi2c_write(self.master, self.host_id, reg, data);
+        REGI2C_LOCK.lock(|| self.write_unlocked(reg, data));
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn read(&self, reg: u8) -> u8 {
+        REGI2C_LOCK.lock(|| self.read_unlocked(reg))
+    }
+
+    // The ESP32-S31 light sleep sets the MPLL with the caches suspended, through the RAM `read` and
+    // `write` in `soc::esp32s31::regi2c`. The `*_unlocked` accessors must then be inlined into the
+    // RAM caller. On other chips, the accessors end in flash or ROM code anyway, and inlining only
+    // copies them into each call site.
+
+    /// Writes `reg` without taking the lock.
+    ///
+    /// The caller must hold [`REGI2C_LOCK`].
+    #[allow(unused)]
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    pub fn write_unlocked(&self, reg: u8, data: u8) {
+        regi2c_write(self.master, self.host_id, reg, data);
+    }
+
+    /// Reads `reg` without taking the lock. See [`Self::write_unlocked`].
+    #[allow(unused)]
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    pub fn read_unlocked(&self, reg: u8) -> u8 {
         regi2c_read(self.master, self.host_id, reg)
     }
 }
@@ -42,13 +97,11 @@ impl RegI2cRegister {
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn write_reg(&self, data: u8) {
         self.master.write(self.reg_add, data);
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn read(&self) -> u8 {
         self.master.read(self.reg_add)
     }
@@ -79,18 +132,24 @@ impl RawRegI2cField {
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn read(&self) -> u8 {
         (self.register.read() >> self.lsb) & self.mask()
     }
 
     #[allow(unused)]
-    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
     pub fn write_field(&self, data: u8) {
+        REGI2C_LOCK.lock(|| self.write_field_unlocked(data));
+    }
+
+    /// Writes the field without taking the lock. See [`RegI2cMaster::write_unlocked`].
+    #[allow(unused)]
+    #[cfg_attr(all(esp32s31, not(is_debug_build)), inline(always))]
+    pub fn write_field_unlocked(&self, data: u8) {
+        let master = self.register.master;
+        let reg = self.register.reg_add;
         let mask = self.mask() << self.lsb;
-        let bits = self.register.read();
-        self.register
-            .write_reg((bits & !mask) | ((data << self.lsb) & mask));
+        let bits = master.read_unlocked(reg);
+        master.write_unlocked(reg, (bits & !mask) | ((data << self.lsb) & mask));
     }
 }
 
