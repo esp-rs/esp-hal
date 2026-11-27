@@ -340,6 +340,48 @@ pub fn software_reset() -> ! {
     crate::rom::software_reset()
 }
 
+#[procmacros::doc_replace]
+/// Performs a software reset into the ROM download mode.
+///
+/// The force-download flag stays set until a power-on reset, so the flashing tool must clear it
+/// before it starts the application. An enabled RTC watchdog keeps running in the download mode.
+#[cfg_attr(
+    esp32s3,
+    doc = "If the USB OTG controller uses the USB pads, it detaches from the host first. This blocks for 300 ms."
+)]
+#[cfg_attr(esp32s3, doc = "")]
+/// # Examples
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::system::software_reset_to_download_mode;
+/// software_reset_to_download_mode();
+/// # {after_snippet}
+/// ```
+#[cfg(not(esp32))]
+#[instability::unstable]
+pub fn software_reset_to_download_mode() -> ! {
+    #[cfg(soc_has_usb_device)]
+    crate::soc::usb_phy::prepare_usj_for_rom_download();
+
+    cfg_select! {
+        esp32s2 => crate::peripherals::LPWR::regs()
+            .options1()
+            .modify(|_, w| w.force_download_boot().set_bit()),
+        any(esp32c2, esp32c3, esp32s3) => crate::peripherals::LPWR::regs()
+            .option1()
+            .modify(|_, w| w.force_download_boot().set_bit()),
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32h4) => crate::peripherals::LP_AON::regs()
+            .sys_cfg()
+            .modify(|_, w| w.force_download_boot().set_bit()),
+        any(esp32p4, esp32s31) => crate::peripherals::LP_SYS::regs()
+            .sys_ctrl()
+            .modify(|_, w| w.force_download_boot().set_bit()),
+    };
+
+    software_reset()
+}
+
 /// Resets the given CPU, leaving peripherals unchanged.
 #[instability::unstable]
 #[inline]
