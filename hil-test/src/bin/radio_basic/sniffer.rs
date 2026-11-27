@@ -10,6 +10,7 @@ mod tests {
     };
 
     const WIFI_MODE_STA: u32 = 1;
+    const WIFI_MODE_APSTA: u32 = 3;
 
     // esp-radio has no getters for promiscuous mode and the Wi-Fi mode.
     unsafe extern "C" {
@@ -52,6 +53,7 @@ mod tests {
                 AccessPointConfig::default(),
             ))
             .unwrap();
+        assert_eq!(wifi_mode(), WIFI_MODE_APSTA);
 
         assert!(promiscuous_mode());
     }
