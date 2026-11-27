@@ -17,6 +17,8 @@ use esp_hal::{
     DriverMode,
     canfd::{
         CanFd,
+        CanFdRx,
+        CanFdTx,
         ClockSource,
         Config,
         ConfigError,
@@ -35,6 +37,7 @@ use esp_hal::{
         TxBufferState,
     },
     rtc_cntl::WakeLock,
+    time::{Duration, Instant},
 };
 use hil_test as _;
 
@@ -74,7 +77,7 @@ fn wait_tx<D: DriverMode>(canfd: &CanFd<'static, D>, index: u8) -> TxBufferState
 fn wait_tx_state(index: u8, state: impl Fn() -> TxBufferState) -> TxBufferState {
     // The slowest bit rate these tests configure needs over a hundred
     // milliseconds for one frame.
-    let deadline = esp_hal::time::Instant::now() + esp_hal::time::Duration::from_millis(500);
+    let deadline = Instant::now() + Duration::from_millis(500);
     loop {
         let state = state();
         if !matches!(
@@ -84,7 +87,7 @@ fn wait_tx_state(index: u8, state: impl Fn() -> TxBufferState) -> TxBufferState 
             return state;
         }
         assert!(
-            esp_hal::time::Instant::now() < deadline,
+            Instant::now() < deadline,
             "TX buffer {} never finished, stuck in {:?}",
             index,
             state
@@ -109,10 +112,25 @@ fn accepted(canfd: &mut CanFd<'static, Blocking>, id: impl Into<Id>) -> bool {
     canfd.rx_frame_count() > 0
 }
 
+/// [`accepted`] through the two halves of a split driver.
+fn accepted_split(
+    rx: &mut CanFdRx<'_, Blocking>,
+    tx: &mut CanFdTx<'_, Blocking>,
+    id: impl Into<Id>,
+) -> bool {
+    rx.flush_rx();
+    let frame = Frame::new(id, &[0xAA]).unwrap();
+    let index = tx.transmit(&frame).unwrap();
+    assert_eq!(
+        wait_tx_state(index, || tx.tx_buffer_state(index)),
+        TxBufferState::Ok,
+        "transmit failed"
+    );
+    rx.rx_frame_count() > 0
+}
+
 #[embedded_test::tests(default_timeout = 3)]
 mod blocking_tests {
-    use esp_hal::time::{Duration, Instant};
-
     use super::*;
 
     /// Checks the timestamp counter advances at `rate` counts per second,
@@ -380,6 +398,200 @@ mod blocking_tests {
         assert_eq!(ctx.canfd.rx_frame_count(), 0, "FD frame must be filtered");
 
         ctx.canfd.accept_all();
+    }
+
+    #[test]
+    fn the_receiving_half_changes_filters_on_the_bus(mut ctx: Context<Blocking>) {
+        let (mut rx, mut tx) = ctx.canfd.split();
+
+        // Accept 0x220..=0x22F.
+        rx.set_mask_filter(
+            MaskFilter::A,
+            &MaskFilterConfig::standard(std(0x220), std(0x7F0)),
+        );
+        rx.disable_mask_filter(MaskFilter::B);
+        rx.disable_mask_filter(MaskFilter::C);
+        rx.disable_range_filter();
+        assert!(
+            accepted_split(&mut rx, &mut tx, std(0x225)),
+            "0x225 must pass"
+        );
+        assert!(
+            !accepted_split(&mut rx, &mut tx, std(0x235)),
+            "0x235 must not"
+        );
+
+        // Enabling another filter leaves filter A as it is.
+        rx.set_range_filter(&RangeFilterConfig::standard(std(0x400), std(0x40F)));
+        assert!(
+            accepted_split(&mut rx, &mut tx, std(0x225)),
+            "0x225 must still pass"
+        );
+        assert!(
+            accepted_split(&mut rx, &mut tx, std(0x408)),
+            "0x408 must pass"
+        );
+        assert!(
+            !accepted_split(&mut rx, &mut tx, std(0x235)),
+            "0x235 must not"
+        );
+
+        rx.accept_all();
+        assert!(
+            accepted_split(&mut rx, &mut tx, std(0x235)),
+            "all must pass"
+        );
+    }
+
+    #[test]
+    fn filters_set_through_the_receiving_half_outlive_it(mut ctx: Context<Blocking>) {
+        {
+            let (mut rx, _) = ctx.canfd.split();
+            rx.set_mask_filter(
+                MaskFilter::A,
+                &MaskFilterConfig::standard(std(0x220), std(0x7F0)),
+            );
+        }
+
+        // Changing another filter through the driver must not bring back what
+        // the driver last set on filter A itself.
+        ctx.canfd.disable_range_filter();
+        assert!(accepted(&mut ctx.canfd, std(0x225)), "0x225 must pass");
+        assert!(!accepted(&mut ctx.canfd, std(0x235)), "0x235 must not");
+
+        ctx.canfd.accept_all();
+    }
+
+    #[test]
+    fn filters_rewritten_under_traffic_keep_every_frame_whole(mut ctx: Context<Blocking>) {
+        const FRAMES: usize = 200;
+
+        fn id(number: usize) -> StandardId {
+            std(0x2A0 + (number as u16 & 0xF))
+        }
+
+        // The first byte is the frame number, and the other bytes depend on it.
+        fn payload(number: usize) -> [u8; 64] {
+            let mut bytes: [u8; 64] =
+                core::array::from_fn(|at| (number as u8).wrapping_mul(7) ^ at as u8);
+            bytes[0] = number as u8;
+            bytes
+        }
+
+        let (mut rx, mut tx) = ctx.canfd.split();
+
+        // Both settings of filter A accept all the identifiers in use.
+        let narrow = MaskFilterConfig::standard(std(0x2A0), std(0x7F0));
+        let wide = MaskFilterConfig::standard(std(0x280), std(0x780));
+        rx.set_mask_filter(MaskFilter::A, &narrow);
+        rx.disable_mask_filter(MaskFilter::B);
+        rx.disable_mask_filter(MaskFilter::C);
+        rx.disable_range_filter();
+        rx.flush_rx();
+
+        let mut queued = 0;
+        let mut received = [false; FRAMES];
+        let mut missing = FRAMES;
+        let mut rewrites = 0u32;
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while missing > 0 {
+            // Keeping every TX buffer armed makes the frames follow each other
+            // without a pause, so each filter change falls between two of them.
+            while queued < FRAMES {
+                let frame = Frame::new_fd(id(queued), &payload(queued))
+                    .unwrap()
+                    .with_bit_rate_switch(true);
+                match tx.transmit(&frame) {
+                    Ok(_) => queued += 1,
+                    Err(Error::NoFreeTxBuffer) => break,
+                    Err(error) => panic!("frame {} was not queued: {:?}", queued, error),
+                }
+            }
+
+            let next = if rewrites % 2 == 0 { &wide } else { &narrow };
+            rx.set_mask_filter(MaskFilter::A, next);
+            rewrites += 1;
+
+            while rx.rx_frame_count() > 0 {
+                let frame = rx.receive().unwrap();
+                let number = usize::from(frame.payload()[0]);
+                assert!(number < FRAMES, "a frame numbered {}", number);
+                assert!(!received[number], "frame {} came twice", number);
+                assert_eq!(frame.id(), Id::Standard(id(number)), "frame {}", number);
+                assert_eq!(frame.payload(), &payload(number)[..], "frame {}", number);
+                received[number] = true;
+                missing -= 1;
+            }
+
+            assert!(
+                Instant::now() < deadline,
+                "{} of {} frames never came",
+                missing,
+                FRAMES
+            );
+        }
+
+        assert!(!rx.rx_overrun());
+        assert!(rewrites as usize > FRAMES / 2, "only {} rewrites", rewrites);
+        rx.accept_all();
+    }
+
+    #[test]
+    fn a_filter_change_waits_for_the_frame_on_the_bus(mut ctx: Context<Blocking>) {
+        let (mut rx, mut tx) = ctx.canfd.split();
+
+        rx.set_mask_filter(
+            MaskFilter::A,
+            &MaskFilterConfig::standard(std(0x100), std(0x7FF)),
+        );
+        rx.disable_mask_filter(MaskFilter::B);
+        rx.disable_mask_filter(MaskFilter::C);
+        rx.disable_range_filter();
+        rx.flush_rx();
+
+        // At the default bit rates the controller stores the header of this
+        // frame about 40 microseconds after its start, and the whole frame
+        // takes over 300. After 150 it is in its data field.
+        let data: [u8; 64] = core::array::from_fn(|at| at as u8 ^ 0x5A);
+        let frame = Frame::new_fd(std(0x100), &data)
+            .unwrap()
+            .with_bit_rate_switch(true);
+        let index = tx.transmit(&frame).unwrap();
+        let queued = Instant::now();
+        while queued.elapsed() < Duration::from_micros(150) {}
+        assert_eq!(tx.tx_buffer_state(index), TxBufferState::InProgress);
+
+        // The new filter rejects the frame that is on the bus. Applied
+        // immediately, it would leave a part of that frame in the RX buffer.
+        rx.set_mask_filter(
+            MaskFilter::A,
+            &MaskFilterConfig::standard(std(0x200), std(0x7FF)),
+        );
+        assert_eq!(rx.rx_frame_count(), 1, "the frame on the bus was lost");
+        let received = rx.receive().unwrap();
+        assert_eq!(received.id(), Id::Standard(std(0x100)));
+        assert_eq!(received.payload(), &data[..]);
+
+        // The new filter applies from the next frame on.
+        assert!(
+            !accepted_split(&mut rx, &mut tx, std(0x100)),
+            "0x100 must not pass any more"
+        );
+        let frame = Frame::new_fd(std(0x200), &data)
+            .unwrap()
+            .with_bit_rate_switch(true);
+        let index = tx.transmit(&frame).unwrap();
+        assert_eq!(
+            wait_tx_state(index, || tx.tx_buffer_state(index)),
+            TxBufferState::Ok,
+            "transmit failed"
+        );
+        assert_eq!(rx.rx_frame_count(), 1);
+        let received = rx.receive().unwrap();
+        assert_eq!(received.id(), Id::Standard(std(0x200)));
+        assert_eq!(received.payload(), &data[..]);
+
+        rx.accept_all();
     }
 
     #[test]
@@ -1447,7 +1659,6 @@ mod fault_tests {
         canfd::ErrorState,
         delay::Delay,
         gpio::{DriveMode, Level, Output, OutputConfig, Pull},
-        time::{Duration, Instant},
     };
 
     use super::*;
