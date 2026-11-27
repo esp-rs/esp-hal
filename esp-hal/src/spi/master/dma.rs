@@ -389,7 +389,17 @@ impl<'d> SpiDma<'d, Async> {
 
                 self.0.state.waker.register(cx.waker());
                 self.0.enable_listen(Self::DONE_EVENTS, true);
-                Poll::Pending
+
+                // On some chips the interrupt enable bit and the interrupt status bit are in the
+                // same register. If the transfer ends while we enable the interrupt, the
+                // read-modify-write clears the status bit, and the peripheral does not request an
+                // interrupt. Check the peripheral again to detect this case.
+                if self.0.busy() {
+                    Poll::Pending
+                } else {
+                    self.0.clear_interrupts(Self::DONE_EVENTS);
+                    Poll::Ready(())
+                }
             }
         }
         impl Drop for Fut {
