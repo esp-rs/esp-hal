@@ -9,6 +9,7 @@ use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
 
 use crate::{
+    private::panic_free,
     rtc_cntl::{
         cpu_retention,
         sleep::{self, RtcSleepConfig},
@@ -529,7 +530,7 @@ pub(crate) fn sleep_retained(buffer: *mut u8, saved: &sleep::SavedState) -> bool
 
     // The wake stub writes this word while the compiler believes that nothing did.
     // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
-    let pmufunc = unsafe { device_regs::load_word(&raw const (*frame).pmufunc) };
+    let pmufunc = unsafe { panic_free::load_word(&raw const (*frame).pmufunc) };
     let rejected = if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
         arm_wake_stub();
         sleep::pmu_sleep_start(saved)

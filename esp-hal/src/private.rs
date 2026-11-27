@@ -2,6 +2,9 @@
 
 use portable_atomic::{AtomicPtr, Ordering};
 
+#[cfg(riscv)]
+pub(crate) mod panic_free;
+
 /// An optional `extern "C" fn()` stored as an atomic pointer.
 pub(crate) struct CFnPtr(AtomicPtr<()>);
 
