@@ -313,9 +313,11 @@ fn input_hash(workspace: &Path) -> Result<String> {
     for file in files {
         let relative = file.strip_prefix(&root).unwrap();
         hasher.update(relative.to_string_lossy().replace('\\', "/").as_bytes());
-        hasher.update(
-            std::fs::read(&file).with_context(|| format!("Failed to read {}", file.display()))?,
-        );
+        // Git checks text files out as CRLF on Windows. That is not a metadata change.
+        let contents = std::fs::read_to_string(&file)
+            .with_context(|| format!("Failed to read {}", file.display()))?
+            .replace("\r\n", "\n");
+        hasher.update(contents.as_bytes());
     }
 
     Ok(format!("{:x}", hasher.finalize()))
