@@ -23,7 +23,7 @@
         "esp-radio provides Wi-Fi, Bluetooth Low Energy (BLE), and ESP-NOW drivers for \
          Espressif microcontrollers."
     }
-    all(wifi_driver_supported, not(ieee802154_driver_supported)) => {
+    wifi_driver_supported => {
         "esp-radio provides Wi-Fi and ESP-NOW drivers for Espressif microcontrollers."
     }
     all(bt_driver_supported, ieee802154_driver_supported) => {
