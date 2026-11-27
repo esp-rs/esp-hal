@@ -270,8 +270,9 @@ pub(crate) fn set_open_drain_output(gpio: u8, enable: bool) {
 #[cfg(lp_i2c_master_driver_supported)]
 pub(crate) fn reset_pin(lp: u8) {
     output_enable(lp, false);
-    // On these chips, each low-power pad has the same digital pin number.
-    set_open_drain_output(lp, false);
+    RTC_IO::regs()
+        .pin(lp as usize)
+        .modify(|_, w| w.pad_driver().clear_bit());
 
     // Resistors, input enable, the pad's LP function and whether it is muxed to the LP IO at all
     // are all held in this register.

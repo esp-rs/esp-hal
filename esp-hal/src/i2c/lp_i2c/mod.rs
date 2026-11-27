@@ -131,18 +131,45 @@ for_each_lp_function! {
 }
 
 /// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
+    /// The device address exceeds the 7-bit address range.
+    AddressInvalid,
     /// The transmission size exceeded the limit.
     TransactionSizeLimitExceeded,
     /// The acknowledgment check failed.
     AckCheckFailed,
-    /// A timeout occurred during transmission.
+    /// A timeout occurred while waiting for the transfer.
     TimeOut,
     /// The arbitration for the bus was lost.
     ArbitrationLost,
+    /// The transfer ended before all bytes were transferred.
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    ExecutionIncomplete,
 }
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::AddressInvalid => {
+                f.write_str("The device address exceeds the 7-bit address range")
+            }
+            Self::TransactionSizeLimitExceeded => {
+                f.write_str("The transmission size exceeds the limit")
+            }
+            Self::AckCheckFailed => f.write_str("The acknowledgment check failed"),
+            Self::TimeOut => f.write_str("A timeout occurred while waiting for the transfer"),
+            Self::ArbitrationLost => f.write_str("The arbitration for the bus was lost"),
+            #[cfg(lp_i2c_master_version = "rtc_i2c")]
+            Self::ExecutionIncomplete => {
+                f.write_str("The transfer ended before all bytes were transferred")
+            }
+        }
+    }
+}
+
+impl core::error::Error for Error {}
 
 #[procmacros::doc_replace(
     "sda" => {
@@ -178,6 +205,10 @@ pub struct LpI2c<'d> {
     /// LP pin numbers, kept so that the pads can be released when the driver is dropped.
     sda: u8,
     scl: u8,
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    needs_reset: bool,
+    #[cfg(lp_i2c_master_version = "rtc_i2c")]
+    software_timeout: Option<crate::time::Duration>,
 }
 
 impl<'d> LpI2c<'d> {
@@ -220,13 +251,15 @@ impl<'d> LpI2c<'d> {
             i2c,
             sda: sda.lp_number(),
             scl: scl.lp_number(),
+            #[cfg(lp_i2c_master_version = "rtc_i2c")]
+            needs_reset: false,
+            #[cfg(lp_i2c_master_version = "rtc_i2c")]
+            software_timeout: None,
         };
 
         me.init();
 
-        // Configure LP I2C GPIOs
-        // NOTE: We always initialize the SCL pin first, then the SDA pin. This order of
-        // initialization is important to avoid any spurious I2C start conditions on the bus.
+        // Initialize SCL before SDA to avoid spurious START conditions.
         scl.connect_scl();
         sda.connect_sda();
 
@@ -283,7 +316,8 @@ impl<'d> LpI2c<'d> {
     /// Writes `data` to the `register` of the slave with the given `address`.
     ///
     /// The transfer consists of a single write transaction that sends the device address, the
-    /// register address, then `data`.
+    /// register address, then `data`. If `data` is empty, the transfer sends only the device
+    /// address and register address.
     ///
     /// # Examples
     ///
@@ -304,9 +338,22 @@ impl<'d> LpI2c<'d> {
     ///
     /// # Errors
     ///
-    /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
-    /// can transfer in a single transaction.
+    /// - [`Error::AddressInvalid`] when `address` exceeds `0x7f`.
+    #[cfg_attr(
+        lp_i2c_master_version = "rtc_i2c",
+        doc = "- [`Error::TransactionSizeLimitExceeded`] when `data` is longer than 253 bytes."
+    )]
+    /// - A NACK returns [`Error::AckCheckFailed`].
+    /// - A timeout or arbitration loss returns [`Error::TimeOut`] or [`Error::ArbitrationLost`],
+    ///   respectively.
+    #[cfg_attr(
+        lp_i2c_master_version = "rtc_i2c",
+        doc = "- [`Error::ExecutionIncomplete`] when the controller stops before sending all bytes."
+    )]
     pub fn write(&mut self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
+        if address > 0x7f {
+            return Err(Error::AddressInvalid);
+        }
         self.write_bytes(address, register, data)
     }
 
@@ -324,7 +371,7 @@ impl<'d> LpI2c<'d> {
     /// `data`.
     ///
     /// The transfer writes the device address and the register address, then repeats the start
-    /// condition to read `data` back.
+    /// condition to read `data` back. An empty buffer skips the transfer after address validation.
     ///
     /// # Examples
     ///
@@ -346,9 +393,25 @@ impl<'d> LpI2c<'d> {
     ///
     /// # Errors
     ///
-    /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
-    /// can transfer in a single transaction.
+    /// - [`Error::AddressInvalid`] when `address` exceeds `0x7f`.
+    #[cfg_attr(
+        lp_i2c_master_version = "rtc_i2c",
+        doc = "- [`Error::TransactionSizeLimitExceeded`] when `data` is longer than 255 bytes."
+    )]
+    /// - A NACK returns [`Error::AckCheckFailed`].
+    /// - A timeout or arbitration loss returns [`Error::TimeOut`] or [`Error::ArbitrationLost`],
+    ///   respectively.
+    #[cfg_attr(
+        lp_i2c_master_version = "rtc_i2c",
+        doc = "- [`Error::ExecutionIncomplete`] when the controller stops before receiving all bytes."
+    )]
     pub fn read(&mut self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
+        if address > 0x7f {
+            return Err(Error::AddressInvalid);
+        }
+        if data.is_empty() {
+            return Ok(());
+        }
         self.read_bytes(address, register, data)
     }
 }
