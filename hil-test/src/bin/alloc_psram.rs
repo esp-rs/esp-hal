@@ -5,6 +5,9 @@
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 // Just below 512 KiB, so that only the second-level rounding of TLSF needs the next size class.
 //% ENV(tlsf): ESP_ALLOC_CONFIG_TLSF_MAX_ALLOCATION=524256
+// This configuration runs the tests with the heap in the PSRAM after the code.
+//% CHIP_FILTER(code_in_psram): psram_supports_code_in_psram
+//% ENV(code_in_psram): ESP_HAL_CONFIG_CODE_IN_PSRAM=true
 // The default 64KB leaves nothing to reclaim, see the dcache_reclaimed tests below.
 //% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
 //% FEATURES: unstable esp-alloc/nightly
@@ -35,7 +38,15 @@ mod tests {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
         hil_test::init_logger!(p);
-        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+        let psram = esp_hal::psram::Psram::new(p.PSRAM, Default::default());
+        // With code in PSRAM, the code takes the start of PSRAM, and the heap gets the rest.
+        let heap = psram.raw_parts().1;
+        if cfg!(code_in_psram) {
+            assert!(psram.size() > heap);
+        } else {
+            assert_eq!(psram.size(), heap);
+        }
+        esp_alloc::psram_allocator!(&psram);
     }
 
     // alloc::vec::Vec tests
@@ -548,9 +559,9 @@ mod mpll {
         clock::{
             ClockConfig,
             CpuClock,
-            ll::{MpllClkConfig, mpll_clk_frequency},
+            ll::{ClockTree, MpllClkConfig, configure_mpll_clk, mpll_clk_frequency},
         },
-        peripherals::{HP_SYS_CLKRST, LP_AON_CLK_RST},
+        peripherals::{HP_SYS_CLKRST, LP_AON_CLK_RST, MEMSPI2},
         psram::{Psram, PsramConfig, PsramTimingParams},
     };
 
@@ -576,19 +587,41 @@ mod mpll {
         );
     }
 
-    fn assert_psram_holds_a_pattern(psram: &Psram) {
+    /// Asserts that PSRAM runs from the MPLL, at half the MPLL rate.
+    fn assert_psram_on_half_mpll() {
+        let source = HP_SYS_CLKRST::regs()
+            .psram_ctrl0()
+            .read()
+            .clk_src_sel()
+            .bits();
+        hil_test::assert_eq!(source, 1, "PSRAM does not run from the MPLL");
+        let bits = MEMSPI2::regs().sram_clk().read().bits();
+        hil_test::assert_eq!((bits & 0xff) + 1, 2, "the PSRAM bus clock divider is not 2");
+    }
+
+    /// The word at `i` of the pattern for `seed`.
+    fn pattern_word(seed: u32, i: usize) -> u32 {
+        (i as u32 ^ seed).wrapping_mul(0x9E37_79B9) ^ seed
+    }
+
+    fn psram_words(psram: &Psram) -> &'static mut [u32] {
         let (start, size) = psram.raw_parts();
         hil_test::assert!(size > 0);
+        unsafe { core::slice::from_raw_parts_mut(start as *mut u32, size / 4) }
+    }
 
-        let words = size / 4;
-        let psram = unsafe { core::slice::from_raw_parts_mut(start as *mut u32, words) };
+    fn fill_pattern(psram: &Psram) {
+        for (i, word) in psram_words(psram).iter_mut().enumerate() {
+            *word = pattern_word(0, i);
+        }
+    }
 
-        for (i, word) in psram.iter_mut().enumerate() {
-            *word = (i as u32).wrapping_mul(0x9E37_79B9);
-        }
-        for (i, word) in psram.iter().enumerate() {
-            hil_test::assert_eq!(*word, (i as u32).wrapping_mul(0x9E37_79B9));
-        }
+    fn assert_pattern(psram: &Psram) {
+        let first_difference = psram_words(psram)
+            .iter()
+            .enumerate()
+            .position(|(i, &word)| word != pattern_word(0, i));
+        hil_test::assert_eq!(first_difference, None);
     }
 
     #[test]
@@ -600,7 +633,28 @@ mod mpll {
         let psram = Psram::new(p.PSRAM, PsramConfig::default());
 
         assert_mpll_programmed(400_000_000);
-        assert_psram_holds_a_pattern(&psram);
+        fill_pattern(&psram);
+        assert_pattern(&psram);
+    }
+
+    // Fails if the hardware keeps the old MPLL rate, or if PSRAM loses its content in the change.
+    #[test]
+    fn mpll_change_after_psram_new() {
+        let p = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(ClockConfig::from(CpuClock::max())),
+        );
+        hil_test::init_logger!(p);
+        let psram = Psram::new(p.PSRAM, PsramConfig::default());
+        fill_pattern(&psram);
+
+        for (mpll, hz) in [
+            (MpllClkConfig::_500, 500_000_000),
+            (MpllClkConfig::_400, 400_000_000),
+        ] {
+            ClockTree::with(|clocks| configure_mpll_clk(clocks, mpll));
+            assert_mpll_programmed(hz);
+            assert_pattern(&psram);
+        }
     }
 
     #[test]
@@ -616,6 +670,92 @@ mod mpll {
         let psram = Psram::new(p.PSRAM, config);
 
         assert_mpll_programmed(500_000_000);
-        assert_psram_holds_a_pattern(&psram);
+        fill_pattern(&psram);
+        assert_pattern(&psram);
+    }
+
+    // The APP core reads PSRAM in a loop while the MPLL moves from 400 to 500 MHz and back. Both
+    // patterns are larger than the data cache. Fails if the APP core does not continue after a
+    // change or reads wrong data, or if this core's pattern changes.
+    #[test]
+    #[timeout(10)]
+    fn mpll_change_with_app_core_running() {
+        use core::sync::atomic::{AtomicU32, Ordering};
+
+        use esp_hal::{
+            system::{CpuControl, Stack},
+            time::{Duration, Instant},
+        };
+
+        /// 256 KiB of `u32` words, more than the data cache holds.
+        const UNCACHED_WORDS: usize = 0x1_0000;
+
+        static READS: AtomicU32 = AtomicU32::new(0);
+        static WRONG: AtomicU32 = AtomicU32::new(0);
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+        let psram = Psram::new(peripherals.PSRAM, PsramConfig::default());
+        let words = psram_words(&psram);
+        hil_test::assert!(words.len() >= 2 * UNCACHED_WORDS);
+        let (local, shared) = words[..2 * UNCACHED_WORDS].split_at_mut(UNCACHED_WORDS);
+        // PSRAM keeps its content across the reset between two tests, so the seed differs from
+        // run to run.
+        let seed = esp_hal::rng::Rng::new().random();
+        for (i, word) in local.iter_mut().enumerate() {
+            *word = pattern_word(seed, i);
+        }
+        let shared_seed = !seed;
+        for (i, word) in shared.iter_mut().enumerate() {
+            *word = pattern_word(shared_seed, i);
+        }
+        let shared = shared.as_ptr() as usize;
+
+        let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+        let stack = hil_test::mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, move || {
+                loop {
+                    for i in 0..UNCACHED_WORDS {
+                        let word = unsafe { (shared as *const u32).add(i).read_volatile() };
+                        if word != pattern_word(shared_seed, i) {
+                            WRONG.fetch_add(1, Ordering::Relaxed);
+                        }
+                        READS.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+            })
+            .unwrap();
+
+        // Waits until the APP core reads the whole pattern once more.
+        let assert_app_core_reads = || {
+            let before = READS.load(Ordering::Relaxed);
+            let deadline = Instant::now() + Duration::from_millis(500);
+            while READS.load(Ordering::Relaxed).wrapping_sub(before) < UNCACHED_WORDS as u32 {
+                hil_test::assert!(Instant::now() < deadline, "the APP core stopped");
+            }
+            hil_test::assert_eq!(
+                WRONG.load(Ordering::Relaxed),
+                0,
+                "the APP core read wrong data"
+            );
+        };
+
+        assert_app_core_reads();
+        for (mpll, hz) in [
+            (MpllClkConfig::_500, 500_000_000),
+            (MpllClkConfig::_400, 400_000_000),
+        ] {
+            ClockTree::with(|clocks| configure_mpll_clk(clocks, mpll));
+            hil_test::assert_eq!(ClockTree::with(|clocks| clocks.mpll_clk()), Some(mpll));
+            assert_mpll_programmed(hz);
+            assert_psram_on_half_mpll();
+            assert_app_core_reads();
+            let first_difference = local
+                .iter()
+                .enumerate()
+                .position(|(i, &word)| word != pattern_word(seed, i));
+            hil_test::assert_eq!(first_difference, None, "this core's pattern changed");
+        }
     }
 }

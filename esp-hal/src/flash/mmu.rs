@@ -102,7 +102,7 @@ fn unmap_flash_page(guard: FlashMmapGuard) {
 
 /// Read decrypted flash bytes via temporary MMU mappings.
 ///
-/// The cache must stay on. Callers park the other core and disable interrupts.
+/// The cache must stay on. With code in flash, callers park the other core and disable interrupts.
 pub(super) fn read_flash_encrypted(offset: u32, data: &mut [u32]) -> Result<(), Error> {
     if data.is_empty() {
         return Ok(());
@@ -182,7 +182,7 @@ fn invalidate_cache(_vaddr: u32, _size: u32) {
 /// IDF invalidates in this order (`spi_flash_check_and_flush_cache` after the
 /// operation's cache-restore path). ESP32 cannot invalidate by address and
 /// flushes while still off instead.
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, code_in_psram)))]
 pub(super) fn invalidate_mapped(start: u32, len: u32) {
     if len == 0 {
         return;
@@ -203,7 +203,7 @@ pub(super) fn invalidate_mapped(start: u32, len: u32) {
 /// One physical page can appear more than once. On C2, C3, and S3 the same
 /// entry is also visible through a separate I-bus window, so both vaddrs are
 /// invalidated.
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, code_in_psram)))]
 fn invalidate_mapped_page(page_paddr: u32, page_size: u32) {
     let page = flash_page_number(page_paddr);
 
@@ -217,7 +217,7 @@ fn invalidate_mapped_page(page_paddr: u32, page_size: u32) {
     }
 }
 
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, code_in_psram)))]
 fn invalidate_entry_caches(entry_id: u32, page_size: u32) {
     cfg_select! {
         esp32s2 => {
@@ -278,6 +278,15 @@ pub(super) fn drom_entries() -> Range<u32> {
 /// The flash offset that a DROM entry maps, or `None` when the entry is
 /// outside the DROM window, invalid, or maps PSRAM.
 pub(super) fn drom_entry_offset(entry_id: u32) -> Option<u32> {
+    // With code in PSRAM, flash is unmapped. The last DROM entry mapped the app's first page, and
+    // the start-up saved its offset.
+    #[cfg(code_in_psram)]
+    if entry_id == drom_entries().end - 1 {
+        return Some(
+            crate::psram::code_in_psram::APP_OFFSET.load(portable_atomic::Ordering::Relaxed),
+        );
+    }
+
     (drom_entries().contains(&entry_id)
         && entry_is_valid(entry_id)
         && entry_is_flash_mapping(entry_id))
@@ -297,7 +306,7 @@ fn data_entries() -> Range<u32> {
 }
 
 /// Every entry that can map flash, including windows that only serve code.
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, code_in_psram)))]
 fn all_entries() -> Range<u32> {
     cfg_select! {
         // Include the S2 I-bus slots (0..0x80). Skip DBUS2/DPORT (0x140..).

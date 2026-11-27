@@ -228,6 +228,13 @@ options:
     default:
       - value: false
 
+  - name: code-in-psram
+    description: "Run `.text` and `.rodata` from PSRAM. Needs esp-hal at opt-level 2 or 3. esp-hal
+      does not encrypt PSRAM yet."
+    default:
+      - value: false
+    active: "psram_supports_code_in_psram"
+
   - name: clear-crypto-secrets
     description: "Clear secret material (keys, exponents, intermediate results) from
       the crypto accelerator registers after each operation. Disabling

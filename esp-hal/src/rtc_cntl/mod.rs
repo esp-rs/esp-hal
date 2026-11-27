@@ -838,6 +838,59 @@ cfg_select! {
     }
 }
 
+// The flash value, for code in PSRAM. Its low seven bits are 0 while no flash operation is in
+// progress, and otherwise one more than the number of the core that started the operation. Every
+// copy of esp-hal in a program uses the one symbol, as for `ESP_HAL_WAKE_LOCK_COUNT`.
+//
+// Only a stop of the APP core reads the number of the core. The number is exact there: a stop
+// needs the `AppCoreGuard`, and an RTOS that runs on the APP core keeps it, so no thread moves to
+// or from the APP core.
+#[cfg(code_in_psram)]
+cfg_select! {
+    feature = "rt" => {
+        #[unsafe(no_mangle)]
+        static ESP_HAL_FLASH_OPERATION: portable_atomic::AtomicU32 =
+            portable_atomic::AtomicU32::new(0);
+
+        #[inline(always)]
+        pub(crate) fn flash_operation() -> &'static portable_atomic::AtomicU32 {
+            &ESP_HAL_FLASH_OPERATION
+        }
+    }
+    _ => {
+        unsafe extern "Rust" {
+            static ESP_HAL_FLASH_OPERATION: portable_atomic::AtomicU32;
+        }
+
+        #[inline(always)]
+        pub(crate) fn flash_operation() -> &'static portable_atomic::AtomicU32 {
+            // SAFETY: the `rt` copy of esp-hal defines the static.
+            unsafe { &ESP_HAL_FLASH_OPERATION }
+        }
+    }
+}
+
+/// Bit 7 of the flash value: a stop of the APP core waits for the end of the APP core's flash
+/// operation.
+///
+/// Only the stopping core sets the bit, while the APP core is parked inside that operation. The
+/// APP core clears the bit with the low bits at the end of the operation, and then stops.
+#[cfg(code_in_psram)]
+pub(crate) const FLASH_STOP_PENDING: u32 = 1 << 7;
+
+/// Returns whether a flash operation is in progress on any core or in any thread. Always `false`
+/// without code in PSRAM.
+#[cfg(sleep_driver_supported)]
+#[inline(always)]
+pub(crate) fn flash_operation_in_progress() -> bool {
+    cfg_select! {
+        code_in_psram => {
+            flash_operation().load(portable_atomic::Ordering::Acquire) & !FLASH_STOP_PENDING != 0
+        }
+        _ => false,
+    }
+}
+
 /// A guard that prevents the system from entering automatic light sleep.
 ///
 /// While at least one `WakeLock` is held, [`WakeLock::is_active`] returns `true`

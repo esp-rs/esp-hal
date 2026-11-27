@@ -9,13 +9,20 @@
 //! 1. The length of the sleep. The sleep must last at least 90 percent of the time to the wakeup
 //!    deadline.
 //! 2. The wakeup cause.
-//! 3. Every word of PSRAM, on a chip with PSRAM.
+//! 3. Every word of PSRAM, on a chip with PSRAM. With code in PSRAM, the check includes a PSRAM
+//!    static.
 //! 4. On a chip with an FPU, the callee-saved FPU registers and `fcsr` of each core that took part
 //!    in the sleep. They hold a pattern across the request, and a light sleep with CPU retention
 //!    powers the FPU down.
 //!
 //! The checks run at the default and at the maximum CPU clock, without and with CPU retention. On a
 //! chip with two cores, each core requests a light sleep.
+//!
+//! On a chip with two cores and with code in PSRAM, two more checks request a light sleep on one
+//! core during a flash erase on the other. The light sleep must be refused, and the same light
+//! sleep after the erase must not be refused. A check that misses the erase tries again.
+//!
+//! Set `ESP_HAL_CONFIG_CODE_IN_PSRAM=true` to build with code in PSRAM.
 //!
 //! The program keeps its progress in memory that a reset does not clear:
 //!
@@ -44,6 +51,11 @@ use core::{
 use esp_backtrace as _;
 #[cfg(multi_core)]
 use esp_hal::system::{CpuControl, Stack};
+#[cfg(all(multi_core, code_in_psram))]
+use esp_hal::{
+    Blocking,
+    flash::{Config as FlashConfig, Flash},
+};
 use esp_hal::{
     clock::CpuClock,
     main,
@@ -59,6 +71,8 @@ use esp_hal::{
     time::{Duration, Instant},
 };
 use qa_test::{Progress, ProgressWord, report};
+#[cfg(all(multi_core, code_in_psram))]
+use qa_test::{flash_operation, scratch_blocks};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -74,6 +88,20 @@ const SLICE_WORDS: usize = 16 * 1024;
 /// The seed of the PSRAM pattern. Each check puts its number in the high bits, and each slice adds
 /// its number. A read that returns the data of a different check or slice fails the check.
 const PSRAM_SEED: u32 = 0x6C07_8965;
+
+/// The PSRAM static's seed is the check's seed XOR this value, so the static and the heap hold
+/// different patterns.
+#[cfg(code_in_psram)]
+const STATIC_SEED: u32 = 0x5354_4154;
+
+#[cfg(code_in_psram)]
+const STATIC_WORDS: usize = 1024;
+
+/// A static in `.bss.psram`, which lies outside the PSRAM that `Psram::raw_parts` returns. 4 KiB
+/// spans many cache lines.
+#[cfg(code_in_psram)]
+#[esp_hal::psram(zeroed)]
+static mut PSRAM_STATIC: [u32; STATIC_WORDS] = [0; STATIC_WORDS];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Clock {
@@ -120,6 +148,18 @@ const CHECKS: &[Check] = &[
         name: "light sleep from core 1 at the default CPU clock",
         clock: Clock::Default,
         run: light_sleep_from_core1,
+    },
+    #[cfg(all(multi_core, code_in_psram))]
+    Check {
+        name: "light sleep during an erase on core 1",
+        clock: Clock::Default,
+        run: refused_during_core1_erase,
+    },
+    #[cfg(all(multi_core, code_in_psram))]
+    Check {
+        name: "light sleep from core 1 during an erase on core 0",
+        clock: Clock::Default,
+        run: refused_during_core0_erase,
     },
     #[cfg(supports_cpu_power_down)]
     Check {
@@ -189,6 +229,13 @@ fn fill_psram(board: &mut Board<'_>) {
             };
         }
     }
+    // The static must be written last. Only the lines that are still dirty at the sleep can lose
+    // their data.
+    #[cfg(code_in_psram)]
+    for i in 0..STATIC_WORDS {
+        let word = pattern(i, STATIC_SEED ^ board.seed);
+        unsafe { core::ptr::write_volatile(&raw mut PSRAM_STATIC[i], word) };
+    }
 }
 
 fn check_psram(board: &mut Board<'_>) -> Result<(), &'static str> {
@@ -203,6 +250,19 @@ fn check_psram(board: &mut Board<'_>) -> Result<(), &'static str> {
             .count();
         if bad != 0 {
             report!("  slice {n} of PSRAM read {bad} bad words");
+            failed = true;
+        }
+    }
+    #[cfg(code_in_psram)]
+    {
+        let bad = (0..STATIC_WORDS)
+            .filter(|&i| {
+                let word = unsafe { core::ptr::read_volatile(&raw const PSRAM_STATIC[i]) };
+                word != pattern(i, STATIC_SEED ^ board.seed)
+            })
+            .count();
+        if bad != 0 {
+            report!("  the PSRAM static read {bad} bad words");
             failed = true;
         }
     }
@@ -417,6 +477,21 @@ const IDLE: u32 = 0;
 /// The command that makes core 1 request a light sleep.
 #[cfg(multi_core)]
 const SLEEP: u32 = 1;
+/// The command that makes core 1 erase the block of [`FLASH`].
+#[cfg(all(multi_core, code_in_psram))]
+const ERASE: u32 = 2;
+/// The command that makes core 1 request a light sleep after an erase on core 0 starts.
+#[cfg(all(multi_core, code_in_psram))]
+const SLEEP_DURING_ERASE: u32 = 3;
+
+#[cfg(multi_core)]
+static CORE1_REFUSED: AtomicBool = AtomicBool::new(false);
+/// Whether core 1 saw core 0's erase in progress, and requested its light sleep.
+#[cfg(all(multi_core, code_in_psram))]
+static CORE1_REQUESTED: AtomicBool = AtomicBool::new(false);
+/// The length in microseconds of core 1's last light sleep call.
+#[cfg(all(multi_core, code_in_psram))]
+static CORE1_TOOK_US: AtomicU32 = AtomicU32::new(0);
 
 /// Whether core 1's last light sleep lost its FPU registers. Core 1 writes it before it sets
 /// `COMMAND` back to `IDLE`.
@@ -437,11 +512,33 @@ fn app_core_entry() -> ! {
         match COMMAND.load(Ordering::Acquire) {
             SLEEP => {
                 let mut lpwr = LowPower::new(unsafe { esp_hal::peripherals::LPWR::steal() });
+                let mut refused = false;
                 let result = with_fpu_pattern(|| {
-                    let _ = lpwr.sleep_light(RtcSleepConfig::default());
+                    refused = lpwr.sleep_light(RtcSleepConfig::default()) == LightSleep::Refused;
                     Ok(())
                 });
                 CORE1_FPU_LOST.store(result.is_err(), Ordering::Relaxed);
+                CORE1_REFUSED.store(refused, Ordering::Relaxed);
+                COMMAND.store(IDLE, Ordering::Release);
+            }
+            #[cfg(code_in_psram)]
+            ERASE => {
+                ERASE_OK.store(erase(), Ordering::Release);
+                COMMAND.store(IDLE, Ordering::Release);
+            }
+            #[cfg(code_in_psram)]
+            SLEEP_DURING_ERASE => {
+                let requested = wait_for_erase(Cpu::ProCpu);
+                if requested {
+                    let mut lpwr = LowPower::new(unsafe { esp_hal::peripherals::LPWR::steal() });
+                    lpwr.set_wakeup_deadline(Instant::now() + SLEEP_LENGTH);
+                    let before = Instant::now();
+                    let result = lpwr.sleep_light_if(RtcSleepConfig::default(), may_sleep);
+                    let took = Instant::now() - before;
+                    CORE1_TOOK_US.store(took.as_micros() as u32, Ordering::Relaxed);
+                    CORE1_REFUSED.store(result == LightSleep::Refused, Ordering::Relaxed);
+                }
+                CORE1_REQUESTED.store(requested, Ordering::Relaxed);
                 COMMAND.store(IDLE, Ordering::Release);
             }
             _ => core::hint::spin_loop(),
@@ -573,10 +670,9 @@ fn wait_with_caller_saved_pattern() -> Result<(), &'static str> {
     }
 }
 
-/// Starts core 1 the first time a check needs it, then sends core 1 the command to request a light
-/// sleep.
+/// Starts core 1 the first time a check needs it.
 #[cfg(multi_core)]
-fn request_on_core1(board: &mut Board<'_>) -> Result<(), &'static str> {
+fn start_core1(board: &mut Board<'_>) {
     if !board.core1_started {
         static mut APP_CORE_STACK: Stack<8192> = Stack::new();
         let guard = board
@@ -588,16 +684,31 @@ fn request_on_core1(board: &mut Board<'_>) -> Result<(), &'static str> {
         core::mem::forget(guard);
         board.core1_started = true;
     }
+}
+
+/// Waits up to `limit` for core 1 to end its command.
+#[cfg(multi_core)]
+fn wait_for_core1(limit: Duration) -> Result<(), &'static str> {
+    let end = Instant::now() + limit;
+    while COMMAND.load(Ordering::Acquire) != IDLE {
+        if Instant::now() > end {
+            return Err("core 1 did not end its command");
+        }
+    }
+    Ok(())
+}
+
+/// Starts core 1 the first time a check needs it, then sends core 1 the command to request a light
+/// sleep.
+#[cfg(multi_core)]
+fn request_on_core1(board: &mut Board<'_>) -> Result<(), &'static str> {
+    start_core1(board);
     cfg_select! {
         target_feature = "f" => wait_with_caller_saved_pattern()?,
         _ => {
             COMMAND.store(SLEEP, Ordering::Release);
-            let end = Instant::now() + Duration::from_secs(1);
-            while COMMAND.load(Ordering::Acquire) != IDLE {
-                if Instant::now() > end {
-                    return Err("core 1's light sleep did not return");
-                }
-            }
+            wait_for_core1(Duration::from_secs(1))
+                .map_err(|_| "core 1's light sleep did not return")?;
         }
     }
     if CORE1_FPU_LOST.load(Ordering::Relaxed) {
@@ -616,6 +727,202 @@ fn light_sleep_from_core1(board: &mut Board<'_>) -> Result<(), &'static str> {
 fn light_sleep_from_core1_with_retention(board: &mut Board<'_>) -> Result<(), &'static str> {
     install_retention(board);
     sleep_and_check(board, request_on_core1)
+}
+
+#[cfg(all(multi_core, code_in_psram))]
+const BLOCK: u32 = 0x1_0000;
+
+/// The hang bound on one block erase, 1 s less than the RTC watchdog's 5 s. A check feeds the
+/// watchdog before each erase.
+#[cfg(all(multi_core, code_in_psram))]
+const ERASE_BOUND: Duration = Duration::from_secs(4);
+
+/// The erases that a check tries before it fails.
+#[cfg(all(multi_core, code_in_psram))]
+const ATTEMPTS: u32 = 8;
+
+/// The flash, and the block that the checks erase. Core 1 uses it only in its `ERASE` command, and
+/// core 0 only while core 1 does not run that command.
+#[cfg(all(multi_core, code_in_psram))]
+static mut FLASH: Option<(Flash<'static, Blocking>, u32)> = None;
+
+#[cfg(all(multi_core, code_in_psram))]
+static ERASING: AtomicBool = AtomicBool::new(false);
+#[cfg(all(multi_core, code_in_psram))]
+static ERASE_DONE: AtomicBool = AtomicBool::new(false);
+#[cfg(all(multi_core, code_in_psram))]
+static ERASE_OK: AtomicBool = AtomicBool::new(false);
+/// Whether [`may_sleep`] ran, and whether it found a flash operation in progress.
+#[cfg(all(multi_core, code_in_psram))]
+static CONDITION_RAN: AtomicBool = AtomicBool::new(false);
+#[cfg(all(multi_core, code_in_psram))]
+static HELD_IN_CONDITION: AtomicBool = AtomicBool::new(false);
+
+/// The pattern for [`write_block`]. A nonzero `static mut` is in internal RAM, where a ROM flash
+/// routine can read it.
+#[cfg(all(multi_core, code_in_psram))]
+static mut BLOCK_PATTERN: [u32; 4096] = [0x5AA5_C33C; 4096];
+
+/// The condition of the checks' light sleeps. The light sleep calls it only after its flash check
+/// passed, with the other core parked, so an operation in progress here shows a broken check.
+#[cfg(all(multi_core, code_in_psram))]
+fn may_sleep() -> bool {
+    let held = flash_operation() != 0;
+    HELD_IN_CONDITION.store(held, Ordering::Relaxed);
+    CONDITION_RAN.store(true, Ordering::Release);
+    !held
+}
+
+#[cfg(all(multi_core, code_in_psram))]
+enum Outcome {
+    Refused,
+    /// The request missed the erase: the flash check let it through with no operation in progress.
+    Missed,
+}
+
+#[cfg(all(multi_core, code_in_psram))]
+fn outcome(result: LightSleep) -> Result<Outcome, &'static str> {
+    match (CONDITION_RAN.load(Ordering::Acquire), result) {
+        (true, _) if HELD_IN_CONDITION.load(Ordering::Relaxed) => {
+            Err("the flash check let a light sleep through during a flash operation")
+        }
+        (true, _) => Ok(Outcome::Missed),
+        (false, LightSleep::Refused) => Ok(Outcome::Refused),
+        (false, _) => Err("a light sleep ended without the flash check or the condition"),
+    }
+}
+
+/// Erases the block of [`FLASH`], and returns whether the erase succeeded.
+#[cfg(all(multi_core, code_in_psram))]
+fn erase() -> bool {
+    // SAFETY: the caller is the only user of `FLASH` until the erase ends.
+    let Some((flash, block)) = (unsafe { (*addr_of_mut!(FLASH)).as_mut() }) else {
+        return false;
+    };
+    let block = *block;
+    ERASING.store(true, Ordering::Release);
+    // SAFETY: the block is in the booted partition, after the image.
+    let erased = unsafe { flash.erase(block, block + BLOCK) }.is_ok();
+    ERASE_DONE.store(true, Ordering::Release);
+    erased
+}
+
+/// Writes the pattern over the block of [`FLASH`]. A written block takes longer to erase.
+#[cfg(all(multi_core, code_in_psram))]
+fn write_block() {
+    // SAFETY: the caller is the only user of `FLASH` until the write ends.
+    let Some((flash, block)) = (unsafe { (*addr_of_mut!(FLASH)).as_mut() }) else {
+        return;
+    };
+    // SAFETY: nothing writes `BLOCK_PATTERN`.
+    let pattern = unsafe { &*core::ptr::addr_of!(BLOCK_PATTERN) };
+    for offset in (0..BLOCK).step_by(core::mem::size_of_val(pattern)) {
+        // SAFETY: the block is in the booted partition, after the image.
+        unsafe { flash.write(*block + offset, pattern) }.unwrap();
+    }
+}
+
+/// Waits until `eraser`, the other core, is inside its erase: `ERASING` is set, and the flash value
+/// names `eraser`. Returns `false` if the erase ends first, or after 1 s.
+#[cfg(all(multi_core, code_in_psram))]
+fn wait_for_erase(eraser: Cpu) -> bool {
+    let end = Instant::now() + Duration::from_secs(1);
+    loop {
+        if ERASING.load(Ordering::Acquire) && flash_operation() == eraser as u32 + 1 {
+            return true;
+        }
+        if ERASE_DONE.load(Ordering::Acquire) || Instant::now() > end {
+            return false;
+        }
+    }
+}
+
+#[cfg(all(multi_core, code_in_psram))]
+fn clear_erase_flags() {
+    ERASING.store(false, Ordering::Relaxed);
+    ERASE_DONE.store(false, Ordering::Relaxed);
+    ERASE_OK.store(false, Ordering::Relaxed);
+    CONDITION_RAN.store(false, Ordering::Relaxed);
+    HELD_IN_CONDITION.store(false, Ordering::Relaxed);
+}
+
+/// Core 0 requests a light sleep during an erase on core 1.
+#[cfg(all(multi_core, code_in_psram))]
+fn refused_during_core1_erase(board: &mut Board<'_>) -> Result<(), &'static str> {
+    require_no_retention(board)?;
+    start_core1(board);
+    for _ in 0..ATTEMPTS {
+        clear_erase_flags();
+        // Before the command, so that the write is never under `ERASING`.
+        write_block();
+        board.rtc.rwdt.feed();
+        COMMAND.store(ERASE, Ordering::Release);
+        let requested = wait_for_erase(Cpu::AppCpu);
+        let mut result = None;
+        let mut took = Duration::ZERO;
+        let mut during = false;
+        if requested {
+            board
+                .lpwr
+                .set_wakeup_deadline(Instant::now() + SLEEP_LENGTH);
+            let before = Instant::now();
+            result = Some(
+                board
+                    .lpwr
+                    .sleep_light_if(RtcSleepConfig::default(), may_sleep),
+            );
+            took = Instant::now() - before;
+            during = !ERASE_DONE.load(Ordering::Acquire);
+        }
+
+        wait_for_core1(ERASE_BOUND)?;
+        if !ERASE_OK.load(Ordering::Acquire) {
+            return Err("the erase on core 1 failed");
+        }
+        let Some(result) = result else { continue };
+        if let Outcome::Refused = outcome(result)? {
+            report!("  the refused light sleep took {took}, the erase still ran: {during}");
+            return sleep_and_check(board, request_on_core0);
+        }
+    }
+    Err("no light sleep was requested inside the erase")
+}
+
+/// Core 1 requests a light sleep during an erase on core 0.
+#[cfg(all(multi_core, code_in_psram))]
+fn refused_during_core0_erase(board: &mut Board<'_>) -> Result<(), &'static str> {
+    require_no_retention(board)?;
+    start_core1(board);
+    for _ in 0..ATTEMPTS {
+        clear_erase_flags();
+        CORE1_REQUESTED.store(false, Ordering::Relaxed);
+        write_block();
+        board.rtc.rwdt.feed();
+        COMMAND.store(SLEEP_DURING_ERASE, Ordering::Release);
+        let erased = erase();
+        let during = COMMAND.load(Ordering::Acquire) == IDLE;
+
+        wait_for_core1(ERASE_BOUND)?;
+        if !erased {
+            return Err("the erase on core 0 failed");
+        }
+        if !CORE1_REQUESTED.load(Ordering::Relaxed) {
+            continue;
+        }
+        let result = if CORE1_REFUSED.load(Ordering::Relaxed) {
+            LightSleep::Refused
+        } else {
+            LightSleep::Ended
+        };
+        if let Outcome::Refused = outcome(result)? {
+            let took = Duration::from_micros(u64::from(CORE1_TOOK_US.load(Ordering::Relaxed)));
+            report!(
+                "  core 1's refused light sleep took {took}, returned during the erase: {during}"
+            );
+            return sleep_and_check(board, request_on_core1);
+        }
+    }
+    Err("core 1 requested no light sleep inside the erase")
 }
 
 /// Returns the index of the first check at or after `index` that runs on this chip.
@@ -678,6 +985,13 @@ fn main() -> ! {
     #[cfg(not(psram_driver_supported))]
     let psram: &'static mut [u32] = &mut [];
     report!("PSRAM: {} KiB", psram.len() / 256);
+
+    #[cfg(all(multi_core, code_in_psram))]
+    {
+        let mut flash = Flash::new(peripherals.FLASH, FlashConfig::default()).unwrap();
+        let block = scratch_blocks(&mut flash, 1);
+        unsafe { FLASH = Some((flash, block)) };
+    }
 
     let mut board = Board {
         rtc,

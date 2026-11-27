@@ -417,6 +417,18 @@ impl<T> NonReentrantMutex<T> {
         self.lock_state
             .lock_non_reentrant(|| f(unsafe { self.data.as_mut_unchecked() }))
     }
+
+    /// Returns a mutable reference to the protected data without taking the lock.
+    ///
+    /// # Safety
+    ///
+    /// The caller must have exclusive access to the data while the reference is live. During that
+    /// time, [`Self::with`] must not run on any core or in an interrupt handler.
+    #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn as_mut_unchecked(&self) -> &mut T {
+        unsafe { &mut *self.data.get() }
+    }
 }
 
 unsafe impl<T: Send> Send for NonReentrantMutex<T> {}

@@ -3,6 +3,13 @@ __stack_chk_guard = ABSOLUTE(_stack_end) + ${ESP_HAL_CONFIG_STACK_GUARD_OFFSET};
 
 ASSERT(_stack_start - _stack_end >= ${ESP_HAL_CONFIG_ENSURE_MAIN_STACK_MINIMUM}, "Main stack is smaller than ${ESP_HAL_CONFIG_ENSURE_MAIN_STACK_MINIMUM} bytes.");
 
+/* 1 if `.text` and `.rodata` run from PSRAM, else 0 */
+#IF ESP_HAL_CONFIG_CODE_IN_PSRAM
+ESP_HAL_CODE_IN_PSRAM = 1;
+#ELSE
+ESP_HAL_CODE_IN_PSRAM = 0;
+#ENDIF
+
 #IF esp32
 /* reserved at the start of DRAM for the BT stack */
 #IF CARGO_FEATURE("__bluetooth")

@@ -228,6 +228,18 @@ pub(crate) fn end_run(core: Cpu) {
     unsafe { internal_park_core(core, true) };
 }
 
+/// Answers a park request of the other core, if one waits. The caller can have interrupts on or
+/// masked.
+///
+/// `serve` reads the phase before it masks interrupts. With interrupts on, the IPC handler could
+/// answer the request in between, and `serve` would then wait for a release that never comes.
+#[ram]
+fn serve_current() {
+    let token = unsafe { SingleCoreInterruptLock.enter() };
+    serve(Cpu::current());
+    unsafe { SingleCoreInterruptLock.exit(token) };
+}
+
 /// Waits until `done` returns `true`, and answers the park requests of the other core meanwhile.
 ///
 /// Use this function to wait with masked interrupts for work that the other core does.
@@ -239,25 +251,69 @@ pub(crate) fn wait_until(done: impl Fn() -> bool) {
     }
 }
 
+/// Returns whether the APP core is in a flash operation of its own, and if so marks a stop as
+/// pending in the flash value. The APP core then stops itself at the end of that operation.
+///
+/// The caller holds the claim, and its park holds the APP core, so the APP core does not start or
+/// end a flash operation during the call.
+#[inline(always)]
+fn defer_stop_to_flash_operation() -> bool {
+    cfg_select! {
+        code_in_psram => {
+            let value = crate::rtc_cntl::flash_operation();
+            let in_operation = value.load(Ordering::Acquire) == Cpu::AppCpu as u32 + 1;
+            if in_operation {
+                value.fetch_or(crate::rtc_cntl::FLASH_STOP_PENDING, Ordering::AcqRel);
+            }
+            in_operation
+        }
+        _ => false,
+    }
+}
+
 /// Parks the APP core until [`super::CpuControl`] starts it again.
 ///
 /// The parks that hold the APP core keep working. The APP core stays parked after the last park
 /// ends.
+///
+/// With code in PSRAM, a park can land inside a flash operation of the APP core. A core that stops
+/// there leaves the operation unfinished, and the closure of the APP core can borrow the `Flash`.
+/// The call then releases its park, and waits until the APP core stops itself at the end of the
+/// operation. If another park holds the APP core, the call also waits for the end of that park.
 #[ram]
 pub(crate) fn stop_app_core() {
-    let _suspend = SchedulerSuspendGuard::new();
+    let suspend = SchedulerSuspendGuard::new();
     if Cpu::current() == Cpu::AppCpu {
         stop_current_core();
     }
 
     // A park that never ends keeps the core stalled after the other parks end.
-    if park(Cpu::AppCpu) {
-        let claim = Claim::take();
-        APP_CORE_TAKES_IPC.store(false, Ordering::SeqCst);
-        drop(claim);
-        // Posts to the APP core return `Offline` after the store.
-        unsafe { ipc::fail_stranded(Cpu::AppCpu) };
+    if !park(Cpu::AppCpu) {
+        return;
     }
+    let claim = Claim::take();
+    if defer_stop_to_flash_operation() {
+        let generation = GENERATION.load(Ordering::Relaxed);
+        drop(claim);
+        unpark(Cpu::AppCpu);
+        // The wait is as long as the operation, so the other threads of the current core must
+        // run. No park request of this call is pending, and no scheduler runs on the APP core, so
+        // the thread cannot move there.
+        drop(suspend);
+        // Another thread can start the APP core again after the stop. The APP core can also ask
+        // the current core to park while the caller masks interrupts.
+        while GENERATION.load(Ordering::Acquire) == generation
+            && (takes_ipc(Cpu::AppCpu) || is_running(Cpu::AppCpu))
+        {
+            serve_current();
+            core::hint::spin_loop();
+        }
+        return;
+    }
+    APP_CORE_TAKES_IPC.store(false, Ordering::SeqCst);
+    drop(claim);
+    // Posts to the APP core return `Offline` after the store.
+    unsafe { ipc::fail_stranded(Cpu::AppCpu) };
 }
 
 /// Stalls the current core, which must be the APP core, until [`super::CpuControl`] starts it
@@ -268,6 +324,18 @@ pub(crate) fn stop_current_core() -> ! {
     // again.
     let _mask = unsafe { SingleCoreInterruptLock.enter() };
     debug_assert_eq!(Cpu::current(), Cpu::AppCpu);
+
+    // An interrupt handler of the APP core can stop the core inside a flash operation of the APP
+    // core. That operation never ends, so the stop clears its mark. The clear comes before the
+    // claim, because a stop from the PRO core can park the APP core in `Claim::take`.
+    #[cfg(code_in_psram)]
+    let _ = crate::rtc_cntl::flash_operation().fetch_update(
+        Ordering::AcqRel,
+        Ordering::Acquire,
+        |value| {
+            (value & !crate::rtc_cntl::FLASH_STOP_PENDING == Cpu::AppCpu as u32 + 1).then_some(0)
+        },
+    );
 
     // The claim orders the stop against a park from the PRO core. That park ends before the stop,
     // or waits until the stall below takes effect.

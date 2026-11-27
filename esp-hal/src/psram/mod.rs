@@ -13,6 +13,12 @@
         `esp-hal` will try to automatically detect the best option, but manual configuration is also possible and more reliable.")
 )]
 #![doc = ""]
+#![cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "With the `code-in-psram` option, the start-up starts PSRAM and runs the code from it. \
+           `#[psram(zeroed)]` places a static in PSRAM."
+)]
+#![doc = ""]
 //! ## Examples
 //!
 //! ### PSRAM as heap memory
@@ -54,6 +60,9 @@ mod quad_xtensa;
 #[cfg_attr(esp32s31, path = "esp32s31.rs")]
 pub(crate) mod implem;
 
+#[cfg(code_in_psram)]
+pub(crate) mod code_in_psram;
+
 pub use implem::*;
 use portable_atomic::{AtomicUsize, Ordering};
 
@@ -73,6 +82,7 @@ pub enum PsramSize {
     Size(usize),
 }
 
+#[cfg(not(code_in_psram))]
 impl PsramSize {
     pub(crate) fn get(&self) -> usize {
         match self {
@@ -91,11 +101,41 @@ const EXTMEM_ORIGIN: usize = property!("psram.extmem_origin");
 static MAPPED_PSRAM_START: AtomicUsize = AtomicUsize::new(0);
 static MAPPED_PSRAM_END: AtomicUsize = AtomicUsize::new(0);
 
+/// Returns the range that `Psram::raw_parts` gives: the PSRAM after the code and the PSRAM statics.
 #[inline(always)]
-pub(crate) fn psram_range() -> Range<usize> {
+pub(crate) fn psram_heap_range() -> Range<usize> {
     let end = MAPPED_PSRAM_END.load(Ordering::Acquire);
     let start = MAPPED_PSRAM_START.load(Ordering::Relaxed);
     if end < start { 0..0 } else { start..end }
+}
+
+/// Returns the addresses that hold data in PSRAM: the heap, and with code in PSRAM the PSRAM
+/// statics before it. DMA treats a buffer in this range as PSRAM.
+#[inline(always)]
+pub(crate) fn psram_range() -> Range<usize> {
+    let heap = psram_heap_range();
+    cfg_select! {
+        code_in_psram => {
+            let start = &raw const code_in_psram::_psram_bss_start as usize;
+            let end = &raw const code_in_psram::_psram_bss_end as usize;
+            if start == end {
+                heap
+            } else if heap.is_empty() {
+                start..end
+            } else {
+                start..heap.end
+            }
+        }
+        _ => heap,
+    }
+}
+
+/// Returns whether PSRAM holds anything that must survive a sleep: the heap, or with code in
+/// PSRAM the code and the PSRAM statics, even when the heap is empty.
+#[allow(unused, reason = "only the sleep code of some chips calls it")]
+#[inline(always)]
+pub(crate) fn in_use() -> bool {
+    cfg!(code_in_psram) || !psram_range().is_empty()
 }
 
 /// # Safety
@@ -111,24 +151,88 @@ pub struct Psram {
     _peri: PSRAM<'static>,
 }
 
+/// Records the PSRAM that the start-up started. [`Psram::raw_parts`] returns the range after the
+/// code and the PSRAM statics.
+///
+/// # Panics
+///
+/// Panics if `.bss.psram` ends past the end of PSRAM. The start-up then left it unzeroed.
+#[cfg(code_in_psram)]
+pub(crate) fn adopt_started_psram() {
+    const PAGE: usize = property!("mmu.page_size");
+
+    let size = code_in_psram::SIZE.load(Ordering::Relaxed);
+    let end = EXTMEM_ORIGIN + size;
+    let used = code_in_psram::CODE_END.load(Ordering::Relaxed);
+    let used = {
+        let bss_end = &raw const code_in_psram::_psram_bss_end as usize;
+        if bss_end > end {
+            panic!(
+                "PSRAM statics end at {:#x}, but PSRAM is {} MB",
+                bss_end,
+                size / 1_024 / 1_024
+            );
+        }
+        used.max(bss_end)
+    };
+    let start = used.next_multiple_of(PAGE);
+    info!("PSRAM size: {} MB", size / 1_024 / 1_024);
+    if code_in_psram::flash_encrypted() {
+        warn!("The code copied to PSRAM is plaintext: esp-hal does not encrypt PSRAM");
+    }
+    unsafe { set_psram_range(start..end) };
+}
+
 impl Psram {
     /// Initializes PSRAM.
-    pub fn new(peri: PSRAM<'static>, mut config: PsramConfig) -> Self {
-        if init_psram(&mut config) {
-            info!("PSRAM size: {} MB", config.size.get() / 1_024 / 1_024);
-            let range = map_psram(config);
+    #[cfg_attr(
+        psram_supports_code_in_psram,
+        doc = "\n\nWith `code-in-psram`, PSRAM is already started before `esp_hal::init`. `new`",
+        doc = "logs a warning if `config` is not the default, and PSRAM does not change."
+    )]
+    pub fn new(
+        peri: PSRAM<'static>,
+        #[cfg_attr(code_in_psram, allow(unused_mut))] mut config: PsramConfig,
+    ) -> Self {
+        cfg_select! {
+            code_in_psram => {
+                if config != PsramConfig::default() {
+                    warn!("PSRAM runs from start-up and ignores this config");
+                }
+            }
+            _ => {
+                if init_psram(&mut config) {
+                    info!("PSRAM size: {} MB", config.size.get() / 1_024 / 1_024);
+                    let range = map_psram(config);
 
-            unsafe { set_psram_range(range) };
+                    unsafe { set_psram_range(range) };
 
-            #[cfg(all(cache_livelock_workaround, feature = "rt"))]
-            crate::soc::cache_livelock::psram_mapped();
+                    #[cfg(all(cache_livelock_workaround, feature = "rt"))]
+                    crate::soc::cache_livelock::psram_mapped();
+                }
+            }
         }
         Self { _peri: peri }
     }
 
     /// Returns the address and size of the available in external memory.
     pub fn raw_parts(&self) -> (*mut u8, usize) {
-        let range = psram_range();
+        let range = psram_heap_range();
         (range.start as *mut u8, range.end - range.start)
+    }
+
+    /// Returns the size of PSRAM in bytes: the detected size, or the size that the configuration
+    /// sets. Returns 0 if PSRAM did not start.
+    #[cfg_attr(
+        psram_supports_code_in_psram,
+        doc = "\n\nWith `code-in-psram`, the range from [`Self::raw_parts`] is smaller, because",
+        doc = "the start-up uses the beginning of PSRAM for the code."
+    )]
+    #[instability::unstable]
+    pub fn size(&self) -> usize {
+        cfg_select! {
+            code_in_psram => code_in_psram::SIZE.load(Ordering::Relaxed),
+            _ => psram_range().len(),
+        }
     }
 }

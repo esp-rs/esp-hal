@@ -3,6 +3,9 @@
 //! Assumes a certain (i.e. default) partition table layout.
 //% CHIP_FILTER: flash_driver_supported
 //% FEATURES: unstable
+//% FEATURES(code_in_flash):
+//% CHIP_FILTER(code_in_psram): flash_driver_supported && psram_supports_code_in_psram
+//% ENV(code_in_psram): ESP_HAL_CONFIG_CODE_IN_PSRAM=true
 //% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "--cfg=__test_flash" ]
 //% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "--cfg=__test_flash" ]
 //% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = ["-Z", "stack-protector=all"]
@@ -281,9 +284,15 @@ mod tests {
 
         let mapped = addr_of!(SCRATCH.0[0]);
         // Warm D-cache; do not use `SCRATCH.0[0]` as a value (const-folded).
-        let _cached = unsafe { read_volatile(mapped) };
+        let cached = unsafe { read_volatile(mapped) };
 
-        let pattern = [0x5A5A_5A5Au32; 1];
+        // With code in PSRAM, the word differs from the copy in PSRAM, so the asserts can tell
+        // which one a read returns.
+        let pattern = [if cfg!(code_in_psram) {
+            !cached
+        } else {
+            0x5A5A_5A5A
+        }];
         // SAFETY: `SCRATCH` is a dedicated mapped sector, not firmware.
         unsafe {
             flash.erase(offset, offset + sector).unwrap();
@@ -295,7 +304,12 @@ mod tests {
         assert_eq!(via_rom, pattern);
 
         let via_cache = unsafe { read_volatile(mapped) };
-        assert_eq!(via_cache, pattern[0]);
+        if cfg!(code_in_psram) {
+            // `.rodata` is a copy in PSRAM, which a flash write does not change.
+            assert_eq!(via_cache, cached);
+        } else {
+            assert_eq!(via_cache, pattern[0]);
+        }
     }
 
     #[cfg(multi_core)]
@@ -381,7 +395,9 @@ mod tests {
         while COUNTER.load(Ordering::Relaxed) == before {}
     }
 
-    #[cfg(multi_core)]
+    // With code in PSRAM, a flash operation does not park the other core, so the two cores' ROM
+    // calls would overlap.
+    #[cfg(all(multi_core, not(code_in_psram)))]
     #[test]
     fn test_auto_park_from_both_cores_at_the_same_time() {
         use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -463,10 +479,13 @@ mod tests {
         .unwrap();
 
         let mut buf = [0u32; 1];
-        assert_eq!(
-            flash.read(APP_DESC_OFFSET, &mut buf),
+        // With code in PSRAM, nothing fetches from flash, so the strategy has no effect.
+        let expected = if cfg!(code_in_psram) {
+            Ok(())
+        } else {
             Err(Error::OtherCoreRunning)
-        );
+        };
+        assert_eq!(flash.read(APP_DESC_OFFSET, &mut buf), expected);
     }
 
     /// HIL boards have no encryption key burned, so `read_encrypted` returns
@@ -518,6 +537,30 @@ mod tests {
         flash.read(NVS, &mut words).unwrap();
         assert_ne!(words, zeros);
 
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+    }
+
+    #[cfg(code_in_psram)]
+    #[test]
+    fn test_write_encrypted_marks_the_operation() {
+        use esp_hal::timer::{PeriodicTimer, systimer::SystemTimer};
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        hil_test::init_logger!(peripherals);
+        let timer = PeriodicTimer::new(SystemTimer::new(peripherals.SYSTIMER).alarm0);
+        let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
+
+        let sector = flash.chip_info().sector_size;
+        // SAFETY: NVS is not mapped firmware.
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+        let zeros = [0u32; 1024];
+        hil_test::assert_flash_value_marks(
+            timer,
+            // SAFETY: as above.
+            || unsafe { flash.write_encrypted(NVS, &zeros).unwrap() },
+            "encrypted write",
+        );
+        // SAFETY: as above.
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
     }
 
@@ -659,6 +702,24 @@ mod tests {
         assert_eq!(booted.offset(), APP_DESC_OFFSET - 0x20);
     }
 
+    /// Fails if a region of the booted partition lets an erase or a write reach the app.
+    #[test]
+    fn test_booted_partition_is_write_protected() {
+        use esp_bootloader_esp_idf::partitions::{self, Error};
+
+        let mut flash = flash_from_peripherals(esp_hal::init(esp_hal::Config::default()));
+        let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+        let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();
+
+        let booted = pt.booted_partition().unwrap().unwrap();
+        let mut region = booted.as_auto_flash_region(&mut flash);
+
+        // The ranges are not aligned, so a region without the protection returns `NotAligned`
+        // and does not change the app.
+        assert_eq!(region.erase(0, 1), Err(Error::WriteProtected));
+        assert_eq!(region.write(1, &[0]), Err(Error::WriteProtected));
+    }
+
     #[test]
     fn test_drom_entry_offset_reads_the_window() {
         use esp_hal::flash::{flash_mmu_drom_entries, flash_mmu_entry_offset};
@@ -667,11 +728,20 @@ mod tests {
         hil_test::init_logger!(peripherals);
         let drom = flash_mmu_drom_entries();
 
-        // The linker scripts put the app's rodata at the start of the DROM window.
-        assert_eq!(
-            flash_mmu_entry_offset(drom.start),
-            Some(APP_DESC_OFFSET - 0x20)
-        );
+        if cfg!(code_in_psram) {
+            // The start-up unmaps flash, and keeps the offset of the app's first page.
+            assert_eq!(flash_mmu_entry_offset(drom.start), None);
+            assert_eq!(
+                flash_mmu_entry_offset(drom.end - 1),
+                Some(APP_DESC_OFFSET - 0x20)
+            );
+        } else {
+            // The linker scripts put the app's rodata at the start of the DROM window.
+            assert_eq!(
+                flash_mmu_entry_offset(drom.start),
+                Some(APP_DESC_OFFSET - 0x20)
+            );
+        }
         assert_eq!(flash_mmu_entry_offset(drom.end), None);
     }
 }
