@@ -1,0 +1,18 @@
+[build]
+target = "xtensa-esp32s3-none-elf"
+
+[target.xtensa-esp32s3-none-elf]
+runner = "espflash flash --monitor"
+rustflags = [
+  # GNU LD
+  "-C", "link-arg=-Wl,-Tlinkall.x",
+  "-C", "link-arg=-nostartfiles",
+]
+
+[env]
+ESP_LOG = "info"
+SSID = "SSID"
+PASSWORD = "PASSWORD"
+
+[unstable]
+build-std = ["core", "alloc"]
