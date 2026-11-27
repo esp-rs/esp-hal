@@ -41,10 +41,18 @@ pub struct AccessPointConfig {
 
 impl AccessPointConfig {
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
-        // Soft-AP doesn't support WEP (nor WAPI/OWE, which
+        // Soft-AP doesn't support WEP or WPA3 Personal (nor WAPI/OWE, which
         // `AuthenticationMethodConfig` doesn't include).
         if matches!(self.authentication, AuthenticationMethodConfig::Wep(_)) {
             warn!("WEP is not supported in access point mode.");
+            return Err(WifiError::Unsupported);
+        }
+        if matches!(
+            self.authentication,
+            AuthenticationMethodConfig::Wpa3Personal(_)
+                | AuthenticationMethodConfig::Wpa2Wpa3Personal(_)
+        ) {
+            warn!("WPA3 is not supported in access point mode.");
             return Err(WifiError::Unsupported);
         }
 

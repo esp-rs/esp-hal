@@ -1,0 +1,1 @@
+Vendored from espressif/esp-idf v5.4.2 (components/wifi_provisioning/proto including wifi_ctrl.proto, and components/protocomm/proto). IDF master network_provisioning is not used.
