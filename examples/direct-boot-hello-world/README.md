@@ -8,13 +8,29 @@ flash, `.bss` zeroed, `#[ram]` code running, and interrupts handled. It then ent
 
 Direct boot works on every chip except the ESP32 and the ESP32-S2.
 
-espflash does not support the direct-boot image format yet, so `cargo xtask run`, `cargo run`,
-`espflash flash` and `espflash save-image` don't work for this example. Build, convert and flash
-it in separate steps instead.
+## Running
+
+```shell
+cargo xtask run direct-boot-hello-world
+```
+
+`cargo xtask run` and `cargo run` use `espflash flash --monitor`. The ELF metadata names the
+direct-boot image format, and espflash writes that image. Support for the format is not released
+yet, so just running the example only works with the unreleased espflash installed locally. A
+released espflash still writes an ESP-IDF image, which the ROM does not start directly.
+
+Use a UART port: the USB Serial/JTAG connection drops during deep sleep. The expected output is in
+[Monitor](#monitor).
+
+## Building and flashing by hand
+
+The steps below write the same image with a released espflash. They also document the image: the
+ELF file's loadable sections at their load addresses, which are flash offsets.
 
 ## Prerequisites
 
-- [espflash](https://github.com/esp-rs/espflash): `cargo install espflash --locked`
+- [espflash](https://github.com/esp-rs/espflash). `cargo install espflash --locked` is enough for
+  these steps. Just running the example needs the unreleased build installed locally.
 - `rust-objcopy`: `cargo install cargo-binutils` and `rustup component add llvm-tools`
 - For the ESP32-S3, the `esp` Xtensa toolchain installed via [espup](https://github.com/esp-rs/espup)
 

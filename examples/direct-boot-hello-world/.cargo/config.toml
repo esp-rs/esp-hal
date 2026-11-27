@@ -1,12 +1,14 @@
-# No `espflash flash` runner: it would create an ESP-IDF image. See the README for flashing.
+# `espflash flash` writes a direct-boot image when it understands the ELF metadata.
 
 [target.'cfg(target_arch = "riscv32")']
+runner    = "espflash flash --monitor"
 rustflags = [
   "-C", "link-arg=-Tlinkall.x",
   "-C", "force-frame-pointers",
 ]
 
 [target.'cfg(target_arch = "xtensa")']
+runner    = "espflash flash --monitor"
 rustflags = [
   # GNU LD
   "-C", "link-arg=-Wl,-Tlinkall.x",
