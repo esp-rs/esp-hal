@@ -1206,6 +1206,12 @@ driver_configs![
                 octal_spi: bool,
                 #[serde(default)]
                 hex_spi: bool,
+                /// The chip supports the `code-in-psram` esp-config option.
+                #[serde(default)]
+                supports_code_in_psram: bool,
+                /// PSRAM has its own MMU and address window, apart from flash.
+                #[serde(default)]
+                separate_window: bool,
                 /// The MSPI can tune the flash and PSRAM input timing.
                 #[serde(default)]
                 has_timing_tuning: bool,

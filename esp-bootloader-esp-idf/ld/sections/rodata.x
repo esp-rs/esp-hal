@@ -29,5 +29,8 @@ SECTIONS {
     . = ALIGN(4);
     *( .rodata_wlog_*.* )
     . = ALIGN(4);
+    /* With code in PSRAM, pad to `.text`. Where `.text_gap` is empty, the image tool then merges
+       both into one segment. */
+    . = ALIGN(ESP_HAL_CODE_IN_PSRAM ? ALIGNOF(.text) : 4);
   } > RODATA
 }

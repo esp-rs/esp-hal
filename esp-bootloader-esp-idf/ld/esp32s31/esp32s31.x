@@ -13,6 +13,9 @@ PROVIDE(interrupt0 = DefaultHandler);
 */
 PROVIDE(_mp_hook = default_mp_hook);
 
+/* `psram.x` must come before `rwdata.x`. See `psram.x`. */
+INCLUDE "psram.x"
+
 SECTIONS {
   /* Shared sections - ordering matters */
   INCLUDE "rwtext.x"
@@ -22,19 +25,23 @@ SECTIONS {
 
 SECTIONS {
   /**
-   * Bootloader really wants to have separate segments for ROTEXT and RODATA
-   * Thus, we need to force a gap here.
+   * The ESP-IDF bootloader takes exactly two mapped segments. Without code in PSRAM, the gap
+   * makes ROTEXT and RODATA two segments. With code in PSRAM, the start-up in the flash window is
+   * the second segment, so ROTEXT and RODATA must be one segment, without a gap.
    */
   .text_gap (NOLOAD): {
-    . = . + 8;
-    . = ALIGN(4) + 0x20;
+    . = . + (ESP_HAL_CODE_IN_PSRAM ? 0 : 8);
+    . = ALIGN(4) + (ESP_HAL_CODE_IN_PSRAM ? 0 : 0x20);
   } > ROM
 }
 INSERT BEFORE .text;
 
 INCLUDE "rodata.x"
 INCLUDE "text.x"
+ASSERT(!ESP_HAL_CODE_IN_PSRAM || ADDR(.text) == ADDR(.rodata.wifi) + SIZEOF(.rodata.wifi), "With code-in-psram, .text must start where .rodata.wifi ends");
 INCLUDE "rtc_fast.x"
+/* See `psram_code_end.x`. The sections below are in RAM, or are INFO sections at 0. */
+INCLUDE "psram_code_end.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
 INCLUDE "metadata.x"

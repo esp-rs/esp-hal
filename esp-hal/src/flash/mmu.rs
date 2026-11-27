@@ -278,6 +278,15 @@ pub(super) fn drom_entries() -> Range<u32> {
 /// The flash offset that a DROM entry maps, or `None` when the entry is
 /// outside the DROM window, invalid, or maps PSRAM.
 pub(super) fn drom_entry_offset(entry_id: u32) -> Option<u32> {
+    // With code in PSRAM, flash is unmapped. The last DROM entry mapped the app's first page, and
+    // the start-up saved its offset.
+    #[cfg(code_in_psram)]
+    if entry_id == drom_entries().end - 1 {
+        return Some(
+            crate::psram::code_in_psram::APP_OFFSET.load(portable_atomic::Ordering::Relaxed),
+        );
+    }
+
     (drom_entries().contains(&entry_id)
         && entry_is_valid(entry_id)
         && entry_is_flash_mapping(entry_id))

@@ -21,6 +21,7 @@ use crate::{
         ClockTreeNodeType,
         ConfiguresExpression,
         DependencyGraph,
+        EarlyInit,
         Function,
         ManagementProperties,
         SourceFrequencySignature,
@@ -349,6 +350,152 @@ impl ClockTreeNodeInstance {
 
     fn wake_locking(&self) -> bool {
         self.node.wake_locking()
+    }
+
+    fn early_init(&self) -> bool {
+        self.node.early_init().is_set()
+    }
+
+    /// Returns the node's `cfg` attribute and its `early_init` attribute, for each early function.
+    fn early_cfg_attrs(&self) -> TokenStream {
+        let node_cfg = self.rustc_cfg_attr();
+        let early_cfg = self.node.early_init().cfg_attr();
+        quote! { #node_cfg #early_cfg }
+    }
+
+    fn early_request_fn_name(&self) -> Ident {
+        format_ident!("{}_early", self.request_fn_name())
+    }
+
+    /// The HAL function that the `early_init` functions call instead of `configure_<node>_impl`.
+    fn early_configure_impl_name(&self) -> Ident {
+        format_ident!("{}_early_impl", self.config_apply_function_name())
+    }
+
+    /// The HAL function that the `early_init` functions call instead of `enable_<node>_impl`.
+    fn early_enable_impl_name(&self) -> Ident {
+        format_ident!("{}_early_impl", self.enable_fn_name())
+    }
+
+    /// Returns whether a request of the node calls the HAL's enable function.
+    fn requests_enable(&self) -> bool {
+        self.properties.refcount_accessor().is_some() || self.properties.has_enable()
+    }
+
+    /// Generates stubs of the HAL functions that the `early_init` functions call.
+    fn early_hal_functions(&self) -> Vec<TokenStream> {
+        let receiver = self.properties.receiver();
+        let mut functions = vec![];
+        if self.is_configurable() {
+            let ty_name = self.config_type_name();
+            let configure = self.early_configure_impl_name();
+            functions.push(quote! {
+                fn #configure(#(#receiver,)* _clocks: &mut ClockTree, _config: #ty_name) {
+                    todo!()
+                }
+            });
+        }
+        if self.requests_enable() {
+            let enable = self.early_enable_impl_name();
+            functions.push(quote! {
+                fn #enable(#(#receiver,)* _clocks: &mut ClockTree) {
+                    todo!()
+                }
+            });
+        }
+        functions
+    }
+
+    /// Returns the statement with which the `early_init` node `user` starts this node as its
+    /// source, or `None` if the node cannot start early. An always-on source without an enable
+    /// needs no statement.
+    fn early_request_call(&self, user: &ClockTreeNodeInstance) -> Result<Option<TokenStream>> {
+        if self.early_init() && self.node.has_early_request() {
+            let (early_init, user_early_init) = (self.node.early_init(), user.node.early_init());
+            anyhow::ensure!(
+                early_init.covers(&user_early_init),
+                "Clock node `{}` has `early_init = {user_early_init}`, so its source `{}` must have the same `early_init`, not `{early_init}`",
+                user.name_str(),
+                self.name_str()
+            );
+            let request_fn_name = self.early_request_fn_name();
+            Ok(Some(quote! { #request_fn_name(clocks); }))
+        } else if self.properties.always_on()
+            && !self.properties.has_enable()
+            && self.properties.refcount_accessor().is_none()
+        {
+            Ok(Some(quote! {}))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Returns an expression for the node's frequency that calls no function, if there is one.
+    fn early_frequency_expr(&self, tree: &ProcessedClockData) -> Option<TokenStream> {
+        if self.properties.receiver.is_some() {
+            return None;
+        }
+        if self.is_configurable() {
+            let cache_name = self.freq_cache_static_name();
+            return (self.early_init() && !self.skips_frequency_cache(tree))
+                .then(|| quote! { #cache_name.load(::core::sync::atomic::Ordering::Acquire) });
+        }
+        let frequency = self.node_frequency_impl(tree, &[]);
+        let constant = frequency
+            .to_string()
+            .replace('_', "")
+            .parse::<u64>()
+            .is_ok();
+        constant.then_some(frequency)
+    }
+
+    /// Returns the body of an early request: count the user, and on the first one start the
+    /// `sources` and enable the node.
+    fn early_request_body(&self, sources: TokenStream) -> TokenStream {
+        let enable_early_impl = self.early_enable_impl_name();
+        let receiver = self.properties.receiver();
+        let refcount_accessor = self.properties.refcount_accessor();
+        let enable = if self.requests_enable() {
+            quote! { #(#receiver.)* #enable_early_impl(clocks); }
+        } else {
+            quote! {}
+        };
+        match refcount_accessor {
+            Some(refcount) => quote! {
+                let first = #refcount == 0;
+                #refcount = #refcount.saturating_add(1);
+                if first {
+                    #sources
+                    #enable
+                }
+            },
+            None => quote! {
+                #sources
+                #enable
+            },
+        }
+    }
+
+    /// Returns `request_<node>_early`, which requests the node as `request_<node>` does, for
+    /// another `early_init` node.
+    fn early_request_function(&self, sources: TokenStream) -> TokenStream {
+        let request_fn_name = self.early_request_fn_name();
+        let receiver = self.properties.receiver();
+        let body = self.early_request_body(sources);
+        let doc = format!(
+            " Requests `{}` before `main`, as `{}` does. See `ClockTree::unlocked`.",
+            self.name_str(),
+            self.request_fn_name()
+        );
+        let cfg_attrs = self.early_cfg_attrs();
+        quote! {
+            #cfg_attrs
+            #[doc = #doc]
+            #[inline(always)]
+            pub(crate) fn #request_fn_name(#(#receiver,)* clocks: &mut ClockTree) {
+                #body
+            }
+        }
     }
 
     fn input_clocks(&self, tree: &ProcessedClockData) -> Vec<String> {
@@ -714,6 +861,8 @@ impl ClockTreeNodeInstance {
                 implementation: source_frequency_impl,
             },
 
+            early_init: quote! {},
+
             frequency: Function {
                 _name: frequency_function_name.to_string(),
                 implementation: if self.is_configurable() && self.skips_frequency_cache(tree) {
@@ -1000,7 +1149,18 @@ impl SystemClocks {
                 ));
             }
 
-            let node_funcs = clock_item.node_functions(tree);
+            let mut node_funcs = clock_item.node_functions(tree);
+            if clock_item.early_init() {
+                anyhow::ensure!(
+                    !clock_item.properties.always_on() && !clock_item.wake_locking(),
+                    "Clock node `{}`: `early_init` is not supported with `always_on` or `wake_locking`",
+                    clock_item.name_str()
+                );
+                node_funcs.early_init = clock_item.node.early_init_functions(clock_item, tree)?;
+                node_funcs
+                    .hal_functions
+                    .extend(clock_item.early_hal_functions());
+            }
             if !node_funcs.hal_functions.is_empty() && is_first_instance {
                 let mut doclines = vec![];
                 let header = if clock_item.group_template.is_empty() {
@@ -1442,6 +1602,39 @@ impl SystemClocks {
             }
         });
 
+        let mut early_cfgs: Vec<EarlyInit> = vec![];
+        for early_init in tree.clock_tree.values().map(|node| node.node.early_init()) {
+            if early_init.is_set() && !early_cfgs.contains(&early_init) {
+                early_cfgs.push(early_init);
+            }
+        }
+        let unlocked_cfg = match early_cfgs.as_slice() {
+            [] => None,
+            cfgs if cfgs.contains(&EarlyInit::Bool(true)) => Some(quote! {}),
+            [cfg] => Some(cfg.cfg_attr()),
+            cfgs => {
+                let cfgs = cfgs.iter().filter_map(|cfg| match cfg {
+                    EarlyInit::Cfg(cfg) => Some(format_ident!("{}", cfg)),
+                    EarlyInit::Bool(_) => None,
+                });
+                Some(quote! { #[cfg(any(#(#cfgs),*))] })
+            }
+        };
+        let unlocked = unlocked_cfg.map(|cfg_attr| {
+            quote! {
+                /// Returns the clock tree without taking the lock, for the early-init functions.
+                ///
+                /// # Safety
+                ///
+                /// The safety rules of `esp_sync::NonReentrantMutex::as_mut_unchecked` apply.
+                #cfg_attr
+                #[inline(always)]
+                pub(crate) unsafe fn unlocked() -> &'static mut ClockTree {
+                    unsafe { CLOCK_TREE.as_mut_unchecked() }
+                }
+            }
+        });
+
         Ok(quote! {
             #[macro_export]
             /// ESP-HAL must provide implementation for the following functions:
@@ -1463,6 +1656,8 @@ impl SystemClocks {
                         pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                             CLOCK_TREE.with(f)
                         }
+
+                        #unlocked
 
                         #(
                             #[doc = #clock_tree_node_state_getter_doclines]

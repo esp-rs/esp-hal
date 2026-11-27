@@ -180,7 +180,13 @@ fn main() -> ! {
 //! With `-Z stack-protector`, the code of these operations is instrumented too. If it detects
 //! stack corruption while the caches are suspended, the panic handler cannot run, because it lives
 //! in flash, and the chip locks up instead of reporting the corruption.
-//!
+#![cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "",
+    doc = "The `code-in-psram` option needs this level in every build, because its start-up runs",
+    doc = "in every firmware. The build stops at `opt-level` 0 or 1."
+)]
+#![doc = ""]
 //! ## Don't use `core::mem::forget`
 //!
 //! You should never use `core::mem::forget` on any type defined in [esp crates].
@@ -350,6 +356,8 @@ pub use procmacros::handler;
 pub use procmacros::load_lp_code;
 #[cfg(feature = "rt")]
 pub use procmacros::main;
+#[instability::unstable]
+pub use procmacros::psram;
 pub use procmacros::ram;
 
 #[instability::unstable]
@@ -657,6 +665,15 @@ pub mod __macro_implementation {
 
     pub const fn assert_is_uninit<T: super::Uninit>() {}
 
+    // `.bss.psram` needs the code-in-PSRAM start-up, which maps PSRAM before `main` and zeroes the
+    // section.
+    #[instability::unstable]
+    pub const fn assert_psram_available() {
+        if !cfg!(code_in_psram) {
+            core::panic!("`psram` needs the `code-in-psram` option");
+        }
+    }
+
     #[cfg(feature = "rt")]
     #[cfg(riscv)]
     pub use esp_riscv_rt::entry as __entry;
@@ -799,6 +816,9 @@ pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 
     crate::clock::init(config.clock_config());
+
+    #[cfg(code_in_psram)]
+    crate::psram::adopt_started_psram();
 
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.RTC_TIMER.reborrow());

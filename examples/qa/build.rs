@@ -12,5 +12,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // `#[psram(zeroed)]`, which `sleep-checks` uses, fails to compile without esp-hal's
+    // `code-in-psram`, so it needs a cfg.
+    println!("cargo:rustc-check-cfg=cfg(code_in_psram)");
+    println!("cargo:rerun-if-env-changed=ESP_HAL_CONFIG_CODE_IN_PSRAM");
+    if std::env::var("ESP_HAL_CONFIG_CODE_IN_PSRAM").as_deref() == Ok("true") {
+        println!("cargo::rustc-cfg=code_in_psram");
+    }
+
     Ok(())
 }
