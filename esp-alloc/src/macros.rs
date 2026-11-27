@@ -37,6 +37,13 @@ macro_rules! heap_allocator {
 /// esp_alloc::psram_allocator!(peripherals.PSRAM, hal::psram);
 /// ```
 ///
+/// On ESP32, `Psram::new` also takes the PSRAM pins. Create the `Psram` and give it to the macro:
+///
+/// ```rust, no_run
+/// let psram = hal::psram::Psram::new(peripherals.PSRAM, pins, Default::default());
+/// esp_alloc::psram_allocator!(&psram);
+/// ```
+///
 /// # ⚠️ Limitations
 ///
 /// On ESP32, ESP32-S2 and ESP32-S3 the atomic instructions do not work
