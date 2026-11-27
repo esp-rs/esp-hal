@@ -6,7 +6,7 @@ static TRNG_ENABLED: AtomicUsize = AtomicUsize::new(0);
 static TRNG_USERS: AtomicUsize = AtomicUsize::new(0);
 
 use super::Rng;
-#[cfg(rng_trng_requires_i2s0)]
+#[cfg(esp32)]
 use crate::peripherals::I2S0;
 use crate::peripherals::{ADC1, RNG};
 
@@ -15,31 +15,27 @@ use crate::peripherals::{ADC1, RNG};
 pub struct TrngSource<'d> {
     _rng: RNG<'d>,
     _adc: ADC1<'d>,
-    #[cfg(rng_trng_requires_i2s0)]
+    #[cfg(esp32)]
     _i2s: I2S0<'d>,
 }
 
 impl<'d> TrngSource<'d> {
     /// Enables the SAR ADC entropy source.
     #[cfg_attr(
-        rng_trng_requires_i2s0,
+        esp32,
         doc = r"
 
 The entropy source also uses I2S0 to run the SAR ADC."
     )]
     // TODO: this is not final. A single ADC channel should be sufficient.
     #[instability::unstable]
-    pub fn new(
-        _rng: RNG<'d>,
-        _adc: ADC1<'d>,
-        #[cfg(rng_trng_requires_i2s0)] _i2s: I2S0<'d>,
-    ) -> Self {
+    pub fn new(_rng: RNG<'d>, _adc: ADC1<'d>, #[cfg(esp32)] _i2s: I2S0<'d>) -> Self {
         crate::soc::trng::ensure_randomness();
         unsafe { Self::increase_entropy_source_counter() }
         Self {
             _rng,
             _adc,
-            #[cfg(rng_trng_requires_i2s0)]
+            #[cfg(esp32)]
             _i2s,
         }
     }
@@ -151,7 +147,7 @@ pub enum TrngError {
 #[cfg_attr(docsrs, procmacros::doc_replace(
     "analog_pin" => gpio_for_signal!(ADC1_CH3),
     "trng_source_args" => {
-        cfg(rng_trng_requires_i2s0) => "peripherals.RNG, peripherals.ADC1.reborrow(), peripherals.I2S0",
+        cfg(esp32) => "peripherals.RNG, peripherals.ADC1.reborrow(), peripherals.I2S0",
         _ => "peripherals.RNG, peripherals.ADC1.reborrow()"
     },
 ))]

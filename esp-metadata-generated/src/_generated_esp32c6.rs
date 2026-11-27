@@ -481,9 +481,6 @@ macro_rules! property {
     ("rng.trng_supported") => {
         true
     };
-    ("rng.trng_requires_i2s0") => {
-        false
-    };
     ("rng.is_lp_sys") => {
         true
     };

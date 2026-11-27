@@ -33,10 +33,12 @@ mod tests {
     fn test_trng_returns_random_values() {
         let p = esp_hal::init(Default::default());
         hil_test::init_logger!(p);
-        let _source = cfg_select! {
-            rng_trng_requires_i2s0 => TrngSource::new(p.RNG, p.ADC1, p.I2S0),
-            _ => TrngSource::new(p.RNG, p.ADC1),
-        };
+        let _source = TrngSource::new(
+            p.RNG,
+            p.ADC1,
+            #[cfg(esp32)]
+            p.I2S0,
+        );
 
         let rng = Trng::try_new().unwrap();
 
@@ -51,10 +53,12 @@ mod tests {
     fn test_trng_source_cannot_be_disabled_while_in_use() {
         let p = esp_hal::init(Default::default());
         hil_test::init_logger!(p);
-        let source = cfg_select! {
-            rng_trng_requires_i2s0 => TrngSource::new(p.RNG, p.ADC1, p.I2S0),
-            _ => TrngSource::new(p.RNG, p.ADC1),
-        };
+        let source = TrngSource::new(
+            p.RNG,
+            p.ADC1,
+            #[cfg(esp32)]
+            p.I2S0,
+        );
 
         let trng = Trng::try_new().unwrap();
 
@@ -73,10 +77,12 @@ mod tests {
     fn test_trng_source_cannot_be_dropped_while_in_use() {
         let p = esp_hal::init(Default::default());
         hil_test::init_logger!(p);
-        let source = cfg_select! {
-            rng_trng_requires_i2s0 => TrngSource::new(p.RNG, p.ADC1, p.I2S0),
-            _ => TrngSource::new(p.RNG, p.ADC1),
-        };
+        let source = TrngSource::new(
+            p.RNG,
+            p.ADC1,
+            #[cfg(esp32)]
+            p.I2S0,
+        );
 
         let _trng = Trng::try_new().unwrap();
 
@@ -89,10 +95,12 @@ mod tests {
         let p = esp_hal::init(Default::default());
         hil_test::init_logger!(p);
 
-        let source = cfg_select! {
-            rng_trng_requires_i2s0 => TrngSource::new(p.RNG, p.ADC1, p.I2S0),
-            _ => TrngSource::new(p.RNG, p.ADC1),
-        };
+        let source = TrngSource::new(
+            p.RNG,
+            p.ADC1,
+            #[cfg(esp32)]
+            p.I2S0,
+        );
 
         // Unsafely increase the counter. Practically, this may be done in esp-radio.
         unsafe { TrngSource::increase_entropy_source_counter() };
