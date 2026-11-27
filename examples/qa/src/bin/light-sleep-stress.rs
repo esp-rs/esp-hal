@@ -402,6 +402,8 @@ struct Counts {
     long_slept: AtomicU32,
     not_slept: AtomicU32,
     waits: AtomicU32,
+    /// The waits after which `wakeup_cause` contains the timer.
+    timer_waits: AtomicU32,
     passes: AtomicU32,
     flash_cycles: AtomicU32,
     /// The work passes, sleeps, and waits of each core.
@@ -424,6 +426,7 @@ static COUNTS: Counts = Counts {
     refused: AtomicU32::new(0),
     not_slept: AtomicU32::new(0),
     waits: AtomicU32::new(0),
+    timer_waits: AtomicU32::new(0),
     passes: AtomicU32::new(0),
     flash_cycles: AtomicU32::new(0),
     progress: [const { AtomicU32::new(0) }; CORES],
@@ -711,6 +714,11 @@ fn wait_round(core: usize, rng: &mut Rng) {
     let waited = Instant::now() - before;
     let n = count(&COUNTS.waits);
     count(&COUNTS.progress[core]);
+    // A rejected request leaves `wakeup_cause` empty. The phase starts from a reset, so a timer
+    // cause belongs to a sleep of this phase.
+    if wakeup_cause().contains(WakeupSource::Timer) {
+        count(&COUNTS.timer_waits);
+    }
     if !length_ok(waited, length, stalls) {
         problem!("core {core}: wait {n} lasted {waited} of {length}");
     }
@@ -763,7 +771,7 @@ impl Controller {
         let c = &COUNTS;
         REPORT_GEN.fetch_add(1, Ordering::AcqRel);
         report!(
-            "stress: {} s, sleeps {}, short {}, long {}, long slept {}, refused {}, not slept {}, waits {}, work passes {}, flash cycles {}",
+            "stress: {} s, sleeps {}, short {}, long {}, long slept {}, refused {}, not slept {}, waits {}, timer waits {}, work passes {}, flash cycles {}",
             (Instant::now() - self.started).as_secs(),
             c.sleeps.load(Ordering::Relaxed),
             c.short.load(Ordering::Relaxed),
@@ -772,6 +780,7 @@ impl Controller {
             c.refused.load(Ordering::Relaxed),
             c.not_slept.load(Ordering::Relaxed),
             c.waits.load(Ordering::Relaxed),
+            c.timer_waits.load(Ordering::Relaxed),
             c.passes.load(Ordering::Relaxed),
             c.flash_cycles.load(Ordering::Relaxed),
         );
@@ -813,9 +822,7 @@ impl Controller {
         let missing = match phase.caller {
             _ if !made(&c.flash_cycles) => Some("no flash cycle"),
             Caller::Automatic if !made(&c.waits) => Some("no wait"),
-            Caller::Automatic if !wakeup_cause().contains(WakeupSource::Timer) => {
-                Some("no automatic light sleep")
-            }
+            Caller::Automatic if !made(&c.timer_waits) => Some("no automatic light sleep"),
             Caller::Bare | Caller::Thread if !made(&c.sleeps) => Some("no sleep"),
             Caller::Bare | Caller::Thread if !made(&c.long_slept) => {
                 Some("no long sleep ended within its bounds")
