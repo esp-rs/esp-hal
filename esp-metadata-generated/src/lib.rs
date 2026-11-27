@@ -125,3 +125,7 @@ include!("_generated_esp32s3.rs");
 include!("_generated_esp32s31.rs");
 #[cfg(any(feature = "build-script", docsrs))]
 include!("_build_script_utils.rs");
+#[cfg(feature = "build-script")]
+mod linker_scripts;
+#[cfg(feature = "build-script")]
+pub use linker_scripts::LinkerScriptRenderer;

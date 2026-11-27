@@ -1,9 +1,4 @@
-use std::{
-    env,
-    error::Error,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{env, error::Error, path::PathBuf};
 
 use esp_metadata_generated::Chip;
 
@@ -23,33 +18,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     emit_linker_scripts(chip)
 }
 
-/// Copies the linker scripts into `OUT_DIR`. They include `hal-defaults.x` and the `esp_hal_*.x`
+/// Renders the linker scripts into `OUT_DIR`. They include `hal-defaults.x` and the `esp_hal_*.x`
 /// fragments from esp-hal's `OUT_DIR`, so no file here may share a name with one there.
 fn emit_linker_scripts(chip: Chip) -> Result<(), Box<dyn Error>> {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
 
+    let renderer = chip.linker_script_renderer();
     if !chip.is_xtensa() {
-        copy_dir("ld/riscv", &out)?;
-        // The start-up first sets `mtvec` to `_pre_init_trap`. With a CLIC, the trap base
-        // ignores the low 6 bits of `mtvec`.
-        let align = if chip.contains("soc_has_clic") {
-            ". = ALIGN(64);"
-        } else {
-            ""
-        };
-        fs::write(out.join("direct_boot_pre_init_trap_align.x"), align)?;
+        renderer.render_dir("ld/riscv", &out)?;
     }
-    copy_dir(format!("ld/{}", chip.name()), &out)?;
+    renderer.render_dir(format!("ld/{}", chip.name()), &out)?;
 
-    Ok(())
-}
-
-fn copy_dir(src: impl AsRef<Path>, dst: &Path) -> Result<(), Box<dyn Error>> {
-    for entry in fs::read_dir(src)? {
-        let path = entry?.path();
-        println!("cargo:rerun-if-changed={}", path.display());
-        fs::copy(&path, dst.join(path.file_name().unwrap()))?;
-    }
     Ok(())
 }

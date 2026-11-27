@@ -1629,6 +1629,11 @@ pub fn generate_lib_rs() -> TokenStream {
 
         #[cfg(any(feature = "build-script", docsrs))]
         include!( "_build_script_utils.rs");
+
+        #[cfg(feature = "build-script")]
+        mod linker_scripts;
+        #[cfg(feature = "build-script")]
+        pub use linker_scripts::LinkerScriptRenderer;
     }
 }
 

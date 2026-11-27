@@ -1,21 +1,11 @@
 #[cfg(feature = "rt")]
-use std::{
-    collections::HashMap,
-    env,
-    fs::{self, File},
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{env, path::PathBuf};
 use std::{error::Error, fmt::Write as _};
 
 #[cfg(feature = "rt")]
 use esp_config::Value;
 use esp_config::generate_config_from_yaml_definition;
-#[cfg(feature = "rt")]
-use esp_metadata_generated::Chip;
 use esp_metadata_generated::assert_unique_features;
-#[cfg(feature = "rt")]
-use somni_template::{BlockStyle, Env, Syntax, Template};
 
 macro_rules! bail {
     ($($arg:tt)*) => {
@@ -101,16 +91,25 @@ fn try_main() -> Result<(), Box<dyn Error>> {
 
         println!("cargo:rustc-link-search={}", out.display());
 
+        let mut renderer = chip.linker_script_renderer();
+        for (name, value) in cfg.iter() {
+            match value {
+                Value::Bool(value) => renderer.bool(name, *value),
+                Value::Integer(value) => renderer.string(name, value.to_string()),
+                Value::String(value) => renderer.string(name, value.clone()),
+            };
+        }
+
         let hal_defaults = if chip.is_xtensa() {
             "ld/xtensa/hal-defaults.x"
         } else {
             "ld/riscv/hal-defaults.x"
         };
-        preprocess_file(chip, &cfg, hal_defaults, out.join("hal-defaults.x"))?;
+        renderer.render_file(hal_defaults, out.join("hal-defaults.x"))?;
 
         // The parts of the memory layout that depend on esp-hal's configuration. The linker
         // scripts of the bootloader support crate include them.
-        copy_dir_all(chip, &cfg, "ld/fragments", &out)?;
+        renderer.render_dir("ld/fragments", &out)?;
     }
 
     Ok(())
@@ -181,109 +180,4 @@ macro_rules! __esp_hal_at_least_version {
     )?;
 
     Ok(())
-}
-
-#[cfg(feature = "rt")]
-fn copy_dir_all(
-    chip: Chip,
-    cfg: &HashMap<String, Value>,
-    src: impl AsRef<Path>,
-    dst: impl AsRef<Path>,
-) -> Result<(), Box<dyn Error>> {
-    // The per-file directives miss files added to the directory.
-    println!("cargo:rerun-if-changed={}", src.as_ref().display());
-
-    fs::create_dir_all(&dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        if ty.is_dir() {
-            copy_dir_all(
-                chip,
-                cfg,
-                entry.path(),
-                dst.as_ref().join(entry.file_name()),
-            )?;
-        } else {
-            preprocess_file(
-                chip,
-                cfg,
-                entry.path(),
-                dst.as_ref().join(entry.file_name()),
-            )?;
-        }
-    }
-    Ok(())
-}
-
-/// A naive pre-processor for linker scripts
-#[cfg(feature = "rt")]
-fn preprocess_file(
-    chip: Chip,
-    cfg: &HashMap<String, Value>,
-    src: impl AsRef<Path>,
-    dst: impl AsRef<Path>,
-) -> Result<(), Box<dyn Error>> {
-    println!("cargo:rerun-if-changed={}", src.as_ref().display());
-
-    let mut out_file = File::create(dst)?;
-
-    let syntax = Syntax {
-        expr: ("${".to_string(), "}".to_string()),
-        block: BlockStyle::Line {
-            prefix: "#".to_string(),
-        },
-    };
-
-    let template_src = std::fs::read_to_string(src)?;
-    let template = Template::compile(&template_src, &syntax)
-        .map_err(|e| e.display_with(&template_src).to_string())?;
-
-    let rendered = template
-        .render(somni_env(chip, cfg))
-        .map_err(|e| e.display_with(&template_src).to_string())?;
-    out_file.write_all(rendered.as_bytes())?;
-
-    Ok(())
-}
-
-#[cfg(feature = "rt")]
-fn somni_env(chip: Chip, cfg: &HashMap<String, Value>) -> Env {
-    let mut env = Env::new();
-
-    // cargo features
-    env.function("CARGO_FEATURE", |feature: &str| {
-        let vars = std::env::var("CARGO_CFG_FEATURE").unwrap_or_default();
-        let enabled_features = vars.split(',').collect::<Vec<_>>();
-        enabled_features.contains(&feature)
-    });
-
-    // esp-metadata
-    for c in Chip::all_possible_symbols() {
-        if let Some((name, _)) = c.split_once(',') {
-            // empty string is never a valid value, but we need the variables to exist
-            env.value(name, "");
-        } else {
-            env.value(c, false);
-        }
-    }
-    for c in chip.all_symbols() {
-        if let Some((name, value)) = c.split_once('=') {
-            env.value(name, value.trim().trim_matches('"'));
-        } else {
-            env.value(c, true);
-        }
-    }
-
-    // esp-config values
-    for (name, value) in cfg.iter() {
-        match value {
-            // bools are usually used in conditions
-            Value::Bool(value) => env.value(name, *value),
-            // the rest are usually substituted, so convert them to strings
-            Value::Integer(value) => env.value(name, value.to_string()),
-            Value::String(value) => env.value(name, value.clone()),
-        };
-    }
-    env
 }

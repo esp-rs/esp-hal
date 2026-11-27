@@ -2,8 +2,9 @@
 
 The memory layout depends on how the application gets started, so it is owned by the bootloader
 support crate rather than by esp-hal. These scripts describe the layout the ESP-IDF 2nd-stage
-bootloader expects. `build.rs` copies them into `OUT_DIR` and puts that directory on the linker
-search path; the application passes `-Tlinkall.x` as usual.
+bootloader expects. `build.rs` renders them into `OUT_DIR` and puts that directory on the linker
+search path; the application passes `-Tlinkall.x` as usual. The renderer evaluates `#IF` and
+`${...}` against the chip's esp-metadata symbols.
 
 - `<chip>/`: `memory.x`, `<chip>.x` and `linkall.x`, the entry point of the scripts.
 - `sections/`: output sections shared by all chips.
