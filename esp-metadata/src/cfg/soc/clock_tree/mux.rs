@@ -13,6 +13,7 @@ use crate::cfg::{
         Bounds,
         ClockTreeNodeType,
         ConfiguresExpression,
+        EarlyInit,
         RootSource,
         RootSourceArm,
         SourceFrequencySignature,
@@ -38,6 +39,16 @@ pub struct Multiplexer {
 
     #[serde(default)]
     wake_locking: bool,
+
+    /// Generate `<node>_early_init_<variant>` for each variant whose source is `early_init`, or
+    /// always on without an enable. The function selects the variant and requests the node before
+    /// `main`, without the lock, logging or a panic path. It needs `ClockTree::unlocked`, and
+    /// calls `configure_<node>_early_impl` and `enable_<node>_early_impl`, which the HAL provides.
+    /// With `early_init = "<cfg>"`, the functions exist only under that cfg.
+    ///
+    /// Not supported with `always_on`, `wake_locking` or `configures`.
+    #[serde(default)]
+    early_init: EarlyInit,
 
     /// Optional `#[cfg(...)]` expression. The node is omitted when the condition is false.
     #[serde(default)]
@@ -72,6 +83,78 @@ impl ClockTreeNodeType for Multiplexer {
 
     fn wake_locking(&self) -> bool {
         self.wake_locking
+    }
+
+    fn early_init(&self) -> EarlyInit {
+        self.early_init.clone()
+    }
+
+    /// One function per variant: a `match` on the variant would reach the request of a source that
+    /// cannot start early.
+    fn early_init_functions(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> Result<TokenStream> {
+        let name = instance.name_str();
+        anyhow::ensure!(
+            self.is_configurable() && !self.has_configures(),
+            "Clock node `{name}`: `early_init` needs a configurable multiplexer without `configures`"
+        );
+        let ty_name = instance.config_type_name();
+        let receiver = instance.properties.receiver();
+        let config_field = instance.properties.indexed_config_accessor();
+        let hal_impl = instance.early_configure_impl_name();
+        let cache_name = instance.freq_cache_static_name();
+        let cache = if instance.properties.receiver.is_some() {
+            quote! { #cache_name[self as usize] }
+        } else {
+            quote! { #cache_name }
+        };
+
+        let mut functions = vec![];
+        for variant in &self.variants {
+            let upstream = instance.resolve_node(tree, &variant.outputs);
+            let (Some(source), Some(frequency)) = (
+                upstream.early_request_call(instance)?,
+                upstream.early_frequency_expr(tree),
+            ) else {
+                continue;
+            };
+            let cache_store = (!instance.skips_frequency_cache(tree)).then(|| {
+                quote! { #cache.store(#frequency, ::core::sync::atomic::Ordering::Release); }
+            });
+            let variant_name = variant.config_enum_variant_name();
+            let fn_name =
+                instance.suffix_function(&format!("early_init_{}", variant.name.to_lowercase()));
+            let cfg_attr = variant.cfg_attr();
+            let early_cfg_attrs = instance.early_cfg_attrs();
+            let request = instance.early_request_body(source);
+            let doc = format!(
+                " Selects `{}` for `{name}` and requests `{name}` before `main`, as `{}` and `{}` do. See `ClockTree::unlocked`.",
+                variant.outputs,
+                instance.config_apply_function_name(),
+                instance.request_fn_name()
+            );
+            functions.push(quote! {
+                #early_cfg_attrs
+                #cfg_attr
+                #[doc = #doc]
+                #[inline(always)]
+                pub(crate) fn #fn_name(#(#receiver,)* clocks: &mut ClockTree) {
+                    #config_field = Some(#ty_name::#variant_name);
+                    #cache_store
+                    #(#receiver.)* #hal_impl(clocks, #ty_name::#variant_name);
+                    #request
+                }
+            });
+        }
+        anyhow::ensure!(
+            !functions.is_empty(),
+            "Clock node `{name}`: no source of this `early_init` multiplexer can start early"
+        );
+
+        Ok(quote! { #(#functions)* })
     }
 
     fn rustc_cfg(&self) -> Option<&str> {

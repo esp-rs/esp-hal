@@ -292,6 +292,11 @@ pub fn flash_mmu_drom_entries() -> core::ops::Range<u32> {
 ///
 /// Returns `None` when `index` is outside [`flash_mmu_drom_entries`], or when
 /// the entry is invalid or maps PSRAM.
+#[cfg_attr(
+    psram_supports_code_in_psram,
+    doc = "\n\nWith `code-in-psram`, the start-up unmaps flash. For entry `end - 1`, the function \
+           returns the offset of the app's first page, which the bootloader mapped."
+)]
 #[instability::unstable]
 pub fn flash_mmu_entry_offset(index: u32) -> Option<u32> {
     mmu::drom_entry_offset(index)

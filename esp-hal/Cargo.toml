@@ -31,6 +31,7 @@ check-configs = [
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_APB_FREQUENCY_REDUCTION = "4" }, if = 'soc_has_apb_frequency_reduction' },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_KEEP_UART0_ENABLED = "false" } },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_KEEP_USB_SERIAL_JTAG_ENABLED = "false" }, if = 'soc_has_usb_device' },
+    { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_CODE_IN_PSRAM = "true", CARGO_PROFILE_DEV_OPT_LEVEL = "2" }, if = 'psram_supports_code_in_psram' },
     { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
     { features = ["unstable", "rt", "__sdmmc"],     if = 'sdmmc_driver_supported' },
@@ -46,6 +47,8 @@ clippy-configs = [
         { if = 'sdmmc_driver_supported', features = ["__sdmmc"] },
         { if = 'sleep_idle_frequency_scaling', env = { ESP_HAL_CONFIG_IDLE_FREQUENCY_SCALING = "true" } },
     ] },
+    # For the opt-level, see lib.rs, Optimization level.
+    { features = ["unstable", "rt", "embassy-time-05"], env = { ESP_HAL_CONFIG_CODE_IN_PSRAM = "true", CARGO_PROFILE_DEV_OPT_LEVEL = "2" }, if = 'psram_supports_code_in_psram' },
 ]
 
 [package.metadata.docs.rs]

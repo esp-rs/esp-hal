@@ -42,6 +42,7 @@ use crate::{
         clock_tree::{
             Bounds,
             ClockTreeNodeType,
+            EarlyInit,
             Expression,
             RejectExpression,
             RootSource,
@@ -67,6 +68,17 @@ pub struct Source {
 
     #[serde(default)]
     wake_locking: bool,
+
+    /// Generate `<node>_early_init` and `request_<node>_early`, which configure and start the node
+    /// before `main`, without the lock, logging or a panic path. They need `ClockTree::unlocked`,
+    /// and call `configure_<node>_early_impl` and `enable_<node>_early_impl`, which the HAL
+    /// provides. With `early_init = "<cfg>"`, the functions exist only under that cfg.
+    ///
+    /// A derived source's `from` must have the same `early_init`, or be always on without an
+    /// enable. Not supported with `always_on`, `wake_locking`, `reject` or `adjustable`, on a
+    /// configurable source without `values`, or on a source in a clock group.
+    #[serde(default)]
+    early_init: EarlyInit,
 
     /// Optional `#[cfg(...)]` expression. The node is omitted when the condition is false.
     #[serde(default)]
@@ -129,6 +141,22 @@ impl ClockTreeNodeType for Source {
 
     fn wake_locking(&self) -> bool {
         self.wake_locking
+    }
+
+    fn early_init(&self) -> EarlyInit {
+        self.early_init.clone()
+    }
+
+    fn has_early_request(&self) -> bool {
+        true
+    }
+
+    fn early_init_functions(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> Result<TokenStream> {
+        self.early_init_impl(instance, tree, quote! {})
     }
 
     fn root_source(
@@ -241,6 +269,64 @@ impl ClockTreeNodeType for Source {
 }
 
 impl Source {
+    /// Generates `<node>_early_init` and `request_<node>_early`. `sources` starts the node's
+    /// source. No other node is configured yet, so the functions refresh no downstream frequency.
+    fn early_init_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+        sources: TokenStream,
+    ) -> Result<TokenStream> {
+        let name = instance.name_str();
+        anyhow::ensure!(
+            self.reject.is_none() && self.adjustable.is_none(),
+            "Clock node `{name}`: `early_init` is not supported with `reject` or `adjustable`"
+        );
+        anyhow::ensure!(
+            instance.properties.receiver.is_none(),
+            "Clock node `{name}`: `early_init` is not supported on clock group sources"
+        );
+        anyhow::ensure!(
+            self.values.is_some() || !self.is_configurable(),
+            "Clock node `{name}`: `early_init` needs `values` on a configurable source"
+        );
+
+        let request = instance.early_request_function(sources);
+        let configure = if self.is_configurable() {
+            let ty_name = instance.config_type_name();
+            let fn_name = instance.suffix_function("early_init");
+            let config_field = instance.properties.indexed_config_accessor();
+            let hal_impl = instance.early_configure_impl_name();
+            let frequency = self.node_frequency_impl(instance, tree, &[]);
+            let cache_store = (!instance.skips_frequency_cache(tree)).then(|| {
+                let cache_name = instance.freq_cache_static_name();
+                quote! { #cache_name.store(#frequency, ::core::sync::atomic::Ordering::Release); }
+            });
+            let doc = format!(
+                " Configures `{name}` before `main`, as `{}` does. See `ClockTree::unlocked`.",
+                instance.config_apply_function_name()
+            );
+            let cfg_attrs = instance.early_cfg_attrs();
+            quote! {
+                #cfg_attrs
+                #[doc = #doc]
+                #[inline(always)]
+                pub(crate) fn #fn_name(clocks: &mut ClockTree, config: #ty_name) {
+                    #config_field = Some(config);
+                    #cache_store
+                    #hal_impl(clocks, config);
+                }
+            }
+        } else {
+            quote! {}
+        };
+
+        Ok(quote! {
+            #configure
+            #request
+        })
+    }
+
     fn list_of_fixed_frequencies(&self) -> Option<Vec<u32>> {
         self.values.as_ref().and_then(|d| d.as_enum_values())
     }
@@ -252,6 +338,8 @@ impl Source {
     ) -> TokenStream {
         let clock_name = instance.name_str();
         let ty_name = instance.config_type_name();
+        // The `early_init` functions call `value()`, and must not call into `.text`.
+        let inline = self.early_init.inline_attr();
 
         let base_docline = if self.values.is_none() {
             None
@@ -318,6 +406,7 @@ impl Source {
                 }
 
                 impl #ty_name {
+                    #inline
                     pub fn value(&self) -> u32 {
                         match self {
                            #(#ty_name::#values => #frequencies,)*
@@ -368,6 +457,7 @@ impl Source {
                 }
 
                 impl #ty_name {
+                    #inline
                     pub fn value(&self) -> u32 {
                         self.0
                     }
@@ -396,6 +486,30 @@ impl ClockTreeNodeType for DerivedClockSource {
 
     fn wake_locking(&self) -> bool {
         self.source_options.wake_locking()
+    }
+
+    fn early_init(&self) -> EarlyInit {
+        self.source_options.early_init()
+    }
+
+    fn has_early_request(&self) -> bool {
+        true
+    }
+
+    fn early_init_functions(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> Result<TokenStream> {
+        let from = instance.resolve_node(tree, &self.from);
+        let Some(source) = from.early_request_call(instance)? else {
+            anyhow::bail!(
+                "Clock node `{}` is `early_init`, so its source `{}` must be an `early_init` source",
+                instance.name_str(),
+                from.name_str()
+            );
+        };
+        self.source_options.early_init_impl(instance, tree, source)
     }
 
     fn input_clocks(
