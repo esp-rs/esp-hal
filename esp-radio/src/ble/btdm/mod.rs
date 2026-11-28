@@ -459,6 +459,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         #[cfg(modem_retention = "backup_dma")]
         mac_bb::init(config.modem_sleep() && super::lp_clk::light_sleep_supported());
 
+        #[cfg(esp32)]
+        chip_specific::select_patches(&cfg);
+
         let res = btdm_controller_init(
             #[cfg(esp32)]
             {

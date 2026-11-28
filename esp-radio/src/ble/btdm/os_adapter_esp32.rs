@@ -347,6 +347,10 @@ pub struct Config {
     /// to use BR/EDR: the controller then starts in dual mode, and the host uses BR/EDR
     /// and BLE through the same HCI.
     ///
+    /// With 1, the controller rejects `HCI_Create_Connection` with "Connection Limit
+    /// Exceeded", so the device can only accept connections. Use 2 or more to also
+    /// connect to other devices.
+    ///
     /// BR/EDR links are sensitive to interrupt latency. If code keeps interrupts
     /// disabled for some milliseconds, for example to write log lines to a blocking
     /// UART, a BR/EDR link can time out.
@@ -400,6 +404,15 @@ impl Config {
 /// controller calls `patch_apply` during `btdm_controller_init` without arguments.
 static BREDR_ENABLED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
+/// Selects the ROM patches for the mode in `cfg`. Call it immediately before
+/// `btdm_controller_init` with the same configuration.
+pub(crate) fn select_patches(cfg: &esp_bt_controller_config_t) {
+    BREDR_ENABLED.store(
+        u32::from(cfg.mode) & esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT != 0,
+        core::sync::atomic::Ordering::Relaxed,
+    );
+}
+
 /// The controller mode for `btdm_controller_init` and `btdm_controller_enable`.
 pub(crate) fn controller_mode(config: &Config) -> esp_bt_mode_t {
     if config.bredr_max_connections > 0 {
@@ -410,10 +423,6 @@ pub(crate) fn controller_mode(config: &Config) -> esp_bt_mode_t {
 }
 
 pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
-    BREDR_ENABLED.store(
-        config.bredr_max_connections > 0,
-        core::sync::atomic::Ordering::Relaxed,
-    );
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
@@ -437,7 +446,8 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         bt_sco_datapath: 0,
         auto_latency: false,
         bt_legacy_auth_vs_evt: false,
-        bt_max_sync_conn: 1,
+        // `SOC_MEM_BT_EM_BREDR_REAL_END` has no exchange memory for SCO/eSCO links.
+        bt_max_sync_conn: 0,
         ble_sca: 1,
         pcm_role: 0,
         pcm_polar: 0,
