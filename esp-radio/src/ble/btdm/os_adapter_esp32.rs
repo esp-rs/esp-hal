@@ -180,11 +180,17 @@ extern "C" fn patch_apply() {
 
     unsafe extern "C" {
         fn config_ble_funcs_reset();
+        fn config_bt_funcs_reset();
         fn config_btdm_funcs_reset();
     }
 
+    // The BR/EDR patches apply only when the controller runs BR/EDR.
+    // See https://github.com/espressif/esp-idf/blob/051e4c4eb20346e043cdd47bc388fde75ff8af63/components/bt/controller/esp32/bt.c#L1899.
     unsafe {
         config_btdm_funcs_reset();
+        if BREDR_ENABLED.load(core::sync::atomic::Ordering::Relaxed) {
+            config_bt_funcs_reset();
+        }
         config_ble_funcs_reset();
     }
 }
@@ -333,6 +339,24 @@ pub struct Config {
 
     /// Disconnect when Instant Passed (0x28) occurs during ACL channel map update.
     disconnect_llcp_chan_map_update: bool,
+
+    /// The maximum number of simultaneous Bluetooth Classic (BR/EDR) ACL
+    /// connections.
+    ///
+    /// 0, the default, starts the controller in BLE-only mode. Set a value from 1 to 7
+    /// to use BR/EDR: the controller then starts in dual mode, and the host uses BR/EDR
+    /// and BLE through the same HCI.
+    ///
+    /// With 1, the controller rejects `HCI_Create_Connection` with "Connection Limit
+    /// Exceeded", so the device can only accept connections. Use 2 or more to also
+    /// connect to other devices.
+    ///
+    /// BR/EDR links are sensitive to interrupt latency. If code keeps interrupts
+    /// disabled for some milliseconds, for example to write log lines to a blocking
+    /// UART, a BR/EDR link can time out.
+    ///
+    /// Range: 0 - 7
+    bredr_max_connections: u8,
 }
 
 impl Default for Config {
@@ -353,6 +377,7 @@ impl Default for Config {
             ping: false,
             disconnect_llcp_conn_update: false,
             disconnect_llcp_chan_map_update: false,
+            bredr_max_connections: 0,
         }
     }
 }
@@ -369,8 +394,31 @@ impl Config {
         crate::ble::validate_range!(self, scan_duplicate_list_count, 10, 1000);
         crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 1000);
         crate::ble::validate_range!(self, enc_key_sz_min, 7, 16);
+        crate::ble::validate_range!(self, bredr_max_connections, 0, 7);
 
         Ok(())
+    }
+}
+
+/// Whether the controller is configured with BR/EDR. `patch_apply` reads it, because the
+/// controller calls `patch_apply` during `btdm_controller_init` without arguments.
+static BREDR_ENABLED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+/// Selects the ROM patches for the mode in `cfg`. Call it immediately before
+/// `btdm_controller_init` with the same configuration.
+pub(crate) fn select_patches(cfg: &esp_bt_controller_config_t) {
+    BREDR_ENABLED.store(
+        u32::from(cfg.mode) & esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT != 0,
+        core::sync::atomic::Ordering::Relaxed,
+    );
+}
+
+/// The controller mode for `btdm_controller_init` and `btdm_controller_enable`.
+pub(crate) fn controller_mode(config: &Config) -> esp_bt_mode_t {
+    if config.bredr_max_connections > 0 {
+        esp_bt_mode_t_ESP_BT_MODE_BTDM
+    } else {
+        esp_bt_mode_t_ESP_BT_MODE_BLE
     }
 }
 
@@ -392,13 +440,14 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         normal_adv_size: config.scan_duplicate_list_count,
         send_adv_reserved_size: SCAN_SEND_ADV_RESERVED_SIZE as _,
         controller_debug_flag: BTDM_CTRL_CONTROLLER_DEBUG_FLAG as _,
-        mode: esp_bt_mode_t_ESP_BT_MODE_BLE as _,
+        mode: controller_mode(config) as _,
         ble_max_conn: config.max_connections,
-        bt_max_acl_conn: 0,
+        bt_max_acl_conn: config.bredr_max_connections,
         bt_sco_datapath: 0,
         auto_latency: false,
         bt_legacy_auth_vs_evt: false,
-        bt_max_sync_conn: 1,
+        // `SOC_MEM_BT_EM_BREDR_REAL_END` has no exchange memory for SCO/eSCO links.
+        bt_max_sync_conn: 0,
         ble_sca: 1,
         pcm_role: 0,
         pcm_polar: 0,

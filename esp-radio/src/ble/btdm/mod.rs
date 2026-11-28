@@ -459,6 +459,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         #[cfg(modem_retention = "backup_dma")]
         mac_bb::init(config.modem_sleep() && super::lp_clk::light_sleep_supported());
 
+        #[cfg(esp32)]
+        chip_specific::select_patches(&cfg);
+
         let res = btdm_controller_init(
             #[cfg(esp32)]
             {
@@ -484,13 +487,15 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             esp32 => {
                 btdm_rf_bb_init_phase2();
                 coex_bt_high_prio();
+                // The controller only enables the mode that it was initialized with.
+                // See https://github.com/espressif/esp-idf/blob/051e4c4eb20346e043cdd47bc388fde75ff8af63/components/bt/controller/esp32/bt.c#L1919-L1920.
+                btdm_controller_enable(chip_specific::controller_mode(config));
             }
             _ => {
                 coex_pti_v2();
+                btdm_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
             }
         }
-
-        btdm_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
 
         if config.modem_sleep() {
             btdm_controller_enable_sleep(true);

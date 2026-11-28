@@ -103,6 +103,34 @@ mod tests {
         }
     }
 
+    // Dual mode starts, and the controller takes a BR/EDR command.
+    #[cfg(esp32)]
+    #[test]
+    fn test_bredr_write_scan_enable(p: Peripherals) {
+        hil_test::init_logger!(p);
+        let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        let config = esp_radio::ble::Config::default().with_bredr_max_connections(1);
+        let mut connector = BleConnector::new(p.BT, config).unwrap();
+
+        const WRITE_SCAN_ENABLE_OCF: u16 = 0x1a;
+        let opcode = (((CONTROLLER_OGF as u16) << 10) + WRITE_SCAN_ENABLE_OCF).to_le_bytes();
+
+        // Inquiry scan and page scan on.
+        let cmd = [H4_TYPE_COMMAND, opcode[0], opcode[1], 1, 0x03];
+        connector.write(&cmd).unwrap();
+
+        let mut buf = [0u8; 255];
+        loop {
+            let len = read_packet(&mut connector, &mut buf);
+            if len == 7 && buf[1] == 14 && buf[4] == opcode[0] && buf[5] == opcode[1] {
+                assert_eq!(buf[6], 0, "Expected Write_Scan_Enable to succeed");
+                break;
+            }
+        }
+    }
+
     // This test case is a regression test for #3760 and asserts that dropping the controller during
     // reset does not generate an exception.
     #[test]
