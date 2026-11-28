@@ -34,5 +34,6 @@ shows stripes while a photo loads.
   feed the panel, so the LCD DMA reads two small bounce buffers in internal RAM. An interrupt on
   the second core draws the next rows into each finished buffer: the scaled camera picture and
   the buttons on top of it.
-- A photo is a JPEG file (`jpeg-encoder`) on the FAT volume (`embedded-fatfs`) of the microSD
-  card, which runs on the SDMMC host with a 4-bit bus. The gallery decodes it with `zune-jpeg`.
+- The hardware JPEG encoder reads RGB565 frames directly from PSRAM and produces 4:4:4 JPEGs.
+  Photos are stored on the FAT volume (`embedded-fatfs`) of the microSD card, which runs on the
+  SDMMC host with a 4-bit bus. The gallery decodes them with `zune-jpeg`.

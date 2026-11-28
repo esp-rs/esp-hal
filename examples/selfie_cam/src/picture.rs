@@ -104,6 +104,11 @@ impl Picture {
     pub fn pixels(&self) -> &[u16] {
         self.0.as_ref().unwrap().pixels()
     }
+
+    /// Returns the big-endian RGB565 bytes of the visible image.
+    pub fn bytes(&self) -> &[u8] {
+        &self.0.as_ref().unwrap().0[..BYTES]
+    }
 }
 
 impl Drop for Picture {

@@ -1,5 +1,16 @@
 //! Hardware baseline JPEG encoding.
+//!
+//! ## Supported formats
+//!
+//! | Input layout | Output subsampling |
+//! | --- | --- |
+//! | RGB565 and BGR565 (either byte order), RGB888, BGR888 | 4:4:4, 4:2:2, 4:2:0 |
+//! | YCbCr 4:4:4 (YUV, VUY) | 4:4:4, 4:2:2, 4:2:0 |
+//! | YCbCr 4:2:2 (YUYV, UYVY) | 4:2:2, 4:2:0 |
+//! | Packed YCbCr 4:2:0 | 4:2:0 |
+//! | Grayscale | Grayscale |
 
+mod format;
 mod header;
 
 use core::{
@@ -7,18 +18,11 @@ use core::{
     sync::atomic::{Ordering, compiler_fence},
 };
 
-use procmacros::doc_replace;
-
+use self::format::{InputLayout, Sampling};
+pub use self::format::{PixelFormat, Subsampling};
 use crate::{
     dma::aligned::{PSRAM_CACHE_LINE, region_dma_alignment},
-    dma2d::{
-        AnyDma2dRxChannel,
-        BURST_128_BYTES,
-        Channels,
-        MACRO_BLOCK_NONE,
-        invalidate,
-        writeback,
-    },
+    dma2d::{AnyDma2dRxChannel, BURST_128_BYTES, Channels, invalidate, writeback},
     pac::jpeg::int_raw::R as InterruptStatus,
     peripherals::{DMA2D, DMA2D_TX_CH0, JPEG},
     soc::{is_slice_in_dram, is_slice_in_psram},
@@ -28,8 +32,6 @@ use crate::{
 
 const RX_BUFFER_ALIGNMENT: usize = 4;
 const JPEG_TRIGGER: u8 = 0;
-const MCU_SIZE: u32 = 16;
-const MACRO_BLOCK_16X16: u8 = 2;
 const DMA_FIELD_BITS: u32 = 14;
 const DMA_FIELD_MASK: u32 = (1 << DMA_FIELD_BITS) - 1;
 const MAX_DIMENSION: usize = DMA_FIELD_MASK as usize;
@@ -47,6 +49,8 @@ pub enum Error {
     InvalidInput,
     /// Unsupported buffer memory region, size, or alignment.
     InvalidBuffer,
+    /// Incompatible input pixel format and output subsampling.
+    UnsupportedFormat,
     /// Insufficient space for the compressed image.
     OutputTooSmall,
     /// The configured completion wait expired.
@@ -62,6 +66,7 @@ impl core::fmt::Display for Error {
         f.write_str(match self {
             Self::InvalidInput => "invalid JPEG input",
             Self::InvalidBuffer => "invalid JPEG buffer",
+            Self::UnsupportedFormat => "incompatible input format and subsampling",
             Self::OutputTooSmall => "JPEG output buffer is too small",
             Self::Timeout => "JPEG encoding timed out",
             Self::Hardware => "JPEG hardware error",
@@ -69,20 +74,24 @@ impl core::fmt::Display for Error {
     }
 }
 
-/// Image dimensions and compression quality for a JPEG encode operation.
+/// JPEG encoding settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct JpegProperties {
+pub struct Config {
     /// Image width in pixels, from 1 to 16383.
     pub width: u16,
     /// Image height in pixels, from 1 to 16383.
     pub height: u16,
     /// Compression quality, from 1 to 100.
     pub quality: u8,
+    /// Pixel layout of the input image.
+    pub input_format: PixelFormat,
+    /// Chroma subsampling of the encoded JPEG.
+    pub subsampling: Subsampling,
 }
 
-/// A blocking RGB565 to baseline JPEG encoder.
+/// A blocking baseline JPEG encoder.
 #[derive(Debug)]
 #[instability::unstable]
 pub struct Encoder<'d> {
@@ -94,11 +103,7 @@ pub struct Encoder<'d> {
 }
 
 impl<'d> Encoder<'d> {
-    /// Creates a JPEG encoder with DMA2D TX0 and any receive channel.
-    ///
-    /// TX0 is the only transmit channel that supports the macroblock reordering
-    /// required for JPEG encoding.
-    /// See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_hal_dma/esp32s31/include/hal/dma2d_ll.h#L1002-L1011>.
+    /// Creates a new JPEG encoder using DMA2D TX0 for macroblock reordering.
     #[instability::unstable]
     pub fn new(
         peripheral: JPEG<'d>,
@@ -114,40 +119,36 @@ impl<'d> Encoder<'d> {
         }
     }
 
-    /// Sets the time limit for waiting for JPEG completion.
+    /// Sets the software timeout for JPEG completion.
     ///
-    /// Pass `None` to wait without a software timeout. This is the default.
+    /// The timeout is disabled by default (`None`).
     /// DMA cleanup can extend past this limit.
     #[instability::unstable]
     pub fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.timeout = timeout;
     }
 
-    #[doc_replace(
-        "sram_alignment" => {
-            cfg(soc_internal_memory_cached) => "64",
-            _ => "4"
-        },
-        "psram_alignment" => {
-            cfg(soc_internal_memory_cached) => "128",
-            _ => "64"
-        }
-    )]
-    /// Encodes a tightly packed little-endian RGB565 image as a YCbCr 4:2:0 JPEG.
+    /// Encodes a tightly packed image and returns the JPEG length in bytes.
     ///
-    /// Returns the JPEG length in bytes. Width and height must be in the range 1 to
-    /// 16383 pixels, and quality must be in the range 1 to 100. The input must be in
-    /// SRAM or initialized PSRAM and aligned to two bytes. Partial 16x16 blocks
-    /// require no input padding.
+    /// See [supported formats](crate::jpeg#supported-formats) for valid format combinations
+    /// and [`PixelFormat`] for input layout requirements.
     ///
-    /// The output address and length must be aligned to __sram_alignment__ bytes in SRAM or
-    /// __psram_alignment__ bytes in PSRAM. PSRAM configurations that require strictly aligned
-    /// memory transactions, such as encryption or ECC, are unsupported.
+    /// The input must be in SRAM or initialized PSRAM.
+    /// RGB565, BGR565, and YCbCr 4:2:2 input must be aligned to two bytes.
+    ///
+    /// The output address and length must be multiples of
+    #[doc = cfg_select! {
+        esp32p4 => "64 bytes in cached SRAM, 4 bytes in uncached SRAM, or 128 bytes in PSRAM.",
+        esp32s31 => "4 bytes in SRAM or 64 bytes in PSRAM.",
+    }]
+    /// PSRAM configurations that require strictly aligned memory transactions, such as encryption
+    /// or ECC, are unsupported.
     /// Output contents are unspecified on error.
     ///
     /// # Errors
     ///
     /// - [`Error::InvalidInput`] when dimensions or quality are invalid, or the input is too short.
+    /// - [`Error::UnsupportedFormat`] when the input format and subsampling are incompatible.
     /// - [`Error::InvalidBuffer`] when a buffer is inaccessible or unaligned, or the output payload
     ///   capacity exceeds the DMA descriptor limit.
     /// - [`Error::OutputTooSmall`] when the JPEG does not fit.
@@ -158,13 +159,15 @@ impl<'d> Encoder<'d> {
         &mut self,
         input: &[u8],
         output: &mut [u8],
-        properties: JpegProperties,
+        config: Config,
     ) -> Result<usize, Error> {
-        let JpegProperties {
+        let Config {
             width,
             height,
             quality,
-        } = properties;
+            input_format,
+            subsampling,
+        } = config;
         let width_usize = usize::from(width);
         let height_usize = usize::from(height);
         if !(1..=MAX_DIMENSION).contains(&width_usize)
@@ -173,9 +176,8 @@ impl<'d> Encoder<'d> {
         {
             return Err(Error::InvalidInput);
         }
-        let input = input
-            .get(..width_usize * height_usize * 2)
-            .ok_or(Error::InvalidInput)?;
+        let layout = InputLayout::new(input_format, subsampling, width_usize, height_usize)?;
+        let input = input.get(..layout.len).ok_or(Error::InvalidInput)?;
         if output.len() <= header::LEN {
             return Err(Error::OutputTooSmall);
         }
@@ -184,7 +186,7 @@ impl<'d> Encoder<'d> {
             .max(RX_BUFFER_ALIGNMENT);
         if !(is_slice_in_dram(input) || is_slice_in_psram(input))
             || !(is_slice_in_dram(output) || is_slice_in_psram(output))
-            || !(input.as_ptr() as usize).is_multiple_of(2)
+            || !(input.as_ptr() as usize).is_multiple_of(layout.alignment)
             || !(output.as_ptr() as usize).is_multiple_of(output_alignment)
             || !output.len().is_multiple_of(output_alignment)
             || output.len() - header::LEN > MAX_PAYLOAD
@@ -192,28 +194,33 @@ impl<'d> Encoder<'d> {
             return Err(Error::InvalidBuffer);
         }
 
-        let (luminance, chrominance) = header::quantization_tables(quality);
+        let sampling = Sampling::new(subsampling);
+        let (luminance, chrominance) = header::quantization_tables(quality, &sampling);
+        let chrominance = chrominance.as_ref();
         let (header, payload) = output.split_first_chunk_mut::<{ header::LEN }>().unwrap();
-        // Bound the DMA and cache maintenance range. A 4:2:0 MCU has six blocks,
-        // each with at most 64 symbols of 16 Huffman bits and 16 coefficient bits.
+        // Allow 64 symbols per block, each up to 16 Huffman bits and 16 coefficient bits.
         // Byte stuffing can double the scan size, and EOI adds two bytes.
-        const MAX_MCU_BYTES: usize = 6 * 64 * (16 + 16) / 8 * 2;
+        const MAX_BLOCK_BYTES: usize = 64 * (16 + 16) / 8 * 2;
+        let (mcu_width, mcu_height) = sampling.mcu_size();
         let mcu_count =
-            width_usize.div_ceil(MCU_SIZE as usize) * height_usize.div_ceil(MCU_SIZE as usize);
-        let max_scan_length = (mcu_count * MAX_MCU_BYTES + 2).next_multiple_of(output_alignment);
-        let capacity = payload.len().min(max_scan_length);
+            width_usize.div_ceil(mcu_width as usize) * height_usize.div_ceil(mcu_height as usize);
+        let max_scan_length = mcu_count
+            .saturating_mul(sampling.blocks_per_mcu() * MAX_BLOCK_BYTES)
+            .saturating_add(2);
+        let capacity = payload
+            .len()
+            .min(max_scan_length)
+            .next_multiple_of(output_alignment);
         let payload = &mut payload[..capacity];
-        header::write(header, width, height, &luminance, &chrominance);
+        header::write(header, width, height, &sampling, &luminance, chrominance);
 
         const DMA_OWNED: u32 = 1 << 31;
         const MODE_2D: u32 = 1 << 29;
         const MULTIPLE_BLOCKS: u32 = 1 << 28;
-        const RGB565_PBYTE: u32 = 3 << 28;
-        // RGB565 to 4:2:0 uses a 48x16 DMA block. Use the visible dimensions
-        // for HA and VA so DMA2D pads partial macroblocks.
+        // Use the visible dimensions for HA and VA so DMA2D pads partial macroblocks.
         let mut tx = Descriptor([
-            DMA_OWNED | MODE_2D | (48 << DMA_FIELD_BITS) | MCU_SIZE,
-            RGB565_PBYTE | (u32::from(width) << DMA_FIELD_BITS) | u32::from(height),
+            DMA_OWNED | MODE_2D | (layout.dma_block_width << DMA_FIELD_BITS) | mcu_height,
+            (layout.dma_pbyte << 28) | (u32::from(width) << DMA_FIELD_BITS) | u32::from(height),
             MULTIPLE_BLOCKS,
             input.as_ptr() as u32,
             0,
@@ -231,13 +238,20 @@ impl<'d> Encoder<'d> {
 
         self.channels.reset();
         let jpeg = JPEG::regs();
+        let color_space_bits = layout.color_space as u8;
+        #[cfg(esp32p4)]
+        let (color_space_bits, extd_select) = match layout.color_space {
+            format::ColorSpace::Ycbcr444 => (0, Some(false)),
+            format::ColorSpace::Ycbcr420 => (0, Some(true)),
+            _ => (color_space_bits, None),
+        };
         jpeg.config().modify(|_, w| w.soft_rst().set_bit());
         jpeg.config().modify(|_, w| unsafe {
             w.soft_rst().clear_bit();
             w.mode().clear_bit();
-            w.color_space().bits(2);
-            w.sample_sel().bits(2);
-            w.pixel_rev().clear_bit();
+            w.color_space().bits(color_space_bits);
+            w.sample_sel().bits(sampling.sample_sel);
+            w.pixel_rev().bit(layout.pixel_reverse);
             w.tailer_en().set_bit();
             w.ff_check_en().set_bit();
             w.qnr_precision().clear_bit();
@@ -245,44 +259,45 @@ impl<'d> Encoder<'d> {
             w.lqnr_tbl_sel().bits(0);
             w.cqnr_tbl_sel().bits(1)
         });
+        #[cfg(esp32p4)]
+        jpeg.extd_config().write(|w| {
+            w.extd_color_space_en().bit(extd_select.is_some());
+            w.extd_color_space().bit(extd_select.unwrap_or(false))
+        });
         jpeg.pic_size().write(|w| unsafe {
             w.ha().bits(width);
             w.va().bits(height)
         });
         jpeg.int_clr().write(|w| unsafe { w.bits(u32::MAX) });
-        jpeg.dqt_info().write(|w| unsafe {
-            w.t0_dqt_info().bits(0);
-            w.t1_dqt_info().bits(1);
-            w.t2_dqt_info().bits(2);
-            w.t3_dqt_info().bits(3)
-        });
-        // Write coefficients through raw pointers because the PAC marks the FIFO ports read-only.
-        // See <https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/esp_hal_jpeg/esp32s31/include/hal/jpeg_ll.h#L274-L322>.
-        for (port, values) in [
-            (jpeg.t0qnr().as_ptr(), &luminance),
-            (jpeg.t1qnr().as_ptr(), &chrominance),
-            (jpeg.t2qnr().as_ptr(), &luminance),
-            (jpeg.t3qnr().as_ptr(), &chrominance),
-        ] {
-            for &value in values {
-                unsafe { port.write_volatile(u32::from(value)) };
+
+        for &value in &luminance {
+            jpeg.t0qnr()
+                .write(|w| unsafe { w.t0_qnr_val().bits(u32::from(value)) });
+        }
+        if let Some(chrominance) = chrominance {
+            for &value in chrominance {
+                jpeg.t1qnr()
+                    .write(|w| unsafe { w.t1_qnr_val().bits(u32::from(value)) });
             }
         }
 
         let dma = DMA2D::regs();
         let (tx_channel, rx_channel) = self.channels.indices();
         self.channels.connect(JPEG_TRIGGER);
+        if layout.dma_swap_bytes {
+            self.channels.swap_tx_pixel_bytes();
+        }
         dma.out_conf0_ch(tx_channel).modify(|_, w| unsafe {
             w.out_reorder_en_ch().set_bit();
             w.out_mem_burst_length_ch().bits(BURST_128_BYTES);
             w.out_page_bound_en_ch().set_bit();
-            w.out_macro_block_size_ch().bits(MACRO_BLOCK_16X16);
+            w.out_macro_block_size_ch()
+                .bits(sampling.dma_macro_block_size);
             w.outdscr_burst_en_ch().set_bit()
         });
         dma.in_conf0_ch(rx_channel).modify(|_, w| unsafe {
             w.in_mem_burst_length_ch().bits(BURST_128_BYTES);
             w.in_page_bound_en_ch().set_bit();
-            w.in_macro_block_size_ch().bits(MACRO_BLOCK_NONE);
             w.indscr_burst_en_ch().set_bit()
         });
 
@@ -290,7 +305,8 @@ impl<'d> Encoder<'d> {
         writeback(payload);
         writeback(core::slice::from_ref(&tx));
         writeback(core::slice::from_ref(&rx));
-        // SAFETY: The descriptors and buffers stay live through channel cleanup.
+        // SAFETY: Reset left the channels idle. Cache writeback is complete, and the descriptors
+        // and buffers stay live until the channels stop.
         unsafe {
             self.channels
                 .start((&raw mut tx) as u32, (&raw mut rx) as u32)
@@ -303,8 +319,7 @@ impl<'d> Encoder<'d> {
             PeripheralClockControl::reset(Peripheral::Jpeg);
         }
         // RX can write the payload and descriptor before reporting an error.
-        // SAFETY: The payload covers whole cache lines because of the output alignment and the
-        // header length, and the descriptor alignment gives it its own lines.
+        // SAFETY: The payload and RX descriptor each cover whole cache lines.
         unsafe {
             invalidate(payload);
             invalidate(core::slice::from_ref(&rx));
@@ -406,7 +421,7 @@ cfg_select! {
             }
         }
 
-        // The JPEG peripheral has no encode timeout.
+        // ESP32-P4 has no JPEG encode timeout interrupt.
         fn encode_timeout(_status: &InterruptStatus) -> bool {
             false
         }
