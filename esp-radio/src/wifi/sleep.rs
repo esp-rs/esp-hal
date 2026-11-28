@@ -77,12 +77,8 @@ pub(crate) fn clear_sleep_lock() {
 /// Call this after `esp_wifi_init`.
 pub(crate) fn claim_wake_source() {
     let mhz = esp_hal::clock::cpu_clock().as_mhz() as i32;
-    unsafe {
-        #[cfg(not(esp32))]
-        esp_wifi_internal_update_light_sleep_wake_ahead_time(WAKE_AHEAD_US);
-        // Without this call, the blob does not arm the TSF wakeup for the next beacon.
-        crate::sys::include::esp_wifi_internal_update_light_sleep_default_params(mhz, mhz);
-    }
+    // Without this call, the blob does not arm the TSF wakeup for the next beacon.
+    unsafe { crate::sys::include::esp_wifi_internal_update_light_sleep_default_params(mhz, mhz) };
 
     WakeupSource::Wifi.enable_with_hooks(
         Some(sleep_entry),
@@ -114,6 +110,12 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     if !station_idle || SLEEP_LOCK.load(Ordering::Relaxed) > 0 || tsf_active {
         config.reject_sleep();
     } else {
+        // The blob ignores this time while the station is not in power save, so it is set again
+        // before each sleep.
+        #[cfg(not(esp32))]
+        unsafe {
+            esp_wifi_internal_update_light_sleep_wake_ahead_time(WAKE_AHEAD_US)
+        };
         // Only when the blob accepts the sleep, because it still uses the MAC and baseband
         // otherwise. If a later hook refuses the sleep, the exit hook restores them.
         #[cfg(all(supports_modem_power_down, feature = "unstable"))]
